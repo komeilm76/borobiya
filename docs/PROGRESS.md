@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: bound local Photon reads and cancellation
+
+- Map place search and reverse-geocoding awaited the local gateway without a client deadline. A response whose JSON body stalled after headers left search or the selected-point address loading indefinitely; a limit-30 diagnostic probe could also stall, and a transport ignoring abort kept a cancelled search pending. Both operations now have a 12-second overall deadline covering headers, bodies and the optional probe, with prompt caller cancellation even if the transport does not settle. Search failures retain the query-free `PlaceSearchError` code and reverse failures retain their unavailable error. Four focused regressions failed before the fix and pass afterward. Live browser/proxy timing remains unverified.
+
 ### 2026-10-23 — Bug hunt: bound rescuer navigation target reads
 
 - The rescuer's route request had a 15-second deadline, but the preceding authenticated mission-target read still awaited headers/JSON indefinitely. An upstream/proxy that stalled after headers left the private incident picker loading forever; an ignored caller abort could also leave the old read pending. The target read now uses the same cancellable deadline as the route request (12 seconds), while preserving the scoped mission-ID validation and same-origin bearer request. Focused tests reproduced a stalled response body and abort before the fix and pass afterward. Browser/proxy timing remains unverified.

@@ -1,14 +1,62 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PlaceSearchError, photonAddress, photonPlaces, reversePlace, searchPlaces } from "./geocoding";
 
+const GEOCODING_DEADLINE_MS = 12_000;
 const feature = (name: string, coordinates: number[] = [51.38, 35.7], extras = {}) => ({
   type: "Feature", geometry: { type: "Point", coordinates },
   properties: { name, city: "Tehran", country: "Iran", osm_type: "N", osm_id: 123, osm_key: "place", ...extras }
 });
 const collection = (features: unknown[]) => ({ type: "FeatureCollection", features });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+function stalledBody(): Response {
+  return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+    controller.enqueue(new TextEncoder().encode('{"type":"FeatureCollection","features":'));
+  } }));
+}
 
 describe("local Photon place search", () => {
+  it("times out a successful reply whose JSON body stalls after headers", async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return stalledBody();
+    }));
+    const result = searchPlaces({ q: "کافه" }).then(() => "unexpected success", (error: PlaceSearchError) => error.code);
+    await vi.advanceTimersByTimeAsync(GEOCODING_DEADLINE_MS + 1);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([result, Promise.resolve("still pending")])).toBe("NETWORK_ERROR");
+  });
+
+  it("bounds the diagnostic limit-five probe as part of the same search deadline", async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      signals.push(init?.signal as AbortSignal);
+      return signals.length === 1
+        ? Response.json({ error: "invalid_geocode_query" }, { status: 400 }) : stalledBody();
+    }));
+    const result = searchPlaces({ q: "کافه", limit: 30 }).then(() => "unexpected success", (error: PlaceSearchError) => error.code);
+    await vi.advanceTimersByTimeAsync(GEOCODING_DEADLINE_MS + 1);
+    expect(signals).toHaveLength(2);
+    expect(signals[1]?.aborted).toBe(true);
+    expect(await Promise.race([result, Promise.resolve("still pending")])).toBe("NETWORK_ERROR");
+  });
+
+  it("ends a pending search immediately on caller cancellation even if fetch ignores abort", async () => {
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    }));
+    const result = searchPlaces({ q: "کافه" }, caller.signal).then(() => "unexpected success", (error: Error) => error.name);
+    caller.abort();
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([result, new Promise(resolve => setTimeout(() => resolve("still pending"), 100))]))
+      .toBe("AbortError");
+  });
   it("validates q/limit/bbox and calls only the same-origin gateway with an abort signal", async () => {
     const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
       Response.json(collection([feature("Azadi Square")])));
@@ -17,7 +65,8 @@ describe("local Photon place search", () => {
     const result = await searchPlaces({ q: "  Azadi Square ", bbox: "51,35,52,36" }, controller.signal);
     expect(fetcher).toHaveBeenCalledOnce();
     expect(fetcher.mock.calls[0]?.[0]).toBe("/geocode?q=Azadi+Square&limit=5&bbox=51%2C35%2C52%2C36");
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: "GET", credentials: "same-origin", signal: controller.signal });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ method: "GET", credentials: "same-origin",
+      signal: expect.any(AbortSignal) });
     expect(result).toEqual([{ placeId: "osm:N:123", name: "Azadi Square",
       address: "Azadi Square, Tehran, Iran", lon: 51.38, lat: 35.7, type: "place" }]);
     await expect(searchPlaces({ q: " " })).rejects.toThrow();
@@ -149,6 +198,20 @@ describe("local Photon place search", () => {
 });
 
 describe("local Photon reverse geocoding", () => {
+  it("times out a reverse reply stalled after headers instead of leaving its point sheet loading", async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return stalledBody();
+    }));
+    const result = reversePlace({ lat: 35, lon: 51 })
+      .then(() => "unexpected success", (error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(GEOCODING_DEADLINE_MS + 1);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([result, Promise.resolve("still pending")])).toBe("REVERSE_GEOCODE_UNAVAILABLE");
+  });
+
   it("calls only the same-origin reverse gateway with validated coordinates and abort signal", async () => {
     const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
       Response.json(collection([feature("Azadi Square", [51.38, 35.7], { housenumber: "12", street: "Azadi" })])));
@@ -156,7 +219,7 @@ describe("local Photon reverse geocoding", () => {
     const controller = new AbortController();
     const result = await reversePlace({ lat: 35.7, lon: 51.38 }, controller.signal);
     expect(fetcher.mock.calls[0]?.[0]).toBe("/reverse?lat=35.7&lon=51.38");
-    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: "same-origin", signal: controller.signal });
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: "same-origin", signal: expect.any(AbortSignal) });
     expect(result).toEqual({ formattedAddress: "Azadi Square, 12, Azadi, Tehran, Iran", country: "Iran",
       city: "Tehran", street: "Azadi", houseNumber: "12" });
     await expect(reversePlace({ lat: 91, lon: 51 })).rejects.toThrow();

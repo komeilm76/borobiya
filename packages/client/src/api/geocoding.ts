@@ -70,6 +70,38 @@ export class PlaceSearchError extends Error {
   }
 }
 
+const GEOCODING_DEADLINE_MS = 12_000;
+
+/** Bound the whole same-origin read, including response bodies and the optional limit probe.
+ * A caller's cancellation must settle even when fetch or the stream ignores its signal. */
+async function boundedGeocodingRead<T>(read: (requestSignal: AbortSignal) => Promise<T>,
+  signal: AbortSignal | undefined, timeoutError: Error): Promise<T> {
+  if (signal?.aborted) throw new DOMException("Geocoding cancelled", "AbortError");
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let rejectPending: ((error: Error) => void) | null = null;
+  const onAbort = () => {
+    controller.abort();
+    rejectPending?.(new DOMException("Geocoding cancelled", "AbortError"));
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      rejectPending = reject;
+      timer = setTimeout(() => {
+        reject(timeoutError);
+        controller.abort();
+      }, GEOCODING_DEADLINE_MS);
+    });
+    if (signal?.aborted) { onAbort(); return await deadline; }
+    return await Promise.race([read(controller.signal), deadline]);
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    rejectPending = null;
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
 /** Diagnose a 400 for limit=30 without falling back to five displayed hits.
  * Same-origin, same query and bbox: only limit changes. Do not retain or expose
  * the response (which may include private place information).
@@ -95,36 +127,38 @@ async function probeFiveResultLimit(query: { q: string; bbox?: string }, signal?
 export async function searchPlaces(input: GeocodeQueryInput, signal?: AbortSignal): Promise<GeocodeResponse> {
   const parsed = geocodeQuerySchema.safeParse(input);
   if (!parsed.success) throw new PlaceSearchError("INVALID_QUERY");
-  const query = parsed.data;
-  const params = new URLSearchParams({ q: query.q, limit: String(query.limit) });
-  if (query.bbox) params.set("bbox", query.bbox);
-  let response: Response;
-  try {
-    response = await fetch(`/geocode?${params}`, {
-      method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal
-    });
-  } catch (error) {
-    if ((error as { name?: unknown } | null)?.name === "AbortError") throw error;
-    throw new PlaceSearchError("NETWORK_ERROR");
-  }
-  if (!response.ok) {
-    let gatewayCode: string | null = null;
+  return boundedGeocodingRead(async (requestSignal) => {
+    const query = parsed.data;
+    const params = new URLSearchParams({ q: query.q, limit: String(query.limit) });
+    if (query.bbox) params.set("bbox", query.bbox);
+    let response: Response;
     try {
-      const body: unknown = await response.json();
-      if (body && typeof body === "object" && !Array.isArray(body) &&
-          "error" in body && typeof body.error === "string" && GATEWAY_CODES.has(body.error)) {
-        gatewayCode = body.error;
-      }
-    } catch { /* A reverse proxy may answer HTML. The HTTP status remains useful. */ }
-    const probe = response.status === 400 && gatewayCode === "invalid_geocode_query" && query.limit === 30
-      ? await probeFiveResultLimit(query, signal) : null;
-    throw new PlaceSearchError("HTTP_ERROR", response.status, gatewayCode, probe);
-  }
-  try {
-    return photonPlaces(await response.json(), query.limit);
-  } catch {
-    throw new PlaceSearchError("INVALID_RESPONSE", response.status);
-  }
+      response = await fetch(`/geocode?${params}`, {
+        method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal: requestSignal
+      });
+    } catch (error) {
+      if ((error as { name?: unknown } | null)?.name === "AbortError") throw error;
+      throw new PlaceSearchError("NETWORK_ERROR");
+    }
+    if (!response.ok) {
+      let gatewayCode: string | null = null;
+      try {
+        const body: unknown = await response.json();
+        if (body && typeof body === "object" && !Array.isArray(body) &&
+            "error" in body && typeof body.error === "string" && GATEWAY_CODES.has(body.error)) {
+          gatewayCode = body.error;
+        }
+      } catch { /* A reverse proxy may answer HTML. The HTTP status remains useful. */ }
+      const probe = response.status === 400 && gatewayCode === "invalid_geocode_query" && query.limit === 30
+        ? await probeFiveResultLimit(query, requestSignal) : null;
+      throw new PlaceSearchError("HTTP_ERROR", response.status, gatewayCode, probe);
+    }
+    try {
+      return photonPlaces(await response.json(), query.limit);
+    } catch {
+      throw new PlaceSearchError("INVALID_RESPONSE", response.status);
+    }
+  }, signal, new PlaceSearchError("NETWORK_ERROR"));
 }
 
 /** Photon reverse returns a GeoJSON collection, not the app's single-address contract. */
@@ -154,10 +188,12 @@ export function photonAddress(payload: unknown): ReverseGeocodeResult | null {
 /** Same-origin offline reverse endpoint; null means Photon found no usable address. */
 export async function reversePlace(input: ReverseGeocodeQuery, signal?: AbortSignal): Promise<ReverseGeocodeResult | null> {
   const { lat, lon } = reverseGeocodeQuerySchema.parse(input);
-  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
-  const response = await fetch(`/reverse?${params}`, {
-    method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal
-  });
-  if (!response.ok) throw new Error("REVERSE_GEOCODE_UNAVAILABLE");
-  return photonAddress(await response.json());
+  return boundedGeocodingRead(async (requestSignal) => {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    const response = await fetch(`/reverse?${params}`, {
+      method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal: requestSignal
+    });
+    if (!response.ok) throw new Error("REVERSE_GEOCODE_UNAVAILABLE");
+    return photonAddress(await response.json());
+  }, signal, new Error("REVERSE_GEOCODE_UNAVAILABLE"));
 }
