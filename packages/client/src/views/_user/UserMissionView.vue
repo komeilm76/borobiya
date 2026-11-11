@@ -20,7 +20,13 @@
       <v-alert v-if="desk.completedMissionId.value" type="success" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
         امدادرسانی پایان یافت و وضعیت مأموریت در سرور ثبت شد.
       </v-alert>
-      <v-alert v-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mission-desk__load-alert mt-6" role="alert">
+      <v-alert v-if="desk.terminalHold.value" type="warning" variant="tonal" rounded="lg"
+        class="mission-desk__load-alert mt-6" role="alert">
+        پایان مأموریت از اتاق زنده گزارش شد؛ راهبری متوقف شده است. تا تأیید وضعیت از سرور، تغییر مرحله و لغو ممکن نیست.
+        <span v-if="desk.error.value">{{ desk.error.value }}</span>
+        <v-btn class="ms-2" size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">بررسی وضعیت از سرور</v-btn>
+      </v-alert>
+      <v-alert v-else-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mission-desk__load-alert mt-6" role="alert">
         {{ desk.error.value }}
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
       </v-alert>
@@ -55,6 +61,7 @@
         </details>
         <div class="mission-desk__progress" aria-label="به‌روزرسانی وضعیت مأموریت">
           <p>تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.</p>
+          <p v-if="desk.loading.value" role="status">در حال تأیید وضعیت مأموریت از سرور؛ تغییر مرحله موقتاً متوقف است.</p>
           <v-btn v-if="desk.nextStatus.value" color="primary" variant="flat" rounded="lg"
             :loading="desk.progressing.value" :disabled="!desk.canAdvance.value"
             @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
@@ -70,12 +77,13 @@
         </div>
         <div class="mission-desk__foot">
           <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-map-marker-path"
-            aria-controls="mission-route-panel" @click="openRouteWorkspace">باز کردن مسیر</v-btn>
+            aria-controls="mission-route-panel" :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
+            @click="openRouteWorkspace">باز کردن مسیر</v-btn>
           <p><v-icon icon="mdi-shield-check-outline" size="20" /> لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.</p>
           <v-menu location="bottom end">
             <template #activator="{ props }">
               <v-btn v-bind="props" variant="text" color="error" rounded="lg" prepend-icon="mdi-dots-horizontal"
-                aria-label="گزینه‌های بیشتر مأموریت" :disabled="desk.progressing.value">بیشتر</v-btn>
+                aria-label="گزینه‌های بیشتر مأموریت" :disabled="desk.progressing.value || desk.loading.value || !!desk.error.value || !!desk.terminalHold.value">بیشتر</v-btn>
             </template>
             <v-list density="comfortable" rounded="lg">
               <v-list-item prepend-icon="mdi-alert-outline" title="قادر به ادامه نیستم" subtitle="ثبت دلیل و آگاه‌سازی مرکز امداد" :disabled="desk.progressing.value"
@@ -93,7 +101,8 @@
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
           :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady"
-          @close-room="closeTool('team')" @sharing-change="teamSharing = $event">
+          @close-room="closeTool('team')" @sharing-change="teamSharing = $event"
+          @mission-ended="onMissionEnded">
           <template #map-actions>
             <div v-if="pickingWaypoint" class="mission-desk__map-hint" role="status">
               برای افزودن ایستگاه روی نقشه بزنید.
@@ -110,7 +119,7 @@
                   <p>مسیریابی با سرور نقشهٔ محلی انجام می‌شود؛ مسیرها پیشنهادند و زمان رسیدن قطعی نیست.</p>
                 </div>
                 <div class="d-flex align-center ga-1">
-                  <v-btn variant="text" color="error" size="small" :disabled="navigation.active.value"
+                  <v-btn variant="text" color="error" size="small" :disabled="navigation.active.value || !routing.target.value || routing.targetLoading.value"
                     @click="resetRoutePlan">پاک کردن مسیر</v-btn>
                   <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند" @click="closeTool('route')" />
                 </div>
@@ -244,6 +253,7 @@
             @click="toggleTool('status')"><v-icon icon="mdi-clipboard-text-outline" size="22" aria-hidden="true" />وضعیت</button>
           <button id="mission-tool-route" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'route' }"
             :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
+            :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
             @click="toggleTool('route')"><v-icon icon="mdi-routes" size="22" aria-hidden="true" />مسیر</button>
           <button id="mission-tool-team" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'team', 'mission-desk__dock-sharing': teamSharing && activeTool !== 'team' }"
             :aria-expanded="activeTool === 'team'" aria-controls="mission-team-panel"
@@ -382,6 +392,7 @@ function addTypedWaypoint(): void {
   waypointLon.value = "";
 }
 function openRouteWorkspace(): void {
+  if (desk.loading.value || desk.error.value || desk.terminalHold.value) return;
   // The private incident read does not request GPS or publish location.
   if (!routing.visible.value) void routing.open();
   activeTool.value = "route";
@@ -402,8 +413,18 @@ function dismissTool(): void {
   if (pickingWaypoint.value) { cancelWaypointPick(); return; }
   if (activeTool.value) closeTool(activeTool.value);
 }
-function resetRoutePlan(): void { closeRoutes(); closeTool("route"); }
-function startGuidance(): void { navigation.start(); closeTool("route"); }
+function resetRoutePlan(): void {
+  if (navigation.active.value || !routing.target.value) return;
+  // Clearing the proposed route must not also remove the incident from the map.
+  routing.clearPlan();
+  pickingWaypoint.value = false;
+  waypointError.value = "";
+  closeTool("route");
+}
+function startGuidance(): void {
+  // A denied/unavailable GPS watch must leave the route and its error visible.
+  if (navigation.start()) closeTool("route");
+}
 function cancelWaypointPick(): void {
   pickingWaypoint.value = false;
   activeTool.value = "route";
@@ -556,6 +577,12 @@ function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
   mapReady.value = true;
   syncRouteMap();
 }
+function onMissionEnded(id: string): void {
+  if (desk.activeMission.value?.id !== id) return;
+  desk.markTerminalEvent(id);
+  closeRoutes(); // Revoke GPS guidance and private incident overlays immediately.
+  void desk.load(); // A socket event is a signal to verify, not an HTTP outcome banner.
+}
 function closeRoutes(): void {
   navigation.stop();
   routing.reset();
@@ -610,7 +637,8 @@ const nextStatusLabel = computed(() => desk.nextStatus.value ? ({
   completed: "امدادرسانی پایان یافت"
 })[desk.nextStatus.value] : "");
 const activeStep = computed(() => steps.findIndex((step) => step.status === desk.activeMission.value?.status));
-const currentStatusLabel = computed(() => steps[activeStep.value]?.label ?? "در حال بررسی");
+const currentStatusLabel = computed(() => desk.terminalHold.value
+  ? "پایان گزارش شد؛ در انتظار تأیید" : steps[activeStep.value]?.label ?? "در حال بررسی");
 const missionSession = computed(() => {
   const owner = auth.user?.id;
   const claims = decodeAccessTokenClaims(auth.accessToken);
@@ -804,6 +832,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__dock .mission-desk__dock-sharing {
   background: rgb(var(--v-theme-error)); color: rgb(var(--v-theme-on-error));
 }
+.mission-desk__dock button:disabled { opacity: .48; cursor: not-allowed; }
 .mission-desk__dock button:focus-visible, .mission-desk__map-hint button:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
 }

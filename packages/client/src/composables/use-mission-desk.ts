@@ -27,6 +27,9 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   const cancellationError = ref<string | null>(null);
   const cancelledMissionId = ref<string | null>(null);
   const completedMissionId = ref<string | null>(null);
+  // A terminal room event is authoritative enough to stop further writes, but
+  // the displayed outcome still needs an HTTP read before it can be confirmed.
+  const terminalHold = ref<string | null>(null);
   const cancellationMissionId = ref<string | null>(null);
   const reasons = ref<CancellationReason[]>([]);
   const reasonId = ref("");
@@ -54,13 +57,15 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   const activeMission = computed(() => missions.value.find((item) => isActiveMission(item.status)) ?? null);
   const nextStatus = computed(() => activeMission.value ? NEXT_STATUS[activeMission.value.status as keyof typeof NEXT_STATUS] ?? null : null);
   const canAdvance = computed(() => !!nextStatus.value && !!sessionKey.value && !progressing.value &&
+    !loading.value && !error.value && !terminalHold.value &&
     !progressBlocked.value && !blocked.value && !cancellationOpen.value && !cancelling.value);
   const selectedReason = computed(() => reasons.value.find((item) => item.id === reasonId.value));
   // The confirmation belongs to the mission that was active when the dialog opened,
   // never a replacement that appears during a list refresh.
   const missionChanged = computed(() => cancellationOpen.value && cancellationMissionId.value !== activeMission.value?.id);
   const canCancel = computed(() => cancellationOpen.value && !missionChanged.value && !reasonLoading.value && !cancelling.value &&
-    !blocked.value && !progressing.value && !!activeMission.value && !!sessionKey.value && !!selectedReason.value &&
+    !blocked.value && !progressing.value && !loading.value && !error.value && !terminalHold.value &&
+    !!activeMission.value && !!sessionKey.value && !!selectedReason.value &&
     (!selectedReason.value.requiresCustomText ||
       (customReason.value.trim().length >= 10 && customReason.value.trim().length <= 200)));
 
@@ -85,6 +90,12 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
       const page = await listRescuerMissions(bearer);
       if (current === listGeneration && userId.value === owner) {
         missions.value = page.items;
+        // A stale/in-flight list is invalidated when a terminal event arrives.
+        // Keep the write lock if the new list still claims that mission active;
+        // another explicit verification is safer than ignoring the room event.
+        if (terminalHold.value && !page.items.some((item) => item.id === terminalHold.value && isActiveMission(item.status))) {
+          terminalHold.value = null;
+        }
         if (completedMissionId.value && page.items.some((item) => isActiveMission(item.status) && item.id !== completedMissionId.value)) {
           completedMissionId.value = null;
         }
@@ -106,6 +117,15 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     } finally {
       if (current === listGeneration) loading.value = false;
     }
+  }
+
+  function markTerminalEvent(id: string): void {
+    if (!sessionKey.value || activeMission.value?.id !== id) return;
+    // Do not let an earlier list reply resurrect a mission after its private
+    // room reported a terminal transition. A fresh read must verify the outcome.
+    ++listGeneration;
+    loading.value = false;
+    terminalHold.value = id;
   }
 
   async function advanceStatus(): Promise<void> {
@@ -146,7 +166,8 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   async function showCancellation(): Promise<void> {
     const owner = userId.value;
     const bearer = token.value;
-    if (!owner || !bearer || !activeMission.value || !sessionKey.value || cancelling.value || progressing.value) return;
+    if (!owner || !bearer || !activeMission.value || !sessionKey.value || cancelling.value || progressing.value ||
+        loading.value || error.value || terminalHold.value) return;
     const current = ++reasonGeneration;
     cancellationMissionId.value = activeMission.value.id;
     cancellationOpen.value = true;
@@ -232,6 +253,7 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     error.value = null;
     cancelledMissionId.value = null;
     completedMissionId.value = null;
+    terminalHold.value = null;
     cancellationMissionId.value = null;
     cancellationOpen.value = false;
     reasonLoading.value = false;
@@ -244,6 +266,6 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   }
 
   return { missions, activeMission, nextStatus, canAdvance, progressing, progressError, advanceStatus, loading, error, cancellationOpen, reasonLoading, cancelling,
-    cancellationError, cancellationNeedsRefresh, cancelledMissionId, completedMissionId, missionChanged, reasons, reasonId, customReason, selectedReason,
-    canCancel, load, showCancellation, dismissCancellation, confirmCancellation, reset };
+    cancellationError, cancellationNeedsRefresh, cancelledMissionId, completedMissionId, terminalHold, missionChanged, reasons, reasonId, customReason, selectedReason,
+    canCancel, load, markTerminalEvent, showCancellation, dismissCancellation, confirmCancellation, reset };
 }

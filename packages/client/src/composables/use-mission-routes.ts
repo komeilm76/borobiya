@@ -117,6 +117,14 @@ export function useMissionRoutes(
     loading.value = false;
     error.value = null;
   }
+  /** Clear a requested plan without hiding the authorized incident from the mission map. */
+  function clearPlan(): void {
+    if (!visible.value || !target.value) return;
+    invalidatePlan();
+    from.value = null;
+    via.value = [];
+    optimize.value = false;
+  }
   function addWaypoint(point: RoutePoint): boolean {
     if (!visible.value || !target.value || via.value.length >= 6) return false;
     // MapLibre can report world-copy or malformed click coordinates. Invalid
@@ -203,6 +211,6 @@ export function useMissionRoutes(
     if (Number.isInteger(index) && index >= 0 && index < routes.value.length) selectedIndex.value = index;
   }
   return { visible, target, targetLoading, profile, from, via, optimize, order, step, routes, selectedIndex, selectedRoute,
-    loading, error, open, reset, selectProfile, findRoutes, selectRoute, addWaypoint, removeWaypoint,
+    loading, error, open, reset, clearPlan, selectProfile, findRoutes, selectRoute, addWaypoint, removeWaypoint,
     moveWaypoint, setOptimize, selectStep };
 }

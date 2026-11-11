@@ -62,7 +62,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('aria-label="ابزارهای مأموریت"');
     expect(view).toContain('function dismissTool(): void {');
     expect(view).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
-    expect(view).toContain('function startGuidance(): void { navigation.start(); closeTool("route"); }');
+    expect(view).toContain('if (navigation.start()) closeTool("route");');
     expect(view).not.toContain('scrollIntoView(');
     expect(view).toContain('<MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"');
     expect(view).toContain('<div v-if="desk.activeMission.value" id="mission-workspace"');
@@ -90,6 +90,14 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('mission-desk__dock-sharing');
     expect(panel).toContain('watch(live.sharing, (sharing) => emit("sharing-change", sharing)');
     expect(panel).toContain('aria-label="بستن پنل اعضای مأموریت"');
+    expect(panel).toContain('watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }');
+    expect(view).toContain('@mission-ended="onMissionEnded"');
+    expect(view).toContain('desk.markTerminalEvent(id);');
+    expect(view).toContain('closeRoutes(); // Revoke GPS guidance and private incident overlays immediately.');
+    expect(view).toContain('void desk.load(); // A socket event is a signal to verify');
+    expect(view).toContain('routing.clearPlan();');
+    expect(view).toContain('v-if="desk.terminalHold.value"');
+    expect(view).toContain('!routing.target.value || routing.targetLoading.value');
     for (const [source, filename] of [[view, "UserMissionView.vue"], [panel, "MissionLivePanel.vue"]] as const) {
       const { descriptor } = parse(source, { filename });
       const style = compileStyle({ source: descriptor.styles[0]!.content, filename, id: "data-v-mission-map", scoped: true });

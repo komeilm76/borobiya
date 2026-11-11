@@ -59,6 +59,9 @@ export function useMissionLiveLocations(
   // Keep explicit GPS consent disabled until the missed-status HTTP read has succeeded.
   const recoveryPending = ref(false);
   const error = ref<string | null>(null);
+  // An authenticated terminal room event must reach the mission desk, not just
+  // stop this panel's GPS publisher while the rest of the page stays stale.
+  const endedMissionId = ref<string | null>(null);
   const now = ref((runtime.now ?? Date.now)());
   const currentTime = runtime.now ?? Date.now;
   let client: RealtimeClient | null = null;
@@ -94,6 +97,7 @@ export function useMissionLiveLocations(
   }
   function stop(): void {
     generation++;
+    endedMissionId.value = null;
     syncAbort?.abort();
     syncAbort = null;
     lastDisconnectAt = null;
@@ -126,8 +130,10 @@ export function useMissionLiveLocations(
     now.value = currentTime();
   }
   function endMission(): void {
+    const id = mission.value?.id;
     stop();
     error.value = "مأموریت پایان یافت؛ اشتراک موقعیت متوقف شد.";
+    if (id) endedMissionId.value = id;
   }
   function onMissionStatus(payload: unknown): void {
     const event = missionStatusUpdatedEventSchema.safeParse(payload);
@@ -380,6 +386,6 @@ export function useMissionLiveLocations(
     client?.updateToken(next);
   }, { flush: "sync" });
   onScopeDispose(stop);
-  return { locations, participantStatus, connected, sharing, recoveryPending, error, now, start, stop,
+  return { locations, participantStatus, connected, sharing, recoveryPending, error, endedMissionId, now, start, stop,
     startSharing, stopSharing, handleEvent };
 }

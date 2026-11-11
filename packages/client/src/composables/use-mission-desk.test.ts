@@ -40,6 +40,53 @@ beforeEach(() => {
 });
 
 describe("mission desk cancellation", () => {
+  it("blocks status writes and cancellation during a refresh and after a failed read", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    expect(desk.canAdvance.value).toBe(true);
+    const pending = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(pending.promise);
+    const refresh = desk.load();
+    expect(desk.canAdvance.value).toBe(false);
+    await desk.showCancellation();
+    expect(desk.cancellationOpen.value).toBe(false);
+    await desk.advanceStatus();
+    expect(advanceRescuerMission).not.toHaveBeenCalled();
+    pending.reject(new TypeError("offline"));
+    await refresh;
+    expect(desk.error.value).toBeTruthy();
+    expect(desk.canAdvance.value).toBe(false);
+    await desk.showCancellation();
+    expect(desk.cancellationOpen.value).toBe(false);
+    await desk.load();
+    expect(desk.canAdvance.value).toBe(true);
+  });
+
+  it("does not let an old list or a still-active snapshot override a terminal room event", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    const pending = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(pending.promise);
+    const oldRead = desk.load();
+    desk.markTerminalEvent(missionId);
+    pending.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await oldRead;
+    expect(desk.terminalHold.value).toBe(missionId);
+    expect(desk.canAdvance.value).toBe(false);
+    vi.mocked(listRescuerMissions).mockRejectedValueOnce(new TypeError("offline"));
+    await desk.load();
+    expect(desk.terminalHold.value).toBe(missionId);
+    expect(desk.canAdvance.value).toBe(false);
+    await desk.load(); // Even a still-active read cannot silently dismiss the terminal event.
+    expect(desk.terminalHold.value).toBe(missionId);
+    await desk.showCancellation();
+    expect(desk.cancellationOpen.value).toBe(false);
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [{ ...mission, status: "completed" }], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.terminalHold.value).toBeNull();
+    expect(desk.activeMission.value).toBeNull();
+  });
+
   it("renders the hidden more-action and explicit reason+confirmation in the accessible view", () => {
     const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
     expect(view).toContain("<v-menu location=\"bottom end\">");
@@ -189,14 +236,11 @@ describe("mission desk cancellation", () => {
     expect(desk.canCancel.value).toBe(true);
   });
 
-  it("does not treat a list started before or during cancellation as post-conflict verification", async () => {
+  it("does not treat a list started during cancellation as post-conflict verification", async () => {
     const desk = useMissionDesk(ref("token"), ref(rescuerId));
     await desk.load();
     await desk.showCancellation();
     desk.reasonId.value = reasons[0]!.id;
-    const before = deferred<{ items: Mission[]; total: number; totalPages: number }>();
-    vi.mocked(listRescuerMissions).mockReturnValueOnce(before.promise);
-    const earlyRead = desk.load();
     const write = deferred<void>();
     vi.mocked(cancelRescuerMission).mockReturnValueOnce(write.promise);
     const saving = desk.confirmCancellation();
@@ -205,9 +249,8 @@ describe("mission desk cancellation", () => {
     const overlappingRead = desk.load();
     write.reject(new ApiError(409, "MISSION_NOT_ACTIVE", "Changed"));
     await saving;
-    before.resolve({ items: [mission], total: 1, totalPages: 1 });
     during.resolve({ items: [mission], total: 1, totalPages: 1 });
-    await Promise.all([earlyRead, overlappingRead]);
+    await overlappingRead;
     expect(desk.canCancel.value).toBe(false);
     expect(desk.cancellationError.value).toContain("تازه");
     await desk.load();
@@ -297,13 +340,14 @@ describe("mission desk cancellation", () => {
     const refresh = desk.load();
     expect(desk.loading.value).toBe(true);
     await desk.showCancellation();
+    expect(desk.cancellationOpen.value).toBe(false); // Wait for the status read first.
     slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
     await refresh;
     expect(desk.loading.value).toBe(false);
     expect(desk.activeMission.value?.id).toBe(mission.id);
   });
 
-  it("ignores a list started before a committed cancellation even if it answers afterwards", async () => {
+  it("waits for a pending list before committing cancellation against the confirmed mission", async () => {
     const desk = useMissionDesk(ref("token"), ref(rescuerId));
     await desk.load();
     await desk.showCancellation();
@@ -311,10 +355,13 @@ describe("mission desk cancellation", () => {
     const slowList = deferred<{ items: Mission[]; total: number; totalPages: number }>();
     vi.mocked(listRescuerMissions).mockReturnValueOnce(slowList.promise);
     const refresh = desk.load();
+    expect(desk.canCancel.value).toBe(false);
     await desk.confirmCancellation();
-    expect(desk.cancelledMissionId.value).toBe(missionId);
+    expect(cancelRescuerMission).not.toHaveBeenCalled();
     slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
     await refresh;
+    await desk.confirmCancellation();
+    expect(desk.cancelledMissionId.value).toBe(missionId);
     expect(desk.activeMission.value).toBeNull();
     expect(desk.loading.value).toBe(false);
   });
@@ -509,20 +556,22 @@ describe("rescuer mission progression", () => {
     expect(desk.canAdvance.value).toBe(true);
   });
 
-  it("discards a pre-mutation list and a late acknowledgement after a new session or unmount reset", async () => {
+  it("waits out a refresh and discards a late acknowledgement after a new session or unmount reset", async () => {
     const token = ref<string | null>(bearer(rescuerId, "session-a"));
     const desk = useMissionDesk(token, ref(rescuerId));
     await desk.load();
     const slowList = deferred<{ items: Mission[]; total: number; totalPages: number }>();
     vi.mocked(listRescuerMissions).mockReturnValueOnce(slowList.promise);
     const reading = desk.load();
+    await desk.advanceStatus();
+    expect(advanceRescuerMission).not.toHaveBeenCalled();
+    slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await reading;
     const slowWrite = deferred<Mission>();
     vi.mocked(advanceRescuerMission).mockReturnValueOnce(slowWrite.promise);
     const saving = desk.advanceStatus();
     slowWrite.resolve({ ...mission, status: "arrived" });
     await saving;
-    slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
-    await reading;
     expect(desk.activeMission.value?.status).toBe("arrived");
     const deferredWrite = deferred<Mission>();
     vi.mocked(advanceRescuerMission).mockReturnValueOnce(deferredWrite.promise);

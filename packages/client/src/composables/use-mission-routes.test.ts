@@ -232,6 +232,41 @@ describe("active rescuer mission route picker", () => {
 });
 
 describe("waypoint editing", () => {
+  it("clears the plan and GPS origin without deleting the private incident or its session", async () => {
+    const getPosition = vi.fn(async () => from);
+    const getRoutes = vi.fn(async () => [route]);
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined,
+      { getTarget: async () => target, getPosition, getRoutes });
+    await picker.open();
+    picker.selectProfile("foot");
+    await picker.findRoutes();
+    picker.addWaypoint({ lat: 35.69, lon: 51.39 });
+    picker.clearPlan();
+    expect(picker.visible.value).toBe(true);
+    expect(picker.target.value).toEqual(target);
+    expect(picker.profile.value).toBe("foot");
+    expect(picker.from.value).toBeNull();
+    expect(picker.via.value).toEqual([]);
+    expect(picker.selectedRoute.value).toBeNull();
+    await picker.findRoutes();
+    expect(getPosition).toHaveBeenCalledTimes(2); // New plan requires fresh GPS consent.
+    expect(getRoutes).toHaveBeenCalledTimes(2);
+  });
+  it("clears a pending route reply without allowing it to repaint the incident map", async () => {
+    const pending = deferred<typeof route[]>();
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined, {
+      getTarget: async () => target, getPosition: async () => from, getRoutes: () => pending.promise
+    });
+    await picker.open();
+    const request = picker.findRoutes();
+    await vi.waitFor(() => expect(picker.loading.value).toBe(true));
+    picker.clearPlan();
+    pending.resolve([route]);
+    await request;
+    expect(picker.target.value).toEqual(target);
+    expect(picker.routes.value).toEqual([]);
+    expect(picker.loading.value).toBe(false);
+  });
   it("rejects invalid map coordinates without throwing or clearing a valid plan", async () => {
     const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined, {
       getTarget: async () => target, getPosition: async () => from, getRoutes: async () => [route]

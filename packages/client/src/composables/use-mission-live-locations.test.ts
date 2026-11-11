@@ -115,6 +115,7 @@ describe("mission live positions (T3.5.7)", () => {
     expect(live.connected.value).toBe(true);
     expect(live.sharing.value).toBe(true);
     expect(second.close).not.toHaveBeenCalled();
+    expect(live.endedMissionId.value).toBeNull();
     scope.stop();
     expect(clears[0]).toHaveBeenCalledOnce();
   });
@@ -289,6 +290,7 @@ describe("mission live positions (T3.5.7)", () => {
     expect(live.sharing.value).toBe(false);
     expect(session.close).toHaveBeenCalledOnce();
     expect(live.error.value).toContain("پایان");
+    expect(live.endedMissionId.value).toBe(mission.id);
     scope.stop();
   });
 

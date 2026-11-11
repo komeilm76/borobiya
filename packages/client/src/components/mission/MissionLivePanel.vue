@@ -120,6 +120,7 @@ const emit = defineEmits<{
   ready: [map: MapLibreMap, marker: typeof Marker];
   "close-room": [];
   "sharing-change": [sharing: boolean];
+  "mission-ended": [missionId: string];
 }>();
 const auth = useAuthStore();
 const theme = useThemeStore();
@@ -131,6 +132,7 @@ const presence = useMissionPresence(computed(() => props.mission.id), computed((
 // Full-screen callers need a persistent disclosure even while the room is closed.
 // The publisher itself remains owned (and stopped on teardown) by this panel.
 watch(live.sharing, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
+watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }, { flush: "sync" });
 const canPublish = computed(() => auth.user?.role === "admin" ||
   auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);
 const map = shallowRef<MapLibreMap | null>(null);
