@@ -9,7 +9,7 @@ import type { AppContext } from './context.ts';
 export interface UserFilters { q?: string; role?: string; active?: boolean; page: number; limit: number }
 export interface AuditFilters { from: number; to: number; action?: string; q?: string; limit: number }
 interface GroupInput { name: string; color: string; capacity: number; incidentIds: string[]; status?: string }
-interface NewUserInput { username: string; password: string; role: string }
+interface NewUserInput { username: string; password: string; role: string; jobTypeId?: string | null }
 
 const SETTINGS_KEYS = new Set(['sos_auto_dispatch', 'default_dispatch_radius_m', 'mission_ready_required', 'maintenance_mode']);
 
@@ -65,23 +65,25 @@ export class AdminService {
   users(filters: UserFilters): Record<string, unknown> {
     const clauses: string[] = [];
     const params: SqlValue[] = [];
-    if (filters.q) { clauses.push('instr(lower(username), lower(?)) > 0'); params.push(filters.q); }
-    if (filters.role) { clauses.push('role = ?'); params.push(filters.role); }
-    if (filters.active !== undefined) { clauses.push('active = ?'); params.push(filters.active ? 1 : 0); }
+    if (filters.q) { clauses.push('instr(lower(users.username), lower(?)) > 0'); params.push(filters.q); }
+    if (filters.role) { clauses.push('users.role = ?'); params.push(filters.role); }
+    if (filters.active !== undefined) { clauses.push('users.active = ?'); params.push(filters.active ? 1 : 0); }
     const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
     const limit = Math.min(100, Math.max(1, filters.limit));
     const offset = Math.max(0, (filters.page - 1) * limit);
     const total = Number(this.ctx.repo.one<{ c: number }>(`SELECT COUNT(*) AS c FROM users${where}`, ...params)?.c ?? 0);
     const rows = this.ctx.repo.all<Record<string, any>>(
-      `SELECT id, username, role, active, security_ready, must_complete_security_questions,
-        ready_for_mission, average_rating, created_at, updated_at,
+      `SELECT users.id, users.username, users.role, users.active, security_ready, must_complete_security_questions,
+        ready_for_mission, average_rating, users.created_at, users.updated_at, users.job_type_id,
+        jt.label AS jobTypeLabel,
         (SELECT COUNT(*) FROM sessions s WHERE s.user_id=users.id AND s.revoked_at IS NULL AND s.expires_at>?) AS sessionCount
-       FROM users${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, this.ctx.clock(), ...params, limit, offset);
+       FROM users LEFT JOIN job_types jt ON jt.id = users.job_type_id${where} ORDER BY users.created_at DESC LIMIT ? OFFSET ?`, this.ctx.clock(), ...params, limit, offset);
     return {
       items: rows.map((row) => ({
         id: String(row.id), username: String(row.username), role: String(row.role), active: Boolean(row.active),
         securityReady: Boolean(row.security_ready), mustCompleteSecurityQuestions: Boolean(row.must_complete_security_questions),
         readyForMission: Boolean(row.ready_for_mission), averageRating: Number(row.average_rating),
+        jobTypeId: row.job_type_id ? String(row.job_type_id) : null, jobTypeLabel: row.jobTypeLabel ? String(row.jobTypeLabel) : null,
         sessionCount: Number(row.sessionCount), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
         online: this.ctx.services.realtime.isUserOnline(String(row.id))
       })),
@@ -96,13 +98,17 @@ export class AdminService {
     if (![ROLES.USER, ROLES.RESPONDER, ROLES.ADMIN].includes(input.role as typeof ROLES[keyof typeof ROLES])) {
       throw badRequest('Unknown account role.', { field: 'role' });
     }
+    if (input.jobTypeId) {
+      const jobType = this.ctx.repo.one('SELECT id FROM job_types WHERE id=? AND active=1', input.jobTypeId);
+      if (!jobType) throw badRequest('Unknown active job type.', { field: 'jobTypeId' });
+    }
     const passwordHash = await hashPassword(input.password);
     const id = newId('usr');
     return this.ctx.uow.commit((tx) => {
       const now = this.ctx.clock();
       tx.repo.run(
-        `INSERT INTO users(id,username,password_hash,role,active,security_ready,must_complete_security_questions,ready_for_mission,created_at,updated_at)
-         VALUES(?,?,?,?,1,0,1,0,?,?)`, id, input.username, passwordHash, input.role, now, now);
+        `INSERT INTO users(id,username,password_hash,role,active,security_ready,must_complete_security_questions,ready_for_mission,job_type_id,created_at,updated_at)
+         VALUES(?,?,?,?,1,0,1,0,?,?,?)`, id, input.username, passwordHash, input.role, input.jobTypeId ?? null, now, now);
       this.audit(tx.repo, identity, 'user.create', id, { username: input.username, role: input.role });
       tx.event(HTTP_EVENTS.USER_UPDATED, { userId: id, created: true, role: input.role }, ['role:admin']);
       return { ok: true, userId: id, username: input.username, role: input.role, mustCompleteSecurityQuestions: true };
@@ -111,7 +117,7 @@ export class AdminService {
 
   usersCsv(filters: UserFilters): string {
     const rows = this.users({ ...filters, page: 1, limit: Math.min(100, filters.limit) }).items as Array<Record<string, unknown>>;
-    const header = ['id', 'username', 'role', 'active', 'securityReady', 'readyForMission', 'averageRating', 'online', 'createdAt'];
+    const header = ['id', 'username', 'role', 'active', 'securityReady', 'readyForMission', 'averageRating', 'jobType', 'online', 'createdAt'];
     const lines = [header.join(',')];
     for (const row of rows) lines.push(header.map((key) => csvEscape(row[key])).join(','));
     return lines.join('\r\n');
@@ -133,7 +139,7 @@ export class AdminService {
     };
   }
 
-  updateUser(identity: AuthIdentity, userId: string, input: { active?: boolean; role?: string }): Record<string, unknown> {
+  updateUser(identity: AuthIdentity, userId: string, input: { active?: boolean; role?: string; jobTypeId?: string | null }): Record<string, unknown> {
     const user = this.ctx.repo.one<Record<string, any>>('SELECT * FROM users WHERE id=?', userId);
     if (!user) throw notFound('User not found.');
     if (userId === identity.userId && (input.active === false || (input.role && input.role !== ROLES.ADMIN))) {
@@ -145,15 +151,20 @@ export class AdminService {
         `SELECT COUNT(*) AS c FROM users WHERE role=? AND active=1 AND id<>?`, ROLES.ADMIN, userId)?.c ?? 0);
       if (!otherAdmins) throw conflict('The last active administrator cannot be removed.');
     }
+    if (input.jobTypeId) {
+      const jobType = this.ctx.repo.one('SELECT id FROM job_types WHERE id=? AND active=1', input.jobTypeId);
+      if (!jobType) throw badRequest('Unknown active job type.', { field: 'jobTypeId' });
+    }
     const active = input.active === undefined ? Number(user.active) : input.active ? 1 : 0;
     const role = input.role ?? String(user.role);
+    const jobTypeId = input.jobTypeId === undefined ? (user.job_type_id ?? null) : input.jobTypeId;
     const result = this.ctx.uow.commit((tx) => {
       const now = this.ctx.clock();
-      tx.repo.run('UPDATE users SET active=?, role=?, updated_at=? WHERE id=?', active, role, now, userId);
-      this.audit(tx.repo, identity, 'user.update', userId, { active, role });
+      tx.repo.run('UPDATE users SET active=?, role=?, job_type_id=?, updated_at=? WHERE id=?', active, role, jobTypeId, now, userId);
+      this.audit(tx.repo, identity, 'user.update', userId, { active, role, jobTypeId });
       tx.event(HTTP_EVENTS.USER_UPDATED, { userId, active: Boolean(active), role, actorId: identity.userId },
         [`user:${userId}`, 'role:admin']);
-      return { ok: true, userId, active: Boolean(active), role };
+      return { ok: true, userId, active: Boolean(active), role, jobTypeId };
     });
     if (!active) this.ctx.services.auth.revokeAllSessions(userId);
     return result;
@@ -330,6 +341,60 @@ export class AdminService {
     for (const id of ids) if (!this.ctx.repo.one('SELECT id FROM incident_types WHERE id=?', id)) throw badRequest('Unknown incident type.', { field: 'incidentIds' });
   }
 
+  jobTypes(): Record<string, unknown> {
+    const rows = this.ctx.repo.all<Record<string, any>>(
+      `SELECT jt.*, (SELECT COUNT(*) FROM users u WHERE u.job_type_id = jt.id AND u.active = 1) AS memberCount
+       FROM job_types jt ORDER BY rank ASC`);
+    return {
+      items: rows.map((row) => this.publicJobType(row)),
+      total: rows.length
+    };
+  }
+
+  createJobType(identity: AuthIdentity, input: { label: string; offerPolicy: string }): Record<string, unknown> {
+    const label = input.label.trim();
+    if (!label) throw badRequest('Job type label is required.', { field: 'label' });
+    if (!['all', 'ready_only'].includes(input.offerPolicy)) throw badRequest('Unknown offer policy.', { field: 'offerPolicy' });
+    const rank = Number(this.ctx.repo.one<{ value: number }>('SELECT COALESCE(MAX(rank),0) AS value FROM job_types')?.value ?? 0) + 1;
+    const id = newId('job');
+    return this.ctx.uow.commit((tx) => {
+      const now = this.ctx.clock();
+      tx.repo.run('INSERT INTO job_types(id,label,offer_policy,rank,active,created_at,updated_at) VALUES(?,?,?,?,1,?,?)',
+        id, label, input.offerPolicy, rank, now, now);
+      this.audit(tx.repo, identity, 'job-type.create', id, { label, offerPolicy: input.offerPolicy });
+      return { ok: true, jobType: this.publicJobType({ id, label, offer_policy: input.offerPolicy, rank, active: 1, created_at: now, updated_at: now, memberCount: 0 }) };
+    });
+  }
+
+  updateJobType(identity: AuthIdentity, jobTypeId: string, input: { label?: string; offerPolicy?: string; active?: boolean }): Record<string, unknown> {
+    const jobType = this.ctx.repo.one<Record<string, any>>('SELECT * FROM job_types WHERE id=?', jobTypeId);
+    if (!jobType) throw notFound('Job type not found.');
+    if (input.offerPolicy !== undefined && !['all', 'ready_only'].includes(input.offerPolicy)) {
+      throw badRequest('Unknown offer policy.', { field: 'offerPolicy' });
+    }
+    const label = input.label === undefined ? String(jobType.label) : input.label.trim();
+    if (!label) throw badRequest('Job type label is required.', { field: 'label' });
+    const offerPolicy = input.offerPolicy ?? String(jobType.offer_policy);
+    const active = input.active === undefined ? Number(jobType.active) : input.active ? 1 : 0;
+    return this.ctx.uow.commit((tx) => {
+      const now = this.ctx.clock();
+      tx.repo.run('UPDATE job_types SET label=?, offer_policy=?, active=?, updated_at=? WHERE id=?', label, offerPolicy, active, now, jobTypeId);
+      this.audit(tx.repo, identity, 'job-type.update', jobTypeId, { label, offerPolicy, active });
+      tx.event(HTTP_EVENTS.SETTINGS_UPDATED, { kind: 'job-type', jobTypeId, offerPolicy, active: Boolean(active) }, ['role:admin']);
+      const row = tx.repo.one<Record<string, any>>(
+        `SELECT jt.*, (SELECT COUNT(*) FROM users u WHERE u.job_type_id = jt.id AND u.active = 1) AS memberCount FROM job_types jt WHERE id=?`, jobTypeId);
+      return { ok: true, jobType: this.publicJobType(row!) };
+    });
+  }
+
+  private publicJobType(row: Record<string, any>): Record<string, unknown> {
+    return {
+      id: String(row.id), label: String(row.label), offerPolicy: String(row.offer_policy),
+      rank: Number(row.rank), active: Boolean(row.active), memberCount: Number(row.memberCount ?? 0),
+      createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
+    };
+  }
+
   private audit(repo: Repository, identity: AuthIdentity, action: string, target: string, meta: Record<string, unknown>): void {
     repo.run('INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
       identity.userId, action, target, identity.ip, JSON.stringify(meta), this.ctx.clock());
@@ -351,3 +416,4 @@ export class AdminService {
     };
   }
 }
+

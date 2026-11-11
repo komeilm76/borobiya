@@ -26,6 +26,8 @@ const RATE = {
 
 const optionalLimit = optional(number({ min: 1, max: 200, integer: true }));
 const optionalTimestamp = optional(number({ min: 0, max: Number.MAX_SAFE_INTEGER, integer: true }));
+const nullableIdentifier: Validator<unknown> = (value, path) =>
+  value === null ? null : (value === undefined ? undefined : identifier(value, path));
 
 const securityAnswers = array(shape({
   questionId: identifier,
@@ -108,9 +110,7 @@ const auditQuery: Validator<unknown> = shape({
   action: optional(text({ min: 1, max: 80 })), q: optional(text({ min: 1, max: 80 })), limit: optionalLimit
 }, { allowUnknown: true });
 const alertsQuery: Validator<unknown> = shape({ includeResolved: optional(boolean()) }, { allowUnknown: true });
-const nearestQuery: Validator<unknown> = shape({
-  latitude, longitude, limit: optionalLimit, incidentTypeId: optional(identifier)
-}, { allowUnknown: true });
+const nearestQuery: Validator<unknown> = shape({ limit: optionalLimit }, { allowUnknown: true });
 
 function actor(ctx: RequestContext<AppContext>): AuthIdentity {
   if (!ctx.auth) throw forbidden('Authentication is required.');
@@ -238,6 +238,12 @@ export function registerRoutes(router: Router<AppContext>): void {
     const input = body<{ reasonId: string; detail?: string }>(ctx);
     return ok(ctx.app.services.sos.cancelSos(actor(ctx), ctx.params.id, input.reasonId, input.detail));
   } });
+  router.add({ method: 'POST', path: '/_user/sos/:id/decline', auth: 'user', rate: RATE.mutation, tags: ['mission'], summary: 'Decline offered SOS', handler: (ctx) =>
+    ok(ctx.app.services.sos.declineOffer(actor(ctx), ctx.params.id)) });
+  router.add({ method: 'GET', path: '/_user/mission-offers', auth: 'user', query: limitQuery, tags: ['mission'], summary: 'Pending mission offers for the caller', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.sos.listOffers(actor(ctx), Number(input.limit ?? 20)));
+  } });
   router.add({ method: 'POST', path: '/_user/sos/:id/accept', auth: 'user', rate: RATE.emergency, tags: ['mission'], summary: 'Accept dispatched SOS', handler: (ctx) =>
     ok(ctx.app.services.sos.acceptSos(actor(ctx), ctx.params.id)) });
   router.add({ method: 'GET', path: '/_user/missions', auth: 'user', query: limitQuery, tags: ['mission'], summary: 'Mission history', handler: (ctx) =>
@@ -258,7 +264,7 @@ export function registerRoutes(router: Router<AppContext>): void {
     ok({ queue: ctx.app.services.sos.listSos(actor(ctx), SOS_STATUS.PENDING, 20), groups: ctx.app.services.admin.groups(), incidentTypes: ctx.app.services.admin.incidentTypes() }) });
   router.add({ method: 'GET', path: '/_admin/users', auth: 'admin', query: adminUsersQuery, tags: ['admin'], summary: 'Users', handler: (ctx) =>
     ok(ctx.app.services.admin.users(usersFilters(ctx))) });
-  router.add({ method: 'POST', path: '/_admin/users', auth: 'admin', body: shape({ username, password, role: oneOf(ROLE_VALUES) }), rate: RATE.mutation, tags: ['admin'], summary: 'Create user', handler: async (ctx) =>
+  router.add({ method: 'POST', path: '/_admin/users', auth: 'admin', body: shape({ username, password, role: oneOf(ROLE_VALUES), jobTypeId: optional(identifier) }), rate: RATE.mutation, tags: ['admin'], summary: 'Create user', handler: async (ctx) =>
     created(await ctx.app.services.admin.createUser(actor(ctx), body<any>(ctx))) });
   router.add({ method: 'GET', path: '/_admin/users.csv', auth: 'admin', query: adminUsersQuery, tags: ['admin'], summary: 'Users CSV', handler: (ctx) =>
     raw(ctx.app.services.admin.usersCsv(usersFilters(ctx)), 'text/csv; charset=utf-8', {
@@ -267,7 +273,7 @@ export function registerRoutes(router: Router<AppContext>): void {
     }) });
   router.add({ method: 'GET', path: '/_admin/users/:id', auth: 'admin', tags: ['admin'], summary: 'User detail', handler: (ctx) =>
     ok(ctx.app.services.admin.userDetails(ctx.params.id)) });
-  router.add({ method: 'PATCH', path: '/_admin/users/:id', auth: 'admin', body: shape({ active: optional(boolean()), role: optional(oneOf(ROLE_VALUES)) }), rate: RATE.mutation, tags: ['admin'], summary: 'Update user', handler: (ctx) =>
+  router.add({ method: 'PATCH', path: '/_admin/users/:id', auth: 'admin', body: shape({ active: optional(boolean()), role: optional(oneOf(ROLE_VALUES)), jobTypeId: nullableIdentifier }), rate: RATE.mutation, tags: ['admin'], summary: 'Update user', handler: (ctx) =>
     ok(ctx.app.services.admin.updateUser(actor(ctx), ctx.params.id, body<any>(ctx))) });
   router.add({ method: 'GET', path: '/_admin/groups', auth: 'admin', tags: ['admin'], summary: 'Service groups', handler: (ctx) => ok(ctx.app.services.admin.groups()) });
   router.add({ method: 'POST', path: '/_admin/groups', auth: 'admin', body: groupBody, rate: RATE.mutation, tags: ['admin'], summary: 'Create service group', handler: (ctx) =>
@@ -305,13 +311,21 @@ export function registerRoutes(router: Router<AppContext>): void {
   } });
   router.add({ method: 'GET', path: '/_admin/sos/:id/nearest', auth: 'admin', query: nearestQuery, tags: ['admin'], summary: 'Nearest responders', handler: (ctx) => {
     const input = query<Record<string, any>>(ctx);
-    return ok(ctx.app.services.sos.nearestResponders({ latitude: Number(input.latitude), longitude: Number(input.longitude) },
-      Number(input.limit ?? 10), input.incidentTypeId ? String(input.incidentTypeId) : undefined));
+    return ok(ctx.app.services.sos.nearestForSos(ctx.params.id, Number(input.limit ?? 10)));
   } });
   router.add({ method: 'GET', path: '/_admin/sos/:id', auth: 'admin', tags: ['admin'], summary: 'SOS detail', handler: (ctx) =>
     ok(ctx.app.services.sos.getSos(actor(ctx), ctx.params.id)) });
-  router.add({ method: 'POST', path: '/_admin/sos/:id/dispatch', auth: 'admin', body: shape({ groupId: identifier, responderIds: array(identifier, { min: 1, max: 20 }) }), rate: RATE.emergency, tags: ['admin'], summary: 'Dispatch SOS', handler: (ctx) => {
-    const input = body<{ groupId: string; responderIds: string[] }>(ctx);
+  router.add({ method: 'GET', path: '/_admin/mission-offers', auth: 'admin', query: shape({ status: optional(oneOf(['pending', 'accepted', 'declined', 'expired', 'cancelled'])), limit: optionalLimit }, { allowUnknown: true }), tags: ['admin'], summary: 'Mission offers', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.sos.listAllOffers(input.status ? String(input.status) : undefined, Number(input.limit ?? 100)));
+  } });
+  router.add({ method: 'GET', path: '/_admin/job-types', auth: 'admin', tags: ['admin'], summary: 'Job types', handler: (ctx) => ok(ctx.app.services.admin.jobTypes()) });
+  router.add({ method: 'POST', path: '/_admin/job-types', auth: 'admin', body: shape({ label: displayText(1, 80), offerPolicy: oneOf(['all', 'ready_only']) }), rate: RATE.mutation, tags: ['admin'], summary: 'Create job type', handler: (ctx) =>
+    created(ctx.app.services.admin.createJobType(actor(ctx), body<any>(ctx))) });
+  router.add({ method: 'PATCH', path: '/_admin/job-types/:id', auth: 'admin', body: shape({ label: optional(displayText(1, 80)), offerPolicy: optional(oneOf(['all', 'ready_only'])), active: optional(boolean()) }), rate: RATE.mutation, tags: ['admin'], summary: 'Update job type', handler: (ctx) =>
+    ok(ctx.app.services.admin.updateJobType(actor(ctx), ctx.params.id, body<any>(ctx))) });
+  router.add({ method: 'POST', path: '/_admin/sos/:id/dispatch', auth: 'admin', body: shape({ groupId: identifier, responderIds: array(identifier, { min: 1, max: 20 }), mode: optional(oneOf(['offer', 'immediate'])) }), rate: RATE.emergency, tags: ['admin'], summary: 'Dispatch SOS', handler: (ctx) => {
+    const input = body<{ groupId: string; responderIds: string[]; mode?: 'offer' | 'immediate' }>(ctx);
     return ok(ctx.app.services.sos.dispatch(actor(ctx), ctx.params.id, input));
   } });
 }
