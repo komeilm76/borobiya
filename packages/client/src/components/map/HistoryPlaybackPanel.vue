@@ -620,7 +620,7 @@ function scrub(value: number | readonly number[]): void {
 }
 
 :global(:root.dark .history-playback) {
-  background: rgba(27, 41, 42, 0.94);
+  background: rgba(var(--v-theme-surface), 0.94);
   color: #edf5f2;
 }
 
@@ -628,7 +628,7 @@ function scrub(value: number | readonly number[]): void {
 :global(:root.dark .history-playback__status),
 :global(:root.dark .history-playback__hint),
 :global(:root.dark .history-playback__field) {
-  color: #a0b6b2;
+  color: var(--bb-color-muted);
 }
 
 :global(:root.dark .history-playback__field input) {
@@ -657,7 +657,7 @@ function scrub(value: number | readonly number[]): void {
   }
 
   :global(:root.dark .history-playback__header) {
-    background: rgba(27, 41, 42, 0.98);
+    background: rgba(var(--v-theme-surface), 0.98);
   }
 }
 
@@ -689,5 +689,13 @@ function scrub(value: number | readonly number[]): void {
   .history-playback__source :deep(.v-btn) { min-height: 44px; height: auto; }
   .history-playback__field { flex: 1 1 100%; }
   .history-playback__apply { flex: 1 1 100%; min-height: 44px; }
+}
+
+:global(:root.dark .history-playback__source),
+:global(:root.dark .history-playback__grants),
+:global(:root.dark .history-playback__range),
+:global(:root.dark .history-playback__transport) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
 }
 </style>

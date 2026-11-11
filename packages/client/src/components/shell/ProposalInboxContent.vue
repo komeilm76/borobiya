@@ -421,4 +421,17 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
   .offer-confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 @media (prefers-reduced-motion: reduce) { .offer-card { transition: none; }.offer-card:not(:disabled):not(.offer-card--selected):hover { transform: none; } }
+
+:global(:root.dark .offer-card:not(.offer-card--selected)) { border-color: var(--bb-color-outline); }
+:global(:root.dark .offer-card--selected) {
+  border-color: var(--bb-color-primary);
+  box-shadow: 0 0 0 2px var(--bb-color-primary), var(--bb-shadow-item);
+}
+:global(:root.dark .offer-detail__facts > div) {
+  background: var(--bb-color-inset);
+  border: 1px solid var(--bb-color-outline);
+}
+:global(:root.dark .offer-card__severity--urgent) { color: #ffadad; background: #422b2b; }
+:global(:root.dark .offer-card__severity--important) { color: #f9ca76; background: #443522; }
+:global(:root.dark .offer-card__severity--standard) { color: var(--bb-color-primary); background: #1d4038; }
 </style>

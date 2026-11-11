@@ -635,7 +635,7 @@
 :root.dark .auth-kicker {
   border-color: rgba(164, 211, 199, 0.16);
   color: #b5d9d1;
-  background: rgba(27, 41, 42, 0.72);
+  background: rgba(var(--v-theme-surface), 0.72);
 }
 
 :root.dark .auth-hero-title,
@@ -660,14 +660,14 @@
 
 :root.dark .auth-trust-row {
   border-color: rgba(190, 221, 213, 0.12);
-  background: rgba(27, 41, 42, 0.78);
+  background: rgba(var(--v-theme-surface), 0.78);
 }
 
 :root.dark .trust-icon,
 :root.dark .auth-card-icon {
   border-color: rgba(139, 210, 200, 0.16);
   color: #8bd2c8;
-  background: linear-gradient(145deg, #24413e, #1b292a);
+  background: linear-gradient(145deg, #24413e, var(--bb-color-surface));
 }
 
 :root.dark .auth-trust-row strong,
@@ -692,7 +692,7 @@
 :root.dark .auth-cross {
   border-color: rgba(139, 210, 200, 0.16);
   color: rgba(139, 210, 200, 0.56);
-  background: rgba(27, 41, 42, 0.5);
+  background: rgba(var(--v-theme-surface), 0.5);
 }
 
 :root.dark .auth-spark {
@@ -705,12 +705,12 @@
 }
 
 :root.dark .auth-card {
-  border-color: rgba(190, 221, 213, 0.12);
-  background: rgba(27, 41, 42, 0.98) !important;
+  border-color: var(--bb-color-outline);
+  background: rgba(var(--v-theme-surface), 0.98) !important;
 }
 
 :root.dark .auth-form .v-field {
-  background: #202f30;
+  background: var(--bb-color-inset);
 }
 
 :root.dark .text-link:hover {
@@ -748,11 +748,11 @@
 :root.dark .recovery-step-number {
   border-color: rgba(139, 210, 200, 0.16);
   color: #a9bfba;
-  background: rgba(27, 41, 42, 0.78);
+  background: rgba(var(--v-theme-surface), 0.78);
 }
 
 :root.dark .recovery-question {
-  border-color: rgba(190, 221, 213, 0.12);
+  border-color: var(--bb-color-outline);
   background: #192728;
 }
 
@@ -881,9 +881,9 @@
 }
 :root.dark .auth-chrome__home:hover { background: #2c4a49; }
 :root.dark .auth-chrome a:focus-visible { outline-color: #71c7be; }
-:root.dark .app-shell--auth .auth-layout { border-color: #46615d; background: #1b292a; }
+:root.dark .app-shell--auth .auth-layout { border-color: var(--bb-color-outline); background: var(--bb-color-surface); }
 :root.dark .app-shell--auth .auth-intro {
   background: linear-gradient(155deg, #103b3c 0%, #1b3535 55%, #282f35 100%);
 }
 :root.dark .app-shell--auth .auth-hero-title span { color: #f4d796; }
-:root.dark .app-shell--auth .auth-card { background: #1b292a !important; }
+:root.dark .app-shell--auth .auth-card { background: var(--bb-color-surface) !important; }

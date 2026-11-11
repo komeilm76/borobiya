@@ -294,4 +294,13 @@ watch(() => route.fullPath, () => {
   .map-proposal__bell, .map-proposal__item, .map-proposal__severity { border: 1px solid CanvasText; }
 }
 @media (prefers-reduced-motion: reduce) { .map-proposal__item { transition: none; } .map-proposal__bell { backdrop-filter: none; } }
+
+:global(:root.dark .map-proposal__item) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .map-proposal__item:hover) {
+  background: rgba(var(--v-theme-primary), .17);
+  border-color: rgb(var(--v-theme-primary));
+}
 </style>

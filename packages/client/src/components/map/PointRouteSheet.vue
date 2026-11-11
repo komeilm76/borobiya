@@ -309,4 +309,15 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 @media (max-height: 430px) and (max-width: 599px) {
   .point-route.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
 }
+
+/* The route actions and metrics must read as separate controls on a dark card. */
+:global(:root.dark .point-route__choice),
+:global(:root.dark .point-route__metrics > div) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .point-route__choice:hover:not(:disabled)) {
+  background: rgba(var(--v-theme-primary), .16);
+  border-color: rgb(var(--v-theme-primary));
+}
 </style>

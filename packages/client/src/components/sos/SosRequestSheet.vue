@@ -724,4 +724,15 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 }
+
+:global(:root.dark .sos-sheet__badge) {
+  color: var(--bb-color-error);
+  background: #422b2b;
+}
+:global(:root.dark .sos-severity-card) { border-color: var(--bb-color-outline); }
+:global(:root.dark .sos-severity-card.is-selected) {
+  border-color: var(--bb-color-error);
+  background: #422b2b;
+}
+:global(:root.dark .sos-sheet__map-wrap) { border-color: var(--bb-color-outline); }
 </style>

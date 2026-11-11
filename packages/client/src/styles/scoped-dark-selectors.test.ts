@@ -38,8 +38,8 @@ function darkTextColor(css: string, selector: string): string {
   const target = `:root.dark ${selector}`;
   for (const block of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!block[1]!.split(",").map((part) => part.trim()).includes(target)) continue;
-    const color = block[2]!.match(/(?:^|;)\s*color:\s*(#[0-9a-f]{6})\s*;/i)?.[1];
-    if (color) return color;
+    const color = block[2]!.match(/(?:^|;)\s*color:\s*(#[0-9a-f]{6}|var\(--bb-color-muted\))\s*;/i)?.[1];
+    if (color) return color === "var(--bb-color-muted)" ? palettes.dark.muted : color;
   }
   throw new Error(`Missing compiled dark text color for ${target}`);
 }

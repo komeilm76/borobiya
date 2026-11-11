@@ -97,4 +97,9 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
 @media (forced-colors: active) {
   .point-route-choices__card[aria-pressed="true"] { outline: 2px solid Highlight; }
 }
+
+:global(:root.dark .point-route-choices__card:not([aria-pressed="true"])) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
 </style>

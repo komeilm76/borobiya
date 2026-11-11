@@ -528,4 +528,14 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
   .mission-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 @media(max-width: 480px) { .mission-steps { grid-template-columns: 1fr; margin: 22px 0; }.mission-steps__item { min-height: 44px; }.mission-desk__foot { align-items: flex-start; flex-direction: column; }.mission-hero__glow { opacity: .4; } }
+
+:global(:root.dark .mission-route__stops),
+:global(:root.dark .mission-route__choice:not(.mission-route__choice--selected)) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .mission-steps__item:not(.mission-steps__item--reached)) {
+  background: var(--bb-color-inset);
+  border: 1px solid var(--bb-color-outline);
+}
 </style>

@@ -536,8 +536,8 @@ a {
 }
 
 :root.dark .app-topbar {
-  border-bottom-color: rgba(190, 221, 213, 0.12) !important;
-  background: rgba(27, 41, 42, 0.92) !important;
+  border-bottom-color: var(--bb-color-outline) !important;
+  background: rgba(var(--v-theme-surface), 0.96) !important;
 }
 
 :root.dark .brand-link {
@@ -577,16 +577,16 @@ a {
 }
 
 :root.dark .welcome-card {
-  border-color: rgba(190, 221, 213, 0.12);
+  border-color: var(--bb-color-outline);
   background:
     radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.08), transparent 37%),
-    rgba(27, 41, 42, 0.96) !important;
+    rgba(var(--v-theme-surface), 0.96) !important;
 }
 
 :root.dark .welcome-symbol {
   border-color: rgba(133, 202, 191, 0.18);
   color: #8bd2c8;
-  background: linear-gradient(145deg, #203b39, #1b292a 70%);
+  background: linear-gradient(145deg, #203b39, var(--bb-color-surface) 70%);
 }
 
 :root.dark .symbol-orbit {
@@ -616,8 +616,8 @@ a {
 }
 
 :root.dark .skeleton-note {
-  border-color: rgba(190, 221, 213, 0.12);
-  background: rgba(27, 41, 42, 0.78);
+  border-color: var(--bb-color-outline);
+  background: rgba(var(--v-theme-surface), 0.78);
 }
 
 :root.dark .note-icon {
@@ -634,11 +634,15 @@ a {
 }
 
 :root.dark .note-version {
-  color: #819994;
+  color: var(--bb-color-muted);
+}
+
+:root.dark .v-card.bb-map-navigation-card {
+  border-color: var(--bb-color-outline);
 }
 
 :root.dark .app-footer {
   border-top-color: rgba(190, 221, 213, 0.1);
   color: #9aafaa;
-  background: rgba(27, 41, 42, 0.82);
+  background: rgba(var(--v-theme-surface), 0.82);
 }

@@ -119,13 +119,16 @@ function ageText(minutes: number): string {
 .device-priority__meta bdi { overflow-wrap: anywhere; }
 .device-priority__session > .v-btn { flex: none; min-height: 44px; }
 .device-priority__confirm p { margin: 0 0 0.5rem; line-height: 1.7; overflow-wrap: anywhere; }
-:global(:root.dark .device-priority__card) { border-color: rgba(226, 240, 238, 0.12); background: rgb(27, 41, 42); }
+:global(:root.dark .device-priority__card) { border-color: var(--bb-color-outline); background: var(--bb-color-surface); }
 :global(:root.dark .device-priority__header h2), :global(:root.dark .device-priority__name) { color: #edf5f2; }
 :global(:root.dark .device-priority__kicker), :global(:root.dark .device-priority__hint),
 :global(:root.dark .device-priority__meta), :global(:root.dark .device-priority__icon),
-:global(:root.dark .device-priority__skeleton) { color: #a0b6b2; }
+:global(:root.dark .device-priority__skeleton) { color: var(--bb-color-muted); }
 :global(:root.dark .device-priority__hint--error) { color: #ffb4ab; }
-:global(:root.dark .device-priority__session) { border-color: rgba(226, 240, 238, 0.14); }
+:global(:root.dark .device-priority__session) {
+  border-color: var(--bb-color-outline);
+  background: var(--bb-color-inset);
+}
 @media (max-width: 599px) {
   .device-priority__header, .device-priority__hint, .device-priority__skeleton { padding-inline: 0.85rem; }
   .device-priority__list { padding-inline: 0.85rem; }

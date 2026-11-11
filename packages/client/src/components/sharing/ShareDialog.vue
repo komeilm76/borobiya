@@ -886,4 +886,16 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   .share-device-chooser__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }
   .share-device-chooser__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
+
+:global(:root.dark .share-dialog__results) { border-color: var(--bb-color-outline); }
+:global(:root.dark .share-dialog__result + .share-dialog__result) { border-top-color: var(--bb-color-outline); }
+:global(:root.dark .share-dialog__result--selected) {
+  background: #1d4038;
+  border-inline-start: 3px solid var(--bb-color-success);
+}
+:global(:root.dark .share-dialog__chip:not(.share-dialog__chip--on)) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .share-dialog__result-rating .v-icon) { color: var(--bb-color-secondary); }
 </style>

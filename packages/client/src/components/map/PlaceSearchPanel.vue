@@ -202,11 +202,18 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
   .place-search__actions :deep(.v-btn__content) { white-space: normal; overflow-wrap: anywhere; text-align: center; }
 }
 
-:global(:root.dark .place-search) { background: rgba(27, 41, 42, 0.95); }
+:global(:root.dark .place-search) { background: rgba(var(--v-theme-surface), 0.95); }
 :global(:root.dark .place-search__headline) { color: #edf5f2; }
-:global(:root.dark .place-search__detail), :global(:root.dark .place-search__feedback), :global(:root.dark .place-search__address) { color: #a0b6b2; }
+:global(:root.dark .place-search__detail), :global(:root.dark .place-search__feedback), :global(:root.dark .place-search__address) { color: var(--bb-color-muted); }
 @media (forced-colors: active) {
   .place-search__indicator { outline: 1px solid CanvasText; }
   .place-search__result--selected { outline: 2px solid Highlight; outline-offset: -2px; }
 }
+
+:global(:root.dark .place-search__result:not(.place-search__result--selected)) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .place-search__result:hover),
+:global(:root.dark .place-search__result:focus-visible) { background: rgba(var(--v-theme-primary), .18); }
 </style>

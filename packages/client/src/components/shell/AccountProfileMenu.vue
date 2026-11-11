@@ -191,4 +191,17 @@ function requestLogout(): void {
 @media (forced-colors: active) {
   .account-profile__card, .account-profile__theme--selected { border: 1px solid CanvasText; }
 }
+
+:global(:root.dark .account-profile__card) { border-color: var(--bb-color-outline); }
+:global(:root.dark .account-profile__identity) {
+  background: var(--bb-color-inset);
+  border-bottom: 1px solid var(--bb-color-outline);
+}
+:global(:root.dark .account-profile__theme:not(.account-profile__theme--selected)) {
+  background: var(--bb-color-inset);
+}
+:global(:root.dark .account-profile__theme--selected) {
+  background: rgba(var(--v-theme-primary), .2);
+  box-shadow: inset 0 0 0 2px rgb(var(--v-theme-primary));
+}
 </style>

@@ -92,4 +92,9 @@ section.point-transport-choices-shell { position: fixed; z-index: 7; pointer-eve
 @media (forced-colors: active) {
   .point-transport-choices__card[aria-pressed="true"] { outline: 2px solid Highlight; }
 }
+
+:global(:root.dark .point-transport-choices__card:not([aria-pressed="true"])) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
 </style>

@@ -144,8 +144,8 @@ const tone = computed(() => ownPositionTone(props.api.position.value, props.api.
   .own-position__actions :deep(.v-btn__content) { white-space: normal; overflow-wrap: anywhere; text-align: center; }
 }
 
-:global(:root.dark .own-position) { background: rgba(27, 41, 42, 0.95); }
+:global(:root.dark .own-position) { background: rgba(var(--v-theme-surface), 0.95); }
 :global(:root.dark .own-position__headline) { color: #edf5f2; }
 :global(:root.dark .own-position__detail),
-:global(:root.dark .own-position__note) { color: #a0b6b2; }
+:global(:root.dark .own-position__note) { color: var(--bb-color-muted); }
 </style>

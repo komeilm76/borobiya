@@ -2743,4 +2743,24 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 :global(:root.dark .user-map-view) { background: var(--bb-color-background); }
+
+@media (min-width: 600px) {
+  :global(:root.dark .user-map-view__telemetry-item) {
+    background: var(--bb-color-inset);
+    border-color: var(--bb-color-outline);
+  }
+  :global(:root.dark .user-map-view__telemetry-item--eta) {
+    background: rgba(var(--v-theme-primary), .17);
+    border-color: rgb(var(--v-theme-primary));
+  }
+}
+@media (max-width: 599px) {
+  :global(:root.dark .user-map-view__telemetry) {
+    background: var(--bb-color-inset);
+    border-color: var(--bb-color-outline);
+  }
+  :global(:root.dark .user-map-view__telemetry-item + .user-map-view__telemetry-item) {
+    border-inline-start-color: var(--bb-color-outline);
+  }
+}
 </style>

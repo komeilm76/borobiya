@@ -178,4 +178,9 @@ onBeforeUnmount(() => {
   .live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }
   .live-panel__members :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
+
+:global(:root.dark .live-panel__member) {
+  background: var(--bb-color-inset);
+  border: 1px solid var(--bb-color-outline);
+}
 </style>

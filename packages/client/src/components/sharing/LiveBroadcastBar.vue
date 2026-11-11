@@ -136,7 +136,7 @@ onMounted(() => {
 }
 
 :global(:root.dark .broadcast-bar) {
-  background: rgba(27, 41, 42, 0.95);
+  background: rgba(var(--v-theme-surface), 0.95);
 }
 
 :global(:root.dark .broadcast-bar__headline) {
@@ -144,6 +144,6 @@ onMounted(() => {
 }
 
 :global(:root.dark .broadcast-bar__detail) {
-  color: #a0b6b2;
+  color: var(--bb-color-muted);
 }
 </style>

@@ -67,4 +67,8 @@ const timeline = useMissionTimeline(computed(() => props.mission.id), props.audi
 .timeline__content strong { font-size: .9rem; }.timeline__actor { font-size: 0.82rem; opacity: .7; }
 .timeline time { font-size: 0.82rem; color: rgb(var(--v-theme-primary)); direction: ltr; unicode-bidi: isolate; }
 .timeline__empty { font-size: .85rem; opacity: .7; margin: 12px 0 0; }
+
+:global(:root.dark .timeline__dot) { border-color: var(--bb-color-primary); }
+:global(:root.dark .timeline__dot--terminal) { border-color: var(--bb-color-error); }
+:global(:root.dark .timeline__step:not(:last-child)::after) { background: var(--bb-color-outline); }
 </style>

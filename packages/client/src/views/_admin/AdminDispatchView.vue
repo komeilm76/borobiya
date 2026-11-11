@@ -1144,4 +1144,12 @@ onBeforeUnmount(() => {
   outline: 2px solid var(--bb-color-primary);
   outline-offset: 2px;
 }
+
+:global(:root.dark .admin-dispatch__surface),
+:global(:root.dark .dispatch-mission-timeline),
+:global(:root.dark .map-selected-alert-card),
+:global(:root.dark .mission-timeline-select) {
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .mission-timeline-select) { background: var(--bb-color-inset); }
 </style>

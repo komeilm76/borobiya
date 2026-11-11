@@ -56,10 +56,10 @@ describe("map history playback small-text contrast (T4.4.3 partial)", () => {
   it("retains readable muted labels on the translucent dark map card", () => {
     // A white tile beneath the 94% opaque dark panel is the least favorable dark backdrop.
     const lightestCard = blend(palettes.dark.surface, "#ffffff", 0.94);
-    expect(rule(":global(:root.dark .history-playback)")).toContain("background: rgba(27, 41, 42, 0.94);");
+    expect(rule(":global(:root.dark .history-playback)")).toContain("background: rgba(var(--v-theme-surface), 0.94);");
     for (const selector of [".history-playback__title-block p", ".history-playback__field", ".history-playback__hint"]) {
-      expect(color(`:global(:root.dark ${selector})`), selector).toBe("#a0b6b2");
-      expect(contrast("#a0b6b2", lightestCard), selector).toBeGreaterThanOrEqual(4.5);
+      expect(color(`:global(:root.dark ${selector})`), selector).toBe("var(--bb-color-muted)");
+      expect(contrast(palettes.dark.muted, lightestCard), selector).toBeGreaterThanOrEqual(4.5);
     }
     expect(rule(":global(:root.dark .history-playback__field input)"))
       .toContain("border-color: var(--bb-color-muted);");
@@ -69,9 +69,9 @@ describe("map history playback small-text contrast (T4.4.3 partial)", () => {
 
   it("keeps the sticky header and inset sections readable on a narrow dark map", () => {
     expect(rule(":global(:root.dark .history-playback__header)"))
-      .toContain("background: rgba(27, 41, 42, 0.98);");
-    const lightestHeader = blend("#1b292a", "#ffffff", 0.98);
-    expect(contrast("#a0b6b2", lightestHeader)).toBeGreaterThanOrEqual(4.5);
+      .toContain("background: rgba(var(--v-theme-surface), 0.98);");
+    const lightestHeader = blend(palettes.dark.surface, "#ffffff", 0.98);
+    expect(contrast(palettes.dark.muted, lightestHeader)).toBeGreaterThanOrEqual(4.5);
     expect(contrast("#edf5f2", lightestHeader)).toBeGreaterThanOrEqual(4.5);
     expect(rule(".history-playback__source")).toContain("background: rgba(var(--v-theme-on-surface), 0.035);");
     expect(rule(".history-playback__range")).toContain("background: rgba(var(--v-theme-on-surface), 0.035);");

@@ -232,4 +232,9 @@ async function requestLogout(): Promise<void> {
 @media (prefers-reduced-motion: reduce) {
   .map-sidebar__menu-button { backdrop-filter: none; }
 }
+
+:global(:root.dark .map-sidebar__theme:not(.map-sidebar__theme--selected)) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
 </style>

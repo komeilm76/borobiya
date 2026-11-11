@@ -931,4 +931,16 @@ onUnmounted(() => {
   .admin-status-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; margin: 0; }
   .admin-status-dialog-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
+
+:global(:root.dark .admin-users-table-wrap) { border-color: var(--bb-color-outline); }
+:global(:root.dark .admin-users-table th) { background: var(--bb-color-inset); }
+:global(:root.dark .admin-users-table tbody td),
+:global(:root.dark .admin-users-table tbody th) { border-top-color: var(--bb-color-outline) !important; }
+:global(:root.dark .admin-role-pill:not(.is-admin)) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .admin-role-pill.is-admin) { border-color: var(--bb-color-secondary); }
+:global(:root.dark .admin-account-status.is-active) { border-color: var(--bb-color-success); }
+:global(:root.dark .admin-account-status.is-inactive) { border-color: var(--bb-color-error); }
 </style>

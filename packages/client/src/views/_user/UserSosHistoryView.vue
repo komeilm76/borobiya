@@ -246,4 +246,10 @@ onBeforeUnmount(() => { ++missionGeneration; clearPhoto(); history.reset(); });
 }
 @media(max-width:530px) { .history__item { flex-wrap: wrap; }.history__item .v-chip { margin-inline-start: 49px; } }
 @media (prefers-reduced-motion: reduce) { .history__item { transition: none; }.history__item:not(:disabled):not(.history__item--selected):hover { transform: none; } }
+
+:global(:root.dark .history__item:not(.history__item--selected)) { border-color: var(--bb-color-outline); }
+:global(:root.dark .history__item--selected) {
+  border-color: var(--bb-color-primary);
+  box-shadow: 0 0 0 2px var(--bb-color-primary), var(--bb-shadow-item);
+}
 </style>

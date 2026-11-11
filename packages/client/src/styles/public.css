@@ -170,12 +170,12 @@
 :root.dark .public-chrome__nav a, :root.dark .public-chrome__login { color: #d0e8de; }
 :root.dark .public-chrome__nav a.router-link-active, :root.dark .public-eyebrow,
 :root.dark .public-section__eyebrow, :root.dark .public-text-link { color: #9be1d1; }
-:root.dark .public-chrome__theme { border-color: #45635f; color: #e2f0e9; }
+:root.dark .public-chrome__theme { border-color: var(--bb-color-outline); color: #e2f0e9; }
 :root.dark .public-chrome__join, :root.dark .public-button--primary { color: #111c1d; background: #91d9c7; }
 :root.dark .public-chrome__join:hover, :root.dark .public-button--primary:hover { background: #b4ecdc; }
 :root.dark .public-chrome__theme:hover, :root.dark .public-chrome__login:hover { background: #24403c; }
 :root.dark .app-shell--public a:focus-visible, :root.dark .app-shell--public button:focus-visible { outline-color: #f4d796; }
-:root.dark .public-hero { border-color: #37514c; background: radial-gradient(circle at 18% 6%, #28443e, transparent 47%), #1c3331; }
+:root.dark .public-hero { border-color: var(--bb-color-outline); background: radial-gradient(circle at 18% 6%, #28443e, transparent 47%), #1c3331; }
 :root.dark .public-hero h1, :root.dark .public-value h3, :root.dark .public-steps h3,
 :root.dark .public-health__body h2 { color: #edf5f2; }
 :root.dark .public-hero h1 em { color: #9be1d1; }
@@ -184,12 +184,12 @@
 :root.dark .public-value p, :root.dark .public-steps li p,
 :root.dark .public-health__body > p:not(.public-section__eyebrow), :root.dark .public-health__body small { color: #c0d6cc; }
 :root.dark .public-hero__assurance .v-icon { color: #91d9c7; }
-:root.dark .public-button--outline { border-color: #52766d; color: #e4f4ec; background: #2a4842; }
+:root.dark .public-button--outline { border-color: var(--bb-color-outline); color: #e4f4ec; background: #2a4842; }
 :root.dark .public-button--outline:hover { background: #37564d; }
-:root.dark .public-value, :root.dark .public-health__card { border-color: #3b534e; background: #1b2e2d; }
+:root.dark .public-value, :root.dark .public-health__card { border-color: var(--bb-color-outline); background: #1b2e2d; }
 :root.dark .public-value__icon { color: #9be1d1; background: #284840; }
 :root.dark .public-value__number { color: #b0c5bc; }
-:root.dark .public-steps { border-color: #3d5650; background: #1b3431; }
+:root.dark .public-steps { border-color: var(--bb-color-outline); background: #1b3431; }
 :root.dark .public-steps__list li { border-color: #3d5650; }
 :root.dark .public-steps__list li > span { color: #102221; background: #91d9c7; }
 :root.dark .public-final { background: #234541; }
