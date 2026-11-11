@@ -12,8 +12,8 @@ type WorkerEvent = {
 };
 type WorkerFetchHandler = (event: WorkerEvent) => void;
 
-function createWorker(fetcher: (request: WorkerRequest) => Promise<Response>,
-  delays: { open?: Promise<void>; put?: Promise<void> } = {}) {
+function createWorker(fetcher: (request: WorkerRequest, init?: RequestInit) => Promise<Response>,
+  delays: { open?: Promise<void>; put?: Promise<void>; fastNetworkTimeout?: boolean } = {}) {
   const handlers: Record<string, (event: never) => void> = {};
   const cachedResponses = new Map<string, Response>();
   const clientMessages: unknown[] = [];
@@ -47,6 +47,9 @@ function createWorker(fetcher: (request: WorkerRequest) => Promise<Response>,
 
   runInNewContext(workerScript, {
     self: workerScope,
+    AbortController,
+    setTimeout: (callback: () => void, ms: number) => setTimeout(callback, delays.fastNetworkTimeout ? 1 : ms),
+    clearTimeout,
     caches: {
       open: vi.fn(async () => { await delays.open; return cache; }),
       keys: vi.fn(async () => []),
@@ -124,6 +127,39 @@ describe("map resource cache worker", () => {
       type: "borobiya-map-cache-fallback",
       pathname: "/tehran/11/1050/698"
     });
+  });
+
+  it("falls back to a cached tile when a network request hangs without headers", async () => {
+    let hang = false;
+    const fetcher = vi.fn((_request: WorkerRequest, init?: RequestInit) => {
+      if (!hang) return Promise.resolve(new Response("saved tile", { status: 200 }));
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+    const worker = createWorker(fetcher, { fastNetworkTimeout: true });
+    await worker.fetchResource(tileRequest);
+    await worker.waitForCache();
+    hang = true;
+
+    const response = await worker.fetchResource(tileRequest);
+    expect(await response.text()).toBe("saved tile");
+    expect(fetcher.mock.calls[1]?.[1]?.signal?.aborted).toBe(true);
+  });
+
+  it("returns a 503 when a network request hangs and no cached tile exists", async () => {
+    const worker = createWorker((_request, init) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    }), { fastNetworkTimeout: true });
+    const response = await worker.fetchResource(tileRequest);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("does not hang even if fetch ignores abort", async () => {
+    const worker = createWorker(() => new Promise<Response>(() => undefined), { fastNetworkTimeout: true });
+    const response = await worker.fetchResource(tileRequest);
+    expect(response.status).toBe(503);
   });
 
   it("caches style, sprite, and glyph resources as well as vector tiles", async () => {

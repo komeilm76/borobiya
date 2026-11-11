@@ -1,5 +1,6 @@
 const CACHE_NAME = "borobiya-map-runtime-v2";
 const MAX_CACHE_ENTRIES = 512;
+const MAP_FETCH_TIMEOUT_MS = 8_000;
 
 function isMapResource(pathname) {
   return /^\/map\/style\/(?:light|dark)$/.test(pathname)
@@ -28,12 +29,32 @@ async function notifyCachedFallback(request) {
   }
 }
 
+async function fetchMapResourceWithDeadline(request) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    // Race the deadline as well as aborting: a stalled fetch may not settle
+    // promptly after its signal is aborted, but cached tiles must remain usable.
+    return await Promise.race([
+      fetch(request, { signal: controller.signal }),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Map resource request timed out"));
+        }, MAP_FETCH_TIMEOUT_MS);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function respondWithMapResource(request, retain) {
   // Start the network request independently of Cache Storage. A slow/opening
   // cache must never hold up a healthy online tile, style, sprite or glyph.
   const cacheReady = Promise.resolve().then(() => caches.open(CACHE_NAME)).catch(() => null);
   try {
-    const response = await fetch(request);
+    const response = await fetchMapResourceWithDeadline(request);
     if (response.status === 200 && response.ok) {
       try {
         // Clone while the live body is still available. The fetch event retains
