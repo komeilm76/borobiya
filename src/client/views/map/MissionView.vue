@@ -104,7 +104,7 @@ const nextActions = computed(() => {
   if (!canActOnMission.value) return [];
   const status = mission.value?.status;
   if (!status) return [];
-  if (status === MISSION_STATUS.ASSIGNED) return [{ action: 'start' as const, label: 'شروع حرکت', icon: 'play-circle-outline' }];
+  if (status === MISSION_STATUS.ASSIGNED) return [{ action: 'start' as const, label: 'شروع مأموریت', icon: 'play-circle-outline' }];
   if (status === MISSION_STATUS.ON_THE_WAY || status === MISSION_STATUS.PENDING) return actions.slice(0, 1);
   if (status === MISSION_STATUS.ARRIVED) return actions.slice(1, 2);
   if (status === MISSION_STATUS.IN_PROGRESS) return actions.slice(2, 3);

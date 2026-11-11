@@ -6,16 +6,18 @@ type TransitionResult =
 
 const SOS_TRANSITIONS: Record<string, Record<string, string>> = {
   [SOS_STATUS.PENDING]: { dispatch: SOS_STATUS.DISPATCHED, cancel: SOS_STATUS.CANCELLED, expire: SOS_STATUS.EXPIRED },
-  [SOS_STATUS.DISPATCHED]: { accept: SOS_STATUS.ACCEPTED, immediate: SOS_STATUS.ACCEPTED, cancel: SOS_STATUS.CANCELLED, expire: SOS_STATUS.EXPIRED },
+  // Immediate dispatch intentionally does NOT create an acceptance: the SOS stays dispatched.
+  // Starting the mission (ASSIGNED -> IN_PROGRESS) is what moves the SOS to in_progress.
+  [SOS_STATUS.DISPATCHED]: { accept: SOS_STATUS.ACCEPTED, cancel: SOS_STATUS.CANCELLED, expire: SOS_STATUS.EXPIRED, start: SOS_STATUS.IN_PROGRESS },
   [SOS_STATUS.ACCEPTED]: { start: SOS_STATUS.IN_PROGRESS, cancel: SOS_STATUS.CANCELLED },
   [SOS_STATUS.IN_PROGRESS]: { complete: SOS_STATUS.COMPLETED, cancel: SOS_STATUS.CANCELLED }
 };
 
 const MISSION_TRANSITIONS: Record<string, Record<string, string>> = {
   [MISSION_STATUS.PENDING]: { accept: MISSION_STATUS.ON_THE_WAY, cancel: MISSION_STATUS.CANCELLED },
-  // Immediate Dispatch: a directly assigned worker starts the journey with `start`; nothing else
-  // is pre-filled. The state machine refuses to skip straight to arrival or completion.
-  [MISSION_STATUS.ASSIGNED]: { start: MISSION_STATUS.ON_THE_WAY, cancel: MISSION_STATUS.CANCELLED },
+  // Immediate Dispatch: the assigned worker presses start; the mission moves straight to
+  // IN_PROGRESS (no acceptance step and no implicit journey leg is recorded).
+  [MISSION_STATUS.ASSIGNED]: { start: MISSION_STATUS.IN_PROGRESS, cancel: MISSION_STATUS.CANCELLED },
   [MISSION_STATUS.ON_THE_WAY]: { arrive: MISSION_STATUS.ARRIVED, cancel: MISSION_STATUS.CANCELLED },
   [MISSION_STATUS.ARRIVED]: { start: MISSION_STATUS.IN_PROGRESS, cancel: MISSION_STATUS.CANCELLED },
   [MISSION_STATUS.IN_PROGRESS]: { complete: MISSION_STATUS.COMPLETED, cancel: MISSION_STATUS.CANCELLED }

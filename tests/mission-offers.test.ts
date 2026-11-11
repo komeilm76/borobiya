@@ -149,21 +149,24 @@ describe('immediate dispatch', () => {
     const sosId = await createSos();
     const response = await dispatch(sosId, [responder], 'immediate');
     expect(response.status, response.text).toBe(200);
-    expect(response.json.data.status).toBe('accepted');
+    // Option A: the SOS stays dispatched; no acceptance is recorded anywhere.
+    expect(response.json.data.status).toBe('dispatched');
     expect(response.json.data.missionStatus).toBe('assigned');
 
-    expect(repo.one<Record<string, unknown>>('SELECT status FROM sos_requests WHERE id=?', sosId)?.status).toBe('accepted');
+    expect(repo.one<Record<string, unknown>>('SELECT status FROM sos_requests WHERE id=?', sosId)?.status).toBe('dispatched');
     expect(repo.one<Record<string, unknown>>('SELECT status FROM missions WHERE id=?', response.json.data.missionId)?.status).toBe('assigned');
-    // No offer rows: the responder was assigned, not offered.
+    // No offer rows and no acceptance event: the responder was assigned, not offered.
     expect(repo.one<{ c: number }>('SELECT COUNT(*) AS c FROM mission_offers WHERE sos_id=?', sosId)?.c).toBe(0);
+    expect(repo.one<{ c: number }>("SELECT COUNT(*) AS c FROM mission_events WHERE mission_id=? AND action='accept'", response.json.data.missionId)?.c).toBe(0);
 
-    // The worker drives the state machine from ASSIGNED: start moves the mission to on_the_way.
+    // The worker presses start: the mission ASSIGNED -> IN_PROGRESS and the SOS follows to in_progress.
     const cookie = await login(server, 'offers.imm', 'Responder!2026x');
     const progress = await apiFetch(server, `/_user/missions/${response.json.data.missionId}/progress`, {
       method: 'POST', cookie, body: { action: 'start' }
     });
     expect(progress.status, progress.text).toBe(200);
-    expect(progress.json.data.status).toBe('on_the_way');
+    expect(progress.json.data.status).toBe('in_progress');
+    expect(progress.json.data.sosStatus).toBe('in_progress');
     expect(repo.one<Record<string, unknown>>('SELECT status FROM sos_requests WHERE id=?', sosId)?.status).toBe('in_progress');
   });
 

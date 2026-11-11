@@ -169,15 +169,10 @@ export class SosService {
     }
     const dispatchTransition = transitionSos(String(sos.status), 'dispatch', identity.role);
     if (!dispatchTransition.ok) throw conflict('This request cannot be dispatched.', { reason: dispatchTransition.reason });
-    // Immediate dispatch never stays in 'dispatched': the responder is assigned, not offered.
-    // It moves the SOS straight to 'accepted' (mirroring offer acceptance) while the mission
-    // itself remains ASSIGNED until the worker presses start.
-    let targetSosStatus = dispatchTransition.next;
-    if (mode === 'immediate') {
-      const acceptedTransition = transitionSos(dispatchTransition.next, 'immediate', identity.role);
-      if (!acceptedTransition.ok) throw conflict('This request cannot be immediately dispatched.', { reason: acceptedTransition.reason });
-      targetSosStatus = acceptedTransition.next;
-    }
+    // Immediate dispatch (Option A): the responder is directly ASSIGNED, never "accepting".
+    // The SOS stays 'dispatched'; the mission remains ASSIGNED until the worker presses start,
+    // which moves both the mission and the SOS to in_progress. No offer row is created.
+    const targetSosStatus = dispatchTransition.next;
     return this.ctx.uow.commit((tx) => {
       const now = this.ctx.clock();
       const namedOffer = mode === 'offer' && responderIds.length === 1 ? responderIds[0] : null;
