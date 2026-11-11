@@ -37,6 +37,17 @@ export const DEFAULT_GROUPS: Array<{ id: string; name: string; color: string; ca
   { id: 'grp_urban', name: 'گروه امداد شهری', color: '#316D86', capacity: 30, incidentIds: ['inc_flood', 'inc_other'] }
 ];
 
+/**
+ * Job types with their mission-offer eligibility policy: `all` receives offers regardless of
+ * readiness (accepting flips readiness to ready); `ready_only` receives offers only while ready.
+ * The policy is configurable per job type from the administration panel.
+ */
+export const JOB_TYPES: Array<{ id: string; label: string; offerPolicy: 'all' | 'ready_only' }> = [
+  { id: 'job_fire', label: 'آتش‌نشانی', offerPolicy: 'all' },
+  { id: 'job_medical', label: 'امداد پزشکی', offerPolicy: 'all' },
+  { id: 'job_maintenance', label: 'خدمات فنی و تأسیسات', offerPolicy: 'ready_only' }
+];
+
 export const DEMO_USERS = [
   { id: 'usr_admin', username: 'admin', role: 'admin' },
   { id: 'usr_requester', username: 'saeed.k', role: 'user' },

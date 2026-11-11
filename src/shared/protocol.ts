@@ -31,12 +31,24 @@ export type SosStatus = (typeof SOS_STATUS)[keyof typeof SOS_STATUS];
 /** Canonical mission lifecycle states tracked by responders. */
 export const MISSION_STATUS = Object.freeze({
   PENDING: 'pending',
+  /** Directly assigned by an administrator (Immediate Dispatch); no acceptance step required. */
+  ASSIGNED: 'assigned',
   ON_THE_WAY: 'on_the_way',
   ARRIVED: 'arrived',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled'
 } as const);
+
+/** Per-job-type policy for whether non-ready workers may receive mission offers. */
+export const OFFER_POLICIES = Object.freeze({
+  /** Offers regardless of readiness; accepting flips readiness to ready. */
+  ALL: 'all',
+  /** Offers only while the worker is on standby. */
+  READY_ONLY: 'ready_only'
+} as const);
+
+export type OfferPolicy = (typeof OFFER_POLICIES)[keyof typeof OFFER_POLICIES];
 
 export type MissionStatus = (typeof MISSION_STATUS)[keyof typeof MISSION_STATUS];
 

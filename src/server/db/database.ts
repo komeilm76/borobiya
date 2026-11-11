@@ -1,10 +1,10 @@
 import * as sqlite from 'bun:sqlite';
 import type { Config } from '../core/config.ts';
 import { hashPassword } from '../core/crypto.ts';
-import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
+import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -176,6 +176,27 @@ CREATE TABLE IF NOT EXISTS sos_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_sos_status_time ON sos_requests(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sos_requester ON sos_requests(requester_id, created_at DESC);
+CREATE TABLE IF NOT EXISTS job_types (
+  id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  offer_policy TEXT NOT NULL DEFAULT 'ready_only' CHECK (offer_policy IN ('all','ready_only')),
+  rank INTEGER NOT NULL UNIQUE,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mission_offers (
+  id TEXT PRIMARY KEY,
+  sos_id TEXT NOT NULL REFERENCES sos_requests(id) ON DELETE CASCADE,
+  responder_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  policy TEXT NOT NULL CHECK (policy IN ('all','ready_only')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','expired','cancelled')),
+  created_at INTEGER NOT NULL,
+  responded_at INTEGER,
+  UNIQUE (sos_id, responder_id)
+);
+CREATE INDEX IF NOT EXISTS idx_offers_responder ON mission_offers(responder_id, status);
+CREATE INDEX IF NOT EXISTS idx_offers_sos ON mission_offers(sos_id, status);
 CREATE TABLE IF NOT EXISTS missions (
   id TEXT PRIMARY KEY,
   sos_id TEXT NOT NULL UNIQUE REFERENCES sos_requests(id) ON DELETE CASCADE,
@@ -274,6 +295,16 @@ export function openDatabase(config: Config): SqliteDatabase {
   }
   database.exec(SCHEMA);
   ensureColumn(database, 'sos_requests', 'photo_data_url', 'TEXT');
+  ensureColumn(database, 'users', 'job_type_id', 'TEXT REFERENCES job_types(id)');
+  // Offer backfill for databases that predate the offers table: a named, dispatched SOS with no
+  // offer row would otherwise be unacceptable. Idempotent, never re-creates declined/accepted rows.
+  database.exec(`
+    INSERT OR IGNORE INTO mission_offers(id, sos_id, responder_id, policy, status, created_at)
+    SELECT 'off_' || s.id || '_' || s.assigned_responder_id, s.id, s.assigned_responder_id, 'all', 'pending', s.updated_at
+    FROM sos_requests s
+    WHERE s.status = 'dispatched' AND s.assigned_responder_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM mission_offers o WHERE o.sos_id = s.id)
+  `);
   database
     .prepare('INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run('schema_version', String(SCHEMA_VERSION));
@@ -305,6 +336,9 @@ export async function seedDatabase(database: SqliteDatabase, config: Config): Pr
   });
   INCIDENT_TYPES.forEach((item, index) => {
     insert('INSERT OR IGNORE INTO incident_types(id,label,icon,color,rank) VALUES(?,?,?,?,?)', item.id, item.label, item.icon ?? 'alert', item.color ?? '#0E6666', index + 1);
+  });
+  JOB_TYPES.forEach((item, index) => {
+    insert('INSERT OR IGNORE INTO job_types(id,label,offer_policy,rank,active,created_at,updated_at) VALUES(?,?,?,?,1,?,?)', item.id, item.label, item.offerPolicy, index + 1, now, now);
   });
   CANCELLATION_REASONS.forEach((item, index) => {
     insert('INSERT OR IGNORE INTO cancellation_reasons(id,label,requires_text,rank) VALUES(?,?,?,?)', item.id, item.label, item.requiresText ? 1 : 0, index + 1);
@@ -347,6 +381,8 @@ export async function seedDatabase(database: SqliteDatabase, config: Config): Pr
     }
   }
   insert('INSERT OR IGNORE INTO group_members(group_id,user_id,role) VALUES(?,?,?)', 'grp_medical', 'usr_responder', 'leader');
+  // The demo responder is a firefighter (policy `all`), so they can accept even while not on standby.
+  insert("UPDATE users SET job_type_id='job_fire', updated_at=? WHERE id='usr_responder' AND job_type_id IS NULL", now);
   insert('INSERT OR IGNORE INTO location_shares(id,owner_id,recipient_id,kind,duration_seconds,expires_at,history_from,history_to,created_at,revoked_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
     'shr_demo_live', 'usr_requester', 'usr_companion', 'live', 3600, now + 3600_000, null, null, now, null);
   insert('INSERT OR IGNORE INTO saved_places(id,user_id,name,label,latitude,longitude,address,icon,rank,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
