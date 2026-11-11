@@ -10,8 +10,9 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Shared protocol constants and pure geometry helpers in `src/shared` are imported by the Bun server, the Vue client and Vitest.
 - [x] A declarative route table generates OpenAPI and owns every body, query, auth and rate-limit declaration.
 - [x] One SQLite schema replaces the former PostgreSQL/PostGIS/Drizzle migration stack.
-- [x] Vue 3 `<script setup lang="ts">` SFCs, typed Vue Router 4 routes, Vuetify 3 via `vite-plugin-vuetify`, Tailwind CSS 4 without preflight and seven typed Pinia setup stores replace the hand-written browser modules.
+- [x] Vue 3 `<script setup lang="ts">` SFCs, typed Vue Router 4 routes, Vuetify 3 via `vite-plugin-vuetify`, Tailwind CSS 4 without preflight and eight typed Pinia setup stores replace the hand-written browser modules.
 - [x] Generated assets and the service-worker cache manifest are deterministic and timestamp-free, so unchanged builds do not dirty the checkout.
+- [x] Stage 3 shipped behind the same gate: mission teams with one active membership per (mission, user), an explicit leader for team missions, assisted (eligible-candidate) plus manual administrator staffing, support requests with create/review/approve/partially-approve/reject/withdraw and enforced hand-count-for-hand full approvals, removal-reason visibility restricted to administrators, and realtime publication to the `mission:<id>` audience (`mission.team.updated`, `support.request.created`, `support.request.reviewed`, `support.request.cancelled`).
 
 ## Authentication and account lifecycle
 
@@ -62,11 +63,12 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Loading, empty, error and offline surfaces are implemented for routed data and forms.
 - [x] Skip navigation, focus restoration, modal focus handling, labelled icon-only controls, visible focus rings, reduced-motion support and keyboard shortcuts are implemented.
 - [x] Contrast ratios for primary text, muted text and semantic status colors are verified by an automated check.
-- [x] Lazy view loading replaces eager imports of all view modules; every one of the 21 views is a code-split chunk.
+- [x] Lazy view loading replaces eager imports of all view modules; every one of the 22 views is a code-split chunk.
 - [x] Every routed view and layout is mounted by the suite, and the role guard is exercised for anonymous, user, administrator and onboarding-only accounts.
 - [x] Animation is declarative first (`<Transition>`, `<TransitionGroup>`, `motion-v`, `@vueuse/motion`) with GSAP limited to one timeline, and every duration collapses to zero under `prefers-reduced-motion`.
 - [x] A full login-to-rating journey test exercises registration/session, sharing, SOS, dispatch, acceptance, mission status and rating.
 - [x] A Bun-native benchmark records validator, tile, HTTP and live-location latency figures for release review.
+- [x] The administrator console ships a support-requests review queue (live pending badge, candidate picker with ineligibility reasons, composable drawer) and the dispatch board's team mode creates team missions with an explicit leader and composition.
 - [x] CI runs install, diagnostics, typechecks, documentation guards, tests, acceptance invariants and deployment configuration checks.
 
 ## Superseded legacy targets

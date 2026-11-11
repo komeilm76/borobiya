@@ -123,10 +123,10 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | mission/08-mission-route-alternatives.png | superseded | — | See above. |
 | mission/09-mission-arrived.png | partial | P2/L | Arrive action implemented (arrive/start/complete state machine). |
 | mission/10-mission-in-progress.png | partial | P2/L | Start/complete implemented. |
-| mission/11-support-request.png | missing | P2/M | No support-request concept anywhere in the server (schema, routes, events). Greenfield; needs product decision before build. |
-| mission/12-support-pending.png | missing | P2/M | Depends on the above. |
+| mission/11-support-request.png | partial | P2/M | Support requests exist end to end (leader composer, pending list, administrator review with full/partial/reject decisions and a staffing picker); the designed sheet presentation is absent. |
+| mission/12-support-pending.png | partial | P2/M | Pending requests render in the leader's support panel with a two-step withdrawal; the designed pending surface is absent. |
 | mission/13-support-accepted-notification.png | missing | P2/M | Depends on the above. |
-| mission/14-team-leader-dashboard.png | missing | P2/M | No TEAM_LEADER role/scope exists (roles: user, responder, admin). Needs product + permission decision. |
+| mission/14-team-leader-dashboard.png | partial | P2/M | Team leadership is a mission-scoped designation (roles unchanged: user, responder, admin); the leader sees the team panel with roster, composition progress and the support-request composer. The designed dashboard is absent. |
 | mission/15-mission-cancel.png | done | P1/H | Assigned responder (or admin) gets an inline mission-cancel panel on the mission card: optional note for the requester, confirmation step, `progress('cancel')` through the state machine, conflict surfaced, authoritative reload afterwards. |
 | mission/16-mission-report.png | partial | P2/M | Rating accepts an optional report note (≤200 chars) via a textarea on the rating block; stored in `missions.rating_note`, served on the mission projection and embedded mission, shown on the mission card after rating. Designed full report form absent. |
 | mission/17-mission-completed.png | partial | P2/M | Completed missions reachable; card shows Persian status label, recorded rating and the saved rating note. No designed completion/report surface. |

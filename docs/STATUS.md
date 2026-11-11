@@ -8,7 +8,9 @@ Core infrastructure includes strict validators, typed errors, deterministic LRU 
 
 Services provide registration, login, recovery, sessions, profiles, devices, saved places, sync, tickets, live and historical location, SOS creation, dispatch, acceptance, mission progress, cancellation, rating, one-to-one PTT floor control, administration, map configuration and realtime coordination. Declarative routes expose public, authentication, user and administrator APIs plus OpenAPI and immutable SVG tiles.
 
-The Vue client provides authentication, onboarding, the mobile map, four-step SOS composition with an optional compressed photo, mission and SOS rails, companions, live sharing, history, profile, press-and-hold PTT, and the desktop administrator console. It uses seven typed Pinia stores, VueUse for browser state, one authenticated WebSocket, durable event catch-up, a versioned service worker compiled from TypeScript, a bounded offline tile cache, self-hosted fonts and a generated icon subset.
+Services also provide mission teams (members, one active membership per mission and user, admin-designated leadership), support requests (create, review, full/partial approval, rejection, withdrawal) with assisted-then-finalized staffing, and every mutation publishes a durable event to the `mission:<id>` audience.
+
+The Vue client provides authentication, onboarding, the mobile map, four-step SOS composition with an optional compressed photo, mission and SOS rails, mission team roster and support-request surfaces for requesters, leaders and administrators, companions, live sharing, history, profile, press-and-hold PTT, and the desktop administrator console (including the support-requests review queue with a live pending badge). It uses eight typed Pinia stores, VueUse for browser state, one authenticated WebSocket, durable event catch-up, a versioned service worker compiled from TypeScript, a bounded offline tile cache, self-hosted fonts and a generated icon subset.
 
 ## Validation gate
 

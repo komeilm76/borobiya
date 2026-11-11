@@ -20,10 +20,10 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 
 ### Browser application
 
-- Vue 3.5 with `<script setup lang="ts">` in every view, layout and component; 21 views cover the four authentication screens, six mobile map screens and ten administrator screens.
+- Vue 3.5 with `<script setup lang="ts">` in every view, layout and component; 22 views cover the four authentication screens, six mobile map screens and eleven administrator screens.
 - Vue Router 4 with typed `ROUTE_NAMES`, lazy view imports and role-aware guards.
 - Vuetify 3 registered through `vite-plugin-vuetify`, compiled with the Borobiya design tokens; Tailwind CSS 4 through `@tailwindcss/vite` with preflight disabled so Vuetify's reset stays authoritative.
-- Seven Pinia setup stores (`auth`, `map`, `sos`, `realtime`, `admin`, `settings`, `offline`) and VueUse for storage, online/network state, media queries, geolocation, debouncing and event listeners.
+- Eight Pinia setup stores (`auth`, `map`, `sos`, `realtime`, `admin`, `settings`, `offline`, `missionTeam`) and VueUse for storage, online/network state, media queries, geolocation, debouncing and event listeners.
 - Motion is declarative first: `<Transition>` and `<TransitionGroup>` for routes, sheets and live lists, `motion-v` with `@vueuse/motion` variants for cards and the command palette, and GSAP for one coordinated reveal timeline. Every duration is `0` under `prefers-reduced-motion`.
 - The service worker is authored in TypeScript (`src/client/service-worker/sw.ts`) and compiled to the browser artifact at build time; `public/` is generated output and git-ignored.
 
@@ -55,7 +55,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 
 `bun run check` is the gate: it builds the Vue bundle and the service worker, typechecks the Bun server (`tsc`), typechecks the Vue client (`vue-tsc --noEmit`), runs the English-only documentation and clean-rebuild guard, and executes the Vitest suite with coverage. `./boro doctor`, `./boro verify`, `bun run bench`, `bun run smoke`, `bun run acceptance` and `./boro deploy:check` complete the release gate.
 
-The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, Vuetify component mounting, all 20 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
+The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, Vuetify component mounting, all 22 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
 
 Professional visual acceptance against the canonical PNG references remains a deliberately deferred human review: this release contains no browser-driven end-to-end sign-off, no screenshot comparison and no real-device testing.
 

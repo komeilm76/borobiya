@@ -264,14 +264,6 @@ describe('access control and projections', () => {
 });
 
 describe('support requests — creation and review', () => {
-  async function setupMission(): Promise<{ missionId: string; leader: string; leaderCookie: string }> {
-    const leader = await createResponder(`team.sr${Math.floor(Math.random() * 1e9)}`, 'job_fire', true);
-    const sosId = await createSos();
-    const dispatch = await immediateDispatch(sosId, leader);
-    const missionId = dispatch.json.data.missionId as string;
-    return { missionId, leader, leaderCookie: await login(server, (await apiFetch(server, `/_admin/missions/${missionId}/team`, { cookie: adminCookie })).json.data.leader.username, 'Responder!2026x') };
-  }
-
   it('only the mission leader may file; the request captures job types, quantities, reason and note', async () => {
     const { missionId, leaderCookie } = await setupMission();
     const asMemberless = await apiFetch(server, `/_user/missions/${missionId}/support-requests`, {
@@ -492,7 +484,8 @@ describe('membership identity', () => {
   });
 });
 
-async function setupMission() {
+
+async function setupMission(): Promise<{ missionId: string; leader: string; leaderCookie: string }> {
   const leader = await createResponder(`team.gen${Math.floor(Math.random() * 1e9)}`, 'job_fire', true);
   const sosId = await createSos();
   const dispatch = await immediateDispatch(sosId, leader);

@@ -12,7 +12,7 @@ On connect the server sends `hello` with protocol version, connection ID, user I
 
 Clients send `ping`, `subscribe`, `location.update`, `talk.start`, `talk.stop`, `snapshot` and `sync`. The server replies with `pong`, `ack`, `error`, `snapshot`, `presence`, `talk.state`, `location.peer` and `event` messages. Every command may carry a `requestId`; acknowledgements and typed errors echo it. Unknown command types return an `INVALID_INPUT` error rather than closing the connection.
 
-`sync` accepts `since` and `limit` and returns a `snapshot` with `kind: "sync"`, the filtered durable events and the new cursor. Event audiences are `all`, `user:<id>`, `role:<role>`, `session:<id>`, `sos:<id>`, `mission:<id>` and `talk:<id>`. The repository filters catch-up events so a client cannot read another user's private events.
+`sync` accepts `since` and `limit` and returns a `snapshot` with `kind: "sync"`, the filtered durable events and the new cursor. Event audiences are `all`, `user:<id>`, `role:<role>`, `session:<id>`, `sos:<id>`, `mission:<id>` and `talk:<id>`. Mission team changes and support-request outcomes are published as durable events to the `mission:<id>` audience (`mission.team.updated`, `support.request.created`, `support.request.reviewed`, `support.request.cancelled`). The repository filters catch-up events so a client cannot read another user's private events.
 
 ## Live location
 

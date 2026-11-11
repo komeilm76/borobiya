@@ -1,6 +1,6 @@
 # Borobiya 2.0.0 — Implementation Plan (Missions, Sharing Center, Trips, History)
 
-Status: Stage 2 landed (commit range d07c944..eb1cc6b); Stage 3 next. Each stage ships as focused
+Status: Stage 2 landed (commit range d07c944..eb1cc6b); Stage 3 landed (8c7893c backend, e721106 client). Each stage ships as focused
 commits on the working branch and is reported separately. This document is the live plan; it is
 updated as stages land.
 
@@ -101,6 +101,7 @@ Defaults adopted for open sub-decisions (flagged for owner review, not silently 
 ## Stage log
 
 - Stage 1 (this document): architecture mapped; defects verified; plan fixed.
+- Stage 3 (8c7893c backend, e721106 client): mission teams end to end — `mission_members` with one active membership per (mission, user); team missions dispatched with an explicit group-verified leader; assisted staffing (eligible-candidate search with ineligibility reasons shown but unselectable) finalized by the administrator; support requests with create/withdraw/review and full/partial/reject decisions enforced against the requested composition (a full approval must staff exactly what was asked, a partial approval needs at least one short line, double review returns 409); removal-reason visibility restricted to administrators; realtime publication of `mission.team.updated` and `support.request.*` to the `mission:<id>` audience; `/_user/job-types` catalog and a team-dispatch endpoint on the board (explicit leader); a support-requests review queue in the administrator console with a live pending badge; the shared mission team panel and support-request panel on the mission screen; roster management (two-step remove and leader designation, requirements editor, username search to add) in the administrator surface; the contract test now parses the client interfaces against live payloads including the team flow. `./boro verify` exits 0: 1061/1061 tests, coverage statements 94.28% / branches 89.30% / functions 94.05% / lines 96.05% (thresholds pass; no gate lowered).
 - Stage 2 (d07c944 schema, 6787a92 server, 6651b6e client, eb1cc6b tests): job types and
   per-job-type offer policies (`all` = Policy A, `ready_only` = Policy B), per-responder
   `mission_offers` rows created atomically at dispatch, Policy-A accept auto-ready inside the
