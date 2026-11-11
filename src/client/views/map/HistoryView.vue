@@ -4,7 +4,7 @@ import { useSosStore } from '@/stores/sos.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { useRouter } from 'vue-router';
-import { MISSION_STATUS, SOS_STATUS } from '@shared/protocol.ts';
+import { statusLabel, statusTone } from '@/utils/status.ts';
 
 /** History screen: your past SOS requests and the missions you took as responder. */
 const sos = useSosStore();
@@ -12,24 +12,6 @@ const format = useFormatters();
 const router = useRouter();
 const history = computed(() => sos.requests);
 const missions = computed(() => sos.missions);
-
-const STATUS_LABELS: Record<string, string> = {
-  [SOS_STATUS.PENDING]: 'در انتظار',
-  [SOS_STATUS.DISPATCHED]: 'اعزام‌شده',
-  [SOS_STATUS.ACCEPTED]: 'پذیرفته‌شده',
-  [SOS_STATUS.IN_PROGRESS]: 'در حال رسیدگی',
-  [SOS_STATUS.COMPLETED]: 'تکمیل‌شده',
-  [SOS_STATUS.CANCELLED]: 'لغو‌شده',
-  [SOS_STATUS.EXPIRED]: 'منقضی‌شده',
-  [MISSION_STATUS.ON_THE_WAY]: 'در راه',
-  [MISSION_STATUS.ARRIVED]: 'رسیده'
-};
-const statusLabel = (status: string): string => STATUS_LABELS[status] ?? status;
-const statusTone = (status: string): string => {
-  if (status === MISSION_STATUS.CANCELLED || status === SOS_STATUS.CANCELLED || status === SOS_STATUS.EXPIRED) return 'status-pill status-pill--neutral';
-  if (status === MISSION_STATUS.COMPLETED || status === SOS_STATUS.COMPLETED) return 'status-pill status-pill--success';
-  return 'status-pill status-pill--warning';
-};
 </script>
 
 <template>

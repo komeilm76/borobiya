@@ -9,6 +9,7 @@ import { haversineMeters } from '@shared/geo.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
 import type { SosView } from '@/api/types.ts';
+import { statusLabel } from '@/utils/status.ts';
 
 /**
  * Requester and responder mission screen: the SOS rail, the mission action buttons that
@@ -235,7 +236,7 @@ async function confirmMissionCancel(): Promise<void> {
       <span v-if="request">کد پیگیری {{ format.number(request.trackingCode) }}</span>
       <span v-else>درخواست فعالی ثبت نشده است</span>
     </div>
-    <span v-if="request" class="status-pill status-pill--warning">{{ request.status }}</span>
+    <span v-if="request" class="status-pill status-pill--warning">{{ statusLabel(request.status) }}</span>
   </div>
   <div class="sheet__body">
     <template v-if="offers.length">

@@ -116,7 +116,12 @@ function onTap(event: MouseEvent): void {
   map.selectDestination(point);
 }
 
-const scaleLabel = computed(() => format.distance(250));
+/** Scales the 42px scale bar honestly: Web Mercator ground meters per screen pixel at the centre latitude. */
+const SCALE_BAR_PIXELS = 42;
+const scaleLabel = computed(() => {
+  const metersPerPixel = (156543.03392 * Math.cos((center.value.latitude * Math.PI) / 180)) / (2 ** zoom.value);
+  return format.distance(metersPerPixel * SCALE_BAR_PIXELS);
+});
 </script>
 
 <template>
