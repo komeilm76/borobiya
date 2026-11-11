@@ -195,13 +195,13 @@
 :root.dark .public-final { background: #234541; }
 :root.dark .public-final .public-section__eyebrow { color: #f4d796; }
 :root.dark .public-final .public-button--primary { color: #173b3a; background: #f4d796; }
-:root.dark .public-footer { border-color: #38534d; background: #192a29; }
+:root.dark .public-footer { border-color: var(--bb-color-outline); background: #192a29; }
 :root.dark .public-footer p, :root.dark .public-footer nav { color: #c0d6cc; }
 :root.dark .public-footer strong { color: #edf5f2; }
 :root.dark .public-health__badge { color: #f5dea4; background: #403720; }
 :root.dark .public-health__badge--online { color: #a5e6bc; background: #224334; }
 :root.dark .public-health__badge--unavailable { color: #ffc3c4; background: #452a2d; }
-:root.dark .public-health__retry { border-color: #4b7065; color: #dcf4e9; background: #28453d; }
+:root.dark .public-health__retry { border-color: var(--bb-color-outline); color: #dcf4e9; background: #28453d; }
 :root.dark .public-health__retry:not(:disabled):hover { background: #35584c; }
 :root.dark .public-health__note { color: #d6e7da; background: #254039; }
 

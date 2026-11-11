@@ -877,7 +877,9 @@
 :root.dark .auth-chrome__theme { color: #edf5f2 !important; }
 :root.dark .auth-chrome__theme:focus-visible { outline-color: #71c7be; }
 :root.dark .auth-chrome__home {
-  border-color: #49615d; color: #edf5f2; background: #203536;
+  border-color: var(--bb-color-outline);
+  color: #edf5f2;
+  background: var(--bb-color-surface);
 }
 :root.dark .auth-chrome__home:hover { background: #2c4a49; }
 :root.dark .auth-chrome a:focus-visible { outline-color: #71c7be; }

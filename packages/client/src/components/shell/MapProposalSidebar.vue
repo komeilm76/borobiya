@@ -295,6 +295,7 @@ watch(() => route.fullPath, () => {
 }
 @media (prefers-reduced-motion: reduce) { .map-proposal__item { transition: none; } .map-proposal__bell { backdrop-filter: none; } }
 
+:global(:root.dark .map-proposal__bell) { border-color: var(--bb-color-outline); }
 :global(:root.dark .map-proposal__item) {
   background: var(--bb-color-inset);
   border-color: var(--bb-color-outline);

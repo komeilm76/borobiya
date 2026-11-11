@@ -11,6 +11,10 @@ Source-level sweep of all 50 client `.vue` files (map, mission, settings, sharin
 
 `packages/client/src/styles/dark-layer-contrast.test.ts` measures these pairings, checks source coverage across every client widget/view directory, and pins the key dark overrides without mounting Vue files. Existing compiled-scoped-CSS, history/companion and admin contrast tests exercise the affected selectors.
 
+## Follow-up: stock map and utility controls
+
+The second pass caught a pale MapLibre loading canvas and light-only stock zoom/attribution controls, plus faint sharing rows, sidebar launchers, auth-home and public-health buttons. Dark map placeholders and MapLibre control groups now follow the theme, with readable inverted stock zoom icons, dark attribution/scale backgrounds and accent-colored attribution links. The user map's custom two-tone compass is **excluded** from stock-icon inversion; forced-colors mode keeps the browser's own control colors. Share rows and the remaining action outlines use the tested inset/outline tiers. This does not modify the map's own street, terrain or label styling or hide attribution.
+
 ## Still to verify visually
 
 Check the real composited result on a small phone, desktop, iOS Safari and text zoom (including dialogs/teleported overlays and live map tiles). Source tests cannot establish every actual pixel contrast or the visual balance of all transient Vuetify states; address any device-specific misses from screenshots rather than assuming this audit proves full WCAG conformance.

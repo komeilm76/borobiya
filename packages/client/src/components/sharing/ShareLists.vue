@@ -827,6 +827,13 @@ defineExpose({ refresh });
 
 .share-lists__confirm-body { min-height: 0; overflow-y: auto; }
 
+/* Share rows are a separate tier inside the dark list card, including owned-device rows. */
+:global(:root.dark .share-lists__row) {
+  background: var(--bb-color-inset);
+  border-color: var(--bb-color-outline);
+}
+:global(:root.dark .share-lists__device-line) { border-top-color: var(--bb-color-outline); }
+
 @media (max-width: 599px) {
   .share-lists__header > div:first-child { width: 100%; }
   .share-lists__tools { flex: 1 1 100%; justify-content: flex-end; }

@@ -278,8 +278,35 @@ defineExpose({ map, setStyle: updateStyle });
   box-shadow: var(--bb-shadow-item-hover);
 }
 
-:global(:root.dark .map-canvas .maplibregl-ctrl-group) {
-  border-color: rgba(190, 221, 213, 0.25);
+:global(:root.dark .map-canvas) { background: var(--bb-color-background); }
+
+/* MapLibre ships light controls and black SVG icons. Theme its stock controls,
+ * but leave the user map's custom two-tone compass icon and primary button alone. */
+@media (forced-colors: none) {
+  :global(:root.dark .map-canvas .maplibregl-ctrl-group) {
+    border-color: var(--bb-color-outline);
+    background: var(--bb-color-surface);
+  }
+  :global(:root.dark .map-canvas:not(.user-map-view__canvas) .maplibregl-ctrl-icon) {
+    filter: invert(1);
+  }
+  :global(:root.dark .map-canvas .maplibregl-ctrl-group button + button) {
+    border-top-color: var(--bb-color-outline);
+  }
+  :global(:root.dark .map-canvas .maplibregl-ctrl-attrib) {
+    color: var(--bb-color-text);
+    background: rgba(var(--v-theme-surface), 0.96);
+  }
+  :global(:root.dark .map-canvas .maplibregl-ctrl-attrib a) {
+    color: var(--bb-color-primary);
+    text-decoration: underline;
+  }
+  :global(:root.dark .map-canvas .maplibregl-ctrl-attrib-button) { filter: invert(1); }
+  :global(:root.dark .map-canvas .maplibregl-ctrl-scale) {
+    color: var(--bb-color-text);
+    background: rgba(var(--v-theme-surface), 0.96);
+    border-color: var(--bb-color-outline);
+  }
 }
 
 @media (forced-colors: active) {

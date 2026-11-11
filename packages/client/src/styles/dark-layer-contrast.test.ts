@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { compileStyle, parse } from "vue/compiler-sfc";
 import { describe, expect, it } from "vitest";
 import { palettes } from "./tokens";
 
@@ -57,6 +58,35 @@ describe("dark surfaces and widget boundaries", () => {
     expect(source("styles/auth.css")).toContain("background: var(--bb-color-inset);");
     expect(source("styles/public.css")).toContain(".public-value, :root.dark .public-health__card { border-color: var(--bb-color-outline);");
     expect(source("styles/tailwind.css")).toContain(":root.dark .v-card.bb-map-navigation-card {\n  border-color: var(--bb-color-outline);");
+  });
+
+  it("keeps the map loading canvas, MapLibre controls and attribution dark without recoloring the custom compass", () => {
+    const canvas = source("components/map/MapCanvas.vue");
+    expect(canvas).toContain(":global(:root.dark .map-canvas) { background: var(--bb-color-background); }");
+    expect(canvas).toContain("background: var(--bb-color-surface);");
+    expect(canvas).toContain(":global(:root.dark .map-canvas:not(.user-map-view__canvas) .maplibregl-ctrl-icon)");
+    expect(canvas).toContain(":global(:root.dark .map-canvas .maplibregl-ctrl-attrib a)");
+    expect(canvas).toContain("color: var(--bb-color-primary);");
+    const style = parse(canvas).descriptor.styles[0]!;
+    const compiled = compileStyle({ source: style.content, filename: "MapCanvas.vue", id: "data-v-map-audit", scoped: true });
+    expect(compiled.errors).toEqual([]);
+    expect(compiled.code).toContain(":root.dark .map-canvas:not(.user-map-view__canvas) .maplibregl-ctrl-icon");
+    expect(compiled.code).not.toContain(":root.dark .map-canvas .maplibregl-ctrl-icon {");
+    expect(contrast(dark.primary, dark.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(source("views/_user/UserMapView.vue")).toContain(
+      ":global(:root.dark .user-map-view__canvas .maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon)");
+  });
+
+  it("separates remaining share rows, float launchers, public links and auth controls", () => {
+    expect(source("components/sharing/ShareLists.vue"))
+      .toContain(":global(:root.dark .share-lists__row) {\n  background: var(--bb-color-inset);\n  border-color: var(--bb-color-outline);");
+    expect(source("components/shell/MapSidebar.vue"))
+      .toContain(":global(:root.dark .map-sidebar__menu-button) { border-color: var(--bb-color-outline); }");
+    expect(source("components/shell/MapProposalSidebar.vue"))
+      .toContain(":global(:root.dark .map-proposal__bell) { border-color: var(--bb-color-outline); }");
+    expect(source("styles/public.css")).toContain(":root.dark .public-health__retry { border-color: var(--bb-color-outline);");
+    expect(source("styles/auth.css")).toContain(":root.dark .auth-chrome__home {\n  border-color: var(--bb-color-outline);");
+    expect(contrast(dark.outline, "#28453d")).toBeGreaterThanOrEqual(3);
   });
 
   it("distinguishes actionable rows without obscuring selected, warning or SOS states", () => {
