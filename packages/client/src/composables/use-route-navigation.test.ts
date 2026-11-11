@@ -44,6 +44,37 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(nav.start()).toBe(false);
   });
 
+  it("recenters on a fresh fix without opening a second GPS watch, but never uses an expired or stopped fix", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    let emit!: (point: { lat: number; lon: number }) => void;
+    const subscribe = vi.fn((onFix: typeof emit) => { emit = onFix; return vi.fn(); });
+    const follow = vi.fn();
+    const scope = effectScope();
+    try {
+      const nav = scope.run(() => useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), follow,
+        { subscribe, now: () => Date.now() }))!;
+      expect(nav.recenter()).toBe(false);
+      nav.start();
+      expect(nav.recenter()).toBe(false); // An active watch is not a live fix yet.
+      emit({ lat: 38.5, lon: -120.2 });
+      expect(follow).toHaveBeenCalledTimes(1);
+      nav.recenter(); // Explicit action bypasses the automatic one-second throttle.
+      expect(follow).toHaveBeenCalledTimes(2);
+      expect(follow.mock.calls[1]?.[0]).toMatchObject({ center: [-120.2, 38.5], pitch: 60 });
+      expect(subscribe).toHaveBeenCalledTimes(1);
+      vi.advanceTimersByTime(20_000);
+      expect(nav.recenter()).toBe(false); // No stale position can move the camera.
+      expect(follow).toHaveBeenCalledTimes(2);
+      emit({ lat: 38.6, lon: -120.3 });
+      expect(nav.recenter()).toBe(true);
+      expect(follow.mock.calls.at(-1)?.[0]).toMatchObject({ center: [-120.3, 38.6] });
+      nav.stop();
+      expect(nav.recenter()).toBe(false);
+      expect(subscribe).toHaveBeenCalledTimes(1);
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("drops an old mission fix on a transient GPS error and follows the next valid fix immediately", () => {
     let emit!: (point: { lat: number; lon: number }) => void;
     let fail!: (denied: boolean) => void;

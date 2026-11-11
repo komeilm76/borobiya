@@ -153,10 +153,23 @@ export function useRouteNavigation(
       return false;
     }
   }
+  /** Explicit camera recenter uses the still-fresh fix, never starts a new GPS watch. */
+  function recenter(): boolean {
+    if (!active.value || !fix.value || !selectedRoute.value) return false;
+    try {
+      follow(navigationCamera(fix.value, decodeRoutePolyline(selectedRoute.value.polyline), profile.value));
+      lastCameraAt = runtime.now();
+      return true;
+    } catch {
+      stop();
+      error.value = "نقشه در دسترس نیست؛ راهبری متوقف شد. دوباره تلاش کنید.";
+      return false;
+    }
+  }
   function dismissError(): void { error.value = null; }
   // Logout or a route/mission switch revokes this GPS consent at the ref change,
   // not at Vue's next tick (which could coalesce a logout and new login).
   watch([owner, missionId, selectedRoute, profile], () => { if (active.value) stop(); }, { flush: "sync" });
   if (getCurrentScope()) onScopeDispose(stop);
-  return { active, fix, error, start, stop, dismissError };
+  return { active, fix, error, start, stop, recenter, dismissError };
 }

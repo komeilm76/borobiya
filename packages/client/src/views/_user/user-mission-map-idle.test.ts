@@ -10,7 +10,7 @@ describe("mission map style restoration", () => {
     const canvas = readFileSync(new URL("../../components/map/MapCanvas.vue", import.meta.url), "utf8");
     // A value import here pulls the 1MB MapLibre chunk before this route can mount MapCanvas.
     expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
-    expect(view).toContain('import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl"');
+    expect(view).toContain('import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl"');
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(view).toContain('function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker)');
     expect(view).toContain('markerConstructor = MarkerClass;');
@@ -42,7 +42,7 @@ describe("mission map style restoration", () => {
   });
   it("shares a decoded geometry snapshot between camera and style restoration", () => {
     expect(view).toContain('const routeSnapshot = useMissionRouteGeometry(routing.selectedRoute);');
-    expect(view).toContain('if (line && routeSnapshot.value.bounds) {');
+    expect(view).toContain('if (routing.selectedRoute.value && routeSnapshot.value.bounds) {');
     expect(view).toContain('map.fitBounds(routeSnapshot.value.bounds,');
     expect(view).toContain('source.setData(routeSnapshot.value.data)');
     expect(view).not.toContain('decodeRoutePolyline(');
@@ -61,7 +61,7 @@ describe("mission map style restoration", () => {
     expect(view).toContain('watch(() => [routing.visible.value, routing.target.value,');
     expect(view).toContain('() => syncRouteMap(), { flush: "sync" });');
     expect(view).toContain('if (next && next !== previous) void routing.open();');
-    expect(view).toContain('if (!navigation.active.value) {');
+    expect(view).toContain('if (!navigation.active.value) frameMissionRoute();');
     expect(view).toContain('else releaseRouteMap(); // The mission panel is about to unmount.');
   });
   it("does not call GeoJSON setData on every map idle when the route layer is already present", () => {

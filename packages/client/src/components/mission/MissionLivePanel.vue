@@ -12,7 +12,7 @@
           {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
         </v-chip>
         <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
-          prepend-icon="mdi-fit-to-screen" @click="focusMembers">نمایش همهٔ اعضا</v-btn>
+          prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
       </div>
     </div>
     <v-alert v-if="!fullscreen && live.error.value" type="warning" variant="tonal" role="alert" class="mb-3">
@@ -51,7 +51,7 @@
           </v-chip>
           <p>موقعیت اعضا فقط با اشتراک آگاهانه نمایش داده می‌شود.</p>
           <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
-            prepend-icon="mdi-fit-to-screen" @click="focusMembers">نمایش همهٔ اعضا</v-btn>
+            prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
         </div>
         <template v-if="fullscreen">
           <v-alert v-if="live.error.value" type="warning" variant="tonal" role="alert">
@@ -121,6 +121,7 @@ const emit = defineEmits<{
   "close-room": [];
   "sharing-change": [sharing: boolean];
   "mission-ended": [missionId: string];
+  "camera-selected": [];
 }>();
 const auth = useAuthStore();
 const theme = useThemeStore();
@@ -177,10 +178,11 @@ function syncMarkers(): void {
     paintedMarkers[role] = op.next;
   }
 }
-function focusMembers() {
+function focusMembers(userInitiated = false) {
   if (!map.value) return;
   const camera = missionLiveCamera(Object.values(live.locations.value).filter((entry) => entry != null));
   if (!camera) return;
+  if (userInitiated) emit("camera-selected"); // Preserve this explicit view against GPS follow.
   if (camera.kind === "single") map.value.easeTo({ center: camera.center, zoom: camera.zoom, duration: 350 });
   else map.value.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 350 });
 }

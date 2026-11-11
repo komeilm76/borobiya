@@ -102,7 +102,7 @@
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
           :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady"
           @close-room="closeTool('team')" @sharing-change="teamSharing = $event"
-          @mission-ended="onMissionEnded">
+          @mission-ended="onMissionEnded" @camera-selected="pauseGuidanceFollow">
           <template #map-actions>
             <div v-if="pickingWaypoint" class="mission-desk__map-hint" role="status">
               برای افزودن ایستگاه روی نقشه بزنید.
@@ -254,8 +254,19 @@
             aria-label="بستن هشدار راهبری" @click="navigation.dismissError()" />
         </div>
         <div v-else-if="navigation.active.value" class="mission-desk__guidance" role="status">
-          <span>{{ navigation.fix.value ? 'راهبری فعال · موقعیت خصوصی GPS' : 'راهبری فعال · در انتظار GPS' }}</span>
+          <span>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'راهبری فعال · موقعیت خصوصی GPS' : 'راهبری فعال · دنبال‌کردن GPS متوقف است' }}</span>
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
+        </div>
+        <div v-show="!pickingWaypoint && activeTool !== 'status' && activeTool !== 'team'"
+          class="mission-desk__map-focus" role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت">
+          <v-btn v-if="navigation.active.value" :icon="followingGps ? 'mdi-crosshairs-gps' : 'mdi-navigation-variant'"
+            :color="followingGps ? 'primary' : 'warning'" variant="flat"
+            :aria-label="followingGps ? 'مرکز کردن موقعیت راهبری' : 'بازگشت به دنبال‌کردن GPS'"
+            :title="followingGps ? 'مرکز کردن موقعیت راهبری' : 'بازگشت به دنبال‌کردن GPS'"
+            :aria-pressed="followingGps" :disabled="!mapReady" @click="resumeGuidanceFollow" />
+          <v-btn v-if="routing.visible.value && routing.target.value" icon="mdi-fit-to-screen" color="primary" variant="flat"
+            aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
+            :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
         <nav class="mission-desk__dock" aria-label="ابزارهای مأموریت">
           <button id="mission-tool-status" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'status' }"
@@ -317,7 +328,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouteNavigation } from "@/composables/use-route-navigation";
-import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
@@ -358,6 +369,7 @@ const missionIntro = computed(() => {
   return "برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.";
 });
 const mapReady = ref(false);
+const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
 const pickingWaypoint = ref(false);
@@ -433,6 +445,7 @@ function resetRoutePlan(): void {
 }
 function startGuidance(): void {
   // A denied/unavailable GPS watch must leave the route and its error visible.
+  followingGps.value = true;
   if (navigation.start()) closeTool("route");
 }
 function stopGuidance(): void {
@@ -483,7 +496,7 @@ function onRouteMapClick(event: MapMouseEvent): void {
 
 const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
-  (camera) => routeMap?.easeTo(camera), undefined,
+  (camera) => { if (followingGps.value) routeMap?.easeTo(camera); }, undefined,
   () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
 function onProfileChange(value: unknown): void {
   if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
@@ -498,6 +511,32 @@ let incidentMarker: Marker | null = null;
 let rescuerMarker: Marker | null = null;
 let waypointMarkers: Marker[] = [];
 let detachRouteMap: (() => void) | null = null;
+function pauseGuidanceFollow(): void {
+  if (navigation.active.value) followingGps.value = false;
+}
+function onMissionMapMove(event: MapMovementEvent): void {
+  // MapLibre camera animations have no originalEvent; only a person's drag,
+  // wheel or zoom-control action suspends follow, as on /_user/map.
+  if (event.originalEvent) pauseGuidanceFollow();
+}
+function resumeGuidanceFollow(): void {
+  if (!navigation.active.value) return;
+  followingGps.value = true;
+  navigation.recenter(); // A fresh fix recenters now; otherwise await the next GPS sample.
+}
+function frameMissionRoute(): void {
+  const map = routeMap;
+  const incident = routing.visible.value ? routing.target.value?.incident : null;
+  if (!map || !incident) return;
+  pauseGuidanceFollow();
+  if (routing.selectedRoute.value && routeSnapshot.value.bounds) {
+    map.fitBounds(routeSnapshot.value.bounds, { padding: 60, maxZoom: 15, duration: 450 });
+  } else {
+    const camera = missionMapCamera(incident, routing.from.value, routing.via.value);
+    if (camera.kind === "both") map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 450 });
+    else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 450 });
+  }
+}
 function highlightRouteStop(): void {
   const selected = routing.order.value[routing.step.value];
   const markers = [rescuerMarker, ...waypointMarkers, incidentMarker];
@@ -544,17 +583,7 @@ function syncRouteMap(): void {
   rescuerMarker?.getElement().setAttribute("aria-label", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده");
   highlightRouteStop();
   // Route changes frame the plan, but updates must not interrupt active GPS guidance.
-  if (!navigation.active.value) {
-    const line = routing.selectedRoute.value;
-    if (line && routeSnapshot.value.bounds) {
-      map.fitBounds(routeSnapshot.value.bounds,
-        { padding: 60, maxZoom: 15, duration: 450 });
-    } else {
-      const camera = missionMapCamera(incident, routing.from.value, routing.via.value);
-      if (camera.kind === "both") map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 450 });
-      else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 450 });
-    }
-  }
+  if (!navigation.active.value) frameMissionRoute();
   applyRouteLayer();
 }
 function applyRouteLayer(): void {
@@ -584,7 +613,12 @@ function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
     const onStyleReady = () => restoreRouteLayer();
     map.on("idle", onStyleReady);
     map.on("click", onRouteMapClick);
-    detachRouteMap = () => { map.off("idle", onStyleReady); map.off("click", onRouteMapClick); };
+    map.on("movestart", onMissionMapMove);
+    detachRouteMap = () => {
+      map.off("idle", onStyleReady);
+      map.off("click", onRouteMapClick);
+      map.off("movestart", onMissionMapMove);
+    };
   }
   markerConstructor = MarkerClass;
   routeMap = map;
@@ -619,7 +653,10 @@ function releaseRouteMap(): void {
 }
 watch(() => [routing.visible.value, routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const,
   () => syncRouteMap(), { flush: "sync" });
-watch(() => navigation.active.value, (active) => { if (active) pickingWaypoint.value = false; });
+watch(() => navigation.active.value, (active) => {
+  if (active) pickingWaypoint.value = false;
+  else followingGps.value = true; // Never carry a paused camera into another mission/watch.
+}, { flush: "sync" });
 // An automatic private target read can fail before any tool is open: show its
 // retry panel. GPS outages instead use the map warning; never steal focus from
 // Team or Status while someone is relying on those controls.
@@ -835,6 +872,18 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance--warning {
   width: min(30rem, calc(100vw - 1.5rem)); border: 1px solid rgb(var(--v-theme-warning));
 }
+/* Keep the compact mission camera controls clear of the bottom dock and the
+   physical-right planner. They remain reachable while the Route tool is open. */
+.mission-desk__map-focus {
+  position: absolute; z-index: 9; left: calc(.75rem + env(safe-area-inset-left, 0px));
+  bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: .5rem;
+}
+.mission-desk__map-focus :deep(.v-btn) {
+  width: 44px; min-width: 44px; height: 44px;
+  border: 1px solid var(--bb-color-outline); box-shadow: var(--bb-shadow-overlay);
+}
+.mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__dock {
   position: absolute; z-index: 10; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   left: 50%; transform: translateX(-50%); display: flex; gap: 3px;

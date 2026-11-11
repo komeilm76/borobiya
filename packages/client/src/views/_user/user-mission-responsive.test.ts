@@ -44,6 +44,28 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain(':disabled="!desk.canCancel.value" @click="desk.confirmCancellation()"');
   });
 
+  it("adapts personal-map camera recovery to the private mission map without importing personal-map tools", () => {
+    expect(view).toContain('class="mission-desk__map-focus" role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت"');
+    expect(view).toContain('v-show="!pickingWaypoint && activeTool !== \'status\' && activeTool !== \'team\'"');
+    expect(view).toContain('aria-label="نمایش محل حادثه و مسیر مأموریت"');
+    expect(view).toContain('if (routing.selectedRoute.value && routeSnapshot.value.bounds) {');
+    expect(view).toContain('if (!navigation.active.value) frameMissionRoute();');
+    expect(view).toContain('map.on("movestart", onMissionMapMove);');
+    expect(view).toContain('map.off("movestart", onMissionMapMove);');
+    expect(view).toContain('if (event.originalEvent) pauseGuidanceFollow();');
+    expect(view).toContain('if (followingGps.value) routeMap?.easeTo(camera);');
+    expect(view).toContain('followingGps.value = true; // Never carry a paused camera into another mission/watch.');
+    expect(view).toContain('navigation.recenter(); // A fresh fix recenters now; otherwise await the next GPS sample.');
+    expect(view).toContain(":color=\"followingGps ? 'primary' : 'warning'\"");
+    expect(view).toContain('دنبال‌کردن GPS متوقف است');
+    expect(view).toContain(':aria-pressed="followingGps" :disabled="!mapReady"');
+    expect(view).toContain('@camera-selected="pauseGuidanceFollow"');
+    expect(panel).toContain('if (userInitiated) emit("camera-selected");');
+    expect(view).not.toContain('useOwnMapPosition'); // Never activate personal sharing or its watcher.
+    expect(view).not.toContain('usePlaceSearch');
+    expect(view).not.toContain('useMapHistory');
+  });
+
   it("gives the active mission a genuine full-bleed map, with compact closable overlay tools", () => {
     const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
     const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
