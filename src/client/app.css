@@ -774,3 +774,10 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 .place-row__text { flex: 1; display: grid; gap: 2px; }
 .place-row .text-link--danger { color: var(--danger); }
 .place-row.is-editing { border-color: var(--primary); }
+.info-card .toggle-on { border-color: var(--success); color: var(--success); }
+.login-list { display: grid; gap: 8px; }
+.login-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r12); background: var(--surface-2); }
+.login-row > .mdi { color: var(--success); font-size: 18px; }
+.login-row.is-failed > .mdi { color: var(--danger); }
+.login-row > div { flex: 1; display: grid; gap: 2px; }
+.login-row small { color: var(--muted); font-size: 11px; }

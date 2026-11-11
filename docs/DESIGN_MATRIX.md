@@ -168,9 +168,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| profile/01-profile-home.png | partial | P2/H | Username/role/rating, theme cycle, offline dataset version, security readiness card, devices with revoke. Missing: member-since, stats cards, account-information rows, logout action, version footer. |
+| profile/01-profile-home.png | partial | P2/H | Username/role/rating, theme cycle, offline dataset version, security readiness card, devices with revoke, saved-places manage (edit/delete), inline username rename, responder readiness switch (POSTs /_user/ready; consumed by the dispatch board), login history. Missing: member-since, stats cards, account-information rows, logout action, version footer. |
 | profile/02-profile-edit.png | missing | P2/H | `PATCH /_user/me` (username change) exists; no client UI. |
-| profile/03-login-history.png | missing | P2/M | `GET /_user/logins` exists; client never calls it. |
+| profile/03-login-history.png | partial | P2/M | Last-8/last-50 login events (device, IP, success/fail, time) render on the profile screen from `GET /_user/logins`; designed full-screen history page not built. |
 | profile/04-active-devices.png | done | P2/L | List + revoke implemented with current-session protection. |
 | profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |
 | profile/06-logout-confirm.png | missing | P2/L | Logout is one control elsewhere; no confirmation sheet. |

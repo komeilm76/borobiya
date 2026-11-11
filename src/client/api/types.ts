@@ -56,6 +56,15 @@ export interface SavedPlaceView {
   rank: number;
 }
 
+/** One row of the caller's login history (successful and failed attempts). */
+export interface LoginEventView {
+  id: number;
+  ip: string;
+  deviceName: string | null;
+  success: boolean;
+  loginAt: number;
+}
+
 /** A bounded live or historical location share. */
 export interface ShareView {
   /** Primary key as the API returns it; also the value the revoke endpoint takes. */

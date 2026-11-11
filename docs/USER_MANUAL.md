@@ -30,4 +30,4 @@ Companion rows show freshness, presence and sharing state. Each active share lis
 
 ## Profile
 
-The fifth section contains account details, username changes, security readiness, devices, login history, saved places and sign-out. Sign-out revokes the current session and closes the realtime connection. If an administrator deactivates the account, all sessions are revoked and the browser returns to login.
+The fifth section contains account details, username changes, responder mission readiness, security readiness, devices, login history, saved places and sign-out. Responders get a readiness switch on this screen: dispatchers see it as ready/busy on the dispatch board. Recent logins (device, IP, success or failure) are listed at the bottom. Sign-out revokes the current session and closes the realtime connection. If an administrator deactivates the account, all sessions are revoked and the browser returns to login.

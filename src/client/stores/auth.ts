@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { ApiError, del, errorMessage, get, post } from '@/api/client.ts';
-import type { SecurityQuestionView, SessionView, UserView } from '@/api/types.ts';
+import { ApiError, del, errorMessage, get, patch, post } from '@/api/client.ts';
+import type { LoginEventView, SecurityQuestionView, SessionView, UserView } from '@/api/types.ts';
 import { ROLES } from '@shared/protocol.ts';
 
 /**
@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserView | null>(null);
   const securityQuestions = ref<SecurityQuestionView[]>([]);
   const devices = ref<SessionView[]>([]);
+  const loginHistory = ref<LoginEventView[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -125,6 +126,34 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** Sets the responder's mission readiness (responders only). */
+  async function setReady(ready: boolean): Promise<void> {
+    await post('/_user/ready', { ready });
+    if (user.value) user.value = { ...user.value, readyForMission: ready };
+  }
+
+  /** Renames the signed-in account. Server lower-cases and rejects duplicates. */
+  async function updateUsername(username: string): Promise<UserView> {
+    await patch('/_user/me', { username });
+    const current = await get<UserView>('/_user/me');
+    user.value = current;
+    return current;
+  }
+
+  /**
+   * Loads the most recent 30-day login history (successful and failed attempts).
+   * A failure must not take down the screen: the list stays empty with the error surfaced.
+   */
+  async function loadLoginHistory(): Promise<LoginEventView[]> {
+    try {
+      const response = await get<{ items: LoginEventView[] }>('/_user/logins', { from: Date.now() - 30 * 86_400_000, limit: 50 });
+      loginHistory.value = response.items ?? [];
+    } catch (caught) {
+      error.value = errorMessage(caught);
+    }
+    return loginHistory.value;
+  }
+
   /** Revokes a single device session; the endpoint is `DELETE /_user/devices/:sessionId`. */
   async function revokeDevice(sessionId: string): Promise<void> {
     await del(`/_user/devices/${encodeURIComponent(sessionId)}`);
@@ -146,6 +175,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     securityQuestions,
     devices,
+    loginHistory,
     loading,
     error,
     isAuthenticated,
@@ -157,10 +187,13 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     completeSecurityQuestions,
+    setReady,
+    updateUsername,
     startRecovery,
     answerRecovery,
     resetPassword,
     loadDevices,
+    loadLoginHistory,
     revokeDevice,
     logout
   };

@@ -21,7 +21,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Recovery uses three selected challenges, decoy responses for unknown usernames, attempt limits, expiry, one-use reset tokens and full session revocation.
 - [x] Administrator-created accounts complete onboarding before ordinary use.
 - [x] Guest-only and role-protected route guards are enforced by the server and the SPA router.
-- [x] Active devices, login history, username changes, saved places and profile readiness are available.
+- [x] Active devices, login history, username changes, saved places and profile readiness are available. Responders can toggle mission readiness from the profile screen; the dispatch board reflects it.
 
 ## Map, location and offline behavior
 

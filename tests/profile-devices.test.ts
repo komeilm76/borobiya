@@ -232,3 +232,146 @@ describe('saved places', () => {
     wrapper.unmount();
   });
 });
+
+describe('responder readiness toggle', () => {
+  it('posts readiness for a responder and reflects it in the switch', async () => {
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      const data = path === '/_user/me' && method === 'GET' ? { id: 'usr_self', username: 'reza.m', role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 4.5, createdAt: 1794000000000 }
+        : path === '/_user/devices' && method === 'GET' ? { items: [], total: 0 }
+        : path === '/_user/ready' && method === 'POST' ? { ok: true, readyForMission: true }
+        : { items: [] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.profile });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    useAuthStore().$patch({
+      user: { id: 'usr_self', username: 'reza.m', role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 4.5, createdAt: 1794000000000 }
+    });
+    const wrapper = mount(ProfileView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, vuetify, router] }
+    });
+    await flushPromises();
+
+    const toggle = wrapper.find('[data-testid="ready-toggle"]');
+    expect(toggle.exists()).toBe(true);
+    expect(toggle.attributes('aria-checked')).toBe('false');
+    await toggle.trigger('click');
+    await flushPromises();
+    const call = calls.find((entry) => entry.path === '/_user/ready' && entry.method === 'POST');
+    expect(call?.body).toEqual({ ready: true });
+    expect(useAuthStore().user?.readyForMission).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('hides the readiness switch from plain users', async () => {
+    stubApi([CURRENT_DEVICE]);
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.profile });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    useAuthStore().$patch({
+      user: { id: 'usr_self', username: 'saeed.k', role: 'user', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 0, createdAt: 1794000000000 }
+    });
+    const wrapper = mount(ProfileView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, vuetify, router] }
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="ready-toggle"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe('username editing', () => {
+  it('validates, PATCHes and refreshes the account', async () => {
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      const data = path === '/_user/me' && method === 'GET' ? { id: 'usr_self', username: 'new.name', role: 'user', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 0, createdAt: 1794000000000 }
+        : path === '/_user/me' && method === 'PATCH' ? { ok: true }
+        : path === '/_user/devices' && method === 'GET' ? { items: [], total: 0 }
+        : { items: [] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.profile });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    useAuthStore().$patch({
+      user: { id: 'usr_self', username: 'saeed.k', role: 'user', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 0, createdAt: 1794000000000 }
+    });
+    const wrapper = mount(ProfileView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, vuetify, router] }
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-testid="edit-username"]').trigger('click');
+    const input = wrapper.find('[data-testid="username-input"]');
+    await input.setValue('INVALID UPPER!!');
+    expect(wrapper.find('[data-testid="save-username"]').attributes('disabled')).toBeDefined();
+    await input.setValue('new.name');
+    await wrapper.find('[data-testid="save-username"]').trigger('click');
+    await flushPromises();
+    expect(calls.some((call) => call.path === '/_user/me' && call.method === 'PATCH' && call.body?.username === 'new.name')).toBe(true);
+    expect(useAuthStore().user?.username).toBe('new.name');
+    wrapper.unmount();
+  });
+});
+
+describe('login history', () => {
+  it('renders recent login attempts with success and failure state', async () => {
+    const calls: Array<{ method: string; path: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      calls.push({ method, path });
+      const data = path === '/_user/me' && method === 'GET'
+        ? { id: 'usr_self', username: 'saeed.k', role: 'user', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 0, createdAt: 1794000000000 }
+        : path === '/_user/devices' && method === 'GET' ? { items: [], total: 0 }
+        : path === '/_user/logins' && method === 'GET'
+          ? { items: [
+              { id: 2, ip: '10.0.0.5', deviceName: 'این مرورگر', success: true, loginAt: 1794136200000 },
+              { id: 1, ip: '10.0.0.9', deviceName: null, success: false, loginAt: 1794130000000 }
+            ], total: 2 }
+        : { items: [] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.profile });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(ProfileView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, vuetify, router] }
+    });
+    await flushPromises();
+    expect(calls.some((call) => call.path === '/_user/logins')).toBe(true);
+    expect(wrapper.text()).toContain('این مرورگر');
+    expect(wrapper.text()).toContain('ناموفق');
+    expect(wrapper.findAll('.login-row')).toHaveLength(2);
+    wrapper.unmount();
+  });
+});

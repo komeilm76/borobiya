@@ -18,9 +18,53 @@ const format = useFormatters();
 const toast = useToast();
 const devices = computed(() => auth.devices);
 const places = computed(() => map.places);
+const logins = computed(() => auth.loginHistory);
+const showAllLogins = ref(false);
+const visibleLogins = computed(() => (showAllLogins.value ? logins.value : logins.value.slice(0, 8)));
+const isResponder = computed(() => auth.user?.role === 'responder');
+const ready = computed(() => Boolean(auth.user?.readyForMission));
+const readyBusy = ref(false);
+
+const editingName = ref(false);
+const nameDraft = ref('');
+const nameSaving = ref(false);
+const nameValid = computed(() => /^[a-z0-9._-]{3,32}$/.test(nameDraft.value));
+
+async function toggleReady(): Promise<void> {
+  if (readyBusy.value) return;
+  readyBusy.value = true;
+  try {
+    await auth.setReady(!ready.value);
+    toast.push(ready.value ? 'وضعیت آمادگی خاموش شد؛ پیشنهاد مأموریتی دریافت نمی‌کنید.' : 'آماده دریافت مأموریت هستید.', 'success', 2600);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    readyBusy.value = false;
+  }
+}
+
+function startEditName(): void {
+  nameDraft.value = auth.user?.username ?? '';
+  editingName.value = true;
+}
+
+async function saveName(): Promise<void> {
+  if (!nameValid.value || nameSaving.value) return;
+  nameSaving.value = true;
+  try {
+    await auth.updateUsername(nameDraft.value.trim().toLowerCase());
+    toast.push('نام کاربری تغییر کرد.', 'success', 2400);
+    editingName.value = false;
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    nameSaving.value = false;
+  }
+}
 
 onMounted(() => {
   void auth.loadDevices();
+  void auth.loadLoginHistory();
   if (!places.value.length && !map.loading) void map.load();
 });
 
@@ -91,6 +135,35 @@ async function remove(place: SavedPlaceView): Promise<void> {
     </button>
   </div>
   <div class="sheet__body">
+    <div class="info-card">
+      <span class="mdi mdi-account-outline" aria-hidden="true" />
+      <div v-if="!editingName">
+        <strong>نام کاربری</strong>
+        <span>{{ auth.user?.username }}</span>
+      </div>
+      <form v-else class="place-edit" @submit.prevent="saveName">
+        <label><span>نام کاربری جدید (حروف کوچک انگلیسی، ۳ تا ۳۲ نویسه)</span>
+          <input v-model="nameDraft" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false" data-testid="username-input" />
+        </label>
+        <div class="action-row">
+          <button type="submit" class="primary-button" :disabled="!nameValid || nameSaving" data-testid="save-username">{{ nameSaving ? 'در حال ذخیره…' : 'ذخیره' }}</button>
+          <button type="button" class="ghost-button" @click="editingName = false">انصراف</button>
+        </div>
+      </form>
+      <button v-if="!editingName" type="button" class="text-link" data-testid="edit-username" @click="startEditName">ویرایش</button>
+    </div>
+
+    <div v-if="isResponder" class="info-card">
+      <span class="mdi mdi-account-check-outline" aria-hidden="true" />
+      <div>
+        <strong>آمادگی مأموریت</strong>
+        <span>{{ ready ? 'آماده دریافت پیشنهاد' : 'غیرفعال؛ پیشنهادی دریافت نمی‌کنید' }}</span>
+      </div>
+      <button type="button" class="ghost-button" :class="{ 'toggle-on': ready }" :disabled="readyBusy" role="switch" :aria-checked="ready" data-testid="ready-toggle" @click="toggleReady">
+        {{ readyBusy ? '…' : ready ? 'آماده‌ام' : 'آماده نیستم' }}
+      </button>
+    </div>
+
     <h3 class="sheet__subtitle">دستگاه‌های فعال</h3>
     <ul class="device-list">
       <li v-for="device in devices" :key="device.sessionId">
@@ -106,6 +179,22 @@ async function remove(place: SavedPlaceView): Promise<void> {
       </li>
     </ul>
     <p v-if="!devices.length" class="sheet__status">دستگاه دیگری فعال نیست.</p>
+
+    <h3 class="sheet__subtitle">ورودهای اخیر</h3>
+    <ul class="login-list">
+      <li v-for="entry in visibleLogins" :key="entry.id" class="login-row" :class="{ 'is-failed': !entry.success }">
+        <span class="mdi" :class="entry.success ? 'mdi-check-circle-outline' : 'mdi-close-circle-outline'" aria-hidden="true" />
+        <div>
+          <strong>{{ entry.deviceName || 'دستگاه ناشناس' }}</strong>
+          <small>{{ entry.ip }} · {{ format.dateTime(entry.loginAt) }}</small>
+        </div>
+        <span class="status-pill" :class="entry.success ? 'status-pill--success' : 'status-pill--danger'">{{ entry.success ? 'موفق' : 'ناموفق' }}</span>
+      </li>
+    </ul>
+    <p v-if="!logins.length" class="sheet__status">ورودی ثبت نشده است.</p>
+    <button v-if="logins.length > 8" type="button" class="text-link" @click="showAllLogins = !showAllLogins">
+      {{ showAllLogins ? 'نمایش کمتر' : `نمایش ${format.number(logins.length - 8)} مورد دیگر` }}
+    </button>
 
     <h3 class="sheet__subtitle">مکان‌های ذخیره‌شده</h3>
     <ul class="place-list">
