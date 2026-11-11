@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: bound rescuer navigation target reads
+
+- The rescuer's route request had a 15-second deadline, but the preceding authenticated mission-target read still awaited headers/JSON indefinitely. An upstream/proxy that stalled after headers left the private incident picker loading forever; an ignored caller abort could also leave the old read pending. The target read now uses the same cancellable deadline as the route request (12 seconds), while preserving the scoped mission-ID validation and same-origin bearer request. Focused tests reproduced a stalled response body and abort before the fix and pass afterward. Browser/proxy timing remains unverified.
+
 ### 2026-10-23 — Navigation follow camera and compact phone telemetry
 
 - Brought the active-follow camera about 0.25 zoom levels closer across car, bicycle and walking, while retaining short-screen road-ahead behavior, dynamic card occlusion, mode separation and the installed map zoom ceiling. On phone widths the guidance card uses a single glanceable telemetry strip: numeric GPS speed with km/h, an explicitly unknown legal-limit sign (the offline route has no reliable posted limit), and a short approximate remaining-time display. Removed long explanatory captions from the phone visual layout, retained full accessible GPS/traffic/unknown-state labels and desktop details, and kept the two explicit trip-exit controls. Design follows the separate speed widget and ETA footer described in Google's Navigation SDK; it does not imply speed-limit data the app does not have. Pure camera/time and nonmounted source/style tests cover the change; physical phone readability and MapLibre follow remain to be checked.

@@ -21,6 +21,37 @@ describe("mission navigation APIs", () => {
       missionId: "50000000-0000-4000-8000-000000000006", incident: to }))));
     await expect(getMissionNavigationTarget("secret-token", missionId)).rejects.toThrow("NAVIGATION_TARGET_MISMATCH");
   });
+  it("does not leave the rescuer target loading when headers arrive but the JSON body stalls", async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"missionId":'));
+      } }));
+    }));
+    const outcome = getMissionNavigationTarget("secret-token", missionId)
+      .then(() => "unexpected success", (error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(12_001);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([outcome, Promise.resolve("still pending")])).toBe("NAVIGATION_TARGET_UNAVAILABLE");
+  });
+
+  it("ends an already-started target read promptly on caller cancellation", async () => {
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    }));
+    const outcome = getMissionNavigationTarget("secret-token", missionId, caller.signal)
+      .then(() => "unexpected success", (error: Error) => error.name);
+    caller.abort();
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([outcome, new Promise((resolve) => setTimeout(() => resolve("still pending"), 500))]))
+      .toBe("AbortError");
+  });
+
   it("POSTs to same-origin /route for up to three viable alternatives, never a remote origin", async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(reply), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);

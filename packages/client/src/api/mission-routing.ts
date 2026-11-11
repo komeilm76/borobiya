@@ -35,10 +35,46 @@ const routesResponseSchema = z.object({
 });
 export type RouteChoice = z.infer<typeof routeSchema>;
 
+/** Bounds both connecting and reading a reply, including adapters that ignore AbortSignal.
+ * Caller cancellation must not wait for a transport that never settles. */
+async function boundedNavigationCall<T>(read: (requestSignal: AbortSignal) => Promise<T>, signal: AbortSignal | undefined,
+  deadlineMs: number, timeoutCode: string): Promise<T> {
+  if (signal?.aborted) throw new DOMException("Navigation request cancelled", "AbortError");
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let rejectPending: ((reason: DOMException) => void) | null = null;
+  const onAbort = () => {
+    controller.abort();
+    rejectPending?.(new DOMException("Navigation request cancelled", "AbortError"));
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      rejectPending = reject;
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error(timeoutCode));
+      }, deadlineMs);
+    });
+    // Handle cancellation during setup without starting even an aborted read.
+    if (signal?.aborted) { onAbort(); return await deadline; }
+    return await Promise.race([read(controller.signal), deadline]);
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    rejectPending = null;
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+/** Allow less time to fetch a scoped target than to calculate a local OSRM route. */
+export const MISSION_TARGET_DEADLINE_MS = 12_000;
+
 /** Incident point is authorized by the API using the active rescuer's mission ID, not a public SOS lookup. */
 export async function getMissionNavigationTarget(token: string, missionId: string, signal?: AbortSignal): Promise<MissionNavigationTarget> {
   const path = apiRoutes.sos.getMissionNavigationTarget.url.replace(":id", encodeURIComponent(missionId));
-  const target = missionNavigationTargetSchema.parse(await requestJson<unknown>(path, { accessToken: token, signal }));
+  const target = await boundedNavigationCall(async (requestSignal) => missionNavigationTargetSchema.parse(
+    await requestJson<unknown>(path, { accessToken: token, signal: requestSignal })
+  ), signal, MISSION_TARGET_DEADLINE_MS, "NAVIGATION_TARGET_UNAVAILABLE");
   // A valid coordinate from another mission must never become this rescuer's destination.
   if (target.missionId !== missionId) throw new Error("NAVIGATION_TARGET_MISMATCH");
   return target;
@@ -62,45 +98,17 @@ export async function getMissionRoutePlan(
     ...(via.length ? { via: via.map((point) => coordinatesSchema.parse(point)) } : {}),
     ...(optimize ? { optimize: true } : { alternatives: 2 })
   };
-  if (signal?.aborted) throw new DOMException("Route request cancelled", "AbortError");
-  const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  let rejectPending: ((reason: DOMException) => void) | null = null;
-  const onAbort = () => {
-    controller.abort();
-    rejectPending?.(new DOMException("Route request cancelled", "AbortError"));
-  };
-  signal?.addEventListener("abort", onAbort, { once: true });
-  let parsed: z.infer<typeof routesResponseSchema>;
-  try {
-    const deadline = new Promise<never>((_, reject) => {
-      rejectPending = reject;
-      timer = setTimeout(() => {
-        controller.abort();
-        reject(new Error("ROUTING_UNAVAILABLE"));
-      }, MISSION_ROUTE_DEADLINE_MS);
+  const parsed = await boundedNavigationCall(async (requestSignal) => {
+    const response = await fetch("/route", {
+      method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
+      credentials: "same-origin", body: JSON.stringify(request), signal: requestSignal
     });
-    // A caller may cancel between the initial check and listener registration.
-    if (signal?.aborted) onAbort();
-    parsed = await Promise.race([
-      (async () => {
-        const response = await fetch("/route", {
-          method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
-          credentials: "same-origin", body: JSON.stringify(request), signal: controller.signal
-        });
-        if (!response.ok) {
-          if (response.status === 422) throw new Error("NO_ROUTE");
-          throw new Error("ROUTING_UNAVAILABLE");
-        }
-        return routesResponseSchema.parse(await response.json());
-      })(),
-      deadline
-    ]);
-  } finally {
-    if (timer !== null) clearTimeout(timer);
-    rejectPending = null;
-    signal?.removeEventListener("abort", onAbort);
-  }
+    if (!response.ok) {
+      if (response.status === 422) throw new Error("NO_ROUTE");
+      throw new Error("ROUTING_UNAVAILABLE");
+    }
+    return routesResponseSchema.parse(await response.json());
+  }, signal, MISSION_ROUTE_DEADLINE_MS, "ROUTING_UNAVAILABLE");
   if (parsed.profile !== profile) throw new Error("ROUTING_UNAVAILABLE");
   const expected = Array.from({ length: via.length + 2 }, (_, index) => index);
   const order = parsed.order ?? expected;
