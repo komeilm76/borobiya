@@ -72,6 +72,20 @@ describe("route-follow camera math (T3.5.6)", () => {
     expect(capped[2]).toBe(16);
     expect(navigationFollowZoom("foot", 35.68, 0, 0, 0, 3, 16)).toBeGreaterThanOrEqual(3);
   });
+  it("follows a little closer on phones without losing road-ahead space or collapsing capped mode zooms", () => {
+    const phone = navigationFollowZoom("car", 35.68, 640, 0, 230, 0, 18);
+    expect(phone).toBeGreaterThan(16.4); // Previously about 16.21 at this visible height.
+    expect(phone).toBeLessThan(16.7); // A modest move, not a jump into building-scale zoom.
+    const compact = navigationFollowZoom("car", 35.68, 320, 0, 150, 0, 18);
+    expect(compact).toBeLessThan(phone); // Short phones still need more road ahead.
+    const capped = (["car", "bicycle", "foot"] as const).map(mode =>
+      navigationFollowZoom(mode, 35.68, 640, 160, 56, 0, 16));
+    expect(capped[0]).toBeGreaterThan(14.9); // Capped car should move in too, not just walking.
+    expect(capped[0]).toBeLessThan(capped[1]!);
+    expect(capped[1]).toBeLessThan(capped[2]!);
+    expect(capped[2]).toBe(16);
+  });
+
   it("uses the specified pitched/flat transport cameras", () => {
     expect(navigationCamera({ lat: 35.68, lon: 51.38 }, east, "bicycle")).toMatchObject({ pitch: 45, zoom: 16 });
     expect(navigationCamera({ lat: 35.68, lon: 51.38 }, east, "foot")).toMatchObject({ pitch: 0, zoom: 17 });

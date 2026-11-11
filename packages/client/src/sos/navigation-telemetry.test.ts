@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateRemainingRouteSeconds, currentSpeedKmh, formatRemainingTime, navigationStatusAnnouncement } from "./navigation-telemetry";
+import { estimateRemainingRouteSeconds, currentSpeedKmh, formatRemainingTime, formatRemainingTimeCompact, navigationStatusAnnouncement } from "./navigation-telemetry";
 
 const line = [[0, 0], [0.01, 0], [0.02, 0]] as const;
 
@@ -38,6 +38,17 @@ describe("private navigation telemetry", () => {
     expect(formatRemainingTime(450)).toBe("۸ دقیقه");
     expect(formatRemainingTime(65)).toBe("۲ دقیقه");
     expect(formatRemainingTime(3700)).toBe("۱ ساعت و ۲ دقیقه");
+  });
+
+  it("uses short Persian time units on a phone without rounding remaining time down", () => {
+    expect(formatRemainingTimeCompact(0)).toBe("زیر ۱د");
+    expect(formatRemainingTimeCompact(60)).toBe("۱د");
+    expect(formatRemainingTimeCompact(61)).toBe("۲د");
+    expect(formatRemainingTimeCompact(3540)).toBe("۵۹د");
+    expect(formatRemainingTimeCompact(3599)).toBe("۱س");
+    expect(formatRemainingTimeCompact(3600)).toBe("۱س");
+    expect(formatRemainingTimeCompact(3700)).toBe("۱س ۲د");
+    expect(formatRemainingTimeCompact(2 * 3600 + 60)).toBe("۲س ۱د");
   });
 
   it("refuses a misleading ETA on an off-route fix or an invalid route", () => {

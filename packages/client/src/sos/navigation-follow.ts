@@ -94,7 +94,11 @@ export function navigationFollowZoom(profile: TransportProfile, latitude: number
   const ideal = (mode: TransportProfile) => Math.log2(metresPerPixelAtZero * usable * (1 - FOLLOW_FRACTION[mode]) /
     (LOOK_AHEAD_METRES[mode] * pitchScale(mode)));
   const ceilingShift = Math.max(0, ideal("foot") - maxZoom);
-  return clamp(ideal(profile) - ceilingShift);
+  // About a fifth more map detail during active follow. Short screens still
+  // back off relative to tall ones, and a zoom cap must not erase the small
+  // separation between transport modes.
+  const closerZoom = 0.25;
+  return clamp(ideal(profile) - ceilingShift + closerZoom);
 }
 
 export function navigationCamera(position: MissionMapPoint, route: readonly [number, number][],

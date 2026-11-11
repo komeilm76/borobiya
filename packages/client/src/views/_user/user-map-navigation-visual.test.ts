@@ -75,6 +75,20 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(map).toContain('variant="flat" color="error" rounded="lg" @click="clearPointRoute"');
   });
 
+  it("makes phone guidance glanceable without hiding unknown-limit or accessible details", () => {
+    const styles = css(map, "UserMapView.vue");
+    expect(map).toContain('isPhone ? `≈ ${formatRemainingTimeCompact(remainingSeconds)}`');
+    expect(map).toContain('برآورد مسیر بدون ترافیک');
+    expect(map).toContain('class="user-map-view__telemetry-unit" aria-hidden="true">km/h</span>');
+    expect(map).toContain('aria-label="حد مجاز نامشخص"');
+    expect(map).toContain('دادهٔ معتبر موجود نیست');
+    expect(styles).toContain('@media (max-width: 599px)');
+    expect(styles).toMatch(/\.user-map-view__telemetry-item small\[data-v-navigation\]\s*\{\s*display: none;/);
+    expect(styles).toContain('.user-map-view__telemetry-item--unknown dd[data-v-navigation] { display: grid;');
+    expect(map).toContain('بازگشت به برنامهٔ سفر');
+    expect(map).toContain('توقف و پایان سفر');
+  });
+
   it("uses the same nested 16px scale for travel metrics, actions and guidance telemetry", () => {
     expect(point).toMatch(/\.point-route__choice\s*\{[^}]*border-radius: var\(--bb-radius-nested, 16px\)/);
     expect(point).toMatch(/\.point-route__metrics > div\s*\{[^}]*border-radius: var\(--bb-radius-nested, 16px\)/);

@@ -149,21 +149,22 @@
             :aria-expanded="navigationSearchOpen" @click="navigationSearchOpen = !navigationSearchOpen" />
           <dl class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
             <div class="user-map-view__telemetry-item">
-              <dt><v-icon icon="mdi-speedometer" size="16" aria-hidden="true" />سرعت فعلی</dt>
-              <dd :aria-label="liveSpeedKmh === null ? 'سرعت فعلی نامشخص' : `سرعت فعلی ${liveSpeedKmh} کیلومتر بر ساعت`">
+              <dt><v-icon icon="mdi-speedometer" size="18" aria-hidden="true" />سرعت</dt>
+              <dd :aria-label="liveSpeedKmh === null ? 'سرعت فعلی نامشخص' : `سرعت فعلی ${liveSpeedKmh} کیلومتر بر ساعت بر اساس GPS`">
                 {{ liveSpeedKmh === null ? '—' : liveSpeedKmh.toLocaleString('fa-IR') }}
               </dd>
+              <span class="user-map-view__telemetry-unit" aria-hidden="true">km/h</span>
               <small>کیلومتر/ساعت · GPS</small>
             </div>
             <div class="user-map-view__telemetry-item user-map-view__telemetry-item--unknown">
-              <dt><v-icon icon="mdi-road-variant" size="16" aria-hidden="true" />حد مجاز</dt>
-              <dd aria-label="حد مجاز نامشخص">—</dd>
-              <small title="مسیر آفلاین دادهٔ حد مجاز قانونی را ارائه نمی‌کند">دادهٔ معتبر موجود نیست</small>
+              <dt><v-icon icon="mdi-road-variant" size="18" aria-hidden="true" />حد مجاز</dt>
+              <dd aria-label="حد مجاز نامشخص" title="مسیر آفلاین دادهٔ حد مجاز قانونی را ارائه نمی‌کند">؟</dd>
+              <small>دادهٔ معتبر موجود نیست</small>
             </div>
             <div class="user-map-view__telemetry-item">
-              <dt><v-icon icon="mdi-timer-outline" size="16" aria-hidden="true" />زمان باقی‌مانده</dt>
-              <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}`">
-                {{ remainingSeconds === null ? '—' : formatRemainingTime(remainingSeconds) }}
+              <dt><v-icon icon="mdi-timer-outline" size="18" aria-hidden="true" />تا مقصد</dt>
+              <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}؛ برآورد مسیر بدون ترافیک`">
+                {{ remainingSeconds === null ? '—' : isPhone ? `≈ ${formatRemainingTimeCompact(remainingSeconds)}` : formatRemainingTime(remainingSeconds) }}
               </dd>
               <small>برآورد مسیر · بدون ترافیک</small>
             </div>
@@ -316,7 +317,7 @@ import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
-import { currentSpeedKmh, estimateRemainingRouteSeconds, formatRemainingTime, navigationStatusAnnouncement } from "@/sos/navigation-telemetry";
+import { currentSpeedKmh, estimateRemainingRouteSeconds, formatRemainingTime, formatRemainingTimeCompact, navigationStatusAnnouncement } from "@/sos/navigation-telemetry";
 import { navigationArrowBearing, navigationCameraOffset, navigationFollowZoom, type NavigationCamera } from "@/sos/navigation-follow";
 import { createNavigationMarkerMotion, NAVIGATION_MOTION_MS, navigationMotionEase } from "@/sos/navigation-marker-motion";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
@@ -2217,6 +2218,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__telemetry-item dd { margin: 0; font-size: 1.16rem; line-height: 1.3; font-weight: 900;
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .user-map-view__telemetry-item small { font-size: .8rem; line-height: 1.25; opacity: .78; overflow-wrap: anywhere; }
+.user-map-view__telemetry-unit { display: none; }
 .user-map-view__telemetry-item--unknown { background: rgba(var(--v-theme-on-surface), .04); }
 .user-map-view__telemetry-item--unknown dd { opacity: .7; }
 .user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .4rem; }
@@ -2453,6 +2455,19 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__journey-content.bb-map-navigation-card { max-height: min(72dvh, 36rem);
     padding: .5rem .75rem;
     border-radius: var(--bb-radius-card, 24px) !important; }
+  /* Keep three named, glanceable values in one row. The full GPS/ETA caveats
+     remain in the accessible labels; an unknown limit never resembles a number. */
+  .user-map-view__telemetry { gap: 0; padding: .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
+    border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); }
+  .user-map-view__telemetry-item { border: 0; border-radius: 0; background: transparent;
+    gap: .1rem; padding: .2rem .1rem; }
+  .user-map-view__telemetry-item + .user-map-view__telemetry-item { border-inline-start: 1px solid rgba(var(--v-theme-on-surface), .12); }
+  .user-map-view__telemetry-item dt { font-size: .8rem; }
+  .user-map-view__telemetry-item dd { font-size: 1.2rem; line-height: 1.25; overflow-wrap: normal; }
+  .user-map-view__telemetry-item small { display: none; }
+  .user-map-view__telemetry-unit { display: block; font-size: .8rem; line-height: 1; opacity: .8; direction: ltr; }
+  .user-map-view__telemetry-item--unknown dd { display: grid; place-items: center;
+    width: 2rem; height: 2rem; border: 2px solid rgba(var(--v-theme-on-surface), .55); border-radius: 50%; }
   /* A horizontal 48px action row clears the sheet even on short phones. The
      shared measured height also moves SOS, which lives outside this view. */
   .user-map-view--navigating .user-map-view__share,

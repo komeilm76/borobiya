@@ -71,3 +71,12 @@ export function formatRemainingTime(seconds: number): string {
   const hours = Math.floor(minutes / 60), rest = minutes % 60;
   return `${hours.toLocaleString("fa-IR")} ساعت${rest ? ` و ${rest.toLocaleString("fa-IR")} دقیقه` : ""}`;
 }
+
+/** Phone-only visual shorthand. The full, explicitly approximate wording stays in the accessible label. */
+export function formatRemainingTimeCompact(seconds: number): string {
+  if (seconds < 60) return "زیر ۱د";
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return `${minutes.toLocaleString("fa-IR")}د`;
+  const hours = Math.floor(minutes / 60), rest = minutes % 60;
+  return `${hours.toLocaleString("fa-IR")}س${rest ? ` ${rest.toLocaleString("fa-IR")}د` : ""}`;
+}
