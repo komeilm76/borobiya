@@ -123,7 +123,7 @@
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
       v-show="!(isShortPhone && activeTool)"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
-      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'success' : 'surface'"
+      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
       :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
       :aria-pressed="broadcast.view.isActive"

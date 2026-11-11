@@ -24,7 +24,9 @@ describe("map sharing quick action", () => {
     expect(button).toContain(':aria-label="broadcast.view.actionLabel"');
     expect(button).toContain(':aria-pressed="broadcast.view.isActive"');
     expect(button).toContain("broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning'");
-    expect(button).toContain("broadcast.view.isActive ? 'success' : 'surface'");
+    expect(button).toContain("broadcast.view.isActive ? 'primary' : 'surface'");
+    expect(view).toContain(":color=\"own.error.value || recenterError ? 'warning' : 'primary'\"");
+    expect(view).toContain('icon="mdi-routes" variant="flat" color="primary"');
     expect(button).toContain(":class=\"{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }\"");
     expect(button).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
     expect(button).toContain('@click="broadcast.toggle()"');
@@ -56,7 +58,7 @@ describe("map sharing quick action", () => {
     expect(styleBlock(view, '.user-map-view__share--idle')).toContain('border-color: var(--bb-color-outline);');
   });
 
-  it("keeps the inactive icon and outline readable in both themes without resembling the active fill", () => {
+  it("keeps the inactive icon and outline readable in both themes against the adjacent primary fill", () => {
     const luminance = (hex: string) => [1, 3, 5].reduce((sum, index, channel) => {
       const value = parseInt(hex.slice(index, index + 2), 16) / 255;
       const linear = value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
@@ -69,7 +71,7 @@ describe("map sharing quick action", () => {
     for (const palette of Object.values(palettes)) {
       expect(contrast(palette.outline, palette.surface)).toBeGreaterThanOrEqual(3);
       expect(contrast(palette.text, palette.surface)).toBeGreaterThanOrEqual(4.5);
-      expect(contrast(palette.success, palette.surface)).toBeGreaterThanOrEqual(3);
+      expect(contrast(palette.primary, palette.surface)).toBeGreaterThanOrEqual(3);
     }
   });
 });
