@@ -31,7 +31,8 @@ describe("requester SOS history on narrow screens (source-pinned; no Vue mount)"
   it("keeps 48px rating targets usable and lets live member badges flow below labels on phones", () => {
     expect(rating).toContain('.rating__choices { display: flex; flex-wrap: wrap;');
     expect(rating).toContain('flex: 0 0 48px; width: 48px; height: 48px;');
-    expect(live).toContain('.live-panel__map { min-height: 20rem;');
+    expect(live).toContain('.live-panel__map { position: relative; min-height: 20rem;');
+    expect(live).toContain('.live-panel__map :deep(.map-canvas) { height: 100%; min-height: 20rem; }');
     expect(live).toContain('@container (max-width: 599px) {');
     expect(live).toContain('.live-panel__member { flex-wrap: wrap; }');
     expect(live).toContain('.live-panel__member > .v-chip { max-width: 100%; }');

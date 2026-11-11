@@ -44,7 +44,7 @@ describe("surface depth across light and dark UI", () => {
     const history = source("../views/_user/UserSosHistoryView.vue");
     const rescuer = source("../views/_user/UserRescuerHistoryView.vue");
     for (const [text, selector] of [
-      [mission, ".mission-route"], [mission, ".mission-desk__card"],
+      [mission, ".mission-desk__card"],
       [proposals, ".accepted-map"], [proposals, ".offer-detail"],
       [history, ".history__panel"], [rescuer, ".history__detail"],
       [source("../components/mission/MissionLivePanel.vue"), ".live-panel"],
@@ -53,6 +53,9 @@ describe("surface depth across light and dark UI", () => {
       expect(text).toContain(`${selector}`);
       expect(text).toMatch(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^}]*box-shadow: var\\(--bb-shadow-surface\\)`));
     }
+    // The route planner is an inset inside the live-map surface, not a second raised map card.
+    expect(mission).toMatch(/\.mission-route \{[^}]*border-radius: var\(--bb-radius-nested, 16px\);[^}]*\}/);
+    expect(mission).not.toMatch(/\.mission-route \{[^}]*box-shadow:/);
     expect(proposals).toContain(".offer-card--selected { border-color: #319581; box-shadow: 0 0 0 2px");
     expect(history).toContain(".history__item--selected { border-color: #269b7c; box-shadow: 0 0 0 2px");
   });

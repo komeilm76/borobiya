@@ -42,9 +42,27 @@ describe("mission map style restoration", () => {
   });
   it("shares a decoded geometry snapshot between camera and style restoration", () => {
     expect(view).toContain('const routeSnapshot = useMissionRouteGeometry(routing.selectedRoute);');
-    expect(view).toContain('map.fitBounds(routeSnapshot.value.bounds!');
+    expect(view).toContain('if (line && routeSnapshot.value.bounds) {');
+    expect(view).toContain('map.fitBounds(routeSnapshot.value.bounds,');
     expect(view).toContain('source.setData(routeSnapshot.value.data)');
     expect(view).not.toContain('decodeRoutePolyline(');
+  });
+  it("keeps the shared map wired after route close, but releases it on mission exit", () => {
+    const close = view.slice(view.indexOf('function closeRoutes(): void {'), view.indexOf('function releaseRouteMap(): void {'));
+    expect(close).toContain('routing.reset();');
+    expect(close).toContain('clearRouteOverlays();');
+    expect(close).not.toContain('detachRouteMap?.()');
+    expect(close).not.toContain('mapReady.value = false');
+    expect(view).toContain('if (!map || !routing.visible.value || !routing.target.value || !needsOverlayRestore({');
+    expect(view).toContain('if (routeMap?.getLayer(ROUTE_LAYER)) routeMap.removeLayer(ROUTE_LAYER);');
+    expect(view).toContain('if (routeMap?.getSource(ROUTE_SOURCE)) routeMap.removeSource(ROUTE_SOURCE);');
+    expect(view).toContain('map.on("click", onRouteMapClick);');
+    expect(view).toContain('detachRouteMap?.();\n  detachRouteMap = null;\n  mapReady.value = false;');
+    expect(view).toContain('watch(() => [routing.visible.value, routing.target.value,');
+    expect(view).toContain('() => syncRouteMap(), { flush: "sync" });');
+    expect(view).toContain('if (next && next !== previous) void routing.open();');
+    expect(view).toContain('if (!navigation.active.value) {');
+    expect(view).toContain('else releaseRouteMap(); // The mission panel is about to unmount.');
   });
   it("does not call GeoJSON setData on every map idle when the route layer is already present", () => {
     expect(view).toContain('map.on("idle", onStyleReady)');

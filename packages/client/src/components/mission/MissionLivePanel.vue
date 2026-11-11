@@ -1,12 +1,13 @@
 <template>
-  <section class="live-panel" dir="rtl" aria-label="موقعیت زندهٔ اعضای مأموریت">
+  <section class="live-panel" :class="{ 'live-panel--routing': routeActive }" dir="rtl" aria-label="نقشه و موقعیت اعضای مأموریت">
     <div class="live-panel__heading">
       <div>
         <span class="live-panel__eyebrow"><v-icon icon="mdi-map-marker-radius" size="17" /> اتاق خصوصی مأموریت</span>
-        <h3>موقعیت اعضای مأموریت</h3>
-        <p>فقط موقعیت‌های تازه‌ای که هر عضو آگاهانه به اشتراک می‌گذارد نمایش داده می‌شود.</p>
+        <h3>{{ routeActive ? 'نقشهٔ مأموریت' : 'موقعیت اعضای مأموریت' }}</h3>
+        <p>{{ routeActive ? 'محل حادثه و مسیرهای قابل‌دسترسی در همین نقشه نمایش داده می‌شوند؛ نشانگر اعضا فقط با اشتراک آگاهانه نشان داده می‌شود.' : 'فقط موقعیت‌هایی که هر عضو آگاهانه به اشتراک می‌گذارد نمایش داده می‌شود.' }}</p>
       </div>
       <div class="d-flex flex-wrap align-center ga-2">
+        <slot name="map-toolbar" />
         <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
           {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
         </v-chip>
@@ -28,9 +29,16 @@
     </div>
     <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ locationAnnouncement }}</span>
     <div class="live-panel__grid">
-      <div class="live-panel__map">
-        <MapCanvas :center="center" :zoom="13" :constrain-bounds="false"
-          :style-url="mapStyleUrl" aria-label="نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر" @ready="onMapReady" />
+      <div class="live-panel__map-area">
+        <div class="live-panel__map">
+          <MapCanvas :center="center" :zoom="13" :constrain-bounds="false"
+            :style-url="mapStyleUrl"
+            :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت داوطلبانهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
+            @ready="onMapReady" />
+          <slot name="map-actions" />
+        </div>
+        <!-- The rescuer's route planner shares this canvas; other callers keep just the live map. -->
+        <slot name="route-planner" />
       </div>
       <div class="live-panel__members">
         <div v-for="member in live.participantStatus.value" :key="member.role" class="live-panel__member">
@@ -76,9 +84,10 @@ import { missionLocationAnnouncement } from "@/mission/location-phase";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
-const props = withDefaults(defineProps<{ mission: LiveMissionIdentity; center?: [number, number] }>(), {
-  center: () => [51.4, 35.7]
+const props = withDefaults(defineProps<{ mission: LiveMissionIdentity; center?: [number, number]; routeActive?: boolean }>(), {
+  center: () => [51.4, 35.7], routeActive: false
 });
+const emit = defineEmits<{ ready: [map: MapLibreMap, marker: typeof Marker] }>();
 const auth = useAuthStore();
 const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
@@ -142,9 +151,19 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
   markerConstructor = MarkerClass;
   map.value = instance;
   syncMarkers();
-  focusMembers();
+  emit("ready", instance, MarkerClass);
+  if (!props.routeActive) focusMembers();
 }
-watch(presentRoles, (next, previous) => { if (next !== previous) focusMembers(); });
+// Live room updates can change markers, but must not steal the camera from
+// active route planning/guidance on the rescuer's shared mission map.
+watch(presentRoles, (next, previous) => { if (next !== previous && !props.routeActive) focusMembers(); });
+watch(() => props.routeActive, (active) => {
+  if (active) return;
+  // Closing the private route should not leave an unlabelled incident-centred map
+  // when nobody has voluntarily shared a location.
+  if (hasMarkers.value) focusMembers();
+  else map.value?.easeTo({ center: props.center, zoom: 13, duration: 350 });
+});
 // The age clock ticks every second; a new array literal would rebuild three DOM-backed
 // markers per tick even when no fix or stale state changed. Sync-flush clears private
 // markers on the same call stack as a mission/account/logout boundary.
@@ -163,16 +182,21 @@ onBeforeUnmount(() => {
 .live-panel__heading h3 { font-size: 1.15rem; margin: 6px 0 2px; }
 .live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }
 .live-panel__eyebrow { font-size: 0.82rem; color: rgb(var(--v-theme-primary)); font-weight: 750; }
-.live-panel__grid { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(230px,.9fr); gap: 18px; }
-.live-panel__map { min-height: 20rem; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; }
+.live-panel__grid { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(230px,.6fr); gap: 18px; }
+.live-panel__map-area { min-width: 0; }
+.live-panel__map { position: relative; min-height: 20rem; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; }
 .live-panel__map :deep(.map-canvas) { height: 100%; min-height: 20rem; }
+.live-panel--routing .live-panel__map { height: min(50dvh, 450px); min-height: 310px; }
+.live-panel--routing .live-panel__map :deep(.map-canvas) { min-height: 0; }
 .live-panel__members { display: grid; gap: 12px; align-content: start; }
 .live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: var(--bb-radius-nested, 16px); background: rgba(31,121,102,.06); }
 .live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .live-panel__member strong { font-size: .85rem; }.live-panel__member small { font-size: 0.82rem; opacity: .78; }
 .live-panel__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }.live-panel__dot.requester { background: #dc593b; }.live-panel__dot.rescuer { background: #16826c; }.live-panel__dot.admin { background: #5555ae; }
+@container (min-width: 721px) { .live-panel--routing .live-panel__map { position: sticky; top: 16px; z-index: 1; } }
 @container (max-width: 720px) { .live-panel__grid { grid-template-columns: minmax(0,1fr); } }
 @container (max-width: 599px) {
+  .live-panel--routing .live-panel__map { height: min(42dvh, 360px); min-height: 275px; }
   .live-panel__member { flex-wrap: wrap; }
   .live-panel__member > .v-chip { max-width: 100%; }
   .live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }

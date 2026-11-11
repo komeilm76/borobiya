@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
+const panel = readFileSync(new URL("../../components/mission/MissionLivePanel.vue", import.meta.url), "utf8");
 
 describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
   it("uses one transport profile for the phone select and desktop buttons, locked during navigation", () => {
@@ -22,11 +23,12 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('<details class="mission-route__stops" @toggle="onWaypointDisclosureToggle">');
     expect(view).toContain('<summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)');
     expect(view).toContain('if (!(event.target as HTMLDetailsElement).open) pickingWaypoint.value = false;');
-    const editor = view.slice(view.indexOf('<details class="mission-route__stops"'), view.indexOf('</details>'));
+    const stopsStart = view.indexOf('<details class="mission-route__stops"');
+    const editor = view.slice(stopsStart, view.indexOf('</details>', stopsStart));
     expect(editor).toContain('@click="addTypedWaypoint"');
     expect(editor).toContain('@click="routing.removeWaypoint(index)"');
     expect(editor).not.toContain('class="mission-route__step-control"');
-    expect(view.indexOf('class="mission-route__step-control"')).toBeGreaterThan(view.indexOf('class="mission-route__map"'));
+    expect(view.indexOf('class="mission-route__step-control"')).toBeGreaterThan(stopsStart);
     expect(view).toContain('.mission-route__stops-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
   });
 
@@ -41,14 +43,18 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain(':disabled="!desk.canCancel.value" @click="desk.confirmCancellation()"');
   });
 
-  it("wraps mission actions and route coordinates before the definite-height, unobscured map", () => {
+  it("keeps one definite-height mission map above the planner on phones and near it on wide screens", () => {
     const phone = view.split("@media(max-width: 599px) {")[1]!.split("@media(max-width: 480px)")[0]!;
-    expect(phone).toContain(".mission-desk__toolbar { flex-wrap: wrap; }");
     expect(phone).toContain(".mission-route__controls > div { width: 100%; min-width: 0; }");
     expect(phone).toContain(".mission-route__route-actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%;");
     expect(phone).toContain(".mission-route__coordinate { flex: 1 1 100%; max-width: none; min-width: 0; }");
-    expect(view).toContain(".mission-route__map { height: min(50vh, 430px); min-height: 310px;");
-    expect(view.indexOf('class="mission-route__map"')).toBeGreaterThan(view.indexOf('class="mission-route__stops"'));
+    expect(view).not.toContain('<MapCanvas');
+    expect(panel.match(/<MapCanvas\b/g)).toHaveLength(1);
+    expect(panel.indexOf('<slot name="route-planner"')).toBeGreaterThan(panel.indexOf('<MapCanvas'));
+    expect(view).toContain('<template #route-planner>');
+    expect(panel).toContain('.live-panel--routing .live-panel__map { height: min(50dvh, 450px); min-height: 310px; }');
+    expect(panel).toContain('.live-panel--routing .live-panel__map { height: min(42dvh, 360px); min-height: 275px; }');
+    expect(panel).toContain('@container (min-width: 721px) { .live-panel--routing .live-panel__map { position: sticky;');
     expect(view).toContain('routing.findRoutes(true)');
     expect(view).toContain('routing.addWaypoint({ lat, lon })');
   });
