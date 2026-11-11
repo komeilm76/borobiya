@@ -61,10 +61,12 @@
             <div><span>زمان تقریبی سفر</span><strong>{{ api.durationLabel.value }}</strong></div>
           </div>
           <div class="point-route__actions point-route__actions--plan">
-            <v-btn variant="tonal" color="primary" rounded="lg" @click="backToPoint">انصراف</v-btn>
+            <v-btn class="point-route__start" color="primary" variant="flat" rounded="lg" prepend-icon="mdi-navigation-variant"
+              :disabled="!api.point.value" @click="emit('start')">شروع سفر</v-btn>
             <v-btn v-if="api.error.value || (!api.routes.value.length && !api.loading.value)"
-              variant="tonal" color="primary" rounded="lg" :disabled="api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
-            <v-btn color="primary" variant="flat" rounded="lg" :disabled="!api.point.value" @click="emit('start')">شروع سفر</v-btn>
+              variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-refresh" :disabled="api.loading.value"
+              @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
+            <v-btn variant="text" color="primary" rounded="lg" @click="backToPoint">انصراف</v-btn>
           </div>
         </template>
       </div>
@@ -231,33 +233,50 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 .point-route__headings strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }
 .point-route__header :deep(.v-btn) { flex: 0 0 auto; min-width: 44px; height: 44px; }
 .point-route__content { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
-.point-route__endpoints { display: grid; gap: .4rem; padding: .7rem .85rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .1); }
-.point-route__endpoint { display: grid; grid-template-columns: 5rem minmax(0, 1fr); gap: .4rem; min-width: 0; align-items: center; }
+.point-route__endpoints { display: grid; gap: .3rem; padding: .7rem .85rem;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), .1); }
+/* A connected A-to-B rail reads as a trip, not two unrelated address form fields. */
+.point-route__endpoint { position: relative; display: grid; grid-template-columns: 12px 4.25rem minmax(0, 1fr);
+  gap: .55rem; min-width: 0; min-height: 34px; align-items: center; }
+.point-route__endpoint::before { content: ''; width: 11px; height: 11px; border: 2px solid rgb(var(--v-theme-primary));
+  border-radius: 50%; background: rgb(var(--v-theme-surface)); }
+.point-route__endpoint:last-child::before { border-color: rgb(var(--v-theme-error)); background: rgb(var(--v-theme-error)); }
+.point-route__endpoint:first-child::after { content: ''; position: absolute; right: 4px;
+  top: calc(50% + 8px); height: calc(100% + .3rem - 16px);
+  border-inline-start: 2px dashed rgba(var(--v-theme-on-surface), .3); }
 .point-route__endpoint-name { font-weight: 800; font-size: .82rem; }
 .point-route__endpoint-address { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; font-size: .87rem; }
-.point-route__choices { display: grid; gap: .5rem; padding: .7rem .85rem; }
-.point-route__choice { display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 56px; padding: .5rem .7rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px);
-  background: rgba(var(--v-theme-on-surface), .035);
-  text-align: start; color: inherit; cursor: pointer; font: inherit; }
+.point-route__choices { display: grid; gap: .45rem; padding: .65rem .85rem; }
+.point-route__choice { display: flex; align-items: center; gap: .55rem; width: 100%; min-height: 56px; padding: .5rem .7rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .12); border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-primary), .035);
+  text-align: start; color: inherit; cursor: pointer; font: inherit; transition: background-color .15s, border-color .15s; }
+.point-route__choice:hover:not(:disabled) { border-color: rgba(var(--v-theme-primary), .48);
+  background: rgba(var(--v-theme-primary), .09); }
 .point-route__choice:disabled { opacity: .55; cursor: not-allowed; }
+.point-route__choice > .v-icon:first-child { flex: 0 0 38px; width: 38px; height: 38px;
+  border-radius: 12px; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
+.point-route__choice > .v-icon:last-child { color: rgb(var(--v-theme-primary)); }
 .point-route__choice > span { flex: 1; min-width: 0; display: grid; }
 .point-route__choice strong { font-size: .9rem; }
 .point-route__choice small { font-size: .8rem; opacity: .8; }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; padding: .25rem .85rem .7rem; }
-.point-route__metrics > div { display: grid; gap: .1rem; min-width: 0; padding: .45rem;
+.point-route__metrics > div { display: grid; gap: .1rem; min-width: 0; padding: .55rem .7rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px);
-  background: rgba(var(--v-theme-on-surface), .035); }
+  background: rgba(var(--v-theme-on-surface), .04); }
 .point-route__metrics span { font-size: .81rem; opacity: .8; }
-.point-route__metrics strong { font-size: .95rem; }
+.point-route__metrics strong { font-size: 1.08rem; font-weight: 850; font-variant-numeric: tabular-nums; }
 .point-route__message { margin: .4rem .85rem; font-size: .84rem; line-height: 1.5; }
 .point-route__error { color: rgb(var(--v-theme-error)); }
 .point-route__fallback { display: grid; gap: .3rem; margin: .4rem .85rem; font-size: .85rem; }
 .point-route__fallback textarea { width: 100%; min-height: 3rem; padding: .35rem; border: 1px solid currentColor; border-radius: .5rem; resize: none; }
-.point-route__actions { display: flex; flex-wrap: wrap; gap: .5rem; padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
-  border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-route__actions :deep(.v-btn) { flex: 1 1 8rem; min-height: 44px; height: auto;
-  border-radius: .75rem !important; }
+.point-route__actions { position: sticky; bottom: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: .5rem;
+  padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(var(--v-theme-on-surface), .12); background: rgb(var(--v-theme-surface)); }
+.point-route__actions :deep(.v-btn) { flex: 1 1 8rem; min-height: 46px; height: auto;
+  border-radius: 14px !important; font-weight: 800; }
+.point-route__actions--plan :deep(.point-route__start) { flex: 2 1 11rem; }
+.point-route__actions--plan :deep(.v-btn:last-child) { flex: 1 1 6rem; }
 .point-route__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .point-route__header :deep(.v-btn:focus-visible), .point-route button:focus-visible, .point-route textarea:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }

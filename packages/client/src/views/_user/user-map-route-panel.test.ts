@@ -95,7 +95,7 @@ describe("progressive trip planning and editing", () => {
     expect(styles).toContain('max-height: min(72dvh, 36rem)');
     expect(styles).toContain('width: min(36rem, calc(100vw - 1.5rem))'); // Desktop card stays within viewport.
     expect(styles).toContain('width: min(30rem, calc(100vw - 7.5rem'); // Tablet SOS rail stays reachable.
-    expect(styles).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+    expect(styles).toContain('grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, 1fr))');
     expect(styles).toContain('safe-area-inset-bottom');
   });
 

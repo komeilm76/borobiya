@@ -141,13 +141,23 @@
       <v-card id="map-navigation-sheet" class="user-map-view__journey-content bb-floating-card bb-map-navigation-card"
         elevation="3" rounded="xl" dir="rtl">
         <div class="user-map-view__journey-bar">
-          <v-icon icon="mdi-navigation-variant" size="21" aria-hidden="true" />
-          <span class="user-map-view__journey-label" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+          <span class="user-map-view__journey-emblem" aria-hidden="true"><v-icon icon="mdi-navigation-variant" size="21" /></span>
+          <div class="user-map-view__journey-heading">
+            <small :title="journey.title.value">در حال سفر · <bdi dir="auto">{{ journey.title.value }}</bdi></small>
+            <span class="user-map-view__journey-label" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+          </div>
           <span class="sr-only" role="status" aria-live="polite">{{ journeyAnnouncement }}</span>
           <v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify" variant="text"
             aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان" aria-controls="map-navigation-search"
             :aria-expanded="navigationSearchOpen" @click="navigationSearchOpen = !navigationSearchOpen" />
           <dl class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
+            <div class="user-map-view__telemetry-item user-map-view__telemetry-item--eta">
+              <dt><v-icon icon="mdi-timer-outline" size="18" aria-hidden="true" />تا مقصد</dt>
+              <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}؛ برآورد مسیر بدون ترافیک`">
+                {{ remainingSeconds === null ? '—' : isPhone ? `≈ ${formatRemainingTimeCompact(remainingSeconds)}` : formatRemainingTime(remainingSeconds) }}
+              </dd>
+              <small>برآورد مسیر · بدون ترافیک</small>
+            </div>
             <div class="user-map-view__telemetry-item">
               <dt><v-icon icon="mdi-speedometer" size="18" aria-hidden="true" />سرعت</dt>
               <dd :aria-label="liveSpeedKmh === null ? 'سرعت فعلی نامشخص' : `سرعت فعلی ${liveSpeedKmh} کیلومتر بر ساعت بر اساس GPS`">
@@ -161,17 +171,10 @@
               <dd aria-label="حد مجاز نامشخص" title="مسیر آفلاین دادهٔ حد مجاز قانونی را ارائه نمی‌کند">؟</dd>
               <small>دادهٔ معتبر موجود نیست</small>
             </div>
-            <div class="user-map-view__telemetry-item">
-              <dt><v-icon icon="mdi-timer-outline" size="18" aria-hidden="true" />تا مقصد</dt>
-              <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}؛ برآورد مسیر بدون ترافیک`">
-                {{ remainingSeconds === null ? '—' : isPhone ? `≈ ${formatRemainingTimeCompact(remainingSeconds)}` : formatRemainingTime(remainingSeconds) }}
-              </dd>
-              <small>برآورد مسیر · بدون ترافیک</small>
-            </div>
           </dl>
           <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های سفر">
-            <v-btn variant="tonal" color="primary" rounded="lg" @click="backToTravelPlan">بازگشت به برنامهٔ سفر</v-btn>
-            <v-btn variant="flat" color="error" rounded="lg" @click="clearPointRoute">توقف و پایان سفر</v-btn>
+            <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-arrow-right" @click="backToTravelPlan">بازگشت به برنامهٔ سفر</v-btn>
+            <v-btn variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline" @click="clearPointRoute">توقف و پایان سفر</v-btn>
           </div>
         </div>
         <div v-if="journey.gpsWarning.value || journey.rerouteMessage.value" class="user-map-view__navigation-status">
@@ -2183,10 +2186,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* One nonmodal guidance card with identical content on every screen size. */
 .user-map-view__journey-stack { position: fixed; z-index: 7; left: 50%; transform: translateX(-50%);
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); width: min(36rem, calc(100vw - 1.5rem)); pointer-events: none; }
-.user-map-view__journey-content { display: flex; flex-direction: column; gap: .35rem; max-height: min(72dvh, 36rem);
-  overflow-y: auto; overscroll-behavior: contain; padding: .55rem .75rem; pointer-events: auto; }
-.user-map-view__journey-bar { display: grid; grid-template-columns: 21px minmax(0, 1fr) 44px;
-  align-items: center; column-gap: .65rem; row-gap: .5rem; color: rgb(var(--v-theme-on-surface)); }
+.user-map-view__journey-content { display: flex; flex-direction: column; gap: .4rem; max-height: min(72dvh, 36rem);
+  overflow-y: auto; overscroll-behavior: contain; padding: .7rem .75rem; pointer-events: auto; }
+.user-map-view__journey-bar { display: grid; grid-template-columns: 38px minmax(0, 1fr) 44px;
+  align-items: center; column-gap: .65rem; row-gap: .55rem; color: rgb(var(--v-theme-on-surface)); }
+.user-map-view__journey-emblem { display: grid; place-items: center; width: 38px; height: 38px;
+  border-radius: 12px; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
+.user-map-view__journey-heading { display: grid; min-width: 0; gap: .05rem; }
+.user-map-view__journey-heading small { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .8rem; font-weight: 800; color: rgb(var(--v-theme-primary)); }
 .user-map-view__journey-bar > .v-btn { min-width: 44px; height: 44px; }
 .user-map-view__journey-bar > .v-btn:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
 .user-map-view__navigation-search { max-height: 32dvh; min-height: 0; overflow-y: auto; }
@@ -2203,35 +2211,40 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); }
 .user-map-view__gps-warning { display: flex; align-items: flex-start; gap: .4rem; }
 .user-map-view__gps-warning .v-icon { flex: 0 0 auto; margin-top: .12rem; }
-.user-map-view__journey-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-size: .86rem; font-weight: 700; }
-/* One compact glanceable row inside the existing guidance card, not another map overlay.
-   Keep labels and unavailable states visible at 320px and with enlarged text. */
-.user-map-view__telemetry { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .35rem; margin: 0; }
+.user-map-view__journey-label { display: block; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .91rem; font-weight: 800; }
+/* ETA leads; speed is a GPS observation and the legal limit is explicitly unknown.
+   All three remain in one glanceable row, even on narrow phones. */
+.user-map-view__telemetry { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, 1fr));
+  gap: .4rem; margin: 0; }
 .user-map-view__telemetry-item { min-width: 0; display: flex; flex-direction: column; align-items: center;
-  gap: .05rem; padding: .4rem .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  gap: .05rem; padding: .48rem .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
   border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); text-align: center; }
+.user-map-view__telemetry-item--eta { border-color: rgba(var(--v-theme-primary), .28);
+  background: rgba(var(--v-theme-primary), .1); }
 .user-map-view__telemetry-item dt { display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
   gap: .2rem; font-size: .8rem; line-height: 1.25; font-weight: 700; }
 .user-map-view__telemetry-item dt .v-icon { color: rgb(var(--v-theme-primary)); }
 .user-map-view__telemetry-item dd { margin: 0; font-size: 1.16rem; line-height: 1.3; font-weight: 900;
   font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.user-map-view__telemetry-item--eta dd { color: rgb(var(--v-theme-primary)); font-size: 1.35rem; }
 .user-map-view__telemetry-item small { font-size: .8rem; line-height: 1.25; opacity: .78; overflow-wrap: anywhere; }
 .user-map-view__telemetry-unit { display: none; }
 .user-map-view__telemetry-item--unknown { background: rgba(var(--v-theme-on-surface), .04); }
 .user-map-view__telemetry-item--unknown dd { opacity: .7; }
-.user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .4rem; }
-.user-map-view__journey-actions > :first-child { flex: 1 1 auto; }
-.user-map-view__journey-actions :deep(.v-btn) { min-height: 44px; min-width: 44px; height: auto;
-  border-radius: .75rem !important; }
+.user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .45rem;
+  padding-top: .55rem; border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
+.user-map-view__journey-actions > :first-child { flex: 2 1 10rem; }
+.user-map-view__journey-actions > :last-child { flex: 1 1 9rem; }
+.user-map-view__journey-actions :deep(.v-btn) { min-height: 46px; min-width: 44px; height: auto;
+  border-radius: 14px !important; font-weight: 800; }
 .user-map-view__journey-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .user-map-view__journey-actions :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: 2px; }
 @media (min-width: 600px) {
   /* The desktop/tablet search widget is already on the map. Do not reserve a
      blank icon column after hiding the redundant header launcher. */
-  .user-map-view__journey-bar { grid-template-columns: 21px minmax(0, 1fr); }
+  .user-map-view__journey-bar { grid-template-columns: 38px minmax(0, 1fr); }
 }
 @media (min-width: 600px) and (max-width: 1023px) {
   /* The same card, parked beside rather than over the SOS/route action rail. */
@@ -2453,7 +2466,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     transform: none; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); width: auto; }
   .user-map-view__journey-content.bb-map-navigation-card { max-height: min(72dvh, 36rem);
-    padding: .5rem .75rem;
+    padding: .65rem .75rem;
     border-radius: var(--bb-radius-card, 24px) !important; }
   /* Keep three named, glanceable values in one row. The full GPS/ETA caveats
      remain in the accessible labels; an unknown limit never resembles a number. */
@@ -2461,6 +2474,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); }
   .user-map-view__telemetry-item { border: 0; border-radius: 0; background: transparent;
     gap: .1rem; padding: .2rem .1rem; }
+  .user-map-view__telemetry-item--eta { border-radius: 12px; background: rgba(var(--v-theme-primary), .13); }
   .user-map-view__telemetry-item + .user-map-view__telemetry-item { border-inline-start: 1px solid rgba(var(--v-theme-on-surface), .12); }
   .user-map-view__telemetry-item dt { font-size: .8rem; }
   .user-map-view__telemetry-item dd { font-size: 1.2rem; line-height: 1.25; overflow-wrap: normal; }

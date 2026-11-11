@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Navigation card hierarchy and action refinement
+
+- Reworked the selected-point and Travel cards around a connected origin-to-destination rail, clearer vehicle/route selectors and larger trip estimates. Travel now leads with Start, while Cancel is visually quiet and the action area stays reachable while details scroll. Active Guidance leads with the approximate ETA, separates GPS speed from the explicitly unknown legal limit, and gives Back-to-plan and destructive Stop distinct treatments. The shared chooser/footer buttons use consistent 14px corners and 46px minimum hit targets instead of the previous generic button treatment. Source/compiled-style regressions cover hierarchy and keep search, SOS, route choice and accessible labels intact. Rendered phone/tablet and physical GPS verification remain open.
+
 ### 2026-10-23 — Bug hunt: bound local Photon reads and cancellation
 
 - Map place search and reverse-geocoding awaited the local gateway without a client deadline. A response whose JSON body stalled after headers left search or the selected-point address loading indefinitely; a limit-30 diagnostic probe could also stall, and a transport ignoring abort kept a cancelled search pending. Both operations now have a 12-second overall deadline covering headers, bodies and the optional probe, with prompt caller cancellation even if the transport does not settle. Search failures retain the query-free `PlaceSearchError` code and reverse failures retain their unavailable error. Four focused regressions failed before the fix and pass afterward. Live browser/proxy timing remains unverified.

@@ -66,8 +66,8 @@ section.point-transport-choices-shell { position: fixed; z-index: 7; pointer-eve
 .point-transport-choices__footer { display: flex; flex-wrap: wrap; gap: .5rem;
   padding: .5rem .85rem calc(.5rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-transport-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 44px; height: auto;
-  border-radius: .75rem !important; }
+.point-transport-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 46px; height: auto;
+  border-radius: 14px !important; font-weight: 800; }
 .point-transport-choices__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
 @media (min-width: 600px) and (max-width: 1023px) {
   section.point-transport-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;

@@ -66,13 +66,37 @@ describe("map navigation card visual language (nonmounted)", () => {
       [routes, ".point-route-choices__footer"],
       [transport, ".point-transport-choices__footer"],
       [map, ".user-map-view__journey-actions"]] as const) {
-      expect(source).toMatch(new RegExp(`${selector.replaceAll('.', '\\.')}[^\\n]*:deep\\(\\.v-btn\\)\\s*\\{[^}]*border-radius: \\.75rem !important;`));
+      expect(source).toMatch(new RegExp(`${selector.replaceAll('.', '\\.')}[^\\n]*:deep\\(\\.v-btn\\)\\s*\\{[^}]*border-radius: 14px !important;`));
     }
-    expect(point).toContain('variant="tonal" color="primary" rounded="lg" @click="backToPoint"');
+    expect(point).toContain('variant="text" color="primary" rounded="lg" @click="backToPoint"');
+    expect(point).toContain('class="point-route__start" color="primary" variant="flat" rounded="lg"');
     expect(routes).toContain('variant="tonal" color="primary" rounded="lg" @click="emit(\'close\')"');
     expect(transport).toContain('variant="tonal" color="primary" rounded="lg" @click="emit(\'close\')"');
-    expect(map).toContain('variant="tonal" color="primary" rounded="lg" @click="backToTravelPlan"');
-    expect(map).toContain('variant="flat" color="error" rounded="lg" @click="clearPointRoute"');
+    expect(map).toContain('variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-arrow-right" @click="backToTravelPlan"');
+    expect(map).toContain('variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline" @click="clearPointRoute"');
+  });
+
+  it("makes travel a connected origin-to-destination plan with a persistent primary action", () => {
+    const planActions = point.slice(point.indexOf('class="point-route__actions point-route__actions--plan"'),
+      point.indexOf('</div>', point.indexOf('class="point-route__actions point-route__actions--plan"')));
+    expect(planActions.indexOf('شروع سفر')).toBeLessThan(planActions.indexOf('انصراف'));
+    expect(planActions).toContain('محاسبهٔ دوباره');
+    expect(point).toContain('.point-route__endpoint:first-child::after');
+    expect(point).toContain('.point-route__endpoint:last-child::before');
+    expect(point).toContain('.point-route__actions { position: sticky; bottom: 0;');
+    expect(point).toContain('.point-route__actions--plan :deep(.point-route__start)');
+  });
+
+  it("puts ETA first in guidance, separates the actions, and keeps unknown limits explicit", () => {
+    const guidance = map.slice(map.indexOf('class="user-map-view__journey-bar"'),
+      map.indexOf('class="user-map-view__navigation-status"'));
+    expect(guidance).toContain('class="user-map-view__journey-heading"');
+    expect(guidance).toContain('در حال سفر · <bdi dir="auto">{{ journey.title.value }}</bdi>');
+    expect(guidance.indexOf('user-map-view__telemetry-item--eta')).toBeLessThan(guidance.indexOf('mdi-speedometer'));
+    expect(guidance.indexOf('mdi-speedometer')).toBeLessThan(guidance.indexOf('user-map-view__telemetry-item--unknown'));
+    expect(map).toContain('.user-map-view__journey-actions { grid-column: 1 / -1;');
+    expect(map).toContain('border-top: 1px solid rgba(var(--v-theme-on-surface), .12);');
+    expect(map).toContain('.user-map-view__telemetry-item--eta { border-color:');
   });
 
   it("makes phone guidance glanceable without hiding unknown-limit or accessible details", () => {
