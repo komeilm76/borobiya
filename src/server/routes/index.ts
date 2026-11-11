@@ -142,6 +142,21 @@ const candidatesQuery: Validator<unknown> = shape({
   includeIneligible: optional(boolean()),
   limit: optionalLimit
 }, { allowUnknown: true });
+const stopShape = shape({
+  label: displayText(1, 120), latitude, longitude, placeId: optional(identifier)
+});
+const tripsQuery: Validator<unknown> = shape({ saved: optional(boolean()) }, { allowUnknown: true });
+const tripCreateBody = shape({
+  name: displayText(1, 80),
+  stops: array(stopShape, { min: 1, max: 25 })
+});
+const tripUpdateBody = shape({
+  name: optional(displayText(1, 80)),
+  stops: optional(array(stopShape, { min: 1, max: 25 }))
+}, { allowUnknown: false });
+const tripInviteBody = shape({ inviteeId: identifier });
+const tripSaveBody = shape({ saved: boolean() });
+
 const supportRequestsQuery: Validator<unknown> = shape({
   status: optional(oneOf(['pending', 'partially_approved', 'approved', 'rejected', 'cancelled'])),
   missionId: optional(identifier),
@@ -252,6 +267,37 @@ export function registerRoutes(router: Router<AppContext>): void {
     const input = query<Record<string, any>>(ctx); const now = ctx.app.clock();
     return ok(ctx.app.services.location.history(actor(ctx), ctx.params.userId, Number(input.from ?? now - 86_400_000), Number(input.to ?? now), Number(input.limit ?? 200)));
   } });
+  // Trips and group navigation (Stage 5).
+  router.add({ method: 'GET', path: '/_user/trips/invitations', auth: 'user', tags: ['trips'], summary: 'My pending trip invitations', handler: (ctx) =>
+    ok(ctx.app.services.trips.myInvitations(actor(ctx))) });
+  router.add({ method: 'POST', path: '/_user/trips/invitations/:invitationId/accept', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Accept a trip invitation', handler: (ctx) =>
+    ok(ctx.app.services.trips.acceptInvitation(actor(ctx), ctx.params.invitationId)) });
+  router.add({ method: 'POST', path: '/_user/trips/invitations/:invitationId/decline', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Decline a trip invitation', handler: (ctx) =>
+    ok(ctx.app.services.trips.declineInvitation(actor(ctx), ctx.params.invitationId)) });
+  router.add({ method: 'DELETE', path: '/_user/trips/invitations/:invitationId', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Cancel a trip invitation (leader)', handler: (ctx) =>
+    ok(ctx.app.services.trips.cancelInvitation(actor(ctx), ctx.params.invitationId)) });
+  router.add({ method: 'POST', path: '/_user/trips', auth: 'user', body: tripCreateBody, rate: RATE.mutation, tags: ['trips'], summary: 'Create a trip', handler: (ctx) =>
+    created(ctx.app.services.trips.createTrip(actor(ctx), body<{ name: string; stops: any[] }>(ctx))) });
+  router.add({ method: 'GET', path: '/_user/trips', auth: 'user', query: tripsQuery, tags: ['trips'], summary: 'My trips', handler: (ctx) => {
+    const input = query<{ saved?: boolean }>(ctx);
+    return ok(ctx.app.services.trips.listTrips(actor(ctx), input.saved === true));
+  } });
+  router.add({ method: 'GET', path: '/_user/trips/:tripId', auth: 'user', tags: ['trips'], summary: 'Trip detail', handler: (ctx) =>
+    ok(ctx.app.services.trips.tripDetail(actor(ctx), ctx.params.tripId)) });
+  router.add({ method: 'PATCH', path: '/_user/trips/:tripId', auth: 'user', body: tripUpdateBody, rate: RATE.mutation, tags: ['trips'], summary: 'Rename or rewrite a trip (leader)', handler: (ctx) =>
+    ok(ctx.app.services.trips.updateTrip(actor(ctx), ctx.params.tripId, body<{ name?: string; stops?: any[] }>(ctx))) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/save', auth: 'user', body: tripSaveBody, rate: RATE.mutation, tags: ['trips'], summary: 'Save or unsave a trip', handler: (ctx) =>
+    ok(ctx.app.services.trips.setSaved(actor(ctx), ctx.params.tripId, body<{ saved: boolean }>(ctx).saved)) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/start', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Start a trip (leader)', handler: (ctx) =>
+    ok(ctx.app.services.trips.startTrip(actor(ctx), ctx.params.tripId)) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/complete', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Complete a trip (leader)', handler: (ctx) =>
+    ok(ctx.app.services.trips.completeTrip(actor(ctx), ctx.params.tripId)) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/cancel', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Cancel a trip (leader)', handler: (ctx) =>
+    ok(ctx.app.services.trips.cancelTrip(actor(ctx), ctx.params.tripId)) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/leave', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Leave a trip (member)', handler: (ctx) =>
+    ok(ctx.app.services.trips.leaveTrip(actor(ctx), ctx.params.tripId)) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/invitations', auth: 'user', body: tripInviteBody, rate: RATE.mutation, tags: ['trips'], summary: 'Invite an account to a trip (leader)', handler: (ctx) =>
+    ok(ctx.app.services.trips.invite(actor(ctx), ctx.params.tripId, body<{ inviteeId: string }>(ctx).inviteeId)) });
   router.add({ method: 'POST', path: '/_user/realtime/ticket', auth: 'user', rate: RATE.ticket, tags: ['realtime'], summary: 'Issue one-time WebSocket ticket', handler: (ctx) =>
     ok(ctx.app.services.users.ticket(actor(ctx), ctx.ip)) });
   router.add({ method: 'GET', path: '/_user/sync', auth: 'user', query: syncQuery, tags: ['realtime'], summary: 'Durable event catch-up', handler: (ctx) => {

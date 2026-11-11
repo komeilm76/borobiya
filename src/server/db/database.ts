@@ -4,7 +4,7 @@ import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -141,6 +141,54 @@ CREATE TABLE IF NOT EXISTS location_points (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_location_points_user_time ON location_points(user_id, recorded_at DESC);
+CREATE TABLE IF NOT EXISTS trips (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','active','completed','cancelled')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  started_at INTEGER,
+  completed_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_trips_owner ON trips(owner_id, status, updated_at DESC);
+CREATE TABLE IF NOT EXISTS trip_stops (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  rank INTEGER NOT NULL,
+  label TEXT NOT NULL,
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  place_id TEXT REFERENCES saved_places(id) ON DELETE SET NULL,
+  UNIQUE (trip_id, rank)
+);
+CREATE INDEX IF NOT EXISTS idx_trip_stops_trip ON trip_stops(trip_id, rank);
+CREATE TABLE IF NOT EXISTS group_trips (
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('leader','member')),
+  joined_at INTEGER NOT NULL,
+  PRIMARY KEY (trip_id, user_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_group_trips_one_leader ON group_trips(trip_id) WHERE role = 'leader';
+CREATE INDEX IF NOT EXISTS idx_group_trips_user ON group_trips(user_id, joined_at DESC);
+CREATE TABLE IF NOT EXISTS trip_invitations (
+  id TEXT PRIMARY KEY,
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  invited_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invitee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','cancelled')),
+  created_at INTEGER NOT NULL,
+  responded_at INTEGER,
+  UNIQUE (trip_id, invitee_id)
+);
+CREATE INDEX IF NOT EXISTS idx_trip_invitations_invitee ON trip_invitations(invitee_id, status, created_at DESC);
+CREATE TABLE IF NOT EXISTS saved_trips (
+  trip_id TEXT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (trip_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS saved_places (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -340,6 +388,8 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
  *       one-off pass realigns rows written before the fix. Finished missions are untouched.
  *   v7: location_shares.scope — grants carry the explicitly selected detail set as a JSON array
  *       ('route' | 'motion' | 'accuracy'). NULL keeps the pre-v7 behaviour (every detail).
+ *   v8: trips, trip_stops, group_trips, trip_invitations and saved_trips — the trip domain
+ *       (Stage 5). Additive tables only; no existing row is touched.
  *
  * @param config Runtime configuration.
  * @returns A ready Bun SQLite handle with WAL, foreign keys and a busy timeout.

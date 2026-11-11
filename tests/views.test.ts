@@ -15,7 +15,7 @@ import { ROLES } from '../src/shared/protocol.ts';
 
 const VIEWS = {
   auth: ['LoginView', 'RegisterView', 'RecoveryView', 'OnboardingView'],
-  map: ['MapView', 'SosView', 'TalkView', 'MissionView', 'SharingCenterView', 'HistoryView', 'ProfileView'],
+  map: ['MapView', 'SosView', 'TalkView', 'MissionView', 'SharingCenterView', 'HistoryView', 'ProfileView', 'TripsView'],
   admin: [
     'OverviewView',
     'DispatchView',
@@ -47,6 +47,8 @@ const FIXTURES: Record<string, unknown> = {
   '/_user/shares': { items: [] },
   '/_user/sos': { items: [] },
   '/_user/missions': { items: [] },
+  '/_user/trips': { items: [], total: 0 },
+  '/_user/trips/invitations': { items: [], total: 0 },
   '/_user/profile': { id: 'usr_test', username: 'saeed.k', devices: [], loginHistory: [] },
   '/_user/devices': { items: [] },
   '/_admin/overview': { kpis: {}, series: [], alerts: [], recentRequests: [] },
@@ -134,7 +136,8 @@ describe('routed views render', () => {
       MissionView: '/_user/mission',
       SharingCenterView: '/_user/sharing',
       HistoryView: '/_user/history',
-      ProfileView: '/_user/profile'
+      ProfileView: '/_user/profile',
+      TripsView: '/_user/trips'
     };
     for (const name of VIEWS.map) {
       const module = (await import(`../src/client/views/map/${name}.vue`)) as { default: unknown };
@@ -169,7 +172,7 @@ describe('routed views render', () => {
   it('the route table covers every view file exactly once', async () => {
     const declared = ROUTES.map((route) => route.component).filter(Boolean).length;
     const total = VIEWS.auth.length + VIEWS.map.length + VIEWS.admin.length;
-    expect(total).toBe(22);
+    expect(total).toBe(23);
     expect(declared).toBe(total);
     const names = ROUTES.map((route) => route.name).filter(Boolean);
     expect(new Set(names).size).toBe(names.length);

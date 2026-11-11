@@ -418,3 +418,66 @@ export interface SupportRequestCandidateView {
   eligible: boolean;
   ineligibleReason: string | null;
 }
+
+/** A stop on a trip (`GET /_user/trips/:id`); `placeId` links a saved place when there is one. */
+export interface TripStopView {
+  id: string;
+  rank: number;
+  label: string;
+  latitude: number;
+  longitude: number;
+  placeId: string | null;
+}
+
+/** A member of a trip; the leader is always present exactly once. */
+export interface TripMemberView {
+  userId: string;
+  username: string;
+  role: 'leader' | 'member';
+  joinedAt: number;
+}
+
+/** An invitation to a trip, visible to the leader only. */
+export interface TripInvitationView {
+  id: string;
+  inviteeId: string;
+  inviteeUsername: string;
+  invitedByUsername: string;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
+  createdAt: number;
+  respondedAt: number | null;
+}
+
+/** A trip as the list endpoint returns it (no stops, no membership detail). */
+export interface TripListItemView {
+  id: string;
+  name: string;
+  status: 'planned' | 'active' | 'completed' | 'cancelled';
+  saved: boolean;
+  role: 'leader' | 'member';
+  ownerId: string;
+  ownerUsername: string;
+  stopCount: number;
+  memberCount: number;
+  createdAt: number;
+  updatedAt: number;
+  startedAt: number | null;
+  completedAt: number | null;
+}
+
+/** A full trip projection (`GET /_user/trips/:id`, and the create/patch responses). */
+export interface TripView extends TripListItemView {
+  stops: TripStopView[];
+  members?: TripMemberView[];
+  invitations?: TripInvitationView[];
+}
+
+/** A pending invitation in the invitee's inbox (`GET /_user/trips/invitations`). */
+export interface TripInvitationInboxView {
+  id: string;
+  tripId: string;
+  tripName: string;
+  tripStatus: string;
+  inviterUsername: string;
+  createdAt: number;
+}

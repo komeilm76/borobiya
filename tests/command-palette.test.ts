@@ -243,7 +243,7 @@ describe('command palette component', () => {
     expect(panel.exists()).toBe(true);
     expect(wrapper.find('[role="dialog"]').attributes('aria-modal')).toBe('true');
     expect(document.activeElement).toBe(wrapper.find('[data-testid="command-search"]').element);
-    expect(wrapper.findAll('[role="option"]').length).toBe(8);
+    expect(wrapper.findAll('[role="option"]').length).toBe(9);
     wrapper.unmount();
   });
 
@@ -367,6 +367,7 @@ describe('command effects', () => {
       ['مأموریت', ROUTE_NAMES.mission],
       ['اشتراک‌گذاری', ROUTE_NAMES.sharing],
       ['تاریخچه', ROUTE_NAMES.history],
+      ['سفرها', ROUTE_NAMES.trips],
       ['نمایه و دستگاه‌ها', ROUTE_NAMES.profile]
     ] as const) {
       const { wrapper, router } = await runCommand(label);

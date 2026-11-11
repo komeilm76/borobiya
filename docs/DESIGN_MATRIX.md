@@ -78,8 +78,8 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | navigation/13-navigation-alternatives.png | superseded | — | See above. |
 | navigation/14-navigation-full-route.png | superseded | — | See above. |
 | navigation/15-navigation-off-route.png | superseded | — | See above. |
-| navigation/16-multi-destination.png | superseded | — | See above. |
-| navigation/17-destination-reordering.png | superseded | — | See above. (Saved-place reordering API exists; wiring tracked under bookmarks.) |
+| navigation/16-multi-destination.png | partial | P2/M | Stage 5 implements the ordered multi-destination trip as the Trips screen (top-pill trips tab, `/_user/trips`): create with ranked stops (label + coordinates, saved-place and map-center insertion), save/unsave, start/complete/cancel, explicit-leader group rides with invitation acceptance. Not built: route computation, per-stop ETAs/distances, traffic chips, quick-add-from-map, fastest-order suggestion, trip polyline. |
+| navigation/17-destination-reordering.png | missing | P2/M | Stop reordering UI not built (design shows drag handles/up-down arrows). The server supports wholesale stop-list replacement via `PATCH /_user/trips/:tripId`, so reordering is possible through the API only. Saved-place reordering API also exists; wiring tracked under bookmarks. |
 | navigation/18-sos-confirmation.png | missing | P1/M | SOS review step covers confirmation generally; no designed confirmation sheet from trip context (trip context superseded). |
 | navigation/19-trip-cancel.png | superseded | — | Trip superseded; the underlying SOS cancel gap is tracked under sos/13. |
 | navigation/20-trip-completed.png | superseded | — | Trip superseded. |
@@ -137,7 +137,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| history/01-history-trips.png | superseded | — | Trip history presupposes routing (superseded). |
+| history/01-history-trips.png | superseded | — | Trip history presupposed routing, which superseded it. Stage 5 adds a trips domain, so trip history is now feasible and is queued for Stage 6. |
 | history/02-history-missions.png | partial | P2/H | SOS requests and missions from `/_user/missions` now both render with Persian status labels; no tab structure yet. |
 | history/03-history-missions-agent.png | partial | P2/M | Responder missions render alongside requests with localized status; dedicated agent view absent. |
 | history/04-history-companions.png | partial | P2/M | The history screen and the Sharing Center list every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
@@ -238,14 +238,14 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 ## Documented intentional deviations
 
 - **DEV-01 — Recovery account error (auth/06).** The reference shows an explicit "unknown username" error, which is a user-enumeration oracle. Implementation answers unknown usernames with decoy challenges (enumeration-safe), consistent with `docs/SECURITY.md` and the decoy-resistant recovery design. The design image is retained as reference; implementation deliberately diverges.
-- **DEV-02 — Turn-by-turn navigation family (navigation/08-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — the pill now reads "Map" (its screen is the offline map with the SOS composer, nothing more) and its behavior is exactly what it says (P1 rename, decision 3).
+- **DEV-02 — Turn-by-turn navigation family (navigation/08-15, navigation/18-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — the pill now reads "Map" (its screen is the offline map with the SOS composer, nothing more) and its behavior is exactly what it says (P1 rename, decision 3). navigation/16-multi-destination.png and navigation/17-destination-reordering.png were taken back into scope by the explicit Stage 5 product decision (`docs/IMPLEMENTATION_PLAN.md`): the multi-destination ordered trip is implemented as the Trips screen, still without any routing engine.
 - **DEV-03 — Photo without compression (sos/05).** RESOLVED in P1 — the composer validates, downscales and re-encodes client-side under the server's wire cap. Kept for the record.
 - **DEV-04 — SOS dock placement.** RESOLVED in P1 — the dock now hugs the physical left edge (decision 5), above the search bar, clear of the home indicator.
-- **DEV-05 — Profile metrics.** The reference shows trip counts/kilometers; the product has no trips. P2 must replace them with SOS/mission/sharing counts (see design-flaw register).
+- **DEV-05 — Profile metrics.** The reference shows trip counts/kilometers; P2 replaced them with SOS/mission/sharing counts (see design-flaw register). Stage 5 adds a trips domain, so trip counts are now possible; kilometers still presuppose a routing engine and remain unavailable.
 
 ## Summary tally (canonical 141)
 
-Counts over the 141 canonical rows above: `done` 16, `partial` 47, `missing` 57, `superseded` 15, `reference` 5, intentional `deviation` 1.
+Counts over the 141 canonical rows above: `done` 23, `partial` 66, `missing` 35, `superseded` 11, `reference` 5, intentional `deviation` 1.
 
 ## Design flaws found in the reference material (to fix or consciously keep)
 
@@ -256,6 +256,6 @@ Counts over the 141 canonical rows above: `done` 16, `partial` 47, `missing` 57,
 | DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/sharing metrics in P2; document the swap. |
 | DF-04 | history/07-history-playback.png | Playback UI does not communicate authorization scope/expiry although the API is share-gated. | Add an authorization note; never show playback without an active authorized share. |
 | DF-05 | sos/04-sos-location-picker.png | Dropping an incident pin far from GPS is a fraud/abuse vector with no responder-facing "manual location" marker. | Surface `isManual` (already recorded server-side) on the offer/dispatch screens. |
-| DF-06 | navigation/* (all) | The navigation family contradicts the offline/deterministic-tile architecture and the documented product scope; keeping it as silent reference invites accidental scope creep. | Keep files as visual identity reference; exclude from acceptance scope; revisit only via explicit product decision. |
+| DF-06 | navigation/* (except 16-17) | The navigation family contradicts the offline/deterministic-tile architecture and the documented product scope; keeping it as silent reference invites accidental scope creep. | Keep files as visual identity reference; exclude from acceptance scope. Explicit product decision (Stage 5) brought 16-multi-destination (partial) and 17-destination-reordering (missing) back into scope as the Trips screen; the rest stays excluded. |
 | DF-07 | design/icons vs client | Client consumes generated subset; canonical set allows aliases. Verify in P5 that no ad-hoc icon appears outside the inventory. | Guard via existing asset test; extend if needed. |
 | DF-08 | map-page/navigation/02 | The 350-metre scale bar appears only in the press-hold reference, not in idle. | Treat the scale bar as a permanent map affordance if confirmed with the design owner; otherwise drop. |

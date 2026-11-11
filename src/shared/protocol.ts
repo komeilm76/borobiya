@@ -80,6 +80,34 @@ export const MISSION_MEMBER_ROLES = Object.freeze({
   MEMBER: 'member'
 } as const);
 
+/** Canonical trip lifecycle states (Stage 5: trips and group navigation). */
+export const TRIP_STATUS = Object.freeze({
+  PLANNED: 'planned',
+  ACTIVE: 'active',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled'
+} as const);
+
+export type TripStatus = (typeof TRIP_STATUS)[keyof typeof TRIP_STATUS];
+
+/** Trip invitation lifecycle; an invitee must accept before joining the trip. */
+export const TRIP_INVITATION_STATUS = Object.freeze({
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  CANCELLED: 'cancelled'
+} as const);
+
+export type TripInvitationStatus = (typeof TRIP_INVITATION_STATUS)[keyof typeof TRIP_INVITATION_STATUS];
+
+/** Membership roles inside a trip (not application roles). */
+export const TRIP_MEMBER_ROLES = Object.freeze({
+  LEADER: 'leader',
+  MEMBER: 'member'
+} as const);
+
+export type TripMemberRole = (typeof TRIP_MEMBER_ROLES)[keyof typeof TRIP_MEMBER_ROLES];
+
 /** Durable domain events written to the append-only log and replayed to clients. */
 export const HTTP_EVENTS = Object.freeze({
   HEALTH: 'health',
@@ -96,6 +124,8 @@ export const HTTP_EVENTS = Object.freeze({
   SUPPORT_REQUEST_CREATED: 'support.request.created',
   SUPPORT_REQUEST_REVIEWED: 'support.request.reviewed',
   SUPPORT_REQUEST_CANCELLED: 'support.request.cancelled',
+  TRIP_UPDATED: 'trip.updated',
+  TRIP_INVITATION: 'trip.invitation',
   ADMIN_ALERT: 'admin.alert',
   SETTINGS_UPDATED: 'settings.updated',
   USER_UPDATED: 'user.updated'

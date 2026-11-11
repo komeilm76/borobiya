@@ -5,6 +5,7 @@ import { useEventListener, watchDebounced } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth.ts';
 import { useMapStore } from '@/stores/map.ts';
 import { useSosStore } from '@/stores/sos.ts';
+import { useTripsStore } from '@/stores/trips.ts';
 import { useRealtimeStore } from '@/stores/realtime.ts';
 import { useOfflineStore } from '@/stores/offline.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
@@ -17,13 +18,14 @@ import MapCanvas from '@/components/MapCanvas.vue';
 /**
  * Mobile application shell: the map canvas stays mounted while the bottom sheet shows the
  * active screen. Realtime events, geolocation and the SOS hold gesture live here so they
- * survive route changes between the map, mission, sharing and profile screens.
+ * survive route changes between the map, mission, sharing, trips and profile screens.
  */
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const map = useMapStore();
 const sos = useSosStore();
+const trips = useTripsStore();
 const realtime = useRealtimeStore();
 const offline = useOfflineStore();
 const motion = useMotionPreferences();
@@ -32,6 +34,7 @@ const toast = useToast();
 const tabs = [
   { name: ROUTE_NAMES.history, label: 'تاریخچه', icon: 'history' },
   { name: ROUTE_NAMES.map, label: 'نقشه', icon: 'routes' },
+  { name: ROUTE_NAMES.trips, label: 'سفرها', icon: 'map-marker-path' },
   { name: ROUTE_NAMES.sharing, label: 'اشتراک‌گذاری', icon: 'share-variant' },
   { name: ROUTE_NAMES.mission, label: 'مأموریت', icon: 'web' }
 ] as const;
@@ -62,7 +65,7 @@ const unsubscribers: Array<() => void> = [];
 
 onMounted(async () => {
   map.startLocation();
-  await Promise.all([map.load(), sos.load()]);
+  await Promise.all([map.load(), sos.load(), trips.load()]);
   await realtime.connect();
   unsubscribers.push(
     realtime.on(HTTP_EVENTS.SOS_CREATED, () => void sos.load()),
@@ -70,6 +73,8 @@ onMounted(async () => {
     realtime.on(HTTP_EVENTS.SOS_ACCEPTED, () => void sos.load()),
     realtime.on(HTTP_EVENTS.MISSION_UPDATED, () => void sos.load()),
     realtime.on(HTTP_EVENTS.LOCATION_SHARE_CREATED, () => void map.load()),
+    realtime.on(HTTP_EVENTS.TRIP_UPDATED, () => void trips.load()),
+    realtime.on(HTTP_EVENTS.TRIP_INVITATION, () => void trips.load()),
     realtime.on(WS_EVENTS.LOCATION_PEER, (payload: { userId: string; username?: string; fix: Record<string, number> }) => {
       if (!payload?.userId || !payload.fix) return;
       map.applyLiveFix({ userId: payload.userId, username: payload.username, ...payload.fix } as never);
@@ -84,7 +89,7 @@ onUnmounted(() => {
 });
 
 useEventListener(window, 'keydown', (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && ['sos', 'talk', 'mission', 'profile', 'sharing', 'history'].includes(String(route.name))) {
+  if (event.key === 'Escape' && ['sos', 'talk', 'mission', 'profile', 'sharing', 'history', 'trips'].includes(String(route.name))) {
     void router.push({ name: ROUTE_NAMES.map });
   }
 });

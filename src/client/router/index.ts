@@ -30,6 +30,7 @@ export const ROUTE_NAMES = Object.freeze({
   mission: 'mission',
   sharing: 'sharing',
   history: 'history',
+  trips: 'trips',
   profile: 'profile',
   adminOverview: 'admin-overview',
   adminDispatch: 'admin-dispatch',
@@ -114,6 +115,12 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.history,
     component: () => import('@/views/map/HistoryView.vue'),
     meta: { layout: 'map', access: 'user', label: 'تاریخچه', icon: 'history' }
+  },
+  {
+    path: '/_user/trips',
+    name: ROUTE_NAMES.trips,
+    component: () => import('@/views/map/TripsView.vue'),
+    meta: { layout: 'map', access: 'user', label: 'سفرها', icon: 'map-marker-path' }
   },
   {
     path: '/_user/profile',

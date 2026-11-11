@@ -7,6 +7,7 @@ import { TeamService } from './teams.ts';
 import { AdminService } from './admin.ts';
 import { MapService } from './map.ts';
 import { RealtimeService } from './realtime.ts';
+import { TripsService } from './trips.ts';
 
 export interface Services {
   auth: AuthService;
@@ -17,6 +18,7 @@ export interface Services {
   admin: AdminService;
   map: MapService;
   realtime: RealtimeService;
+  trips: TripsService;
 }
 
 /** Services are thin classes. All shared state lives in explicit caches, SQLite or the realtime hub. */
@@ -29,5 +31,6 @@ export function createServices(context: AppContext): Services {
   const admin = new AdminService(context);
   const map = new MapService(context);
   const realtime = new RealtimeService(context);
-  return { auth, users, location, sos, teams, admin, map, realtime };
+  const trips = new TripsService(context);
+  return { auth, users, location, sos, teams, admin, map, realtime, trips };
 }

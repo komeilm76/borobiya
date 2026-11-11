@@ -296,7 +296,7 @@ describe('navigation', () => {
     await wrapper.find('.sheet__footer button').trigger('click');
     await flushPromises();
     // The footer button is the sheet's primary action; a dead one strands the whole flow.
-    expect(vi.mocked(push).mock.calls.at(-1)?.[0]).toEqual({ name: ROUTE_NAMES.mission });
+    expect(vi.mocked(push).mock.calls.at(-1)?.[0]).toEqual({ name: ROUTE_NAMES.trips });
     wrapper.unmount();
   });
 

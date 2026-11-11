@@ -151,7 +151,7 @@ async function saveDestination(): Promise<void> {
     </div>
   </div>
   <div class="sheet__footer">
-    <button type="button" class="primary-button primary-button--wide" @click="router.push({ name: ROUTE_NAMES.mission })">
+    <button type="button" class="primary-button primary-button--wide" @click="router.push({ name: ROUTE_NAMES.trips })">
       <span>سفر</span><span class="mdi mdi-arrow-left" aria-hidden="true" />
     </button>
   </div>

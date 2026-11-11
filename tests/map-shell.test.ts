@@ -7,6 +7,7 @@ import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 import { useAuthStore } from '../src/client/stores/auth.ts';
 import { useMapStore } from '../src/client/stores/map.ts';
 import { useSosStore } from '../src/client/stores/sos.ts';
+import { useTripsStore } from '../src/client/stores/trips.ts';
 import { useRealtimeStore } from '../src/client/stores/realtime.ts';
 import { useOfflineStore } from '../src/client/stores/offline.ts';
 import MapLayout from '../src/client/layouts/MapLayout.vue';
@@ -40,6 +41,7 @@ async function mountShell(path = '/_user/map', options: { offline?: boolean } = 
 
   const map = useMapStore(pinia);
   const sos = useSosStore(pinia);
+  const trips = useTripsStore(pinia);
   const realtime = useRealtimeStore(pinia);
   const offline = useOfflineStore(pinia);
 
@@ -55,6 +57,7 @@ async function mountShell(path = '/_user/map', options: { offline?: boolean } = 
 
   const mapLoad = vi.spyOn(map, 'load').mockResolvedValue(undefined as never);
   const sosLoad = vi.spyOn(sos, 'load').mockResolvedValue(undefined as never);
+  const tripsLoad = vi.spyOn(trips, 'load').mockResolvedValue(undefined as never);
   const startLocation = vi.spyOn(map, 'startLocation').mockImplementation(() => undefined);
   const stopLocation = vi.spyOn(map, 'stopLocation').mockImplementation(() => undefined);
   const applyLiveFix = vi.spyOn(map, 'applyLiveFix').mockImplementation(() => undefined);
@@ -76,8 +79,8 @@ async function mountShell(path = '/_user/map', options: { offline?: boolean } = 
   };
 
   return {
-    wrapper, router, auth, map, sos, realtime, offline, handlers, emit, advance, navigations,
-    spies: { connect, disconnect, mapLoad, sosLoad, startLocation, stopLocation, applyLiveFix }
+    wrapper, router, auth, map, sos, trips, realtime, offline, handlers, emit, advance, navigations,
+    spies: { connect, disconnect, mapLoad, sosLoad, tripsLoad, startLocation, stopLocation, applyLiveFix }
   };
 }
 
@@ -195,6 +198,7 @@ describe('mobile shell', () => {
     expect(shell.spies.startLocation).toHaveBeenCalledTimes(1);
     expect(shell.spies.mapLoad).toHaveBeenCalledTimes(1);
     expect(shell.spies.sosLoad).toHaveBeenCalledTimes(1);
+    expect(shell.spies.tripsLoad).toHaveBeenCalledTimes(1);
     expect(shell.spies.connect).toHaveBeenCalledTimes(1);
     shell.wrapper.unmount();
   });
@@ -207,7 +211,9 @@ describe('mobile shell', () => {
       HTTP_EVENTS.SOS_CREATED,
       HTTP_EVENTS.SOS_DISPATCHED,
       HTTP_EVENTS.SOS_ACCEPTED,
-      HTTP_EVENTS.MISSION_UPDATED
+      HTTP_EVENTS.MISSION_UPDATED,
+      HTTP_EVENTS.TRIP_UPDATED,
+      HTTP_EVENTS.TRIP_INVITATION
     ]) {
       expect(shell.handlers.has(type), type).toBe(true);
     }
@@ -216,6 +222,11 @@ describe('mobile shell', () => {
 
     await shell.emit(HTTP_EVENTS.SOS_CREATED, { sosId: 'sos_9' });
     expect(shell.spies.sosLoad.mock.calls.length).toBe(before + 1);
+
+    // A trip change refreshes the trips store, not the SOS rail.
+    const tripsBefore = shell.spies.tripsLoad.mock.calls.length;
+    await shell.emit(HTTP_EVENTS.TRIP_UPDATED, { tripId: 'trp_9' });
+    expect(shell.spies.tripsLoad.mock.calls.length).toBe(tripsBefore + 1);
 
     // A new share refreshes the map, not the SOS rail.
     const mapBefore = shell.spies.mapLoad.mock.calls.length;
@@ -264,7 +275,7 @@ describe('mobile shell', () => {
   it('tears down every subscription, the geolocation watch and the socket on unmount', async () => {
     const shell = await mountShell();
     const subscribed = [...shell.handlers.values()].reduce((total, set) => total + set.size, 0);
-    expect(subscribed).toBe(6);
+    expect(subscribed).toBe(8);
     shell.wrapper.unmount();
     expect(shell.spies.stopLocation).toHaveBeenCalledTimes(1);
     expect(shell.spies.disconnect).toHaveBeenCalledTimes(1);

@@ -204,6 +204,40 @@ describe('client types match the API payloads', () => {
     expect(candidates.status, candidates.text).toBe(200);
     problems.push(...check('support request candidate', 'SupportRequestCandidateView', candidates.json.data.items?.[0], interfaces));
 
+    // Trips: create, list, detail (leader view with invitations) and the invitee inbox.
+    const tripCreate = await apiFetch(server, '/_user/trips', {
+      method: 'POST',
+      cookie: userCookie,
+      body: {
+        name: 'مسیر قرارداد',
+        stops: [
+          { label: 'خانه', latitude: 35.7192, longitude: 51.3314, placeId: null },
+          { label: 'بیمارستان امید', latitude: 35.7231, longitude: 51.4122, placeId: null }
+        ]
+      }
+    });
+    expect(tripCreate.status, tripCreate.text).toBe(201);
+    problems.push(...check('trip (create)', 'TripView', tripCreate.json.data, interfaces));
+    problems.push(...check('trip stop', 'TripStopView', tripCreate.json.data.stops?.[0], interfaces));
+    problems.push(...check('trip member', 'TripMemberView', tripCreate.json.data.members?.[0], interfaces));
+    const tripsList = await apiFetch(server, '/_user/trips', { cookie: userCookie });
+    expect(tripsList.status, tripsList.text).toBe(200);
+    problems.push(...check('trip list item', 'TripListItemView', tripsList.json.data.items?.[0], interfaces));
+    const tripId = String(tripCreate.json.data.id);
+    await verify('trip detail', `/_user/trips/${tripId}`, userCookie, 'TripView');
+
+    const invite = await apiFetch(server, `/_user/trips/${tripId}/invitations`, {
+      method: 'POST',
+      cookie: userCookie,
+      body: { inviteeId: 'usr_responder' }
+    });
+    expect(invite.status, invite.text).toBe(200);
+    problems.push(...check('trip invitation (leader)', 'TripInvitationView', invite.json.data.invitations?.[0], interfaces));
+
+    const inbox = await apiFetch(server, '/_user/trips/invitations', { cookie: responderCookie });
+    expect(inbox.status, inbox.text).toBe(200);
+    problems.push(...check('trip invitation inbox', 'TripInvitationInboxView', inbox.json.data.items?.[0], interfaces));
+
     // Audit rows only exist after a mutation, so make one and then read them back.
     await apiFetch(server, '/_admin/settings', {
       method: 'PATCH',
