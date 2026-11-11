@@ -10,7 +10,7 @@ Services provide registration, login, recovery, sessions, profiles, devices, sav
 
 Services also provide mission teams (members, one active membership per mission and user, admin-designated leadership), support requests (create, review, full/partial approval, rejection, withdrawal) with assisted-then-finalized staffing, and every mutation publishes a durable event to the `mission:<id>` audience.
 
-The Vue client provides authentication, onboarding, the mobile map, four-step SOS composition with an optional compressed photo, mission and SOS rails, mission team roster and support-request surfaces for requesters, leaders and administrators, companions, live sharing, history, profile, press-and-hold PTT, and the desktop administrator console (including the support-requests review queue with a live pending badge). It uses eight typed Pinia stores, VueUse for browser state, one authenticated WebSocket, durable event catch-up, a versioned service worker compiled from TypeScript, a bounded offline tile cache, self-hosted fonts and a generated icon subset.
+The Vue client provides authentication, onboarding, the mobile map, four-step SOS composition with an optional compressed photo, mission and SOS rails, mission team roster and support-request surfaces for requesters, leaders and administrators, the Sharing Center, live sharing, history, profile, press-and-hold PTT, and the desktop administrator console (including the support-requests review queue with a live pending badge). It uses eight typed Pinia stores, VueUse for browser state, one authenticated WebSocket, durable event catch-up, a versioned service worker compiled from TypeScript, a bounded offline tile cache, self-hosted fonts and a generated icon subset.
 
 ## Validation gate
 

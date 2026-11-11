@@ -101,6 +101,14 @@ export class LocationService {
         `INSERT INTO location_shares(id,owner_id,recipient_id,kind,duration_seconds,expires_at,history_from,history_to,created_at,revoked_at,scope)
          VALUES(?,?,?,?,?,?,?,?,?,NULL,?)`, id, identity.userId, input.recipientId, input.kind,
         durationSeconds, expiresAt, historyFrom, historyTo, now, scope);
+      tx.repo.run(
+        'INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
+        identity.userId, 'location_share.created', `location_shares:${id}`, identity.ip,
+        JSON.stringify({
+          recipientId: input.recipientId, kind: input.kind,
+          historyFrom, historyTo, expiresAt,
+          scopeDetails: scope ? JSON.parse(scope) : null
+        }), now);
       const payload = { shareId: id, ownerId: identity.userId, recipientId: input.recipientId, kind: input.kind, expiresAt };
       tx.event(HTTP_EVENTS.LOCATION_SHARE_CREATED, payload, [`user:${identity.userId}`, `user:${input.recipientId}`]);
       return payload;
@@ -149,8 +157,17 @@ export class LocationService {
     const share = this.ctx.repo.one<Record<string, any>>(
       'SELECT * FROM location_shares WHERE id=? AND owner_id=? AND revoked_at IS NULL', shareId, identity.userId);
     if (!share) throw notFound('Active share not found.');
+    const now = this.ctx.clock();
     return this.ctx.uow.commit((tx) => {
-      tx.repo.run('UPDATE location_shares SET revoked_at=? WHERE id=?', this.ctx.clock(), shareId);
+      tx.repo.run('UPDATE location_shares SET revoked_at=? WHERE id=?', now, shareId);
+      tx.repo.run(
+        'INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
+        identity.userId, 'location_share.revoked', `location_shares:${shareId}`, identity.ip,
+        JSON.stringify({
+          recipientId: String(share.recipient_id), kind: String(share.kind),
+          historyFrom: share.history_from ?? null, historyTo: share.history_to ?? null,
+          scope: share.scope ?? null
+        }), now);
       tx.event(HTTP_EVENTS.LOCATION_SHARE_ENDED, {
         shareId, ownerId: String(share.owner_id), recipientId: String(share.recipient_id), reason: 'revoked'
       }, [`user:${share.owner_id}`, `user:${share.recipient_id}`]);

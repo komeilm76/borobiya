@@ -428,3 +428,60 @@ describe('Sharing Center grant scope and indefinite live shares', () => {
     expect(recipientRow.scope).toEqual(['route']);
   });
 });
+
+describe('Sharing Center audit trail', () => {
+  const now = () => server.app.context.clock();
+  beforeEach(() => { server.app.context.limiters.clear(); });
+
+  it('writes an audit row when a history share is granted', async () => {
+    const cookie = await login(server, 'maryam.a', 'DemoPass!2026');
+    const from = now() - 3600_000;
+    const to = now();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: {
+        recipientId: 'usr_responder', kind: 'history',
+        historyFrom: from, historyTo: to,
+        scope: ['route', 'motion']
+      }
+    });
+    expect(created.status, created.text).toBe(201);
+    const shareId = created.json.data.share.shareId;
+
+    const audit = server.app.context.repo.one<Record<string, any>>(
+      "SELECT actor_id, action, target, ip, meta_json FROM audit_log WHERE action='location_share.created' AND target=?",
+      `location_shares:${shareId}`);
+    expect(audit).toBeTruthy();
+    expect(audit.actor_id).toBe('usr_companion');
+    expect(String(audit.ip).length).toBeGreaterThan(0);
+    const meta = JSON.parse(String(audit.meta_json));
+    expect(meta.kind).toBe('history');
+    expect(meta.recipientId).toBe('usr_responder');
+    expect(meta.scopeDetails).toEqual(['route', 'motion']);
+    expect(meta.historyFrom).toBe(from);
+    expect(meta.historyTo).toBe(to);
+  });
+
+  it('writes an audit row when a live share is revoked', async () => {
+    const cookie = await login(server, 'maryam.a', 'DemoPass!2026');
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: { recipientId: 'usr_responder', kind: 'live', durationSeconds: 0 }
+    });
+    expect(created.status, created.text).toBe(201);
+    const shareId = created.json.data.share.shareId;
+
+    const revoked = await apiFetch(server, `/_user/location/shares/${shareId}`, { method: 'DELETE', cookie });
+    expect(revoked.status).toBe(200);
+
+    const audit = server.app.context.repo.one<Record<string, any>>(
+      "SELECT actor_id, action, target, ip, meta_json FROM audit_log WHERE action='location_share.revoked' AND target=?",
+      `location_shares:${shareId}`);
+    expect(audit).toBeTruthy();
+    expect(audit.actor_id).toBe('usr_companion');
+    expect(String(audit.ip).length).toBeGreaterThan(0);
+    const meta = JSON.parse(String(audit.meta_json));
+    expect(meta.kind).toBe('live');
+    expect(meta.recipientId).toBe('usr_responder');
+  });
+});

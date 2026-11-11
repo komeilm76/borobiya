@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS location_shares (
   history_to INTEGER,
   created_at INTEGER NOT NULL,
   revoked_at INTEGER,
+  scope TEXT,
   CHECK (owner_id <> recipient_id)
 );
 CREATE INDEX IF NOT EXISTS idx_shares_owner ON location_shares(owner_id, kind, revoked_at, expires_at);

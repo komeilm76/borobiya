@@ -159,3 +159,80 @@ describe('default decoder boundary', () => {
       .rejects.toMatchObject({ code: 'decode-failed' });
   });
 });
+
+describe('default decode fallback and canvas boundary', () => {
+  const originalBitmap = globalThis.createImageBitmap;
+  const originalImage = globalThis.Image;
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+
+  afterEach(() => {
+    if (originalBitmap === undefined) {
+      delete (globalThis as Record<string, unknown>).createImageBitmap;
+    } else {
+      globalThis.createImageBitmap = originalBitmap;
+    }
+    if (originalImage === undefined) {
+      delete (globalThis as Record<string, unknown>).Image;
+    } else {
+      globalThis.Image = originalImage;
+    }
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+  });
+
+  it('falls back to an <img> element when createImageBitmap is missing', async () => {
+    delete (globalThis as Record<string, unknown>).createImageBitmap;
+    const revoked: string[] = [];
+    URL.createObjectURL = (() => 'blob:mock') as typeof URL.createObjectURL;
+    URL.revokeObjectURL = ((url: string) => { revoked.push(url); }) as typeof URL.revokeObjectURL;
+
+    class StubImage {
+      naturalWidth = 320;
+      naturalHeight = 200;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+    (globalThis as Record<string, unknown>).Image = StubImage;
+
+    const result = await compressImageFile(file('image/jpeg', 1024), fakeCanvas(() => 512));
+    expect(result).toMatchObject({ width: 320, height: 200 });
+    expect(revoked).toEqual(['blob:mock']);
+  });
+
+  it('maps an <img> failure to the stable decode-failed code', async () => {
+    delete (globalThis as Record<string, unknown>).createImageBitmap;
+    URL.createObjectURL = (() => 'blob:mock-err') as typeof URL.createObjectURL;
+    URL.revokeObjectURL = (() => undefined) as typeof URL.revokeObjectURL;
+
+    class StubImage {
+      naturalWidth = 0;
+      naturalHeight = 0;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onerror?.());
+      }
+    }
+    (globalThis as Record<string, unknown>).Image = StubImage;
+
+    await expect(compressImageFile(file('image/jpeg', 1024), fakeCanvas(() => 512)))
+      .rejects.toMatchObject({ code: 'decode-failed' });
+  });
+
+  it('fails loudly with canvas-unavailable when the 2D context is missing', async () => {
+    (globalThis as Record<string, unknown>).createImageBitmap = async () => ({
+      width: 100,
+      height: 80,
+      close() { /* noop */ }
+    });
+    // happy-dom canvases have no 2D context, so the default canvas factory must refuse.
+    await expect(compressImageFile(file('image/jpeg', 1024)))
+      .rejects.toMatchObject({ code: 'canvas-unavailable' });
+  });
+});

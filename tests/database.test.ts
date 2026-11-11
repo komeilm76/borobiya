@@ -104,6 +104,28 @@ describe('SQLite persistence and production safety', () => {
     }
   });
 
+  it('a fresh database carries the location_shares scope column', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'borobiya-fresh-scope-'));
+    temporaryDirectories.push(directory);
+    const config = loadConfig({
+      environment: 'test',
+      databasePath: path.join(directory, 'fresh.sqlite'),
+      dataDir: directory,
+      adminPassword: 'FreshScopePass!2026',
+      seedDemoUsers: false,
+      startJobs: false
+    });
+    const database = openDatabase(config);
+    try {
+      const columns = database.prepare('PRAGMA table_info(location_shares)').all() as Array<{ name: string }>;
+      expect(columns.some((column) => column.name === 'scope')).toBe(true);
+      const version = database.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string };
+      expect(version.value).toBe(String(SCHEMA_VERSION));
+    } finally {
+      database.close();
+    }
+  });
+
   it('production configuration rejects demo seeding and known bootstrap passwords', () => {
     for (const adminPassword of [
       'change-me-before-production',

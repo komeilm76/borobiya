@@ -68,7 +68,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | navigation/03-bookmark-form.png | partial | P2/M | Save-the-pin form implemented inline in the destination sheet (name, label, address, icon); the dedicated designed bookmark screen is not built. |
 | navigation/04-bookmark-saved.png | partial | P2/M | Profile screen lists saved places with inline edit (full PATCH payload incl. preserved rank) and delete; reorder UI remains API-only. |
 | navigation/05-search-open.png | done | P1/H | Real offline search: saved places + road POIs from the map configuration (projection-converted), Persian/Arabic-insensitive normalization, keyboard navigation (combobox semantics), loading/empty/error+retry states, result selection moves and zooms the map with a dedicated pin. |
-| navigation/06-destination-selected.png | partial | P2/H | Tapping the canvas selects a destination (pin + sheet panel: coordinates, distance from own fix, save-to-places inline form, clear). Designed name/address header, ETA and traffic chips, and the send/navigate actions need routing and share-to-companion plumbing — not built. |
+| navigation/06-destination-selected.png | partial | P2/H | Tapping the canvas selects a destination (pin + sheet panel: coordinates, distance from own fix, save-to-places inline form, clear). Designed name/address header, ETA and traffic chips, and the send/navigate actions need routing and share plumbing — not built. |
 | navigation/07-destination-details.png | partial | P2/M | The destination panel doubles as the detail surface (coords, distance, save/clear); share-my-location-to-this-point and saved-place detail editing screens not built. |
 | navigation/08-trip-transport-selection.png | superseded | — | Turn-by-turn trip planning superseded (docs/ACCEPTANCE.md). |
 | navigation/09-manual-origin-selection.png | superseded | — | See above. |
@@ -140,7 +140,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/01-history-trips.png | superseded | — | Trip history presupposes routing (superseded). |
 | history/02-history-missions.png | partial | P2/H | SOS requests and missions from `/_user/missions` now both render with Persian status labels; no tab structure yet. |
 | history/03-history-missions-agent.png | partial | P2/M | Responder missions render alongside requests with localized status; dedicated agent view absent. |
-| history/04-history-companions.png | partial | P2/M | The history screen lists every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
+| history/04-history-companions.png | partial | P2/M | The history screen and the Sharing Center list every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
 | history/05-history-filter.png | missing | P2/M | No filter UI. |
 | history/06-history-details.png | missing | P2/M | No detail view. |
 | history/07-history-playback.png | missing | P2/H | Authorized history endpoint exists (`/_user/location/history/:userId`); no playback surface. |
@@ -149,20 +149,22 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/10-history-empty.png | partial | P2/L | Plain empty text exists. |
 | history/11-history-error.png | missing | P2/M | No error state with retry. |
 
-## Mobile map — companions (10)
+## Mobile map — sharing (`design/map-page/companions/`, 10)
+
+Product surface renamed in Stage 4: the former companions screen is the **Sharing Center** (`/_user/sharing`, the nav pill and route name follow). The design folder keeps its original name; rows cite `companions/…` paths. A share is an owner-issued grant of the live position or a window of the history trail to a named account; history grants carry an explicit scope selection, live grants may run without expiry, and granting or revoking a share is audit-logged.
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| companions/01-companions-hub.png | partial | P2/H | Peers (with server-provided usernames over WS) + shares with counterpart, direction and revoke for outgoing shares render; missing online banner, path summary, add/share rows, management entry. |
-| companions/02-companion-add.png | missing | P2/H | No add flow. |
+| companions/01-companions-hub.png | partial | P2/H | Sharing Center screen: shares in both directions with a direction filter (all/outgoing/incoming), counterpart usernames, kind (live/history), expiry or indefinite grants, scope echoed on creation, revoke for outgoing shares; live peers render with usernames. Missing: online banner, add/manage entry points, designed grouping. |
+| companions/02-companion-add.png | missing | P2/H | No add flow (username-search invite). |
 | companions/03-companions-live.png | partial | P2/M | Live peer fixes render with sender username from the WS payload (was raw user id); freshness/status treatment absent. |
 | companions/04-companion-talk.png | done | P2/M | PTT press-and-hold talk implemented (binary frames, floor control, no recording). |
 | companions/05-companion-status.png | missing | P2/M | Freshness rings/status card absent. |
-| companions/06-share-location.png | partial | P2/H | New-share panel on the companions screen: username search (`GET /_user/users/search`) with online/role/rating rows, single-select recipient, live kind with 15 min/1/4/24 h durations. Server endpoint tested. Designed dedicated share sheet absent. |
-| companions/07-share-history.png | partial | P2/H | Same panel, history kind: from/to `datetime-local` inputs with client-side checks mirroring the server (chronological, not future, at most 30 days). Designed dedicated history-share sheet absent. |
-| companions/08-shared-with-me.png | partial | P2/M | `listShares` returns owned + received shares with outgoing/incoming counts and usernames; UI renders one flat list and each row carries direction text (send/receive). Grouping not built. |
+| companions/06-share-location.png | partial | P2/H | New-share panel on the Sharing Center screen: username search (`GET /_user/users/search`) with online/role/rating rows, single-select recipient, live kind with 15 min/1/4/24 h durations plus an indefinite option (`durationSeconds: 0`, no expiry, revoke any time). Server endpoint tested. Designed dedicated share sheet / multi-recipient / accuracy toggle absent. |
+| companions/07-share-history.png | partial | P2/H | Same panel, history kind: from/to `datetime-local` inputs with client-side checks mirroring the server (chronological, not future, at most 30 days); explicit scope selection — route points always included, optional motion (heading/speed) and accuracy details. The server stores the selection (migration v7 `location_shares.scope`), rejects unknown details and projects history points per the granted scope; both parties see the granted scope. Designed dedicated history-share sheet / intensity preview absent. |
+| companions/08-shared-with-me.png | partial | P2/M | `listShares` returns owned + received shares with outgoing/incoming counts and usernames; the screen filters by direction (all/outgoing/incoming) and each row carries direction text. Revoked grants drop off the active list but remain visible via `include=all` (state: active/expired/revoked). Grouped live/history tabs not built. |
 | companions/09-companions-empty.png | partial | P2/L | Plain empty texts exist. |
-| companions/10-companions-offline.png | missing | P2/L | No offline-specific companion state. |
+| companions/10-companions-offline.png | missing | P2/L | No offline-specific sharing state. |
 
 ## Mobile map — profile (9)
 
@@ -251,7 +253,7 @@ Counts over the 141 canonical rows above: `done` 16, `partial` 47, `missing` 57,
 |---|---|---|---|
 | DF-01 | auth/06-recovery-account-error.png | Explicit unknown-username error = user enumeration oracle. | Keep implementation (decoys); do not port the screen. |
 | DF-02 | mission/03-mission-offer.png | A 52-second countdown and "3 offers active" imply a server-enforced offer TTL; offers now have a status lifecycle and an endpoint, but there is no offer-expiry/TTL job. | Drop the countdown, or add offer TTL to the backend as a product decision. Do not fake it client-side. |
-| DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/companion metrics in P2; document the swap. |
+| DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/sharing metrics in P2; document the swap. |
 | DF-04 | history/07-history-playback.png | Playback UI does not communicate authorization scope/expiry although the API is share-gated. | Add an authorization note; never show playback without an active authorized share. |
 | DF-05 | sos/04-sos-location-picker.png | Dropping an incident pin far from GPS is a fraud/abuse vector with no responder-facing "manual location" marker. | Surface `isManual` (already recorded server-side) on the offer/dispatch screens. |
 | DF-06 | navigation/* (all) | The navigation family contradicts the offline/deterministic-tile architecture and the documented product scope; keeping it as silent reference invites accidental scope creep. | Keep files as visual identity reference; exclude from acceptance scope; revisit only via explicit product decision. |

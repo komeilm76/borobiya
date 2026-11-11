@@ -6,7 +6,7 @@ This folder contains practical English documentation for Borobiya 2.0.0: a Bun 1
 
 - `DEVELOPMENT.md` describes local prerequisites, environment variables, generated assets, watch mode and debugging.
 - `DEPLOYMENT.md` covers production configuration, HTTPS, process startup, database location, backups and health checks.
-- `USER_MANUAL.md` explains the mobile account, map, SOS, mission, companion, talk, history and profile workflows.
+- `USER_MANUAL.md` explains the mobile account, map, SOS, mission, sharing, talk, history and profile workflows.
 - `ADMIN_MANUAL.md` explains the desktop overview, dispatch board, users, groups, reports, audit, alerts and settings.
 
 ## Technical references
