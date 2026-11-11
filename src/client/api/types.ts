@@ -200,8 +200,8 @@ export interface OverviewView {
 export interface NearestResponderView {
   id: string;
   username: string;
-  averageRating: number;
-  readyForMission: boolean;
+  averageRating: number | null;
+  readyForMission: boolean | null;
   latitude: number | null;
   longitude: number | null;
   distanceMeters: number | null;
@@ -240,6 +240,8 @@ export interface AdminUserView {
   role: Role;
   /** Whether the account may sign in; the administrator routes call it `active`. */
   active: boolean;
+  jobTypeId: string | null;
+  jobTypeLabel: string | null;
   securityReady: boolean;
   mustCompleteSecurityQuestions: boolean;
   readyForMission: boolean;
@@ -248,6 +250,31 @@ export interface AdminUserView {
   online: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+/** A job type row in the administrator job-types screen. */
+export interface AdminJobTypeView {
+  id: string;
+  label: string;
+  offerPolicy: 'all' | 'ready_only';
+  rank: number;
+  active: boolean;
+  /** Active responders whose job_type_id points at this row. */
+  memberCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** An offer record as the administrator mission-offers endpoint returns it. */
+export interface AdminMissionOfferView {
+  id: string;
+  sosId: string;
+  responderId: string;
+  responderUsername: string | null;
+  policy: 'all' | 'ready_only';
+  status: 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
+  createdAt: number;
+  respondedAt: number | null;
 }
 
 /** A system setting row. */

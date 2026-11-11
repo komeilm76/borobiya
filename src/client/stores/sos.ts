@@ -29,6 +29,8 @@ export const useSosStore = defineStore('sos', () => {
   const cancellationReasons = ref<CancellationReasonView[]>([]);
   const requests = ref<SosView[]>([]);
   const missions = ref<MissionView[]>([]);
+  /** Pending offers addressed to the caller (responder), from the offers endpoint. */
+  const offers = ref<SosView[]>([]);
   const draft = ref<SosDraft>(createDraft());
   /** True while the next map tap should drop the incident pin for a manual location. */
   const placementArmed = ref(false);
@@ -64,16 +66,18 @@ export const useSosStore = defineStore('sos', () => {
     loading.value = true;
     error.value = null;
     try {
-      const [incidents, reasons, sosList, missionList] = await Promise.all([
+      const [incidents, reasons, sosList, missionList, offerList] = await Promise.all([
         get<{ items: IncidentTypeView[] }>('/_public/incident-types'),
         get<{ items: CancellationReasonView[] }>('/_public/cancellation-reasons'),
         get<{ items: SosView[] }>('/_user/sos'),
-        get<{ items: MissionView[] }>('/_user/missions')
+        get<{ items: MissionView[] }>('/_user/missions'),
+        get<{ items: SosView[] }>('/_user/mission-offers')
       ]);
       incidentTypes.value = incidents.items ?? [];
       cancellationReasons.value = reasons.items ?? [];
       requests.value = sosList.items ?? [];
       missions.value = missionList.items ?? [];
+      offers.value = offerList.items ?? [];
       if (!draft.value.incidentTypeId && incidentTypes.value.length) draft.value.incidentTypeId = incidentTypes.value[0].id;
     } catch (caught) {
       error.value = errorMessage(caught);
@@ -153,6 +157,12 @@ export const useSosStore = defineStore('sos', () => {
     await load();
   }
 
+  /** Declines an offered request addressed to the caller. */
+  async function decline(sosId: string): Promise<void> {
+    await post(`/_user/sos/${sosId}/decline`);
+    await load();
+  }
+
   /** Accepts a dispatched request as a responder. */
   async function accept(sosId: string): Promise<{ missionId: string; missionStatus: string }> {
     const result = await post<{ missionId: string; missionStatus: string }>(`/_user/sos/${sosId}/accept`);
@@ -220,7 +230,9 @@ export const useSosStore = defineStore('sos', () => {
     previousStep,
     submit,
     cancel,
+    offers,
     accept,
+    decline,
     progress,
     rate,
     applyRealtimeUpdate

@@ -9,6 +9,7 @@ export const STATUS_LABELS: Record<string, string> = {
   [SOS_STATUS.COMPLETED]: 'تکمیل‌شده',
   [SOS_STATUS.CANCELLED]: 'لغو‌شده',
   [SOS_STATUS.EXPIRED]: 'منقضی‌شده',
+  [MISSION_STATUS.ASSIGNED]: 'تعیین‌شده',
   [MISSION_STATUS.ON_THE_WAY]: 'در راه',
   [MISSION_STATUS.ARRIVED]: 'رسیده'
 };

@@ -21,9 +21,9 @@ const ICON_INVENTORY = path.join(ROOT, 'design/icons/icons.json');
 
 /** Icons the interface uses that are not part of the canonical inventory. */
 const EXTRA_ICONS = [
-  'account', 'account-arrow-right-outline', 'account-cancel-outline', 'account-check-outline',
+  'account', 'account-arrow-right-outline', 'account-cancel-outline', 'account-check-outline', 'account-clock-outline',
   'alert-circle', 'arrow-down', 'arrow-up', 'battery', 'bell-alert-outline', 'bookmark',
-  'bullseye-arrow', 'camera-outline', 'car-emergency', 'cellphone-link', 'chart-bar',
+  'briefcase-account-outline', 'bullseye-arrow', 'camera-outline', 'car-emergency', 'cellphone-link', 'chart-bar',
   'check-circle', 'check-circle-outline', 'circle-medium', 'circle-outline',
   'clipboard-list-outline', 'clipboard-text-outline', 'close-circle', 'cloud-check-outline',
   'cloud-sync-outline', 'compass-outline', 'connection', 'cursor-default-outline',

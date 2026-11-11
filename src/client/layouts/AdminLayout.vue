@@ -32,6 +32,7 @@ const navigation = [
   { name: ROUTE_NAMES.adminUsers, label: 'کاربران', icon: 'account-multiple-outline' },
   { name: ROUTE_NAMES.adminGroups, label: 'گروه‌ها', icon: 'account-group-outline' },
   { name: ROUTE_NAMES.adminIncidents, label: 'نوع حادثه', icon: 'alert-circle-outline' },
+  { name: ROUTE_NAMES.adminJobTypes, label: 'نوع شغل', icon: 'briefcase-account-outline' },
   { name: ROUTE_NAMES.adminAudit, label: 'رویدادها', icon: 'clipboard-text-outline' },
   { name: ROUTE_NAMES.adminAlerts, label: 'هشدارها', icon: 'bell-alert-outline' },
   { name: ROUTE_NAMES.adminSettings, label: 'تنظیمات', icon: 'wrench-outline' }

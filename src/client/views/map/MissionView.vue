@@ -29,16 +29,11 @@ const SEVERITY_LABEL = { low: 'کم', medium: 'متوسط', high: 'شدید' } a
  * accept), so anything DISPATCHED here is actionable. Plain users and admins never see this
  * section; there is no countdown because the backend has no offer TTL to honour.
  */
-const offers = computed(() => {
-  if (auth.user?.role !== ROLES.RESPONDER) return [];
-  // Never offer a request the user already holds a live mission for, even if the list
-  // flickered out of sync — accepting it is impossible server-side anyway.
-  const held = new Set(
-    sos.missions.filter((item) => item.status !== MISSION_STATUS.CANCELLED).map((item) => item.sosId)
-  );
-  return sos.requests.filter((item) => item.status === SOS_STATUS.DISPATCHED && item.requesterId !== auth.user?.id && !held.has(item.id));
-});
+// The offers endpoint is authoritative: only offers addressed to this responder arrive here,
+// already filtered server-side by the job-type readiness policy.
+const offers = computed(() => (auth.user?.role === ROLES.RESPONDER ? sos.offers : []));
 const accepting = ref<string | null>(null);
+const declining = ref<string | null>(null);
 
 function offerDistance(offer: SosView): number | null {
   const fix = map.ownFix;
@@ -109,6 +104,7 @@ const nextActions = computed(() => {
   if (!canActOnMission.value) return [];
   const status = mission.value?.status;
   if (!status) return [];
+  if (status === MISSION_STATUS.ASSIGNED) return [{ action: 'start' as const, label: 'شروع حرکت', icon: 'play-circle-outline' }];
   if (status === MISSION_STATUS.ON_THE_WAY || status === MISSION_STATUS.PENDING) return actions.slice(0, 1);
   if (status === MISSION_STATUS.ARRIVED) return actions.slice(1, 2);
   if (status === MISSION_STATUS.IN_PROGRESS) return actions.slice(2, 3);
@@ -230,6 +226,18 @@ async function confirmMissionCancel(): Promise<void> {
     cancelTarget.value = null;
   }
 }
+async function decline(offer: SosView): Promise<void> {
+  if (declining.value || accepting.value) return;
+  declining.value = offer.id;
+  try {
+    await sos.decline(offer.id);
+    toast.push('پیشنهاد مأموریت رد شد.', 'success', 2400);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    declining.value = null;
+  }
+}
 </script>
 
 <template>
@@ -261,9 +269,12 @@ async function confirmMissionCancel(): Promise<void> {
           <li v-if="offer.requesterUsername"><span class="mdi mdi-account" aria-hidden="true" /> درخواست‌کننده: {{ offer.requesterUsername }}</li>
         </ul>
         <div class="action-row">
-          <button type="button" class="primary-button" :disabled="accepting !== null" data-testid="mission-offer-accept" @click="accept(offer)">
+          <button type="button" class="primary-button" :disabled="accepting !== null || declining !== null" data-testid="mission-offer-accept" @click="accept(offer)">
             <span class="mdi mdi-check" aria-hidden="true" />
             <span>{{ accepting === offer.id ? 'در حال پذیرش…' : 'پذیرش مأموریت' }}</span>
+          </button>
+          <button type="button" class="ghost-button" :disabled="accepting !== null || declining !== null" data-testid="mission-offer-decline" @click="decline(offer)">
+            <span>{{ declining === offer.id ? 'در حال رد…' : 'رد پیشنهاد' }}</span>
           </button>
         </div>
       </article>

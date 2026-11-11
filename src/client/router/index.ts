@@ -37,6 +37,7 @@ export const ROUTE_NAMES = Object.freeze({
   adminUsers: 'admin-users',
   adminGroups: 'admin-groups',
   adminIncidents: 'admin-incidents',
+  adminJobTypes: 'admin-job-types',
   adminAudit: 'admin-audit',
   adminAlerts: 'admin-alerts',
   adminSettings: 'admin-settings'
@@ -154,6 +155,12 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.adminIncidents,
     component: () => import('@/views/admin/IncidentsView.vue'),
     meta: { layout: 'admin', access: 'admin', label: 'نوع حادثه', icon: 'alert-circle-outline' }
+  },
+  {
+    path: '/_admin/job-types',
+    name: ROUTE_NAMES.adminJobTypes,
+    component: () => import('@/views/admin/JobTypesView.vue'),
+    meta: { layout: 'admin', access: 'admin', label: 'نوع شغل', icon: 'briefcase-account-outline' }
   },
   {
     path: '/_admin/audit',

@@ -13,7 +13,15 @@ const format = useFormatters();
 const toast = useToast();
 const query = ref('');
 const role = ref<string>('');
-const draft = ref({ username: '', password: '', role: 'user' });
+const draft = ref({ username: '', password: '', role: 'user', jobTypeId: '' });
+const jobTypes = ref<{ id: string; label: string; offerPolicy: string }[]>([]);
+const DEFAULT_JOB_TYPES = [
+  // Shown until the job-types catalog loads; ids match the seed so the default is valid.
+  { id: 'job_fire', label: 'آتش‌نشانی', offerPolicy: 'all' },
+  { id: 'job_medical', label: 'امداد پزشکی', offerPolicy: 'all' },
+  { id: 'job_maintenance', label: 'خدمات فنی و تأسیسات', offerPolicy: 'ready_only' }
+];
+const policyLabel = (value: string): string => (value === 'all' ? 'بدون شرط آمادگی' : 'فقط آماده‌ها');
 const formError = ref<string | null>(null);
 const users = computed(() => admin.users?.items ?? []);
 const roles = [
@@ -25,6 +33,26 @@ const roles = [
 
 async function search(): Promise<void> {
   await admin.loadUsers({ q: query.value || undefined, role: role.value || undefined, page: 1, limit: 50 });
+}
+
+const jobTypeOptions = computed(() => (jobTypes.value.length ? jobTypes.value : DEFAULT_JOB_TYPES));
+
+async function loadJobTypes(): Promise<void> {
+  try {
+    jobTypes.value = await admin.loadJobTypes();
+  } catch {
+    // The seed catalog is a safe fallback; creating accounts must stay possible while job types are absent.
+    jobTypes.value = DEFAULT_JOB_TYPES;
+  }
+}
+
+async function changeJobType(userId: string, jobTypeId: string): Promise<void> {
+  try {
+    await admin.updateUser(userId, { jobTypeId: jobTypeId || null });
+    toast.push('نوع شغل امدادگر به‌روزرسانی شد.', 'success', 2200);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  }
 }
 
 async function toggle(userId: string, active: boolean): Promise<void> {
@@ -46,15 +74,19 @@ async function create(): Promise<void> {
     return;
   }
   try {
-    await admin.createUser({ ...draft.value, username: draft.value.username.trim().toLowerCase() });
-    draft.value = { username: '', password: '', role: 'user' };
+    const { jobTypeId, ...rest } = draft.value;
+    await admin.createUser({ ...rest, ...(jobTypeId ? { jobTypeId } : {}), username: draft.value.username.trim().toLowerCase() });
+    draft.value = { username: '', password: '', role: 'user', jobTypeId: '' };
     toast.push('حساب ساخته شد؛ کاربر باید پرسش‌های امنیتی را کامل کند.', 'success', 3200);
   } catch (caught) {
     formError.value = errorMessage(caught);
   }
 }
 
-onMounted(() => void admin.loadUsers());
+onMounted(() => {
+  void admin.loadUsers();
+  void loadJobTypes();
+});
 </script>
 
 <template>
@@ -72,12 +104,20 @@ onMounted(() => void admin.loadUsers());
       </header>
       <table class="admin-table">
         <thead>
-          <tr><th>کاربر</th><th>نقش</th><th>وضعیت</th><th>امتیاز</th><th>عملیات</th></tr>
+          <tr><th>کاربر</th><th>نقش</th><th>نوع شغل</th><th>وضعیت</th><th>امتیاز</th><th>عملیات</th></tr>
         </thead>
         <tbody>
           <tr v-for="item in users" :key="item.id">
             <td>{{ item.username }}</td>
             <td>{{ item.role }}</td>
+            <td>
+              <select v-if="item.role === 'responder'" class="admin-select admin-select--compact" :value="item.jobTypeId ?? ''"
+                      :aria-label="`نوع شغل ${item.username}`" data-testid="user-job-type" @change="changeJobType(item.id, ($event.target as HTMLSelectElement).value)">
+                <option value="">بدون نوع شغل</option>
+                <option v-for="jobType in jobTypeOptions" :key="jobType.id" :value="jobType.id">{{ jobType.label }} ({{ policyLabel(jobType.offerPolicy) }})</option>
+              </select>
+              <span v-else>—</span>
+            </td>
             <td>
               <span class="status-pill" :class="item.active ? 'status-pill--success' : 'status-pill--neutral'">
                 {{ item.active ? 'فعال' : 'غیرفعال' }}
@@ -103,6 +143,10 @@ onMounted(() => void admin.loadUsers());
           <option value="user">کاربر</option>
           <option value="responder">امدادگر</option>
           <option value="admin">مدیر</option>
+        </select>
+        <select v-if="draft.role === 'responder'" v-model="draft.jobTypeId" class="admin-select" aria-label="نوع شغل امدادگر تازه" data-testid="new-user-job-type">
+          <option value="">بدون نوع شغل (سیاست: فقط آماده‌ها)</option>
+          <option v-for="jobType in jobTypeOptions" :key="jobType.id" :value="jobType.id">{{ jobType.label }} ({{ policyLabel(jobType.offerPolicy) }})</option>
         </select>
         <VAlert v-if="formError" type="error" variant="tonal" density="compact">{{ formError }}</VAlert>
         <VBtn type="submit" color="primary" block>ساخت حساب</VBtn>

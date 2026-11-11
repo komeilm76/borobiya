@@ -2,6 +2,8 @@ import { ref } from 'vue';
 import { defineStore } from 'pinia';
 import { errorMessage, get, patch, post, put } from '@/api/client.ts';
 import type {
+  AdminJobTypeView,
+  AdminMissionOfferView,
   AdminUserView,
   AlertView,
   AuditEntryView,
@@ -101,13 +103,13 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   /** Creates an administrator-managed account. */
-  async function createUser(input: { username: string; password: string; role: string }): Promise<void> {
+  async function createUser(input: { username: string; password: string; role: string; jobTypeId?: string }): Promise<void> {
     await post('/_admin/users', input);
     await loadUsers();
   }
 
   /** Activates, deactivates or re-roles an account. */
-  async function updateUser(userId: string, input: { active?: boolean; role?: string }): Promise<void> {
+  async function updateUser(userId: string, input: { active?: boolean; role?: string; jobTypeId?: string | null }): Promise<void> {
     await patch(`/_admin/users/${userId}`, input);
     await loadUsers();
   }
@@ -181,20 +183,44 @@ export const useAdminStore = defineStore('admin', () => {
    * throws on failure: the dispatch panel shows its own retry affordance instead of a toast.
    * Distances are null when no location fix is available for a responder.
    */
-  async function nearestResponders(sosId: string, point: { latitude: number; longitude: number }, incidentTypeId?: string): Promise<NearestResponderView[]> {
+  async function nearestResponders(sosId: string, limit = 10): Promise<NearestResponderView[]> {
     const result = await get<{ items: NearestResponderView[]; total: number }>(`/_admin/sos/${sosId}/nearest`, {
-      latitude: point.latitude,
-      longitude: point.longitude,
-      limit: 10,
-      ...(incidentTypeId ? { incidentTypeId } : {})
+      limit
     });
     return result.items ?? [];
   }
 
-  /** Dispatches responders to an SOS request. */
-  async function dispatch(sosId: string, groupId: string, responderIds: string[]): Promise<void> {
-    await post(`/_admin/sos/${sosId}/dispatch`, { groupId, responderIds });
+  /** Dispatches responders to an SOS request. 'offer' sends offers that require acceptance; 'immediate' assigns the single responder directly. */
+  async function dispatch(sosId: string, groupId: string, responderIds: string[], mode: 'offer' | 'immediate' = 'offer'): Promise<{ mode: string } | undefined> {
+    const result = await post<{ mode?: string }>(`/_admin/sos/${sosId}/dispatch`, { groupId, responderIds, mode });
     await loadDispatch();
+    return result ? { mode: result.mode ?? mode } : undefined;
+  }
+
+  /** Loads the job types catalog (admin). */
+  async function loadJobTypes(): Promise<AdminJobTypeView[]> {
+    const result = await guard(() => get<{ items: AdminJobTypeView[] }>('/_admin/job-types'));
+    return result?.items ?? [];
+  }
+
+  /** Lists every mission offer, optionally filtered by status (admin). */
+  async function loadMissionOffers(status?: string, limit = 100): Promise<AdminMissionOfferView[]> {
+    const result = await guard(() =>
+      get<{ items: AdminMissionOfferView[] }>('/_admin/mission-offers', {
+        ...(status ? { status } : {}),
+        limit
+      })
+    );
+    return result?.items ?? [];
+  }
+
+  /** Creates/updates a job type (admin). */
+  async function createJobType(input: { label: string; offerPolicy: 'all' | 'ready_only' }): Promise<void> {
+    await post('/_admin/job-types', input);
+  }
+
+  async function updateJobType(jobTypeId: string, input: { label?: string; offerPolicy?: 'all' | 'ready_only'; active?: boolean }): Promise<void> {
+    await patch(`/_admin/job-types/${jobTypeId}`, input);
   }
 
   /** Loads every dataset an administrator screen may need. */
@@ -233,6 +259,10 @@ export const useAdminStore = defineStore('admin', () => {
     loadHealth,
     dispatch,
     nearestResponders,
+    loadMissionOffers,
+    loadJobTypes,
+    createJobType,
+    updateJobType,
     loadAll
   };
 });

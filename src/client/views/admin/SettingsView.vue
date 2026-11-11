@@ -15,13 +15,12 @@ const formError = ref<string | null>(null);
 const settings = computed(() => admin.settings);
 
 /** The settings the server accepts as `'0'` or `'1'`. */
-const BOOLEAN_KEYS = ['sos_auto_dispatch', 'mission_ready_required', 'maintenance_mode'];
+const BOOLEAN_KEYS = ['sos_auto_dispatch', 'maintenance_mode'];
 
 /** How each setting is described in the form, so a raw key is not the only label. */
 const LABELS: Record<string, string> = {
   sos_auto_dispatch: 'اعزام خودکار',
   default_dispatch_radius_m: 'شعاع اعزام (متر)',
-  mission_ready_required: 'نیاز به آمادگی امدادگر',
   maintenance_mode: 'حالت نگهداری'
 };
 
