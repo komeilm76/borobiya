@@ -43,6 +43,91 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(nav.start()).toBe(false);
   });
 
+  it("drops an old mission fix on a transient GPS error and follows the next valid fix immediately", () => {
+    let emit!: (point: { lat: number; lon: number }) => void;
+    let fail!: (denied: boolean) => void;
+    let now = 1_000;
+    const clear = vi.fn();
+    const follow = vi.fn();
+    const scope = effectScope();
+    try {
+      const nav = scope.run(() => useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), follow, {
+        subscribe: (onFix, onError) => { emit = onFix; fail = onError; return clear; }, now: () => now
+      }))!;
+      expect(nav.start()).toBe(true);
+      emit({ lat: 38.5, lon: -120.2 });
+      expect(nav.fix.value?.lat).toBe(38.5);
+      fail(false);
+      expect(nav.active.value).toBe(true); // GPS watch stays alive for recovery.
+      expect(nav.fix.value).toBeNull(); // A stale fix must not claim that camera is following live GPS.
+      expect(nav.error.value).toContain("GPS");
+      now += 100; // Do not wait out the camera throttle to resume after an outage.
+      emit({ lat: 38.6, lon: -120.3 });
+      expect(nav.fix.value?.lat).toBe(38.6);
+      expect(nav.error.value).toBeNull();
+      expect(follow).toHaveBeenCalledTimes(2);
+    } finally { scope.stop(); }
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
+  it("expires a silent mission GPS fix, keeps watching for recovery and clears its deadline on stop", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    let emit!: (point: { lat: number; lon: number }) => void;
+    const clear = vi.fn();
+    const follow = vi.fn();
+    const scope = effectScope();
+    try {
+      const nav = scope.run(() => useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), follow, {
+        subscribe: (onFix) => { emit = onFix; return clear; }, now: () => Date.now()
+      }))!;
+      nav.start();
+      emit({ lat: 38.5, lon: -120.2 });
+      vi.advanceTimersByTime(19_999);
+      expect(nav.fix.value?.lat).toBe(38.5);
+      vi.advanceTimersByTime(1);
+      expect(nav.fix.value).toBeNull();
+      expect(nav.error.value).toContain("GPS");
+      expect(nav.active.value).toBe(true);
+      expect(clear).not.toHaveBeenCalled();
+      emit({ lat: 38.6, lon: -120.3 });
+      expect(nav.fix.value?.lat).toBe(38.6);
+      expect(nav.error.value).toBeNull();
+      expect(follow).toHaveBeenCalledTimes(2);
+      nav.stop();
+      vi.advanceTimersByTime(21_000);
+      expect(nav.error.value).toBeNull();
+      expect(nav.fix.value).toBeNull();
+      expect(clear).toHaveBeenCalledOnce();
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
+  it("renews freshness only on valid GPS observations and revokes it on a mission switch", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(200_000);
+    const missionId = ref<string | null>(mission);
+    let emit!: (point: { lat: number; lon: number }) => void;
+    const scope = effectScope();
+    try {
+      const nav = scope.run(() => useRouteNavigation(ref("rescuer"), missionId, ref(route), ref("foot"), vi.fn(), {
+        subscribe: (onFix) => { emit = onFix; return () => {}; }, now: () => Date.now()
+      }))!;
+      nav.start();
+      emit({ lat: 38.5, lon: -120.2 });
+      vi.advanceTimersByTime(15_000);
+      emit({ lat: 200, lon: 2 }); // Invalid samples must not extend freshness.
+      vi.advanceTimersByTime(3_000);
+      emit({ lat: 38.6, lon: -120.3 });
+      vi.advanceTimersByTime(2_000);
+      expect(nav.fix.value?.lat).toBe(38.6); // First observation's timer was replaced.
+      missionId.value = null;
+      vi.advanceTimersByTime(25_000);
+      expect(nav.active.value).toBe(false);
+      expect(nav.fix.value).toBeNull();
+      expect(nav.error.value).toBeNull(); // No stale deadline from the old mission.
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("stops on mission/owner/route/profile changes and on permission denial", async () => {
     let fix!: (point: { lat: number; lon: number }) => void;
     let fail!: (denied: boolean) => void;

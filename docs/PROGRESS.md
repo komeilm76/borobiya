@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: expire stale rescuer mission GPS guidance
+
+- The rescuer's active mission GPS watch kept its last fix after a transient timeout/error, and if a native bridge stopped reporting callbacks silently it kept the fix indefinitely. The route panel could still say that the camera was following live GPS even though the coordinate was stale. Mission guidance now clears the private fix immediately on a non-denial GPS error and after 20 seconds without a valid observation; the watcher stays active for automatic recovery, and a fresh fix resumes camera follow without waiting for the old throttle. Timer cleanup is scoped to Stop, disposal and mission/account changes. Focused regressions reproduced both stale-fix paths before the fix and cover valid renewal and mission teardown. Physical GPS/device verification remains open.
+
 ### 2026-10-23 — Navigation card hierarchy and action refinement
 
 - Reworked the selected-point and Travel cards around a connected origin-to-destination rail, clearer vehicle/route selectors and larger trip estimates. Travel now leads with Start, while Cancel is visually quiet and the action area stays reachable while details scroll. Active Guidance leads with the approximate ETA, separates GPS speed from the explicitly unknown legal limit, and gives Back-to-plan and destructive Stop distinct treatments. The shared chooser/footer buttons use consistent 14px corners and 46px minimum hit targets instead of the previous generic button treatment. Source/compiled-style regressions cover hierarchy and keep search, SOS, route choice and accessible labels intact. Rendered phone/tablet and physical GPS verification remain open.

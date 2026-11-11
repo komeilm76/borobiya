@@ -35,9 +35,17 @@ export function useRouteNavigation(
   let unsubscribe: (() => void) | null = null;
   let generation = 0;
   let lastCameraAt = Number.NEGATIVE_INFINITY;
+  // Match the private map GPS freshness window: a silent native watch is not a live fix.
+  const FIX_STALE_AFTER_MS = 20_000;
+  let freshnessTimer: ReturnType<typeof setTimeout> | null = null;
+  function clearFreshnessTimer(): void {
+    if (freshnessTimer !== null) clearTimeout(freshnessTimer);
+    freshnessTimer = null;
+  }
 
   function stop(): void {
     generation++;
+    clearFreshnessTimer();
     const cleanup = unsubscribe;
     const wasActive = active.value;
     unsubscribe = null;
@@ -78,8 +86,18 @@ export function useRouteNavigation(
             selectedRoute.value !== route || profile.value !== transport) { stop(); return; }
         const result = coordinatesSchema.safeParse(candidate);
         if (!result.success) return;
+        clearFreshnessTimer();
         fix.value = result.data;
         error.value = null;
+        if (current !== generation || !active.value) return;
+        freshnessTimer = setTimeout(() => {
+          freshnessTimer = null;
+          if (current !== generation || !active.value || owner.value !== account || missionId.value !== mission ||
+              selectedRoute.value !== route || profile.value !== transport) return;
+          fix.value = null;
+          lastCameraAt = Number.NEGATIVE_INFINITY;
+          error.value = "دادهٔ GPS تازه دریافت نشد؛ موقعیت قبلی دیگر زنده نیست.";
+        }, FIX_STALE_AFTER_MS);
         const now = runtime.now();
         if (now - lastCameraAt < 1000) return;
         lastCameraAt = now;
@@ -90,6 +108,11 @@ export function useRouteNavigation(
         }
       }, (denied) => {
         if (current !== generation) return;
+        // A timeout/outage invalidates the displayed fix immediately, but the watch
+        // stays armed so the next valid observation can recover without a new Start.
+        clearFreshnessTimer();
+        fix.value = null;
+        lastCameraAt = Number.NEGATIVE_INFINITY;
         error.value = denied ? "دسترسی موقعیت قطع شده است؛ راهبری متوقف شد." :
           "موقعیت تازه دریافت نشد؛ اتصال GPS را بررسی کنید.";
         if (denied) stop();
