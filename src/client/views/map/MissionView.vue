@@ -268,6 +268,14 @@ async function confirmMissionCancel(): Promise<void> {
         </div>
       </article>
     </template>
+    <div v-else-if="auth.user?.role === ROLES.RESPONDER && !mission && !request" class="no-offer" data-testid="mission-no-offer">
+      <span class="mdi mdi-radar" aria-hidden="true" />
+      <p>در حال حاضر پیشنهادی برای شما نیست. درخواست‌های اعزام‌شده بر اساس گروه و نوع حادثه به شما می‌رسند.</p>
+      <button type="button" class="ghost-button" data-testid="mission-no-offer-refresh" @click="sos.load()">
+        <span class="mdi mdi-refresh" aria-hidden="true" />
+        <span>بروزرسانی</span>
+      </button>
+    </div>
 
     <template v-if="request">
       <div class="rail">

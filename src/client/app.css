@@ -806,3 +806,6 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 .share-field { display: grid; gap: 6px; font-size: 13px; }
 .share-field select, .share-field input { width: 100%; border: 1px solid var(--border); border-radius: var(--r8); padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; }
 .share-error { color: var(--danger); }
+.no-offer { display: grid; justify-items: center; gap: 10px; padding: 28px 16px; text-align: center; color: var(--muted-ink, #4C5F60); }
+.no-offer .mdi { font-size: 40px; color: var(--primary); }
+.no-offer p { margin: 0; font-size: 13px; line-height: 1.9; }

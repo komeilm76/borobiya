@@ -130,7 +130,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | mission/15-mission-cancel.png | done | P1/H | Assigned responder (or admin) gets an inline mission-cancel panel on the mission card: optional note for the requester, confirmation step, `progress('cancel')` through the state machine, conflict surfaced, authoritative reload afterwards. |
 | mission/16-mission-report.png | partial | P2/M | Rating accepts an optional report note (≤200 chars) via a textarea on the rating block; stored in `missions.rating_note`, served on the mission projection and embedded mission, shown on the mission card after rating. Designed full report form absent. |
 | mission/17-mission-completed.png | partial | P2/M | Completed missions reachable; card shows Persian status label, recorded rating and the saved rating note. No designed completion/report surface. |
-| mission/18-mission-no-offer.png | missing | P2/M | Designed "no active offer" state (refresh + radius change) not implemented; pairs with ready toggle. |
+| mission/18-mission-no-offer.png | partial | P2/M | Empty-offer state for responders with no offers/mission/request: explanation + refresh button (re-fetches the lists). No radius control (server has no radius concept). |
 | mission/19-mission-offline.png | missing | P2/M | Generic offline banner only. |
 
 ## Mobile map — history (11)

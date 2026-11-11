@@ -491,3 +491,26 @@ describe('cancellation', () => {
     wrapper.unmount();
   });
 });
+
+describe('mission screen (no active offer)', () => {
+  it('shows an empty-offer state with a refresh action for responders without offers', async () => {
+    const calls = stubApi({ sos: false, mission: null });
+    const { wrapper } = await render({ role: 'responder', userId: 'usr_self' });
+    expect(wrapper.find('[data-testid="mission-no-offer"]').exists()).toBe(true);
+    expect(wrapper.findAll('[data-testid="mission-offer"]')).toHaveLength(0);
+
+    const before = calls.filter((call) => call.method === 'GET' && call.path === '/_user/sos').length;
+    await wrapper.find('[data-testid="mission-no-offer-refresh"]').trigger('click');
+    await flushPromises();
+    const after = calls.filter((call) => call.method === 'GET' && call.path === '/_user/sos').length;
+    expect(after).toBeGreaterThan(before);
+    wrapper.unmount();
+  });
+
+  it('does not show the empty-offer state to plain users', async () => {
+    stubApi({ sos: false, mission: null });
+    const { wrapper } = await render({ role: 'user', userId: 'usr_self' });
+    expect(wrapper.find('[data-testid="mission-no-offer"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
