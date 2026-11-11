@@ -23,6 +23,7 @@ const VIEWS = {
     'UsersView',
     'GroupsView',
     'IncidentsView',
+    'JobTypesView',
     'AuditView',
     'AlertsView',
     'SettingsView'
@@ -51,6 +52,7 @@ const FIXTURES: Record<string, unknown> = {
   '/_admin/users': { items: [], page: 1, limit: 20, total: 0 },
   '/_admin/groups': { items: [] },
   '/_admin/incidents': { items: [] },
+  '/_admin/job-types': { items: [], total: 0 },
   '/_admin/alerts': { items: [] },
   '/_admin/audit': { items: [] },
   '/_admin/dispatch': { items: [] },
@@ -163,7 +165,7 @@ describe('routed views render', () => {
   it('the route table covers every view file exactly once', async () => {
     const declared = ROUTES.map((route) => route.component).filter(Boolean).length;
     const total = VIEWS.auth.length + VIEWS.map.length + VIEWS.admin.length;
-    expect(total).toBe(20);
+    expect(total).toBe(21);
     expect(declared).toBe(total);
     const names = ROUTES.map((route) => route.name).filter(Boolean);
     expect(new Set(names).size).toBe(names.length);

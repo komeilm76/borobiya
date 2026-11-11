@@ -240,7 +240,7 @@ describe('dispatching', () => {
 
     const dispatched = calls.find((call) => call.method === 'POST' && call.path.endsWith('/dispatch'));
     expect(dispatched?.path).toBe('/_admin/sos/sos_1/dispatch');
-    expect(dispatched?.body).toEqual({ groupId: 'grp_medical', responderIds: ['usr_responder'] });
+    expect(dispatched?.body).toEqual({ groupId: 'grp_medical', responderIds: ['usr_responder'], mode: 'offer' });
     wrapper.unmount();
   });
 

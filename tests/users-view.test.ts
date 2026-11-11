@@ -273,3 +273,48 @@ describe('account creation', () => {
     wrapper.unmount();
   });
 });
+
+/** A responder row with job-type information, as the extended admin view serializes it. */
+const RESPONDER = {
+  ...ACTIVE_USER,
+  id: 'usr_responder_jt',
+  username: 'reza.jt',
+  role: 'responder',
+  jobTypeId: 'job_fire',
+  jobTypeLabel: 'آتش‌نشانی'
+};
+
+describe('job types on the users screen', () => {
+  it('shows the job-type select only for responders and clears with the empty option', async () => {
+    const calls = stubApi({ users: [RESPONDER, ACTIVE_USER] });
+    const { wrapper } = await render();
+
+    const selects = wrapper.findAll('[data-testid="user-job-type"]');
+    expect(selects).toHaveLength(1);
+    await selects[0].setValue('job_maintenance');
+    await flushPromises();
+
+    const patch = calls.find((call) => call.method === 'PATCH' && call.path === '/_admin/users/usr_responder_jt');
+    expect(patch?.body).toEqual({ jobTypeId: 'job_maintenance' });
+    expect(useToast().messages.value.some((message) => message.message === 'نوع شغل امدادگر به‌روزرسانی شد.')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('sends the job type when creating a responder', async () => {
+    const calls = stubApi({ users: [RESPONDER] });
+    const { wrapper } = await render();
+
+    const fields = wrapper.findAll('.stack-form input');
+    await fields[0].setValue('new.responder');
+    await fields[1].setValue('Created!2026x');
+    await wrapper.find('.stack-form select').setValue('responder');
+    await wrapper.find('[data-testid="new-user-job-type"]').setValue('job_fire');
+    await wrapper.find('.stack-form').trigger('submit');
+    await flushPromises();
+
+    const created = calls.find((call) => call.method === 'POST' && call.path === '/_admin/users');
+    expect(created?.body.role).toBe('responder');
+    expect(created?.body.jobTypeId).toBe('job_fire');
+    wrapper.unmount();
+  });
+});

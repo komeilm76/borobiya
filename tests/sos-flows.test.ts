@@ -41,6 +41,13 @@ async function dispatchTo(sosId: string, responderIds: string[]): Promise<void> 
   expect(response.status, response.text).toBe(200);
 }
 
+/** One pending SOS, created at most once and shared by the nearest-endpoint tests. */
+let probeSosId: string | null = null;
+async function pendingProbe(): Promise<string> {
+  if (!probeSosId) probeSosId = await createSos();
+  return probeSosId;
+}
+
 async function acceptAs(sosId: string, cookie: string): Promise<{ missionId: string }> {
   const response = await apiFetch(server, `/_user/sos/${sosId}/accept`, { method: 'POST', cookie });
   expect(response.status, response.text).toBe(200);
@@ -58,6 +65,11 @@ beforeAll(async () => {
   });
   expect(created.status, created.text).toBe(201);
   fieldopsId = created.json.data.userId;
+  // Policy A (fire): offers arrive regardless of readiness, and acceptance flips the responder ready.
+  const typed = await apiFetch(server, `/_admin/users/${fieldopsId}`, {
+    method: 'PATCH', cookie: adminCookie, body: { jobTypeId: 'job_fire' }
+  });
+  expect(typed.status, typed.text).toBe(200);
   fieldopsCookie = await login(server, 'flow.two', 'FlowTwo!2026');
   // Dispatch requires named responders to be active members of the group; add the second responder.
   const member = await apiFetch(server, '/_admin/groups/grp_medical/members', {
@@ -82,46 +94,46 @@ describe('SOS creation extras', () => {
   });
 });
 
-describe('responder visibility of group dispatches', () => {
-  it('lets every active group member see a dispatch aimed at the group, with the requester alias', async () => {
+describe('responder visibility of offers', () => {
+  it('shows the named responder the dispatch, with the requester alias, and hides it from everyone else', async () => {
     const sosId = await createSos();
     await dispatchTo(sosId, [fieldopsId]);
-    // reza.m is a group member but neither the named responder nor the requester.
-    const listed = await apiFetch(server, '/_user/sos', { cookie: responderCookie });
+    // The offer card loads from the list; the named responder must see it.
+    const listed = await apiFetch(server, '/_user/sos', { cookie: fieldopsCookie });
     expect(listed.status, listed.text).toBe(200);
     const item = listed.json.data.items.find((entry: any) => entry.id === sosId);
-    expect(item, 'an unnamed group member must see the dispatch').toBeTruthy();
+    expect(item, 'the named responder must see the offer').toBeTruthy();
     expect(item.status).toBe('dispatched');
     expect(item.requesterUsername).toBe('saeed.k');
     expect(item.isManual).toBe(false);
-    // The list shows the dispatch to the member, so the detail call must not 404 either:
-    // the offer card loads the timeline from it.
-    const detail = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: responderCookie });
+    const detail = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: fieldopsCookie });
     expect(detail.status, detail.text).toBe(200);
     expect(detail.json.data.id).toBe(sosId);
+    // reza.m is in grp_medical but received no offer: offers, not membership, govern visibility.
+    const outsider = await apiFetch(server, '/_user/sos', { cookie: responderCookie });
+    expect(outsider.status, outsider.text).toBe(200);
+    expect(outsider.json.data.items.some((entry: any) => entry.id === sosId)).toBe(false);
+    // The detail endpoint answers 404 rather than confirming the request exists.
+    expect((await apiFetch(server, `/_user/sos/${sosId}`, { cookie: responderCookie })).status).toBe(404);
+    const offers = await apiFetch(server, '/_user/mission-offers', { cookie: responderCookie });
+    expect(offers.status, offers.text).toBe(200);
+    expect(offers.json.data.items.some((entry: any) => entry.id === sosId)).toBe(false);
   });
 });
 
-describe('acceptance through group membership', () => {
-  it('lets an unassigned member of the group accept a dispatch aimed at a colleague', async () => {
+describe('acceptance through offers', () => {
+  it('lets the named responder accept a dispatch aimed at them', async () => {
     const sosId = await createSos();
     await dispatchTo(sosId, [fieldopsId]);
-    // reza.m is in grp_medical but is not the named responder: membership is the ticket.
-    const accepted = await acceptAs(sosId, responderCookie);
+    const accepted = await acceptAs(sosId, fieldopsCookie);
     expect(accepted.missionId).toBeTruthy();
   });
 
-  it('refuses a former member who no longer belongs to the group', async () => {
-    const context = server.app.context;
-    context.repo.run('DELETE FROM group_members WHERE group_id = ? AND user_id = ?', 'grp_medical', 'usr_responder');
-    try {
-      const sosId = await createSos();
-      await dispatchTo(sosId, [fieldopsId]);
-      const response = await apiFetch(server, `/_user/sos/${sosId}/accept`, { method: 'POST', cookie: responderCookie });
-      expect(response.status).toBe(403);
-    } finally {
-      context.repo.run('INSERT INTO group_members(group_id,user_id,role) VALUES(?,?,?)', 'grp_medical', 'usr_responder', 'leader');
-    }
+  it('refuses a responder who received no offer, even though they belong to the group', async () => {
+    const sosId = await createSos();
+    await dispatchTo(sosId, [fieldopsId]);
+    const response = await apiFetch(server, `/_user/sos/${sosId}/accept`, { method: 'POST', cookie: responderCookie });
+    expect(response.status).toBe(403);
   });
 });
 
@@ -228,7 +240,7 @@ describe('cancellation reason requirements', () => {
 
 describe('dispatch edge cases', () => {
   it('dispatches to nobody; an unassigned responder may then claim it', async () => {
-    const sosId = await createSos();
+    const sosId = await pendingProbe();
     // The route schema demands at least one responder, the service tolerates none:
     // the request goes out to the whole group with nobody pre-assigned.
     const result = server.app.context.services.sos.dispatch(
@@ -246,7 +258,8 @@ describe('dispatch edge cases', () => {
   });
 
   it('ranks fix-less responders as null and a stored fix as numbers', async () => {
-    const fixless = await apiFetch(server, '/_admin/sos/sos_any/nearest?latitude=35.7219&longitude=51.3347&limit=10', { cookie: adminCookie });
+    const nearestProbe = await pendingProbe();
+    const fixless = await apiFetch(server, `/_admin/sos/${nearestProbe}/nearest?limit=10`, { cookie: adminCookie });
     const fixlessResponder = fixless.json.data.items.find((item: any) => item.recordedAt === null);
     expect(fixlessResponder).toBeTruthy();
     expect(fixlessResponder.distanceMeters).toBeNull();
@@ -256,7 +269,7 @@ describe('dispatch edge cases', () => {
     server.app.context.repo.run(
       `INSERT INTO location_points(user_id,latitude,longitude,accuracy,heading,speed,recorded_at,created_at)
        VALUES(?,?,?,?,?,?,?,?)`, fieldopsId, 35.73, 51.34, 9, 90, 1.5, Date.now(), Date.now());
-    const ranked = await apiFetch(server, '/_admin/sos/sos_any/nearest?latitude=35.7219&longitude=51.3347&limit=10', { cookie: adminCookie });
+    const ranked = await apiFetch(server, `/_admin/sos/${nearestProbe}/nearest?limit=10`, { cookie: adminCookie });
     const withFix = ranked.json.data.items.find((item: any) => item.id === fieldopsId);
     expect(typeof withFix.recordedAt).toBe('number');
     expect(typeof withFix.distanceMeters).toBe('number');
@@ -276,7 +289,8 @@ describe('default admin and nearest-responder reads', () => {
   });
 
   it('ranks responders without an incident-type filter or explicit limit', async () => {
-    const nearest = await apiFetch(server, '/_admin/sos/sos_any/nearest?latitude=35.7219&longitude=51.3347', { cookie: adminCookie });
+    const nearestProbe = await pendingProbe();
+    const nearest = await apiFetch(server, `/_admin/sos/${nearestProbe}/nearest`, { cookie: adminCookie });
     expect(nearest.status).toBe(200);
     expect(nearest.json.data.items.length).toBeGreaterThan(0);
   });

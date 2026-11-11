@@ -138,7 +138,7 @@ describe('navigation', () => {
   it('lists every administrator destination', async () => {
     const { wrapper } = await render();
     const links = wrapper.findAll('.admin-nav__item');
-    expect(links).toHaveLength(9);
+    expect(links).toHaveLength(10);
     const labels = links.map((link) => link.text());
     expect(labels.some((label) => label.includes('اعزام'))).toBe(true);
     expect(labels.some((label) => label.includes('تنظیمات'))).toBe(true);

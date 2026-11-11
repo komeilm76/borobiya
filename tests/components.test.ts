@@ -92,7 +92,7 @@ describe('router contract', () => {
     for (const name of Object.values(ROUTE_NAMES)) {
       expect(names, name).toContain(name);
     }
-    expect(Object.keys(ROUTE_NAMES).length).toBe(20);
+    expect(Object.keys(ROUTE_NAMES).length).toBe(21);
     const layouts = new Set(ROUTES.map((route) => String(route.meta?.layout ?? 'none')));
     expect(layouts.has('map')).toBe(true);
     expect(layouts.has('admin')).toBe(true);

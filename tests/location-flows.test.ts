@@ -247,7 +247,12 @@ describe('nearest responders with a cached fix', () => {
       });
       expect((await ack).accepted).toBe(true);
 
-      const fresh = await apiFetch(server, '/_admin/sos/sos_unassigned/nearest?latitude=35.72&longitude=51.33', { cookie: adminCookie });
+      const nearestSos = await apiFetch(server, '/_user/sos', {
+        method: 'POST', cookie: requesterCookie,
+        body: { incidentTypeId: 'inc_medical', severity: 'medium', description: 'Nearest probe fixture for the live-fix test.', latitude: 35.72, longitude: 51.33, accuracy: 10, isManual: false }
+      });
+      expect(nearestSos.status, nearestSos.text).toBe(201);
+      const fresh = await apiFetch(server, `/_admin/sos/${nearestSos.json.data.sos.id}/nearest`, { cookie: adminCookie });
       expect(fresh.status, fresh.text).toBe(200);
       const responder = fresh.json.data.items.find((item: any) => item.username === 'reza.m');
       expect(responder?.recordedAt).not.toBeNull();

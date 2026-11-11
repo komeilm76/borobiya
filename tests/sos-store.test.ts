@@ -56,6 +56,7 @@ function route(path: string): unknown {
   if (path === '/_public/cancellation-reasons') return { items: REASONS };
   if (path === '/_user/sos') return { items: [] };
   if (path === '/_user/missions') return { items: MISSIONS };
+  if (path === '/_user/mission-offers') return { items: [] };
   return {};
 }
 
@@ -82,7 +83,8 @@ describe('SOS store loading', () => {
       'GET /_public/incident-types',
       'GET /_public/cancellation-reasons',
       'GET /_user/sos',
-      'GET /_user/missions'
+      'GET /_user/missions',
+      'GET /_user/mission-offers'
     ]);
     expect(sos.incidentTypes).toHaveLength(2);
     expect(sos.cancellationReasons).toHaveLength(1);

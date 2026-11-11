@@ -100,6 +100,7 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
 
       let data: unknown = { ok: true };
       if (path === '/_user/sos') data = { items: options.sos === false ? [] : [SOS_LIST_ITEM] };
+      else if (path === '/_user/mission-offers') data = { items: options.sos === false ? [] : [SOS_LIST_ITEM] };
       else if (path === '/_user/missions') data = { items: mission ? [mission] : [] };
       else if (path === '/_user/sos/sos_1') data = SOS_DETAIL;
       else if (path === '/_public/cancellation-reasons') data = { items: CANCELLATION_REASONS };

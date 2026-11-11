@@ -335,13 +335,26 @@ describe('mission rating guards', () => {
 
 describe('nearby responder search', () => {
   it('ranks the working responder first when a second responder exists', async () => {
-    const response = await apiFetch(server, '/_admin/sos/sos_missing/nearest?latitude=35.7219&longitude=51.3347&limit=10', { cookie: adminCookie });
-    // Unknown SOS ids are fine here: the endpoint ranks responders, it does not read the SOS.
-    expect(response.status).toBe(200);
+    // A second responder who can take the SOS's incident type: the endpoint ranks responders
+    // for the incident at hand, so eligibility runs through group coverage.
+    const created = await apiFetch(server, '/_admin/users', {
+      method: 'POST', cookie: adminCookie,
+      body: { username: 'nearby.two', password: 'NearbyTwo!2026x', role: 'responder' }
+    });
+    expect(created.status, created.text).toBe(201);
+    const secondId = created.json.data.userId;
+    const added = await apiFetch(server, '/_admin/groups/grp_medical/members', {
+      method: 'POST', cookie: adminCookie, body: { userId: secondId, role: 'member' }
+    });
+    expect(added.status, added.text).toBe(200);
+
+    // The nearest endpoint derives the search point from the SOS record itself.
+    const response = await apiFetch(server, `/_admin/sos/${sharedSos}/nearest?limit=10`, { cookie: adminCookie });
+    expect(response.status, response.text).toBe(200);
     expect(response.json.data.items.length).toBeGreaterThanOrEqual(2);
     const usernames = response.json.data.items.map((item: any) => item.username);
     expect(usernames).toContain('reza.m');
-    expect(usernames).toContain('fieldops.two');
+    expect(usernames).toContain('nearby.two');
   });
 });
 
