@@ -59,9 +59,9 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain('@click="live.start()"'); // retry must recheck, not just dismiss the warning
   });
 
-  it("keeps explicit sharing consent, three markers, last-seen text and an accessible stale badge", () => {
+  it("keeps optional sharing for other roles, three markers, last-seen text and an accessible stale badge", () => {
     const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
-    expect(panel).toContain(":aria-label=\"routeActive ? 'نقشهٔ مأموریت و موقعیت داوطلبانهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'\"");
+    expect(panel).toContain(":aria-label=\"routeActive ? 'نقشهٔ مأموریت و موقعیت به‌اشتراک‌گذاشته‌شدهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'\"");
     expect(panel).toContain("member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز'");
     expect(panel).toContain("آخرین مشاهده:");
     expect(panel).toContain("useMissionPresence");
