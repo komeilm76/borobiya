@@ -38,6 +38,22 @@ describe("post-accept mission map camera (T3.5.4)", () => {
       kind: "both", bounds: [[51.30, 35.65], [51.43, 35.71]], padding: 64, maxZoom: 15
     });
   });
+  it("fits nearby incident, origin and snapped route endpoints across the date line, not the whole world", () => {
+    const across = missionMapCamera({ lat: 7, lon: 179.8 }, { lat: 7.1, lon: -179.8 });
+    expect(across.kind).toBe("both");
+    if (across.kind !== "both") return;
+    expect(across.bounds[0][0]).toBeCloseTo(179.8);
+    expect(across.bounds[1][0]).toBeCloseTo(180.2);
+    expect(across.bounds[1][0] - across.bounds[0][0]).toBeCloseTo(.4);
+    expect(across.bounds[0][1]).toBe(7);
+    expect(across.bounds[1][1]).toBe(7.1);
+    const snapped = missionMapCamera({ lat: 7, lon: -179.9 }, null, [],
+      [[179.75, 6.9], [-179.8, 7.05]]);
+    expect(snapped.kind).toBe("both");
+    if (snapped.kind !== "both") return;
+    expect(snapped.bounds[0][0]).toBeCloseTo(179.75);
+    expect(snapped.bounds[1][0]).toBeCloseTo(180.2);
+  });
   it("keeps every edited waypoint visible before a route is calculated, even without GPS", () => {
     const stops = [{ lat: 35.63, lon: 51.55 }, { lat: 35.78, lon: 51.3 }];
     expect(missionMapCamera(incident, null, stops)).toEqual({

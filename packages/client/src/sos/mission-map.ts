@@ -1,3 +1,5 @@
+import { shortestLongitudeBounds } from "@/map/longitude-bounds";
+
 /** Camera math for the post-accept map. Coordinates are GeoJSON [lon, lat], not [lat, lon]. */
 export type MissionMapPoint = { lat: number; lon: number };
 export type MissionMapCamera =
@@ -20,8 +22,7 @@ export function missionMapCamera(incident: MissionMapPoint, rescuer: MissionMapP
   // decoded line would leave the incident marker outside the promised overview.
   const points = [incident, ...(rescuer ? [rescuer] : []), ...stops,
     ...(routeBounds ? routeBounds.map(([lon, lat]) => ({ lat, lon })) : [])];
-  const minLon = Math.min(...points.map((point) => point.lon));
-  const maxLon = Math.max(...points.map((point) => point.lon));
+  const [minLon, maxLon] = shortestLongitudeBounds(points.map((point) => point.lon));
   const minLat = Math.min(...points.map((point) => point.lat));
   const maxLat = Math.max(...points.map((point) => point.lat));
   if (maxLat - minLat < 0.00001 && maxLon - minLon < 0.00001) {

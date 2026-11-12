@@ -1,3 +1,5 @@
+import { shortestLongitudeBounds } from "@/map/longitude-bounds";
+
 /** A bounded camera for the three most recent consented fixes; never use an unvalidated event here. */
 export function missionLiveCamera(points: readonly { lat: number; lon: number }[]):
   | { kind: "single"; center: [number, number]; zoom: number }
@@ -8,8 +10,7 @@ export function missionLiveCamera(points: readonly { lat: number; lon: number }[
   if (points.length === 1) return { kind: "single", center: [first.lon, first.lat], zoom: 14 };
   const lons = points.map((point) => point.lon);
   const lats = points.map((point) => point.lat);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
+  const [minLon, maxLon] = shortestLongitudeBounds(lons);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
   const span = 0.0004;

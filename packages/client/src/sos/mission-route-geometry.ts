@@ -1,5 +1,6 @@
 import { computed, type Ref } from "vue";
 import type { RouteChoice } from "@/api/mission-routing";
+import { unwrapRouteLongitudes } from "@/map/longitude-bounds";
 import { decodeRoutePolyline } from "./route-preview";
 
 type RouteLineData = {
@@ -13,7 +14,7 @@ export function useMissionRouteGeometry(selected: Ref<RouteChoice | null>, decod
   return computed(() => {
     const route = selected.value;
     if (!route) return { bounds: null, data: { type: "FeatureCollection", features: [] } as RouteLineData };
-    const points = decode(route.polyline);
+    const points = unwrapRouteLongitudes(decode(route.polyline));
     let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity;
     for (const [lon, lat] of points) {
       minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon);
