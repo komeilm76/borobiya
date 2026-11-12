@@ -10,7 +10,7 @@ The Bun/Vue rebuild replaces that with one Bun process, one SQLite schema, one d
 
 ## What was retained
 
-The canonical images, reference generators, icon inventory and theme files under `design/` were retained as the visual contract. The product remains right-to-left, keeps system/light/dark themes, preserves the mobile map as the primary surface, and keeps administrator concepts such as overview, dispatch, users, groups, reports, audit, alerts and settings. The SOS and mission workflows, press-and-hold talk, live location, history playback and saved places remain first-class features.
+The canonical images, reference generators, icon inventory and theme files under `design/` were retained as the visual contract. The product remains right-to-left, keeps system/light/dark themes, preserves the mobile map as the primary surface, and keeps administrator concepts such as overview, dispatch, users, groups, reports, audit, alerts and settings. The SOS and mission workflows, press-and-hold talk, live location, the day-grouped history screen and saved places remain first-class features.
 
 Stable demo identifiers were recreated in a compact catalog so deterministic tests can exercise registration, recovery, dispatch, sharing and mission completion. Hardcoded demo credentials remain outside production seeding. The old idea of durable events and audience-filtered catch-up was retained but simplified into one SQLite event table and one post-commit publisher.
 

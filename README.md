@@ -1,6 +1,6 @@
 # Borobiya
 
-Borobiya is a Bun-native offline location, emergency request and dispatch platform. It provides a right-to-left mobile map experience, live location sharing, one-to-one push-to-talk, SOS creation and dispatch, mission progress, history playback and a desktop operations console.
+Borobiya is a Bun-native offline location, emergency request and dispatch platform. It provides a right-to-left mobile map experience, live location sharing, one-to-one push-to-talk, SOS creation and dispatch, mission progress, a day-grouped history screen and a desktop operations console.
 
 The whole product is one Bun process: `Bun.serve` for HTTP and WebSocket upgrades, `bun:sqlite` for storage, `Bun.password` for Argon2id hashing and `Bun.file` for static assets. The browser application is Vue 3 with typed `<script setup lang="ts">` single-file components, Vue Router 4, Vuetify 3, Tailwind CSS 4, Pinia and VueUse, built by Vite through Bun.
 
@@ -17,7 +17,7 @@ The whole product is one Bun process: `Bun.serve` for HTTP and WebSocket upgrade
 - `src/server/core` contains the Bun HTTP helpers, validators, errors, configuration, rate limiting, static file server and WebSocket hub.
 - `src/server/domain` contains pure geometry, state machines, catalogs and the deterministic offline vector tile renderer.
 - `src/server/db` contains one SQLite schema, a typed repository and the transaction/event boundary.
-- `src/server/services` contains authentication, profiles, live location, SOS, missions, talk floor control, administration and realtime use cases.
+- `src/server/services` contains authentication, profiles, live location, SOS, trips and missions (including mission teams and support requests), talk floor control, administration and realtime use cases.
 - `src/server/routes` declares every endpoint and its request schema; `src/server/app.ts` wires the server and `src/server/index.ts` starts it.
 - `src/shared` holds the typed protocol (`protocol.ts`) and the pure geometry and formatting helpers used by the server, the client and the tests.
 - `src/client` is the Vue 3 application: router, Pinia stores, composables, views, layouts, components, Vuetify plugin, styles and the service-worker source.

@@ -14,7 +14,7 @@ This folder contains practical English documentation for Borobiya 2.0.0: a Bun 1
 - `ARCHITECTURE.md` defines layers, dependency direction, the transaction/event boundary and runtime topology.
 - `API.md` documents envelopes, authentication, endpoint groups, validation and error behavior.
 - `WEBSOCKET.md` documents one-use tickets, hello, durable sync, presence, rooms, live location and binary audio.
-- `SECURITY.md` documents CSP, CORS, CSRF, sessions, password hashing, recovery, rate limits and data protection.
+- `SECURITY.md` documents CSP, CORS, CSRF, sessions, password hashing, recovery, rate limits, data protection and the Stage 7 route authorization audit.
 - `PERFORMANCE.md` documents bounded caches, compression, SQLite pragmas, WebSocket limits and service-worker caching.
 - `DESIGN_SYSTEM.md` summarizes colors, typography, spacing, components, responsive behavior and accessibility.
 
@@ -27,6 +27,8 @@ This folder contains practical English documentation for Borobiya 2.0.0: a Bun 1
 - `ACCEPTANCE.md` maps the original specification and roadmap targets to the current Bun/Vue implementation and records their closure.
 - `RELEASE_NOTES.md` records the 2.0.0 Bun and Vue migration, the preserved behavior and the validation evidence.
 - `OPERATIONS.md` is the startup, health, incident, backup, outage and release runbook.
+- `DESIGN_MATRIX.md` maps every canonical design image to `done`/`partial`/`missing`/`superseded`/`reference`/`deviation` with evidence notes — the coverage contract for the visual acceptance review.
+- `IMPLEMENTATION_PLAN.md` records the staged delivery (Stages 1-7) with per-stage exit criteria, verification numbers and the product decisions taken along the way.
 
 ## Reading order
 
