@@ -1,5 +1,5 @@
 <template>
-  <section class="map-canvas" role="region" :aria-label="ariaLabel">
+  <section class="map-canvas" :class="{ 'map-canvas--action-compass': compassAction }" role="region" :aria-label="ariaLabel">
     <div ref="container" class="map-canvas__viewport" />
     <v-snackbar
       v-model="showMapNotice"
@@ -45,6 +45,8 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string;
   constrainBounds?: boolean;
   showZoom?: boolean;
+  /** Use the companion map's 48px two-tone compass action, not the stock control styling. */
+  compassAction?: boolean;
 }>(), {
   styleUrl: DEFAULT_MAP_STYLE,
   zoom: DEFAULT_MAP_ZOOM,
@@ -278,19 +280,62 @@ defineExpose({ map, setStyle: updateStyle });
   box-shadow: var(--bb-shadow-item-hover);
 }
 
+/* MapLibre's own NavigationControl remains the only compass: click/keyboard
+ * resets bearing and dragging its rotating icon changes bearing/pitch. Only its
+ * paint and hit target are shared here; host views position the control slot. */
+.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) { margin: 0; }
+.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group:not(:empty)) {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  box-shadow: var(--bb-shadow-overlay);
+}
+.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass) {
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
+  border-radius: 50%;
+}
+/* MapLibre's stock #333/#ccc arrows disappear on the themed primary surface.
+ * Keep its real rotating icon element and pointer/keyboard behavior, but paint
+ * two distinct high-contrast halves (>=4:1 against each theme's primary). */
+.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath fill='%23ffffff' d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23f4c06a' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E");
+}
+:global(:root.dark .map-canvas--action-compass .maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath fill='%23111c1d' d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23315555' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E");
+}
+@media (forced-colors: active) {
+  .map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+    background-image: none;
+    background-color: ButtonText;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z m0 2 4 8 4-8z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+}
+.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:hover) {
+  background: rgba(var(--v-theme-on-primary), 0.12);
+}
+.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: 3px;
+}
+
+
 :global(:root.dark .map-canvas) { background: var(--bb-color-background); }
 
-/* MapLibre ships light controls and black SVG icons. Theme its stock controls,
- * but leave the user map's custom two-tone compass icon and primary button alone. */
+/* MapLibre ships light controls and black SVG icons. Theme stock controls,
+ * but leave the shared two-tone compass action and primary button alone. */
 @media (forced-colors: none) {
-  :global(:root.dark .map-canvas .maplibregl-ctrl-group) {
+  :global(:root.dark .map-canvas:not(.map-canvas--action-compass) .maplibregl-ctrl-group) {
     border-color: var(--bb-color-outline);
     background: var(--bb-color-surface);
   }
-  :global(:root.dark .map-canvas:not(.user-map-view__canvas) .maplibregl-ctrl-icon) {
+  :global(:root.dark .map-canvas:not(.map-canvas--action-compass) .maplibregl-ctrl-icon) {
     filter: invert(1);
   }
-  :global(:root.dark .map-canvas .maplibregl-ctrl-group button + button) {
+  :global(:root.dark .map-canvas:not(.map-canvas--action-compass) .maplibregl-ctrl-group button + button) {
     border-top-color: var(--bb-color-outline);
   }
   :global(:root.dark .map-canvas .maplibregl-ctrl-attrib) {

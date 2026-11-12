@@ -3,7 +3,7 @@
     <!-- No active mission means no private markers. Show the same full-viewport
          canvas for context, then replace it with the live canvas once assigned. -->
     <MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"
-      :constrain-bounds="false" :show-zoom="false" aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید" />
+      :constrain-bounds="false" :show-zoom="false" compass-action aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید" />
     <div class="mission-desk__shell">
       <header v-if="!desk.activeMission.value" class="mission-hero">
         <span class="mission-hero__eyebrow"><v-icon icon="mdi-lifebuoy" size="18" /> میز مأموریت امدادگر</span>
@@ -824,7 +824,14 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
    remains. Its public canvas has no incident or live-room data. */
 .mission-desk:not(.mission-desk--active) { position: relative; height: 100dvh; min-height: 0; padding: 0; overflow: hidden; }
 .mission-desk__idle-map { position: absolute !important; inset: 0; width: 100%; height: 100%; min-height: 0 !important; border-radius: 0; }
-.mission-desk__idle-map :deep(.maplibregl-ctrl-top-right) { top: calc(4.5rem + env(safe-area-inset-top, 0px)); }
+/* Park the same 48px compass on the physical left, clear of the centered
+   welcome card and the phone's safe-area/dock region. */
+.mission-desk__idle-map :deep(.maplibregl-ctrl-top-right) {
+  top: auto; right: auto; bottom: auto;
+  left: calc(.75rem + env(safe-area-inset-left, 0px));
+  inset-block-end: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  width: 48px;
+}
 .mission-desk:not(.mission-desk--active) .mission-desk__shell {
   position: absolute; z-index: 2; inset: 0; height: 100%; max-width: none;
   pointer-events: none; overflow-y: auto;
@@ -899,10 +906,10 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance-copy strong { font-size: .87rem; }
 .mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
-/* Keep the compact mission camera controls clear of the bottom dock and the
-   physical-right planner. They remain reachable while the Route tool is open. */
+/* Keep camera actions beside the shared 48px compass, clear of the dock and
+   planner; the entire rail stays below the full-width phone sheets. */
 .mission-desk__map-focus {
-  position: absolute; z-index: 9; left: calc(.75rem + env(safe-area-inset-left, 0px));
+  position: absolute; z-index: 9; left: calc(4.25rem + env(safe-area-inset-left, 0px));
   bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   display: flex; gap: .5rem;
 }

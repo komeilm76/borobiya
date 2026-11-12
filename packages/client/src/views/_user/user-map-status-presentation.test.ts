@@ -4,6 +4,9 @@ import { parse, compileStyle } from "vue/compiler-sfc";
 import { palettes } from "../../styles/tokens";
 
 const view = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
+const canvas = readFileSync(new URL("../../components/map/MapCanvas.vue", import.meta.url), "utf8");
+const canvasCss = compileStyle({ filename: "MapCanvas.vue", id: "data-v-shared", scoped: true,
+  source: parse(canvas).descriptor.styles[0]!.content });
 const companions = readFileSync(new URL("../../components/map/LiveCompanionPanel.vue", import.meta.url), "utf8");
 const { descriptor } = parse(view);
 const compiled = compileStyle({ filename: "UserMapView.vue", id: "data-v-warning", scoped: true,
@@ -46,18 +49,19 @@ describe("map visual status and compass", () => {
   it("renders a two-tone legible compass in both themes with native reset/drag behavior", () => {
     expect(compiled.errors).toEqual([]);
     expect(view).toContain(':show-zoom="false"');
-    expect(view).toContain("fill='%23ffffff'");
-    expect(view).toContain("fill='%23f4c06a'");
-    expect(view).toContain("fill='%23111c1d'");
-    expect(view).toContain("fill='%23315555'");
+    expect(canvas).toContain("fill='%23ffffff'");
+    expect(canvas).toContain("fill='%23f4c06a'");
+    expect(canvas).toContain("fill='%23111c1d'");
+    expect(canvas).toContain("fill='%23315555'");
     for (const [background, arrows] of [
       [palettes.light.primary, ["#ffffff", "#f4c06a"]],
       [palettes.dark.primary, ["#111c1d", "#315555"]]
     ] as const) {
       for (const arrow of arrows) expect(ratio(background, arrow)).toBeGreaterThanOrEqual(4);
     }
-    expect(view).not.toContain("filter: invert(1)");
-    expect(compiled.code).toContain(".maplibregl-ctrl-compass .maplibregl-ctrl-icon");
-    expect(view).toContain("@media (forced-colors: active)");
+    expect(canvas).toContain(":not(.map-canvas--action-compass) .maplibregl-ctrl-icon");
+    expect(canvasCss.errors).toEqual([]);
+    expect(canvasCss.code).toContain(".maplibregl-ctrl-compass .maplibregl-ctrl-icon");
+    expect(canvas).toContain("@media (forced-colors: active)");
   });
 });

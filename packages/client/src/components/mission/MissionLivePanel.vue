@@ -32,7 +32,7 @@
       <div class="live-panel__map-area">
         <div class="live-panel__map">
           <MapCanvas :center="center" :zoom="13" :constrain-bounds="false" :show-zoom="!fullscreen"
-            :style-url="mapStyleUrl"
+            :compass-action="fullscreen" :style-url="mapStyleUrl"
             :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت به‌اشتراک‌گذاشته‌شدهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
             @ready="onMapReady" />
           <slot name="map-actions" />
@@ -292,9 +292,14 @@ onBeforeUnmount(() => {
 .live-panel--fullscreen .live-panel__map :deep(.map-canvas) {
   height: 100%; min-height: 0; border-radius: 0;
 }
-/* The network control is an App sibling at the top right. Keep map zoom reachable. */
+/* Rescuer compass uses the same action button as /_user/map, but sits on the
+ * physical left beside the mission camera actions: route/status/team sheets
+ * use the right edge or start above this rail on phones. Clear the safe area. */
 .live-panel--fullscreen .live-panel__map :deep(.maplibregl-ctrl-top-right) {
-  top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  top: auto; right: auto; bottom: auto;
+  left: calc(.75rem + env(safe-area-inset-left, 0px));
+  inset-block-end: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  width: 48px;
 }
 .live-panel--fullscreen .live-panel__members {
   position: absolute; z-index: 6; inset: auto 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px)) auto;

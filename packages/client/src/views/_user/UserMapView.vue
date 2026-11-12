@@ -4,7 +4,7 @@
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
-      :show-zoom="false"
+      :show-zoom="false" compass-action
       aria-label="نقشهٔ تعاملی"
       @ready="onMapReady"
       @coverage-changed="onMapCoverageChanged"
@@ -2305,9 +2305,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border-radius: 0;
 }
 
-/* Keep MapLibre's native compass (tap to reset north, drag to rotate/pitch),
- * but place its sole button in the same physical-right 48px rail as the SOS,
- * sharing and recenter actions. Other MapCanvas users retain their +/- controls. */
+/* MapCanvas provides the shared native 48px compass button; position it in
+ * this view's physical-right SOS/share/recenter rail. */
 .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
   position: fixed;
   z-index: 6;
@@ -2319,45 +2318,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);
   width: 48px;
 }
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) { margin: 0; }
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group:not(:empty)) {
-  width: 48px;
-  height: 48px;
-  border: 0;
-  border-radius: 50%;
-  background: rgb(var(--v-theme-primary));
-  box-shadow: var(--bb-shadow-overlay);
-}
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass) {
-  width: 48px;
-  height: 48px;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
-  border-radius: 50%;
-}
-/* MapLibre's stock #333/#ccc arrows disappear on the themed primary surface.
- * Keep its real rotating icon element and pointer/keyboard behavior, but paint
- * two distinct high-contrast halves (>=4:1 against each theme's primary). */
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath fill='%23ffffff' d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23f4c06a' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E");
-}
-:global(:root.dark .user-map-view__canvas .maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath fill='%23111c1d' d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23315555' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E");
-}
-@media (forced-colors: active) {
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
-    background-image: none;
-    background-color: ButtonText;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z m0 2 4 8 4-8z'/%3E%3C/svg%3E") center / contain no-repeat;
-  }
-}
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:hover) {
-  background: rgba(var(--v-theme-on-primary), 0.12);
-}
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:focus-visible) {
-  outline: 3px solid rgb(var(--v-theme-primary));
-  outline-offset: 3px;
-}
-
 /* Keep MapLibre's scale visible beside, rather than underneath, the bottom-left
  * companions card. Its own bottom-left control slot is still used on narrow maps. */
 .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {

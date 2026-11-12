@@ -79,17 +79,17 @@ describe("dark surfaces and widget boundaries", () => {
     const canvas = source("components/map/MapCanvas.vue");
     expect(canvas).toContain(":global(:root.dark .map-canvas) { background: var(--bb-color-background); }");
     expect(canvas).toContain("background: var(--bb-color-surface);");
-    expect(canvas).toContain(":global(:root.dark .map-canvas:not(.user-map-view__canvas) .maplibregl-ctrl-icon)");
+    expect(canvas).toContain(":global(:root.dark .map-canvas:not(.map-canvas--action-compass) .maplibregl-ctrl-icon)");
     expect(canvas).toContain(":global(:root.dark .map-canvas .maplibregl-ctrl-attrib a)");
     expect(canvas).toContain("color: var(--bb-color-primary);");
     const style = parse(canvas).descriptor.styles[0]!;
     const compiled = compileStyle({ source: style.content, filename: "MapCanvas.vue", id: "data-v-map-audit", scoped: true });
     expect(compiled.errors).toEqual([]);
-    expect(compiled.code).toContain(":root.dark .map-canvas:not(.user-map-view__canvas) .maplibregl-ctrl-icon");
+    expect(compiled.code).toContain(":root.dark .map-canvas:not(.map-canvas--action-compass) .maplibregl-ctrl-icon");
     expect(compiled.code).not.toContain(":root.dark .map-canvas .maplibregl-ctrl-icon {");
     expect(contrast(dark.primary, dark.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(source("views/_user/UserMapView.vue")).toContain(
-      ":global(:root.dark .user-map-view__canvas .maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon)");
+    expect(canvas).toContain(
+      ":global(:root.dark .map-canvas--action-compass .maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon)");
   });
 
   it("separates remaining share rows, float launchers, public links and auth controls", () => {
