@@ -129,7 +129,13 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('id="mission-cancel-waypoint"');
     expect(view).toContain('pickingWaypoint.value ? "mission-cancel-waypoint" : "mission-route-panel"');
     expect(view).toContain('@sharing-change="teamSharing = $event"');
-    expect(view).toContain('mission-desk__dock-sharing');
+    expect(view).toContain('id="mission-tool-team" icon="mdi-account-group-outline"');
+    expect(view).toContain('aria-controls="mission-team-panel" :aria-expanded="activeTool === \'team\'"');
+    expect(view).not.toContain('mission-desk__dock-sharing');
+    expect(view).not.toContain('اشتراک روشن');
+    const dock = view.slice(view.indexOf('<nav class="mission-desk__dock"'), view.indexOf('</nav>', view.indexOf('<nav class="mission-desk__dock"')));
+    expect(dock.match(/<button\b/g)).toHaveLength(2);
+    expect(dock).not.toContain('mission-tool-team');
     expect(panel).toContain('watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)');
     expect(panel).toContain(': live.sharing.value, (sharing) => emit("sharing-change", sharing)');
     expect(panel).toContain('<template v-else-if="canPublish">');

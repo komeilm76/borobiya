@@ -31,7 +31,7 @@
     <div class="live-panel__grid">
       <div class="live-panel__map-area">
         <div class="live-panel__map">
-          <MapCanvas :center="center" :zoom="13" :constrain-bounds="false"
+          <MapCanvas :center="center" :zoom="13" :constrain-bounds="false" :show-zoom="!fullscreen"
             :style-url="mapStyleUrl"
             :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت به‌اشتراک‌گذاشته‌شدهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
             @ready="onMapReady" />
@@ -311,6 +311,12 @@ onBeforeUnmount(() => {
     inset-inline: .75rem; width: auto;
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: min(52dvh, 26rem);
+  }
+}
+@media (max-width: 599px) and (max-height: 560px) {
+  /* Keep the separate members launcher clear of the scrollable room on short phones. */
+  .live-panel--fullscreen .live-panel__members {
+    max-height: max(5rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
 }
 

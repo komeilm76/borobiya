@@ -3,7 +3,7 @@
     <!-- No active mission means no private markers. Show the same full-viewport
          canvas for context, then replace it with the live canvas once assigned. -->
     <MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"
-      :constrain-bounds="false" aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید" />
+      :constrain-bounds="false" :show-zoom="false" aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید" />
     <div class="mission-desk__shell">
       <header v-if="!desk.activeMission.value" class="mission-hero">
         <span class="mission-hero__eyebrow"><v-icon icon="mdi-lifebuoy" size="18" /> میز مأموریت امدادگر</span>
@@ -191,6 +191,11 @@
         <header class="mission-desk__map-heading" aria-label="مأموریت فعال">
           <h1>مأموریت من</h1>
           <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
+          <v-btn id="mission-tool-team" icon="mdi-account-group-outline" variant="text" size="small"
+            :aria-label="activeTool === 'team' ? 'بستن پنل اعضای مأموریت' : 'نمایش اعضای مأموریت'"
+            :title="activeTool === 'team' ? 'بستن اعضای مأموریت' : 'نمایش اعضای مأموریت'"
+            aria-controls="mission-team-panel" :aria-expanded="activeTool === 'team'"
+            @click="toggleTool('team')" />
         </header>
         <div v-if="activeTool !== 'route' && (routing.error.value || navigation.error.value)"
           class="mission-desk__guidance mission-desk__guidance--warning" role="alert">
@@ -229,9 +234,6 @@
             :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
             :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
             @click="toggleTool('route')"><v-icon icon="mdi-routes" size="22" aria-hidden="true" />مسیر</button>
-          <button id="mission-tool-team" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'team', 'mission-desk__dock-sharing': teamSharing && activeTool !== 'team' }"
-            :aria-expanded="activeTool === 'team'" aria-controls="mission-team-panel"
-            @click="toggleTool('team')"><v-icon :icon="teamSharing ? 'mdi-map-marker-check' : 'mdi-account-group-outline'" size="22" aria-hidden="true" />{{ teamSharing ? 'اشتراک روشن' : 'اعضا' }}</button>
         </nav>
       </div>
     </div>
@@ -876,7 +878,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-heading h1 { margin: 0; font-size: .9rem; font-weight: 800; }
-.mission-desk__map-heading span { overflow: hidden; text-overflow: ellipsis; font-size: .8rem; }
+.mission-desk__map-heading span { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: .8rem; }
+.mission-desk__map-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 .mission-desk__guidance {
   position: absolute; z-index: 7; top: calc(4.5rem + env(safe-area-inset-top, 0px));
   left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .5rem;
@@ -911,7 +914,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__dock {
   position: absolute; z-index: 10; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   left: 50%; transform: translateX(-50%); display: flex; gap: 3px;
-  width: min(21rem, calc(100vw - 6rem)); padding: 4px;
+  width: min(15rem, calc(100vw - 6rem)); padding: 4px;
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
   background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
 }
@@ -922,9 +925,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 .mission-desk__dock .mission-desk__dock-active {
   background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary));
-}
-.mission-desk__dock .mission-desk__dock-sharing {
-  background: rgb(var(--v-theme-error)); color: rgb(var(--v-theme-on-error));
 }
 .mission-desk__dock button:disabled { opacity: .48; cursor: not-allowed; }
 .mission-desk__dock button:focus-visible, .mission-desk__map-hint button:focus-visible {
@@ -947,13 +947,19 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 11;
   }
-  .mission-desk__dock { width: min(21rem, calc(100vw - 1.5rem)); }
-  .mission-desk__map-heading { max-width: calc(100vw - 8rem); }
+  .mission-desk__dock { width: min(15rem, calc(100vw - 1.5rem)); }
+  .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
   .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
   .mission-desk__guidance--warning { flex-wrap: wrap; }
   .mission-desk__guidance--warning span { flex: 1 1 100%; }
 }
-:global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active):not(.mission-desk__dock-sharing)) { background: var(--bb-color-inset); }
+@media (max-width: 599px) and (max-height: 560px) {
+  .mission-desk--active .mission-desk__card,
+  .mission-desk--active .mission-route {
+    max-height: max(5rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
+}
+:global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active)) { background: var(--bb-color-inset); }
 
 :global(:root.dark .mission-route__stops),
 :global(:root.dark .mission-route__step-control),
