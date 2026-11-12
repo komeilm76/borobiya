@@ -113,8 +113,8 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| mission/01-mission-ready-on.png | missing | P2/H | No responder availability UI. `POST /_user/ready` exists and is server-tested; unwired. Design adds radius + team chips. |
-| mission/02-mission-ready-off.png | missing | P2/H | Same screen, toggle off. |
+| mission/01-mission-ready-on.png | partial | P2/H | Stage C review found the toggle wired: the profile screen carries the responder readiness switch (POSTs /_user/ready; consumed by dispatch/offer eligibility). The designed dedicated screen — ready hero, radius control, team chips — is absent; the server has no radius concept. |
+| mission/02-mission-ready-off.png | partial | P2/H | Same readiness switch on the profile screen in its off state (POSTs /_user/ready { ready: false }); the designed off-state treatment is absent. |
 | mission/03-mission-offer.png | done | P1/C | Mission screen renders an offer card for dispatched requests the responder may act on (offers are addressed per named responder; responder alias exposed): severity, incident icon+label, description, accuracy, manual-pin flag, distance from own fix, requester. Accept goes through the endpoint with per-item busy guard, lost-race conflicts surfaced, reload afterwards; a decline control calls `POST /_user/sos/:id/decline` and the offer disappears from the list. |
 | mission/04-mission-offer-details.png | partial | P1/H | The offer card carries the designed facts inline; a separate details sheet does not exist. |
 | mission/05-mission-accepted.png | partial | P1/H | Accept lands with a success toast; the offer clears and the mission card shows the live status after reload; the designed accepted-transition surface is not built. |
@@ -177,8 +177,8 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |
 | profile/06-logout-confirm.png | missing | P2/L | Logout is one control elsewhere; no confirmation sheet. |
 | profile/07-map-entry.png | partial | P2/L | Role-aware landing works; designed entry composition absent. |
-| profile/08-bookmarks.png | missing | P2/H | Saved-places UI absent (server CRUD + store exist, unused). |
-| profile/09-bookmark-edit.png | missing | P2/M | Part of saved-places UI. |
+| profile/08-bookmarks.png | partial | P2/H | Stage C review found the saved-places UI shipped: the profile screen lists saved places with per-place inline edit (name, label, address, icon) and delete; server CRUD + store are used. The designed dedicated bookmarks screen (search, reorder, groups) is absent; reorder remains API-only. |
+| profile/09-bookmark-edit.png | partial | P2/M | Inline edit panel per saved place on the profile screen (name, label, address, icon; full PATCH with preserved rank). The designed dedicated edit screen is absent. |
 
 ## Administrator console — dashboard (3)
 
@@ -245,7 +245,17 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 ## Summary tally (canonical 141)
 
-Counts over the 141 canonical rows above: `done` 23, `partial` 66, `missing` 35, `superseded` 11, `reference` 5, intentional `deviation` 1.
+Counts over the 141 canonical rows above: `done` 23, `partial` 70, `missing` 31, `superseded` 11, `reference` 5, intentional `deviation` 1.
+
+## Stage C review log (2026-11-08)
+
+Code-vs-matrix audit of all 141 canonical rows; the matrix was confirmed as the single authority, the six state families (loading / empty / error / offline / forbidden / success) were kept as separate rows, and no row was flipped to `done` — visual acceptance stays a deferred human review (P5), never an automated one.
+
+- Integrity check: the 141 canonical PNGs on disk (154 files minus the 13 `_generator/_preview-*.png` artifacts) map 1:1 onto the 141 matrix rows; no missing, extra or duplicated references.
+- Stale rows corrected: `mission/01-mission-ready-on`, `mission/02-mission-ready-off`, `profile/08-bookmarks`, `profile/09-bookmark-edit` — all four described shipped functionality as absent (readiness switch and saved-places UI are wired); now `partial` with accurate notes.
+- Spot checks confirmed accurate as written: `navigation/17` (no reorder UI), `sos/07`–`sos/11` and `sos/16` (no sending/pending/dispatched/en-route/arrived/offline surfaces), `admin-panel/services/*` (no edit/member-management UI), `admin-panel/dashboard/03-reports` (no deltas/period/donut), `admin-panel/states/01|04`, `history/05|07|08` (filter/playback/per-companion absent), `mission/13|19`, `companions/02|05|10`, `profile/06`, `auth/02|12`.
+- The 23 `done` rows were not re-verified visually; they remain "implemented and wired, pixel fidelity unverified".
+- Remaining `missing` work is enumerated by the matrix; several rows are product/architecture decisions rather than buildable screens (e.g. `history/07` playback is blocked until a trip-track recording decision — see the Stage D proposal, and DF-04).
 
 ## Design flaws found in the reference material (to fix or consciously keep)
 
