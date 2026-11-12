@@ -4,33 +4,45 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 
 const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
 const panel = readFileSync(new URL("../../components/mission/MissionLivePanel.vue", import.meta.url), "utf8");
+const status = readFileSync(new URL("../../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
 
 describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
-  it("uses one transport profile for the phone select and desktop buttons, locked during navigation", () => {
-    expect(view).toMatch(/<v-select :model-value="routing\.profile\.value" :items="transportProfiles"[\s\S]*?class="mission-route__profile-select d-sm-none"[\s\S]*?label="وسیلهٔ حرکت"[\s\S]*?:disabled="navigation\.active\.value"[\s\S]*?@update:model-value="onProfileChange"/);
-    expect(view).toMatch(/<v-btn-toggle class="d-none d-sm-inline-flex" :model-value="routing\.profile\.value"[\s\S]*?:disabled="navigation\.active\.value"[\s\S]*?@update:model-value="onProfileChange"/);
-    expect(view).toContain('if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile)');
-    expect(view).toContain('] satisfies { title: string; value: TransportProfile }[];');
+  it("reuses the map's separate transport chooser, changing the mission profile only on confirmation", () => {
+    const transport = readFileSync(new URL("../../components/map/PointTransportChoicesSheet.vue", import.meta.url), "utf8");
+    expect(view).toContain('<PointTransportChoicesSheet :mission-id="desk.activeMission.value.id" :mission-profile="routing.profile.value"');
+    expect(view).toContain(":open=\"activeTool === 'route' && routeSection === 'transport'\" :show-search=\"false\"");
+    expect(view).toContain('@confirm="confirmMissionTransport" @close="closeRouteSection()"');
+    expect(view).toContain('!desk.activeMission.value || navigation.active.value ||');
+    expect(view).toContain('!transportProfiles.some((option) => option.value === mode)) return;');
+    expect(view).toContain('routing.selectProfile(mode);');
+    expect(view).toContain('if (routing.from.value) void routing.findRoutes();'); // No GPS prompt before explicit route action.
+    expect(transport).toContain('v-for="mode in transportOptions"');
+    expect(transport).toContain('watch([() => props.open, () => props.api?.point.value ?? props.missionId]');
+    expect(view).toContain('.mission-desk__workspace :deep(.point-transport-choices-shell) {\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
   });
 
   it("states the actual mission outcome and keeps optional stops out of the primary route path", () => {
     expect(view).toContain('<h1>{{ missionHeadline }}</h1>');
-    expect(view).toContain('v-if="desk.cancellationNeedsRefresh.value && !desk.cancellationOpen.value"');
-    expect(view).toContain('پیش از تغییر مرحله، وضعیت مأموریت را از سرور تازه کنید.');
+    expect(status).toContain('v-if="desk.cancellationNeedsRefresh.value && !desk.cancellationOpen.value"');
+    expect(status).toContain('پیش از تغییر مرحله، وضعیت مأموریت را از سرور تازه کنید.');
     expect(view).toContain('if (desk.error.value) return "وضعیت تازهٔ مأموریت تأیید نشد.";');
     expect(view).toContain('if (desk.activeMission.value) return "کمک در جریان است.";');
     expect(view).toContain('if (desk.loading.value) return "در حال بررسی مأموریت…";');
     expect(view).toContain('return "مأموریت فعالی ندارید.";');
-    expect(view).toContain('<details class="mission-route__stops" @toggle="onWaypointDisclosureToggle">');
+    expect(view).toContain('<details v-if="routeSection === \'plan\'" class="mission-route__stops" @toggle="onWaypointDisclosureToggle">');
     expect(view).toContain('<summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)');
     expect(view).toContain('if (!(event.target as HTMLDetailsElement).open) pickingWaypoint.value = false;');
-    const stopsStart = view.indexOf('<details class="mission-route__stops"');
+    const stopsStart = view.indexOf('<details v-if="routeSection === \'plan\'" class="mission-route__stops"');
     const editor = view.slice(stopsStart, view.indexOf('</details>', stopsStart));
     expect(editor).toContain('@click="addTypedWaypoint"');
     expect(editor).toContain('@click="routing.removeWaypoint(index)"');
     expect(editor).not.toContain('class="mission-route__step-control"');
     expect(view.indexOf('class="mission-route__step-control"')).toBeGreaterThan(stopsStart);
     expect(view).toContain('.mission-route__stops-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
+    expect(view).toContain('routeSection === \'transport\'');
+    expect(view).toContain('routeSection === \'alternatives\'');
+    expect(view).toContain('@click="acceptAlternative"');
+    expect(view).toContain('@click="routeDeleteConfirmOpen = true"');
   });
 
   it("keeps mission cancellation actions reachable on narrow and short screens", () => {
@@ -83,8 +95,10 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).not.toContain('watch(() => [routing.error.value, navigation.error.value]');
     expect(view).toContain('activeTool !== \'route\' && (routing.error.value || navigation.error.value)');
     expect(view).toContain('aria-label="بستن هشدار راهبری"');
-    expect(view).toContain('v-show="activeTool === \'status\'" id="mission-status-panel"');
-    expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\'" id="mission-route-panel"');
+    expect(view).toContain('<MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === \'status\'"');
+    expect(status).toContain('id="mission-status-panel"');
+    expect(view).toContain('@close="closeTool(\'status\')" @open-route="openRouteWorkspace"');
+    expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\' && routeSection !== \'transport\'" id="mission-route-panel"');
     expect(view).toContain(':room-open="activeTool === \'team\'"');
     expect(view).toContain('const activeTool = ref<"status" | "route" | "team" | null>(null);');
     expect(view).toContain('aria-label="ابزارهای مأموریت"');

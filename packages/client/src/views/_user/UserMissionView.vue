@@ -31,70 +31,10 @@
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
-      <section v-else-if="desk.activeMission.value" v-show="activeTool === 'status'" id="mission-status-panel"
-        class="mission-desk__card" aria-label="مأموریت فعال" tabindex="-1">
-        <div class="mission-desk__card-header">
-          <div>
-            <span class="mission-desk__kicker"><span class="mission-desk__pulse" /> اکنون در جریان</span>
-            <h3>مأموریت امدادی شما</h3>
-            <p>شناسهٔ پیگیری: <bdi dir="ltr">{{ desk.activeMission.value.id }}</bdi></p>
-          </div>
-          <div class="mission-desk__card-actions">
-            <v-chip color="primary" variant="tonal" size="large" prepend-icon="mdi-timeline-clock-outline"
-              role="status" aria-live="polite" aria-atomic="true">{{ currentStatusLabel }}</v-chip>
-            <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-refresh" :loading="desk.loading.value"
-              @click="desk.load()">تازه‌سازی</v-btn>
-            <v-btn icon="mdi-close" variant="text" aria-label="بستن وضعیت مأموریت" @click="closeTool('status')" />
-          </div>
-        </div>
-        <details class="mission-desk__timeline">
-          <summary>مرحلهٔ {{ (activeStep + 1).toLocaleString('fa-IR') }} از ۵ · {{ currentStatusLabel }} — نمایش همهٔ مراحل</summary>
-          <div class="mission-steps" role="list" aria-label="مراحل مأموریت">
-            <div v-for="(step, index) in steps" :key="step.status" class="mission-steps__item"
-              :class="{ 'mission-steps__item--reached': index <= activeStep }"
-              :aria-current="index === activeStep ? 'step' : undefined" role="listitem">
-              <span class="mission-steps__number" aria-hidden="true">{{ (index + 1).toLocaleString('fa-IR') }}</span>
-              <span>{{ step.label }}</span>
-              <v-icon v-if="index < activeStep" icon="mdi-check" size="16" aria-label="انجام شده" />
-            </div>
-          </div>
-        </details>
-        <div class="mission-desk__progress" aria-label="به‌روزرسانی وضعیت مأموریت">
-          <p>تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.</p>
-          <p role="status">اشتراک موقعیت مأموریت پس از تأیید و اجازهٔ GPS خودکار است؛
-            {{ teamSharing ? 'اکنون فعال است.' : 'هنوز برقرار نشده است؛ هشدار اتصال یا اجازهٔ GPS را بررسی کنید.' }}
-          </p>
-          <p v-if="desk.loading.value" role="status">در حال تأیید وضعیت مأموریت از سرور؛ تغییر مرحله موقتاً متوقف است.</p>
-          <v-btn v-if="desk.nextStatus.value" color="primary" variant="flat" rounded="lg"
-            :loading="desk.progressing.value" :disabled="!desk.canAdvance.value"
-            @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
-          <v-alert v-if="desk.progressError.value" type="error" variant="tonal" rounded="lg" role="alert">
-            {{ desk.progressError.value }}
-            <v-btn size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
-          </v-alert>
-          <v-alert v-if="desk.cancellationNeedsRefresh.value && !desk.cancellationOpen.value" type="warning"
-            variant="tonal" rounded="lg" role="alert">
-            وضعیت درخواست لغو هنوز تأیید نشده است؛ پیش از تغییر مرحله، وضعیت مأموریت را از سرور تازه کنید.
-            <v-btn size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
-          </v-alert>
-        </div>
-        <div class="mission-desk__foot">
-          <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-map-marker-path"
-            aria-controls="mission-route-panel" :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
-            @click="openRouteWorkspace">باز کردن مسیر</v-btn>
-          <p><v-icon icon="mdi-shield-check-outline" size="20" /> لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.</p>
-          <v-menu location="bottom end">
-            <template #activator="{ props }">
-              <v-btn v-bind="props" variant="text" color="error" rounded="lg" prepend-icon="mdi-dots-horizontal"
-                aria-label="گزینه‌های بیشتر مأموریت" :disabled="desk.progressing.value || desk.loading.value || !!desk.error.value || !!desk.terminalHold.value">بیشتر</v-btn>
-            </template>
-            <v-list density="comfortable" rounded="lg">
-              <v-list-item prepend-icon="mdi-alert-outline" title="قادر به ادامه نیستم" subtitle="ثبت دلیل و آگاه‌سازی مرکز امداد" :disabled="desk.progressing.value"
-                @click="desk.showCancellation()" />
-            </v-list>
-          </v-menu>
-        </div>
-      </section>
+      <MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === 'status'"
+        :desk="desk" :steps="steps" :active-step="activeStep" :current-status-label="currentStatusLabel"
+        :next-status-label="nextStatusLabel" :team-sharing="teamSharing"
+        @close="closeTool('status')" @open-route="openRouteWorkspace" />
       <section v-else-if="!desk.error.value" class="mission-desk__empty">
         <div class="mission-desk__empty-icon"><v-icon icon="mdi-check-decagram-outline" size="36" /></div>
         <h3>در حال حاضر مأموریت فعالی ندارید</h3>
@@ -114,18 +54,21 @@
             </div>
           </template>
           <template #route-planner>
-            <section v-show="routing.visible.value && activeTool === 'route'" id="mission-route-panel"
-              class="mission-route" aria-label="مسیرهای پیشنهادی مأموریت" tabindex="-1">
+            <v-card v-show="routing.visible.value && activeTool === 'route' && routeSection !== 'transport'" id="mission-route-panel"
+              tag="section" elevation="3" rounded="xl" class="mission-route bb-map-navigation-card bb-floating-card"
+              aria-label="برنامه‌ریزی مسیر مأموریت" tabindex="-1">
               <header class="mission-route__header">
-                <div>
-                  <h2>مسیر تا محل حادثه</h2>
-                  <p>مسیریابی با سرور نقشهٔ محلی انجام می‌شود؛ مسیرها پیشنهادند و زمان رسیدن قطعی نیست.</p>
+                <span class="mission-route__emblem" aria-hidden="true"><v-icon :icon="routeSection === 'plan' ? 'mdi-map-marker-path' : routeSection === 'transport' ? 'mdi-car-multiple' : 'mdi-routes'" /></span>
+                <div class="mission-route__heading">
+                  <small>مأموریت فعال · {{ routeSection === 'plan' ? 'برنامه‌ریزی سفر' : routeSection === 'transport' ? 'انتخاب وسیله' : 'انتخاب مسیر' }}</small>
+                  <h2>{{ routeSection === 'plan' ? 'مسیر تا محل حادثه' : routeSection === 'transport' ? 'وسیلهٔ حرکت' : 'مسیرهای پیشنهادی' }}</h2>
                 </div>
-                <div class="d-flex align-center ga-1">
-                  <v-btn variant="text" color="error" size="small" :disabled="navigation.active.value || !routing.target.value || routing.targetLoading.value"
-                    @click="resetRoutePlan">پاک کردن مسیر</v-btn>
-                  <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند" @click="closeTool('route')" />
-                </div>
+                <v-btn v-if="routeSection !== 'plan'" icon="mdi-arrow-right" variant="text" color="primary"
+                  aria-label="بازگشت به برنامهٔ سفر" @click="closeRouteSection()" />
+                <v-btn v-else-if="routing.from.value || routing.via.value.length" icon="mdi-delete-outline" variant="text" color="error"
+                  :disabled="navigation.active.value || !routing.target.value || routing.targetLoading.value"
+                  aria-label="درخواست پاک کردن مسیر" @click="routeDeleteConfirmOpen = true" />
+                <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند" @click="closeTool('route')" />
               </header>
               <v-progress-linear v-if="routing.targetLoading.value" indeterminate color="primary" aria-label="دریافت محل حادثه" />
               <v-alert v-if="routing.error.value" class="my-3" type="warning" variant="tonal" role="alert">
@@ -133,29 +76,25 @@
                 <v-btn v-if="!routing.target.value" size="small" variant="text" @click="routing.open()">تلاش دوباره</v-btn>
               </v-alert>
               <template v-if="routing.target.value">
-                <div class="mission-route__controls">
-                  <div class="mission-route__profile">
-                    <p class="d-none d-sm-block text-body-2 font-weight-bold mb-2">وسیلهٔ حرکت</p>
-                    <v-select :model-value="routing.profile.value" :items="transportProfiles"
-                      class="mission-route__profile-select d-sm-none" label="وسیلهٔ حرکت" item-title="title" item-value="value"
-                      density="compact" variant="outlined" hide-details :disabled="navigation.active.value"
-                      @update:model-value="onProfileChange" />
-                    <v-btn-toggle class="d-none d-sm-inline-flex" :model-value="routing.profile.value"
-                      :disabled="navigation.active.value" mandatory rounded="lg" color="primary"
-                      @update:model-value="onProfileChange">
-                      <v-btn value="car" prepend-icon="mdi-car">خودرو</v-btn>
-                      <v-btn value="bicycle" prepend-icon="mdi-bicycle">دوچرخه</v-btn>
-                      <v-btn value="foot" prepend-icon="mdi-walk">پیاده</v-btn>
-                    </v-btn-toggle>
-                  </div>
-                  <div class="mission-route__route-actions d-flex flex-wrap ga-2">
-                    <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value" :disabled="navigation.active.value"
-                      @click="routing.findRoutes()">{{ routing.from.value ? 'دریافت مسیرها' : 'اجازهٔ موقعیت و دریافت مسیرها' }}</v-btn>
-                    <v-btn v-if="routing.from.value" color="primary" variant="tonal" rounded="lg"
-                      :disabled="routing.loading.value || navigation.active.value" @click="routing.findRoutes(true)">به‌روزرسانی موقعیت</v-btn>
-                  </div>
+                <div v-if="routeSection === 'plan'" class="mission-route__endpoints" aria-label="مبدأ و مقصد">
+                  <div><small>مبدأ</small><span>{{ routing.from.value ? 'موقعیت ثبت‌شده برای مسیریابی' : 'پس از دریافت موقعیت مشخص می‌شود' }}</span></div>
+                  <div><small>مقصد</small><span>محل حادثه <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi></span></div>
                 </div>
-                <details class="mission-route__stops" @toggle="onWaypointDisclosureToggle">
+                <div v-if="routeSection === 'plan'" class="mission-route__section-links" role="group" aria-label="تنظیمات مسیر">
+                  <button type="button" :disabled="navigation.active.value" @click="openTransportSection"><v-icon icon="mdi-car-multiple" /><span><strong>انتخاب وسیلهٔ دیگر</strong><small>{{ transportProfiles.find(item => item.value === routing.profile.value)?.title }}</small></span><v-icon icon="mdi-chevron-left" /></button>
+                  <button type="button" :disabled="!routing.routes.value.length || navigation.active.value" @click="openAlternativesSection"><v-icon icon="mdi-routes" /><span><strong>انتخاب مسیر دیگر</strong><small>{{ routing.routes.value.length ? `مسیر ${(routing.selectedIndex.value + 1).toLocaleString('fa-IR')} از ${routing.routes.value.length.toLocaleString('fa-IR')}` : 'پس از دریافت مسیر' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
+                </div>
+                <div v-if="routeSection === 'plan'" class="mission-route__route-actions d-flex flex-wrap ga-2">
+                  <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value" :disabled="navigation.active.value"
+                    @click="routing.findRoutes()">{{ routing.from.value ? 'محاسبهٔ دوبارهٔ مسیر' : 'دریافت موقعیت و مسیر' }}</v-btn>
+                  <v-btn v-if="routing.from.value" color="primary" variant="tonal" rounded="lg"
+                    :disabled="routing.loading.value || navigation.active.value" @click="routing.findRoutes(true)">به‌روزرسانی مبدأ</v-btn>
+                </div>
+                <div v-if="routeSection === 'plan' && routing.selectedRoute.value" class="mission-route__metrics" aria-label="برآورد سفر">
+                  <div><span>مسافت</span><strong>{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }}</strong></div>
+                  <div><span>زمان تقریبی سفر</span><strong>{{ formatRouteDuration(routing.selectedRoute.value.duration_s) }}</strong></div>
+                </div>
+                <details v-if="routeSection === 'plan'" class="mission-route__stops" @toggle="onWaypointDisclosureToggle">
                   <summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)
                     <span v-if="routing.via.value.length" class="mission-route__stops-count">{{ routing.via.value.length.toLocaleString('fa-IR') }} ایستگاه</span>
                   </summary>
@@ -191,20 +130,20 @@
                     :disabled="navigation.active.value || !routing.via.value.length" hide-details color="primary"
                     @update:model-value="routing.setOptimize(Boolean($event))" />
                 </details>
-              <p class="mission-route__legend">مربع قرمز (!): محل حادثه · آبی: مبدأ محاسبهٔ مسیر · زرد: ایستگاه میانی.
-                نارنجی/سبز/بنفش: موقعیت داوطلبانهٔ درخواست‌کننده/امدادگر/مدیر؛ این نشانگرها ممکن است با محل حادثه هم‌پوشانی داشته باشند. مختصات حادثه:
+              <details v-if="routeSection === 'plan'" class="mission-route__legend"><summary>راهنمای نشانگرها و مختصات حادثه</summary><p>مربع قرمز (!): محل حادثه · آبی: مبدأ محاسبهٔ مسیر · زرد: ایستگاه میانی.
+                نارنجی/سبز/بنفش: موقعیت به‌اشتراک‌گذاشته‌شدهٔ درخواست‌کننده/امدادگر/مدیر؛ این نشانگرها ممکن است با محل حادثه هم‌پوشانی داشته باشند. مختصات حادثه:
                   <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
-                </p>
-                <div v-if="routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
+                </p></details>
+                <div v-if="routeSection === 'plan' && routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
                   <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
                     label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
                     @update:model-value="focusRouteStep(Number($event))" />
                   <p role="status">{{ currentStopLabel }}</p>
                 </div>
-                <div v-if="routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
+                <div v-if="routeSection === 'alternatives' && routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
                   <button v-for="(choice, index) in routing.routes.value" :key="index" type="button"
                     class="mission-route__choice" :class="{ 'mission-route__choice--selected': routing.selectedIndex.value === index }"
-                    :aria-pressed="routing.selectedIndex.value === index" :disabled="navigation.active.value" @click="routing.selectRoute(index)">
+                    :aria-pressed="routing.selectedIndex.value === index" :disabled="navigation.active.value" @click="previewAlternative(index)">
                     <strong>مسیر {{ (index + 1).toLocaleString('fa-IR') }}</strong>
                     <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
                     <small v-if="choice.elevation">صعود تخمینی: {{ Math.round(choice.elevation.gain_m).toLocaleString('fa-IR') }} متر · نزول تخمینی: {{ Math.round(choice.elevation.loss_m).toLocaleString('fa-IR') }} متر</small>
@@ -219,11 +158,15 @@
                     </span>
                   </button>
                 </div>
-                <p v-if="routing.routes.value.some(choice => choice.elevation)" class="text-caption mt-2">
+                <p v-if="routeSection === 'alternatives' && routing.routes.value.some(choice => choice.elevation)" class="text-caption mt-2">
                   ارتفاع تقریبی از داده‌های محلی Mapzen/Tilezen محاسبه شده است؛ برای تصمیم ایمنی در مسیر به تنهایی کافی نیست.
                   <a href="/terrain-attribution.html" target="_blank" rel="noopener noreferrer">منابع و حق انتساب داده‌های ارتفاع (آفلاین)</a>
                 </p>
-                <div v-if="routing.selectedRoute.value" class="mission-route__navigation">
+                <div v-if="routeSection === 'alternatives'" class="mission-route__navigation">
+                  <v-btn color="primary" variant="flat" rounded="lg" @click="acceptAlternative">تأیید این مسیر</v-btn>
+                  <v-btn color="primary" variant="text" rounded="lg" @click="closeRouteSection()">بازگشت بدون تغییر</v-btn>
+                </div>
+                <div v-if="routeSection === 'plan' && routing.selectedRoute.value" class="mission-route__navigation">
                   <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
                     prepend-icon="mdi-navigation" :disabled="!mapReady" @click="startGuidance">شروع راهبری</v-btn>
                   <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
@@ -235,13 +178,16 @@
                 <v-alert v-if="navigation.error.value" type="warning" variant="tonal" role="alert" class="mt-3">
                   {{ navigation.error.value }}
                 </v-alert>
-                <p v-if="routing.routes.value.length === 1" class="text-caption mt-2" role="status">
+                <p v-if="routeSection === 'plan' && routing.routes.value.length === 1" class="text-caption mt-2" role="status">
                   برای این وسیله فقط یک مسیر در شبکهٔ راه‌های محلی پیدا شد؛ وجود چند مسیر تضمین نمی‌شود.
                 </p>
               </template>
-            </section>
+            </v-card>
           </template>
         </MissionLivePanel>
+        <PointTransportChoicesSheet :mission-id="desk.activeMission.value.id" :mission-profile="routing.profile.value"
+          :open="activeTool === 'route' && routeSection === 'transport'" :show-search="false"
+          @confirm="confirmMissionTransport" @close="closeRouteSection()" />
         <header class="mission-desk__map-heading" aria-label="مأموریت فعال">
           <h1>مأموریت من</h1>
           <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
@@ -256,8 +202,12 @@
           <v-btn v-else-if="!routing.error.value" icon="mdi-close" size="small" variant="text"
             aria-label="بستن هشدار راهبری" @click="navigation.dismissError()" />
         </div>
-        <div v-else-if="navigation.active.value" class="mission-desk__guidance" role="status">
-          <span>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'راهبری فعال · GPS راهبری' : 'راهبری فعال · دنبال‌کردن GPS متوقف است' }}</span>
+        <div v-else-if="navigation.active.value" class="mission-desk__guidance mission-desk__guidance--active" role="status">
+          <span class="mission-desk__guidance-symbol" aria-hidden="true"><v-icon icon="mdi-navigation-variant" /></span>
+          <div class="mission-desk__guidance-copy">
+            <strong>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'در مسیر محل حادثه' : 'دنبال‌کردن GPS متوقف است' }}</strong>
+            <small v-if="routing.selectedRoute.value">{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }} مسیر برنامه‌ریزی‌شده · زمان رسیدن زنده در دسترس نیست</small>
+          </div>
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
         </div>
         <div v-show="!pickingWaypoint && activeTool !== 'status' && activeTool !== 'team'"
@@ -286,6 +236,17 @@
       </div>
     </div>
 
+    <v-dialog v-model="routeDeleteConfirmOpen" max-width="24rem" :close-on-back="false"
+      aria-labelledby="mission-route-delete-title" @keydown.esc.stop="routeDeleteConfirmOpen = false">
+      <v-card class="bb-floating-card" rounded="xl" dir="rtl">
+        <v-card-title id="mission-route-delete-title">برنامهٔ مسیر پاک شود؟</v-card-title>
+        <v-card-text>فقط مسیر، مبدأ و ایستگاه‌های میانی پاک می‌شوند؛ محل حادثه و مأموریت حذف نمی‌شوند.</v-card-text>
+        <v-card-actions>
+          <v-btn variant="tonal" color="primary" @click="routeDeleteConfirmOpen = false">انصراف</v-btn>
+          <v-btn color="error" variant="flat" @click="resetRoutePlan">پاک کردن مسیر</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <v-dialog :model-value="desk.cancellationOpen.value" max-width="510" scrollable :persistent="desk.cancelling.value"
       @update:model-value="(visible: boolean) => { if (!visible) desk.dismissCancellation(); }">
       <v-card rounded="xl" class="pa-2" dir="rtl">
@@ -333,8 +294,11 @@ import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRouteNavigation } from "@/composables/use-route-navigation";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
+import MissionStatusPanel from "@/components/mission/MissionStatusPanel.vue";
+import PointTransportChoicesSheet from "@/components/map/PointTransportChoicesSheet.vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
+import { createMissionRouteWorkspace, type RouteWorkspaceSection } from "@/mission/route-workspace";
 import { missionMapCamera, missionRouteStop } from "@/sos/mission-map";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
@@ -375,6 +339,38 @@ const mapReady = ref(false);
 const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
+// Like the companion map, planning, transport and alternatives are separate views.
+// The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
+const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
+const routeSection = ref<RouteWorkspaceSection>("plan");
+const routeDeleteConfirmOpen = ref(false);
+function closeRouteSection(restore = true): void {
+  if (restore) routeWorkspace.close(); else routeWorkspace.reset();
+  routeSection.value = "plan";
+  if (restore) void nextTick(() => {
+    if (activeTool.value === "route") document.getElementById("mission-route-panel")?.focus({ preventScroll: true });
+  });
+}
+function openTransportSection(): void {
+  if (navigation.active.value || !routing.target.value) return;
+  routeWorkspace.openTransport(); routeSection.value = routeWorkspace.section;
+  void nextTick(() => document.getElementById("map-point-transport-choices-sheet")?.focus({ preventScroll: true }));
+}
+function openAlternativesSection(): void {
+  if (!routing.routes.value.length || navigation.active.value) return;
+  routeWorkspace.openAlternatives(routing.selectedIndex.value);
+  routeSection.value = routeWorkspace.section;
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
+}
+function previewAlternative(index: number): void {
+  routeWorkspace.preview(index, routing.routes.value.length);
+}
+function acceptAlternative(): void {
+  routeWorkspace.accept(); routeSection.value = routeWorkspace.section;
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
+}
+watch(routing.routes, () => closeRouteSection(false), { flush: "sync" });
+
 const pickingWaypoint = ref(false);
 const waypointLat = ref("");
 const waypointLon = ref("");
@@ -424,21 +420,27 @@ function openRouteWorkspace(): void {
   void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
 function toggleTool(tool: "status" | "route" | "team"): void {
+  if (routeDeleteConfirmOpen.value) return;
   if (pickingWaypoint.value) pickingWaypoint.value = false;
   if (activeTool.value === tool) { closeTool(tool); return; }
   if (tool === "route") { openRouteWorkspace(); return; }
+  if (activeTool.value === "route") closeRouteSection();
   activeTool.value = tool;
   void nextTick(() => document.getElementById(`mission-${tool}-panel`)?.focus({ preventScroll: true }));
 }
 function closeTool(tool: "status" | "route" | "team"): void {
+  if (tool === "route") closeRouteSection();
   activeTool.value = null;
   void nextTick(() => document.getElementById(`mission-tool-${tool}`)?.focus({ preventScroll: true }));
 }
 function dismissTool(): void {
+  if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return; }
   if (pickingWaypoint.value) { cancelWaypointPick(); return; }
+  if (activeTool.value === "route" && routeSection.value !== "plan") { closeRouteSection(); return; }
   if (activeTool.value) closeTool(activeTool.value);
 }
 function resetRoutePlan(): void {
+  routeDeleteConfirmOpen.value = false;
   if (navigation.active.value || !routing.target.value) return;
   // Clearing the proposed route must not also remove the incident from the map.
   routing.clearPlan();
@@ -501,8 +503,17 @@ const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
   (camera) => { if (followingGps.value) routeMap?.easeTo(camera); }, undefined,
   () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
-function onProfileChange(value: unknown): void {
-  if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
+function confirmMissionTransport(mode: TransportProfile): void {
+  if (routeSection.value !== "transport" || !desk.activeMission.value || navigation.active.value ||
+    !transportProfiles.some((option) => option.value === mode)) return;
+  if (mode !== routing.profile.value) {
+    routing.selectProfile(mode);
+    // Recalculate from the already-authorized origin. Never wake GPS merely
+    // because a vehicle was selected before the explicit Get Route action.
+    if (routing.from.value) void routing.findRoutes();
+  }
+  closeRouteSection();
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
 const elevationCharts = useRouteElevationCharts(routing.routes, routing.profile);
 const ROUTE_SOURCE = "rescuer-route-preview";
@@ -632,6 +643,8 @@ function onMissionEnded(id: string): void {
   void desk.load(); // A socket event is a signal to verify, not an HTTP outcome banner.
 }
 function closeRoutes(): void {
+  routeDeleteConfirmOpen.value = false;
+  closeRouteSection(false);
   navigation.stop();
   navigation.dismissError();
   routing.reset();
@@ -711,15 +724,41 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 <style scoped>
 .mission-desk { min-height: calc(100vh - 130px); padding: clamp(18px, 4vw, 52px) 18px 100px; color: rgb(var(--v-theme-on-background)); background: radial-gradient(ellipse at 86% 4%, rgba(33,130,113,.10), transparent 52%), rgb(var(--v-theme-background)); }
 .mission-desk__workspace { scroll-margin-top: 16px; }
-.mission-route { margin-top: 12px; padding: clamp(14px, 2vw, 22px); border: 1px solid rgba(35,135,108,.3); border-radius: var(--bb-radius-nested, 16px); background: rgba(31,121,102,.045); }
+.mission-route { margin-top: 12px; padding: clamp(14px, 2vw, 22px); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px); }
 .mission-route__legend { margin: 10px 0; font-size: .82rem; line-height: 1.7; }
 .mission-desk__map-hint { position: absolute; z-index: 2; inset-inline: 12px; bottom: 32px; width: fit-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-surface); font-size: .85rem; }
 .mission-desk__map-hint button { margin-inline-start: 12px; color: rgb(var(--v-theme-primary)); text-decoration: underline; font: inherit; font-weight: 700; }
 :global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; }
 :global(.mission-desk__incident-pin::after) { content: ''; position: absolute; top: 100%; border-inline: 6px solid transparent; border-top: 8px solid #b91c1c; }
 :global(.mission-desk__selected-stop) { outline: 3px solid #fbbf24; outline-offset: 4px; border-radius: 50%; }
-.mission-route__header, .mission-route__controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
-.mission-route__header h2 { font-size: 1.2rem; font-weight: 800; }
+.mission-route__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+.mission-route__header { position: sticky; z-index: 1; top: -1rem; flex-wrap: nowrap; gap: .6rem; margin: -1rem -1rem 1rem; padding: .8rem 1rem; border-bottom: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface)); }
+.mission-route__heading { min-width: 0; flex: 1; }
+.mission-route__heading small { display: block; font-size: .8rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
+.mission-route__emblem { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-primary), .15); color: rgb(var(--v-theme-primary)); }
+.mission-route__header :deep(.v-btn) { flex: none; min-width: 40px; }
+.mission-route__header h2 { margin: 0; font-size: 1.08rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mission-route__endpoints { display: grid; gap: .65rem; margin-bottom: 1rem; padding-inline-start: .75rem; border-inline-start: 2px solid rgb(var(--v-theme-primary)); }
+.mission-route__endpoints > div { display: grid; grid-template-columns: 3.7rem minmax(0, 1fr); align-items: baseline; gap: .5rem; font-size: .85rem; }
+.mission-route__endpoints small { color: rgb(var(--v-theme-primary)); font-weight: 800; }
+.mission-route__endpoints span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-route__section-links { display: grid; gap: .5rem; margin: 1rem 0; }
+.mission-route__section-links button { display: flex; align-items: center; gap: .65rem; width: 100%; min-height: 54px; padding: .55rem .7rem; text-align: start; font: inherit; cursor: pointer; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); }
+.mission-route__section-links button > span { flex: 1; display: grid; min-width: 0; }
+.mission-route__section-links button strong { font-size: .87rem; }
+.mission-route__section-links button small { font-size: .8rem; opacity: .8; }
+.mission-route__section-links button:disabled { opacity: .5; cursor: not-allowed; }
+.mission-route__section-links button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.mission-route__route-actions { margin: .9rem 0; }
+.mission-route__route-actions :deep(.v-btn), .mission-route__navigation :deep(.v-btn) { min-height: 44px; }
+.mission-route__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: 1rem 0; }
+.mission-route__metrics > div { display: grid; gap: .25rem; padding: .75rem; background: var(--bb-color-inset); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
+.mission-route__metrics span { font-size: .8rem; opacity: .8; }
+.mission-route__metrics strong { font-size: 1.02rem; }
+.mission-route__legend { padding: .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
+.mission-route__legend summary { cursor: pointer; font-weight: 700; }
+.mission-route__legend p { margin: .65rem 0 0; }
+.mission-route__legend summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-route__header p { font-size: 0.9rem; opacity: .78; }
 .mission-route__stops { margin-block: 16px; padding: 16px; border: 1px solid rgba(98,146,137,.3); border-radius: var(--bb-radius-nested, 16px); }
 .mission-route__stops-toggle { cursor: pointer; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
@@ -733,7 +772,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-route__stop-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 6px; cursor: grab; }
 .mission-route__choices { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
 .mission-route__choice { display: grid; text-align: start; gap: 7px; color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.35); border-radius: var(--bb-radius-nested, 16px); padding: 16px; cursor: pointer; font: inherit; }
-.mission-route__choice--selected { border: 2px solid rgb(var(--v-theme-primary)); background: rgba(22,130,108,.09); }
+.mission-route__choice--selected { border: 2px solid rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
 .mission-route__choice:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-route__choice:disabled { opacity: .7; cursor: not-allowed; }
 .mission-route__navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 18px; }
@@ -756,39 +795,18 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__toolbar p { font-size: 0.9rem; opacity: .72; margin: 4px 0 0; }
 .mission-desk__card, .mission-desk__empty { border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.25); box-shadow: var(--bb-shadow-surface); }
 .mission-desk__card { padding: clamp(16px, 2vw, 24px); margin-top: 16px; }
-.mission-desk__card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 18px; }
-.mission-desk__card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.mission-desk__timeline { margin: 14px 0; border-top: 1px solid rgba(98,146,137,.25); padding-top: 10px; }
-.mission-desk__timeline summary { cursor: pointer; width: fit-content; font-size: .85rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
-.mission-desk__timeline summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
-.mission-desk__kicker { display: inline-flex; align-items: center; gap: 8px; color: rgb(var(--v-theme-primary)); font-weight: 800; font-size: .84rem; }
-.mission-desk__pulse { width: 9px; height: 9px; border-radius: 50%; background: #16b58f; box-shadow: 0 0 0 5px rgba(22,181,143,.16); }
-.mission-desk__card h3 { font-size: clamp(1.2rem, 2vw, 1.45rem); margin: 9px 0 5px; }
-.mission-desk__card-header p { opacity: .65; font-size: 0.82rem; overflow-wrap: anywhere; }
-.mission-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 14px 0; }
-.mission-steps__item { display: flex; align-items: center; gap: 9px; min-height: 60px; padding: 11px; border-radius: var(--bb-radius-nested, 16px); background: rgba(111,138,130,.09); color: rgb(var(--v-theme-on-surface)); font-size: .81rem; font-weight: 700; }
-.mission-steps__item--reached { background: rgba(34,145,116,.13); color: rgb(var(--v-theme-primary)); opacity: 1; }
-.mission-steps__number { display: inline-grid; flex-shrink: 0; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid currentColor; font-size: .8rem; }
-.mission-desk__progress { display: grid; justify-items: start; gap: 12px; margin-bottom: 20px; }
-.mission-desk__progress p { margin: 0; font-size: .88rem; color: rgb(var(--v-theme-on-surface)); }
-.mission-desk__progress :deep(.v-btn) { min-height: 44px; height: auto; max-width: 100%; min-width: 0; white-space: normal; text-align: center; }
-.mission-desk__progress :deep(.v-btn__content) { white-space: normal; text-align: center; }
-.mission-desk__foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid rgba(98,146,137,.2); padding-top: 18px; }
-.mission-desk__foot p { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.9rem; opacity: .76; }
 .mission-desk__empty { text-align: center; padding: 58px 24px; }
 .mission-desk__empty-icon { width: 70px; height: 70px; border-radius: 20px; background: rgba(34,145,116,.13); color: rgb(var(--v-theme-primary)); display: grid; place-items: center; margin: 0 auto 16px; }
 .mission-desk__empty h3 { font-size: 1.2rem; margin: 0 0 8px; }.mission-desk__empty p { opacity: .7; margin-bottom: 22px; }
 .mission-desk__limit { font-size: .8rem; opacity: .68; margin: 20px 0 0; }
 .mission-cancel-actions { flex-wrap: wrap; }
-@media(max-width: 780px) { .mission-steps { grid-template-columns: repeat(2, 1fr); }.mission-desk__toolbar { align-items: flex-start; }.mission-desk__toolbar p { max-width: 230px; } }
+@media(max-width: 780px) { .mission-desk__toolbar { align-items: flex-start; }.mission-desk__toolbar p { max-width: 230px; } }
 @media(max-width: 599px) {
   .mission-desk { padding-inline: 12px; }
   .mission-desk__toolbar { flex-wrap: wrap; }
   .mission-desk__toolbar > div { flex: 1 1 100%; min-width: 0; }
   .mission-desk__toolbar p { max-width: none; }
   .mission-route { padding: 16px; }
-  .mission-route__controls > div { width: 100%; min-width: 0; }
-  .mission-route__profile-select { width: 100%; }
   .mission-route__route-actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%; min-height: 44px; height: auto; white-space: normal; }
   .mission-route__route-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
   .mission-route__stops { padding: 12px; }
@@ -798,7 +816,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
   .mission-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
-@media(max-width: 480px) { .mission-steps { grid-template-columns: 1fr; margin: 22px 0; }.mission-steps__item { min-height: 44px; }.mission-desk__foot { align-items: flex-start; flex-direction: column; }.mission-hero__glow { opacity: .4; } }
+@media(max-width: 480px) { .mission-hero__glow { opacity: .4; } }
 
 /* While a mission is loading or absent, the same full-screen spatial shell
    remains. Its public canvas has no incident or live-room data. */
@@ -842,7 +860,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   width: min(28rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   margin: 0; padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
-  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+  box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
 .mission-desk--active .mission-desk__load-alert {
@@ -872,6 +890,12 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance--warning {
   width: min(30rem, calc(100vw - 1.5rem)); border: 1px solid rgb(var(--v-theme-warning));
 }
+.mission-desk__guidance--active { width: min(30rem, calc(100vw - 1.5rem)); padding: .55rem .7rem; border: 1px solid var(--bb-color-outline); }
+.mission-desk__guidance-symbol { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(var(--v-theme-primary), .15); color: rgb(var(--v-theme-primary)); }
+.mission-desk__guidance-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.mission-desk__guidance-copy strong { font-size: .87rem; }
+.mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
+.mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
 /* Keep the compact mission camera controls clear of the bottom dock and the
    physical-right planner. They remain reachable while the Route tool is open. */
 .mission-desk__map-focus {
@@ -918,6 +942,11 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: min(52dvh, 26rem);
   }
+  /* The shared vehicle sheet sits above SOS on the private mission map. */
+  .mission-desk__workspace :deep(.point-transport-choices-shell) {
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    z-index: 11;
+  }
   .mission-desk__dock { width: min(21rem, calc(100vw - 1.5rem)); }
   .mission-desk__map-heading { max-width: calc(100vw - 8rem); }
   .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
@@ -926,15 +955,10 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 :global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active):not(.mission-desk__dock-sharing)) { background: var(--bb-color-inset); }
 
-:global(:root.dark .mission-route) { background: #21383a; border-color: var(--bb-color-outline); }
 :global(:root.dark .mission-route__stops),
 :global(:root.dark .mission-route__step-control),
 :global(:root.dark .mission-route__choice:not(.mission-route__choice--selected)) {
   background: var(--bb-color-inset);
   border-color: var(--bb-color-outline);
-}
-:global(:root.dark .mission-steps__item:not(.mission-steps__item--reached)) {
-  background: var(--bb-color-inset);
-  border: 1px solid var(--bb-color-outline);
 }
 </style>

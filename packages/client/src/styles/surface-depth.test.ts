@@ -53,10 +53,12 @@ describe("surface depth across light and dark UI", () => {
       expect(text).toContain(`${selector}`);
       expect(text).toMatch(new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^}]*box-shadow: var\\(--bb-shadow-surface\\)`));
     }
-    // The route planner is an inset inside the live-map surface, not a second raised map card.
-    expect(mission).toMatch(/\.mission-route \{[^}]*border-radius: var\(--bb-radius-nested, 16px\);[^}]*\}/);
-    expect(mission.match(/\.mission-route \{([^}]*)\}/)?.[1]).not.toContain("box-shadow:");
-    expect(mission).toContain("background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);");
+    // The mission planner now shares the map's elevated floating navigation card;
+    // the waypoint and alternative cards remain nested surfaces.
+    expect(mission).toMatch(/\.mission-route \{[^}]*border-radius: var\(--bb-radius-card, 24px\);[^}]*\}/);
+    expect(mission).toContain('class="mission-route bb-map-navigation-card bb-floating-card"');
+    expect(mission).toContain("border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);");
+    expect(mission).toContain("box-shadow: var(--bb-shadow-overlay);");
     expect(proposals).toContain(".offer-card--selected { border-color: #319581; box-shadow: 0 0 0 2px");
     expect(history).toContain(".history__item--selected { border-color: #269b7c; box-shadow: 0 0 0 2px");
   });

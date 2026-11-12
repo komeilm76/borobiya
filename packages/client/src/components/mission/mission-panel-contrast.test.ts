@@ -6,7 +6,7 @@ import { palettes } from "@/styles/tokens";
 const live = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
 const rating = readFileSync(new URL("./MissionRatingPanel.vue", import.meta.url), "utf8");
 const timeline = readFileSync(new URL("./MissionTimelinePanel.vue", import.meta.url), "utf8");
-const missionView = readFileSync(new URL("../../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+const missionView = readFileSync(new URL("./MissionStatusPanel.vue", import.meta.url), "utf8");
 
 function luminance(hex: string): number {
   const channel = (i: number) => {

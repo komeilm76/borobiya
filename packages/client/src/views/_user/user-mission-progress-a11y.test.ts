@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
+const view = readFileSync(new URL("../../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
 
 describe("rescuer mission progress announcements (no Vue SFC mount)", () => {
   it("exposes the current step semantically and announces confirmed status changes", () => {

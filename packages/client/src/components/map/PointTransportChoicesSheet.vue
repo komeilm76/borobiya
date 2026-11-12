@@ -1,6 +1,6 @@
 <template>
   <!-- Match the route chooser: a nonmodal, bounded sheet over the visible map. -->
-  <section v-if="open && api.point.value" class="point-transport-choices-shell"
+  <section v-if="open && (api?.point.value || missionId)" class="point-transport-choices-shell"
     role="region" aria-label="انتخاب وسیلهٔ حرکت" @keydown.esc.stop.prevent="emit('close')">
     <v-card id="map-point-transport-choices-sheet" class="point-transport-choices bb-floating-card bb-map-navigation-card" elevation="3" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-transport-choices__header">
@@ -34,11 +34,21 @@ import { ref, watch } from "vue";
 import type { TransportProfile } from "@/api/mission-routing";
 import type { usePointRoute } from "@/composables/use-point-route";
 import { transportOptions } from "@/map/transport-options";
-const props = defineProps<{ api: ReturnType<typeof usePointRoute>; open: boolean; showSearch: boolean }>();
+const props = defineProps<{
+  api?: ReturnType<typeof usePointRoute>;
+  /** The private mission map has a fixed incident, not a freely selected map point. */
+  missionId?: string | null;
+  missionProfile?: TransportProfile;
+  open: boolean;
+  showSearch: boolean;
+}>();
 const emit = defineEmits<{ close: []; confirm: [mode: TransportProfile]; search: [] }>();
-const selected = ref<TransportProfile>(props.api.profile.value);
-// Never carry an unconfirmed choice into a new destination or a reopened sheet.
-watch([() => props.open, () => props.api.point.value], () => { selected.value = props.api.profile.value; });
+const currentProfile = () => props.api?.profile.value ?? props.missionProfile ?? "car";
+const selected = ref<TransportProfile>(currentProfile());
+// Never carry an unconfirmed choice into a new destination/assignment or reopened sheet.
+watch([() => props.open, () => props.api?.point.value ?? props.missionId], () => {
+  selected.value = currentProfile();
+}, { flush: "sync" });
 </script>
 
 <style scoped>

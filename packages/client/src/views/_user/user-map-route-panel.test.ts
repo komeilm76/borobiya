@@ -289,8 +289,8 @@ describe("progressive trip planning and editing", () => {
     expect(transport).toContain('role="region" aria-label="انتخاب وسیلهٔ حرکت"');
     expect(transport).toContain('v-for="mode in transportOptions"');
     expect(transport).toContain(':aria-pressed="selected === mode.value" @click="selected = mode.value"');
-    expect(transport).toContain('const selected = ref<TransportProfile>(props.api.profile.value)');
-    expect(transport).toContain('selected.value = props.api.profile.value;'); // Reopen/new point resets the draft.
+    expect(transport).toContain('const currentProfile = () => props.api?.profile.value ?? props.missionProfile ?? "car";');
+    expect(transport).toContain('selected.value = currentProfile();'); // Reopen/new point or mission resets the draft.
     expect(transport).toContain("@click=\"emit('confirm', selected)\"");
     expect(transport).toContain('بازگشت بدون تغییر');
     expect(transport).toContain('تأیید وسیلهٔ انتخابی');

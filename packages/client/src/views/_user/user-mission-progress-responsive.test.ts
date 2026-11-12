@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
+const view = readFileSync(new URL("../../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
 
 describe("mission status actions at narrow/zoomed widths (source-pinned)", () => {
   it("bounds the manual next-step action and wraps its label without changing its handler", () => {

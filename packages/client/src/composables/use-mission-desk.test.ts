@@ -88,7 +88,8 @@ describe("mission desk cancellation", () => {
   });
 
   it("renders the hidden more-action and explicit reason+confirmation in the accessible view", () => {
-    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8") +
+      readFileSync(new URL("../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
     expect(view).toContain("<v-menu location=\"bottom end\">");
     expect(view).toContain("قادر به ادامه نیستم");
     expect(view).toContain('v-radio-group v-if="desk.reasons.value.length && !desk.missionChanged.value"');
@@ -503,7 +504,7 @@ describe("mission desk cancellation", () => {
 
 describe("rescuer mission progression", () => {
   it("exposes an explicit accessible next-step control and error/refresh state without mounting the view", () => {
-    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+    const view = readFileSync(new URL("../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
     expect(view).toContain('desk.nextStatus.value');
     expect(view).toContain('desk.advanceStatus()');
     expect(view).toContain(':loading="desk.progressing.value"');
