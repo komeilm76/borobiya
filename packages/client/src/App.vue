@@ -196,8 +196,22 @@
       </RouterView>
     </v-main>
 
+    <v-btn v-if="showGeneralShareButton" class="app-general-share"
+      :class="{ 'app-general-share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
+      :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
+      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
+      :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
+      :aria-pressed="broadcast.view.isActive" :disabled="!broadcast.isSupported"
+      variant="flat" @click="broadcast.toggle()" />
+    <span v-if="showGeneralShareButton && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
+      class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <SosTriggerButton v-if="showSosButton" @trigger="sosSheet.openSheet()" />
     <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
+    <v-snackbar :model-value="Boolean(missionShare.statusError || missionShare.gpsError) && (missionShare.hadActiveMission || !!proposalInbox.acceptedMissionId || route.name === 'user-mission')"
+      color="warning" location="top" multi-line :timeout="-1" role="alert">
+      {{ missionShare.statusError || missionShare.gpsError }}
+      <template #actions><v-btn variant="text" :loading="missionShare.refreshing" @click="missionShare.retry()">بررسی دوباره</v-btn></template>
+    </v-snackbar>
 
     <v-snackbar
       :model-value="Boolean(adminSos.latestAlert) && !adminSos.urgentReplacement"
@@ -277,6 +291,8 @@ import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
 import { pinia } from "./stores";
 import { useAdminSosStore } from "./stores/admin-sos";
 import { useProposalInboxStore } from "./stores/proposal-inbox";
+import { useRescuerMissionShareStore } from "./stores/rescuer-mission-share";
+import { useBroadcastStore } from "./stores/broadcast";
 import { useAuthStore } from "./stores/auth";
 import { useSosSheetStore } from "./stores/sos-sheet";
 import { useThemeStore } from "./stores/theme";
@@ -284,7 +300,10 @@ import { useThemeStore } from "./stores/theme";
 const auth = useAuthStore(pinia);
 const adminSos = useAdminSosStore(pinia);
 const proposalInbox = useProposalInboxStore(pinia);
+const missionShare = useRescuerMissionShareStore(pinia);
+const broadcast = useBroadcastStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
+watch(() => proposalInbox.acceptedMissionId, (id) => { if (id) void missionShare.refresh(); }, { flush: "sync" });
 const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
   () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
@@ -330,6 +349,12 @@ const route = useRoute();
 // Both map-first workspaces use the same full-viewport shell and navigation drawer.
 // Proposal and route-choice overlays remain specific to the companion map.
 const isMapRoute = computed(() => route.name === "user-map" || route.name === "user-mission");
+// The companion map owns its existing share icon. The mission map also needs
+// the general opt-in icon for requester/admin, above the global SOS button.
+// An assigned rescuer's mission publisher is separate and cannot be disabled here.
+const showGeneralShareButton = computed(() => showSosButton.value && route.name !== "user-map" &&
+  !missionShare.mission && !missionShare.hadActiveMission && !proposalInbox.acceptedMissionId &&
+  (auth.user?.role === "admin" || !missionShare.refreshing));
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutUnconfirmed = ref(false);
@@ -375,6 +400,17 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* Same 48px rail and live-broadcast states as /_user/map, immediately above SOS. */
+.app-general-share {
+  position: fixed; z-index: 951;
+  inset-inline-start: 1.25rem;
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
+  width: 48px; height: 48px; min-width: 48px;
+  border: 1px solid rgba(var(--v-theme-on-surface), .15); border-radius: 50%;
+  box-shadow: var(--bb-shadow-overlay);
+}
+.app-general-share--idle { border-color: var(--bb-color-outline); }
+.app-general-share:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 .replacement-signal { animation: urgent-outline 1.1s ease-in-out 2; }
 @keyframes urgent-outline { 50% { outline: 3px solid currentColor; outline-offset: 4px; } }
 @media (max-width: 599px) {

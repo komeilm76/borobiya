@@ -61,6 +61,9 @@
         </details>
         <div class="mission-desk__progress" aria-label="به‌روزرسانی وضعیت مأموریت">
           <p>تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.</p>
+          <p role="status">اشتراک موقعیت مأموریت پس از تأیید و اجازهٔ GPS خودکار است؛
+            {{ teamSharing ? 'اکنون فعال است.' : 'هنوز برقرار نشده است؛ هشدار اتصال یا اجازهٔ GPS را بررسی کنید.' }}
+          </p>
           <p v-if="desk.loading.value" role="status">در حال تأیید وضعیت مأموریت از سرور؛ تغییر مرحله موقتاً متوقف است.</p>
           <v-btn v-if="desk.nextStatus.value" color="primary" variant="flat" rounded="lg"
             :loading="desk.progressing.value" :disabled="!desk.canAdvance.value"
@@ -254,7 +257,7 @@
             aria-label="بستن هشدار راهبری" @click="navigation.dismissError()" />
         </div>
         <div v-else-if="navigation.active.value" class="mission-desk__guidance" role="status">
-          <span>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'راهبری فعال · موقعیت خصوصی GPS' : 'راهبری فعال · دنبال‌کردن GPS متوقف است' }}</span>
+          <span>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'راهبری فعال · GPS راهبری' : 'راهبری فعال · دنبال‌کردن GPS متوقف است' }}</span>
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
         </div>
         <div v-show="!pickingWaypoint && activeTool !== 'status' && activeTool !== 'team'"

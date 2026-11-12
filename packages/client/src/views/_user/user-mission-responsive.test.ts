@@ -116,7 +116,9 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('pickingWaypoint.value ? "mission-cancel-waypoint" : "mission-route-panel"');
     expect(view).toContain('@sharing-change="teamSharing = $event"');
     expect(view).toContain('mission-desk__dock-sharing');
-    expect(panel).toContain('watch(live.sharing, (sharing) => emit("sharing-change", sharing)');
+    expect(panel).toContain('watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)');
+    expect(panel).toContain(': live.sharing.value, (sharing) => emit("sharing-change", sharing)');
+    expect(panel).toContain('<template v-else-if="canPublish">');
     expect(panel).toContain('aria-label="بستن پنل اعضای مأموریت"');
     expect(panel).toContain('watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }');
     expect(view).toContain('@mission-ended="onMissionEnded"');

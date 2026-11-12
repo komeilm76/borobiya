@@ -4,7 +4,7 @@
       <div>
         <span class="live-panel__eyebrow"><v-icon icon="mdi-map-marker-radius" size="17" /> اتاق خصوصی مأموریت</span>
         <h3>{{ routeActive ? 'نقشهٔ مأموریت' : 'موقعیت اعضای مأموریت' }}</h3>
-        <p>{{ routeActive ? 'محل حادثه و مسیرهای قابل‌دسترسی در همین نقشه نمایش داده می‌شوند؛ نشانگر اعضا فقط با اشتراک آگاهانه نشان داده می‌شود.' : 'فقط موقعیت‌هایی که هر عضو آگاهانه به اشتراک می‌گذارد نمایش داده می‌شود.' }}</p>
+        <p>{{ routeActive ? 'محل حادثه و مسیرها در همین نقشه‌اند؛ موقعیت امدادگر در مأموریت فعال خودکار و موقعیت دیگر اعضا با انتخاب خودشان نشان داده می‌شود.' : 'موقعیت امدادگر در مأموریت فعال خودکار است؛ دیگر اعضا فقط با انتخاب خود موقعیتشان را در این اتاق به اشتراک می‌گذارند.' }}</p>
       </div>
       <div class="d-flex flex-wrap align-center ga-2">
         <slot name="map-toolbar" />
@@ -25,7 +25,7 @@
       <v-chip size="small" variant="tonal" :color="presence.rescuer.value === 'online' ? 'success' : 'warning'">
         اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
       </v-chip>
-      <small>وضعیت اتصال، مستقل از اشتراک داوطلبانهٔ موقعیت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
+      <small>وضعیت اتصال، مستقل از اشتراک موقعیت مأموریت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
     </div>
     <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ locationAnnouncement }}</span>
     <div class="live-panel__grid">
@@ -33,7 +33,7 @@
         <div class="live-panel__map">
           <MapCanvas :center="center" :zoom="13" :constrain-bounds="false"
             :style-url="mapStyleUrl"
-            :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت داوطلبانهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
+            :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت به‌اشتراک‌گذاشته‌شدهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
             @ready="onMapReady" />
           <slot name="map-actions" />
         </div>
@@ -49,7 +49,7 @@
           <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
             {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
           </v-chip>
-          <p>موقعیت اعضا فقط با اشتراک آگاهانه نمایش داده می‌شود.</p>
+          <p>موقعیت امدادگر در مأموریت فعال خودکار است؛ موقعیت دیگر اعضا با انتخاب خودشان در اتاق نمایش داده می‌شود.</p>
           <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
             prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
         </div>
@@ -64,7 +64,7 @@
             <v-chip size="small" variant="tonal" :color="presence.rescuer.value === 'online' ? 'success' : 'warning'">
               اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
             </v-chip>
-            <small>وضعیت اتصال، مستقل از اشتراک داوطلبانهٔ موقعیت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
+            <small>وضعیت اتصال، مستقل از اشتراک موقعیت مأموریت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
           </div>
         </template>
         <div v-for="member in live.participantStatus.value" :key="member.role" class="live-panel__member">
@@ -78,8 +78,15 @@
             {{ !member.entry ? 'اشتراک آغاز نشده' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
           </v-chip>
         </div>
-        <p class="live-panel__note">این نشانگر فقط تازگی موقعیت داوطلبانه را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
-        <template v-if="canPublish">
+        <p class="live-panel__note">این نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
+        <template v-if="fullscreen">
+          <p class="live-panel__note" role="status">
+            {{ missionShare.sharing && missionShare.mission?.id === mission.id
+              ? 'اشتراک موقعیت امدادگر با اعضای این مأموریت فعال است.'
+              : 'موقعیت امدادگر پس از تأیید مأموریت و اجازهٔ GPS به‌صورت خودکار با اعضای این مأموریت به اشتراک گذاشته می‌شود. اگر اشتراک برقرار نشد، هشدار بالای صفحه را بررسی کنید.' }}
+          </p>
+        </template>
+        <template v-else-if="canPublish">
           <p v-if="live.recoveryPending.value && !live.error.value" class="live-panel__note" role="status">
             پس از بازگشت اتصال، وضعیت مأموریت در حال بررسی است. تا تأیید سرور اشتراک موقعیت فعال نمی‌شود.
           </p>
@@ -89,7 +96,7 @@
           </v-btn>
           <v-btn v-else color="error" variant="tonal" rounded="lg" block prepend-icon="mdi-stop-circle-outline"
             @click="live.stopSharing()">توقف اشتراک موقعیت من</v-btn>
-          <p class="live-panel__note">اشتراک داوطلبانه است؛ شروع مسیریابی به‌تنهایی موقعیت شما را منتشر نمی‌کند. با خروج از این صفحه یا قطع اتصال متوقف می‌شود.</p>
+          <p class="live-panel__note">این اشتراک اختصاصی مأموریت و داوطلبانه است؛ دکمهٔ پخش عمومی کنار SOS جداست و موقعیت را به این اتاق نمی‌فرستد. با خروج از این صفحه یا قطع اتصال متوقف می‌شود.</p>
         </template>
       </div>
     </div>
@@ -110,6 +117,7 @@ import { missionPresenceLabel } from "@/mission/presence";
 import { missionLocationAnnouncement } from "@/mission/location-phase";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
+import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 
 const props = withDefaults(defineProps<{
   mission: LiveMissionIdentity; center?: [number, number]; routeActive?: boolean;
@@ -125,15 +133,17 @@ const emit = defineEmits<{
   "camera-selected": [];
 }>();
 const auth = useAuthStore();
+const missionShare = useRescuerMissionShareStore();
 const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const live = useMissionLiveLocations(computed(() => props.mission), computed(() => auth.accessToken),
   computed(() => auth.user?.id ?? null), () => auth.ensureSession());
 const presence = useMissionPresence(computed(() => props.mission.id), computed(() => auth.accessToken),
   computed(() => auth.user?.id ?? null));
-// Full-screen callers need a persistent disclosure even while the room is closed.
-// The publisher itself remains owned (and stopped on teardown) by this panel.
-watch(live.sharing, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
+// The rescuer's automatic publisher is app-owned, not unmounted with this map.
+// Other roles may still opt into a *separate* mission-room share from their panels.
+watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)
+  : live.sharing.value, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
 watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }, { flush: "sync" });
 const canPublish = computed(() => auth.user?.role === "admin" ||
   auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);

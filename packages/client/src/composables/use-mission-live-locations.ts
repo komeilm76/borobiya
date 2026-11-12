@@ -47,10 +47,10 @@ function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number
   return () => navigator.geolocation.clearWatch(id);
 }
 
-/** A private mission room listener and separately consented publisher; no location persists in browser storage. */
+/** Private mission-room listener. Only the app-owned active rescuer publisher opts into autoShare. */
 export function useMissionLiveLocations(
   mission: Ref<LiveMissionIdentity | null>, token: Ref<string | null>, userId: Ref<string | null>,
-  ensureSession?: () => Promise<unknown>, runtime: MissionLiveRuntime = {}
+  ensureSession?: () => Promise<unknown>, runtime: MissionLiveRuntime = {}, autoShare = false
 ) {
   const locations = ref<Partial<Record<MissionLocationEvent["role"], MissionLocationEvent>>>({});
   const connected = ref(false);
@@ -160,7 +160,13 @@ export function useMissionLiveLocations(
           connected.value = false;
           stopSharing();
           error.value = "دسترسی به اتاق زندهٔ مأموریت ممکن نیست؛ دوباره تلاش کنید.";
-        } else { connected.value = true; if (!lastDisconnectAt) error.value = null; }
+        } else {
+          connected.value = true;
+          if (!lastDisconnectAt) {
+            error.value = null;
+            if (autoShare && current.rescuerId === owner) startSharing();
+          }
+        }
       });
   }
   async function recoverAuth(opened: RealtimeClient, gen: number): Promise<void> {
@@ -211,7 +217,10 @@ export function useMissionLiveLocations(
       recoveryOwner = null;
       recoveryIdentity = null;
       recoveryPending.value = false;
-      if (connected.value) error.value = null;
+      if (connected.value) {
+        error.value = null;
+        if (autoShare && current.rescuerId === owner) startSharing();
+      }
     } catch {
       if (valid()) {
         stopSharing();
@@ -331,6 +340,7 @@ export function useMissionLiveLocations(
         mission.value?.id !== current.id || userId.value !== owner || device !== ownDeviceId(token.value) ||
         identity !== sessionIdentity(token.value)) return;
       if (timeout || !response?.ok) {
+        if (autoShare && response?.code === "MISSION_UNAVAILABLE") { endMission(); return; }
         error.value = response?.code === "MISSION_UNAVAILABLE" ? "مأموریت دیگر فعال نیست؛ اشتراک متوقف شد." :
           "ارسال موقعیت ممکن نشد؛ وضعیت اتصال و دستگاه اولویت‌دار را بررسی کنید.";
         stopSharing();
