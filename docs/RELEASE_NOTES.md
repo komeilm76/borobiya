@@ -20,7 +20,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 
 ### Browser application
 
-- Vue 3.5 with `<script setup lang="ts">` in every view, layout and component; 23 views cover the four authentication screens, seven mobile map screens and eleven administrator screens (the seventh, `TripsView`, is the Stage 5 trips and group-rides surface).
+- Vue 3.5 with `<script setup lang="ts">` in every view, layout and component; 23 views cover the four authentication screens, seven mobile map screens and eleven administrator screens (the seventh, `TripsView`, is the Stage 5 trips and group-rides surface). The history screen (Stage 6) groups finished trips, your SOS requests, responder missions and audited location shares into day-grouped tabs with inline detail and scoped history-window share creation.
 - Vue Router 4 with typed `ROUTE_NAMES`, lazy view imports and role-aware guards.
 - Vuetify 3 registered through `vite-plugin-vuetify`, compiled with the Borobiya design tokens; Tailwind CSS 4 through `@tailwindcss/vite` with preflight disabled so Vuetify's reset stays authoritative.
 - Nine Pinia setup stores (`auth`, `map`, `sos`, `realtime`, `admin`, `settings`, `offline`, `missionTeam`, `trips`) and VueUse for storage, online/network state, media queries, geolocation, debouncing and event listeners.

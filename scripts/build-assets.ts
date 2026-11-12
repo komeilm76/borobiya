@@ -33,7 +33,7 @@ const EXTRA_ICONS = [
   'lan-connect', 'latitude', 'list-status', 'loading', 'lock-alert', 'logout', 'longitude',
   'map-marker-check-outline', 'map-marker-distance', 'map-marker-path', 'map-marker-radius-outline',
   'map-marker-plus-outline', 'memory', 'message-text-outline', 'microphone', 'microphone-off',
-  'network-outline', 'phone-hangup', 'play-circle-outline', 'pulse', 'radiobox-marked',
+  'network-outline', 'phone-hangup', 'play-circle-outline', 'pulse', 'radiobox-marked', 'repeat',
   'ray-start-arrow', 'ray-end-arrow', 'robot-off-outline', 'school-outline', 'send',
   'shield-check-outline', 'shield-edit-outline', 'shopping-outline', 'signal', 'star', 'sync',
   'table-edit', 'tag', 'target', 'theme-light-dark', 'timer-sand-empty', 'upload-outline',

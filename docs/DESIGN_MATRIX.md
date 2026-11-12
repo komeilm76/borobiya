@@ -104,10 +104,10 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
 | sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with a remove-photo button or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
 | sos/16-sos-offline.png | missing | P2/M | Only a generic offline banner; no SOS-specific offline guidance/queueing stance. |
-| sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, date, Persian status label); not the designed SOS history screen. |
-| sos/18-sos-history-detail.png | missing | P2/M | No per-request detail view. |
+| sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, day-grouped date, tracked-code, Persian status label); not the designed SOS history screen. |
+| sos/18-sos-history-detail.png | partial | P2/M | Expandable per-request detail in HistoryView: description, tracking code, manual-fix flag, severity, and the server-held status timeline from `GET /_user/sos/:id`; not the designed full-screen detail. |
 | sos/19-sos-validation.png | partial | P2/L | Inline validation exists (10–500 description, Persian messages); designed field-level presentation absent. |
-| sos/20-sos-history-empty.png | partial | P2/L | Plain empty text exists in HistoryView. |
+| sos/20-sos-history-empty.png | partial | P2/L | Plain empty text in HistoryView (missions and trips tabs). |
 
 ## Mobile map — mission (19)
 
@@ -137,17 +137,17 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| history/01-history-trips.png | superseded | — | Trip history presupposed routing, which superseded it. Stage 5 adds a trips domain, so trip history is now feasible and is queued for Stage 6. |
-| history/02-history-missions.png | partial | P2/H | SOS requests and missions from `/_user/missions` now both render with Persian status labels; no tab structure yet. |
-| history/03-history-missions-agent.png | partial | P2/M | Responder missions render alongside requests with localized status; dedicated agent view absent. |
-| history/04-history-companions.png | partial | P2/M | The history screen and the Sharing Center list every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
-| history/05-history-filter.png | missing | P2/M | No filter UI. |
-| history/06-history-details.png | missing | P2/M | No detail view. |
-| history/07-history-playback.png | missing | P2/H | Authorized history endpoint exists (`/_user/location/history/:userId`); no playback surface. |
-| history/08-history-companion.png | missing | P2/M | No per-companion history. |
-| history/09-history-loading.png | missing | P2/L | No skeleton/loading state. |
-| history/10-history-empty.png | partial | P2/L | Plain empty text exists. |
-| history/11-history-error.png | missing | P2/M | No error state with retry. |
+| history/01-history-trips.png | partial | P2/M | Stage 6: finished trips (completed/cancelled) render day-grouped on the trips tab with stop count, role, Persian status and date; expandable stop list and a scope-selected share-window action. No routing engine, so no kilometres/duration/vehicle/month summary as designed; replay still absent (see history/07). |
+| history/02-history-missions.png | partial | P2/H | Stage 6: dedicated missions tab with 'mine as requester' and 'mine as responder' sub-tabs, day grouping and expandable details; no designed summary chips, search or filter yet. |
+| history/03-history-missions-agent.png | partial | P2/M | Stage 6: responder missions live in the 'mine as responder' sub-tab with localized status and the granted rating (star row and numeric rating) and its note; no dedicated agent dashboard view. |
+| history/04-history-companions.png | partial | P2/M | The history screen (shares tab) and the Sharing Center list every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
+| history/05-history-filter.png | missing | P2/M | No filter UI; pending a product decision on what recorded history exists to filter. |
+| history/06-history-details.png | partial | P2/M | Stage 6: inline detail for every history record — trips show the ranked stop list, members and start/end times, plus repeat-as-new-trip and save; requests show the server timeline; missions show rating/note; every record can spawn a scoped history-window share. No duration/stop/deviation statistics (no track recording exists) and not the designed modal. |
+| history/07-history-playback.png | missing | P2/H | No playback surface. The authorized endpoint is share-gated (`/_user/location/history/:userId`) and no track is recorded for one's own trips/missions, so the designed replay cannot be rendered honestly today; DF-04 applies whenever a playback surface lands. |
+| history/08-history-companion.png | missing | P2/M | No per-companion history; would additionally need companion-level aggregation the APIs do not expose today. |
+| history/09-history-loading.png | partial | P2/L | Inline loading text on detail expansion (an inline loading line); no designed skeleton screen. |
+| history/10-history-empty.png | partial | P2/L | Plain empty text renders on every history tab (trips/requests/missions/shares). |
+| history/11-history-error.png | partial | P2/M | Stage 6: per-tab error messages with a working retry button (trips, missions, shares). |
 
 ## Mobile map — sharing (`design/map-page/companions/`, 10)
 
