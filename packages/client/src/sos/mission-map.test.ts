@@ -26,6 +26,18 @@ describe("post-accept mission map camera (T3.5.4)", () => {
     expect(missionRouteStop(incident, null, stops, order, 0)).toBeNull();
     expect(missionRouteStop(incident, origin, stops, order, 99)).toBeNull();
   });
+  it("includes the incident and all stops when a selected route snaps far away from either endpoint", () => {
+    const origin = { lat: 35.60, lon: 51.20 };
+    const stop = { lat: 35.85, lon: 51.75 };
+    // The routing service's decoded line follows only the reachable road.
+    const snappedRoad: [[number, number], [number, number]] = [[51.30, 35.65], [51.40, 35.69]];
+    expect(missionMapCamera(incident, origin, [stop], snappedRoad)).toEqual({
+      kind: "both", bounds: [[51.20, 35.60], [51.75, 35.85]], padding: 64, maxZoom: 15
+    });
+    expect(missionMapCamera(incident, null, [], snappedRoad)).toEqual({
+      kind: "both", bounds: [[51.30, 35.65], [51.43, 35.71]], padding: 64, maxZoom: 15
+    });
+  });
   it("keeps every edited waypoint visible before a route is calculated, even without GPS", () => {
     const stops = [{ lat: 35.63, lon: 51.55 }, { lat: 35.78, lon: 51.3 }];
     expect(missionMapCamera(incident, null, stops)).toEqual({

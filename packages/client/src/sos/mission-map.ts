@@ -14,11 +14,12 @@ export function missionRouteStop(incident: MissionMapPoint, origin: MissionMapPo
 }
 
 export function missionMapCamera(incident: MissionMapPoint, rescuer: MissionMapPoint | null,
-  stops: readonly MissionMapPoint[] = []): MissionMapCamera {
-  // Before a route is calculated, frame *all* planned stops as well as the
-  // incident and origin. Otherwise tapping a remote stop immediately pans it
-  // off-screen while the planner claims to show the updated plan.
-  const points = [incident, ...(rescuer ? [rescuer] : []), ...stops];
+  stops: readonly MissionMapPoint[] = [], routeBounds: [[number, number], [number, number]] | null = null): MissionMapCamera {
+  // Always include the actual incident and planned stops, even after a route is
+  // calculated. OSRM may snap its endpoint to a distant road: framing only the
+  // decoded line would leave the incident marker outside the promised overview.
+  const points = [incident, ...(rescuer ? [rescuer] : []), ...stops,
+    ...(routeBounds ? routeBounds.map(([lon, lat]) => ({ lat, lon })) : [])];
   const minLon = Math.min(...points.map((point) => point.lon));
   const maxLon = Math.max(...points.map((point) => point.lon));
   const minLat = Math.min(...points.map((point) => point.lat));

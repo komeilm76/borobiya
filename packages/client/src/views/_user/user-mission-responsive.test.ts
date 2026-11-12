@@ -48,7 +48,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('class="mission-desk__map-focus" role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت"');
     expect(view).toContain('v-show="!pickingWaypoint && activeTool !== \'status\' && activeTool !== \'team\'"');
     expect(view).toContain('aria-label="نمایش محل حادثه و مسیر مأموریت"');
-    expect(view).toContain('if (routing.selectedRoute.value && routeSnapshot.value.bounds) {');
+    expect(view).toContain('routing.selectedRoute.value ? routeSnapshot.value.bounds : null');
     expect(view).toContain('if (!navigation.active.value) frameMissionRoute();');
     expect(view).toContain('map.on("movestart", onMissionMapMove);');
     expect(view).toContain('map.off("movestart", onMissionMapMove);');
@@ -106,7 +106,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(panel).toContain('height: 100%; min-height: 0; border-radius: 0;');
     expect(view).toContain('routing.findRoutes(true)');
     expect(view).toContain('if (!routing.addWaypoint({ lat, lon }))');
-    expect(view).toContain('missionMapCamera(incident, routing.from.value, routing.via.value)');
+    expect(view).toContain('missionMapCamera(incident, routing.from.value, routing.via.value,');
     expect(view).toContain('@update:model-value="focusRouteStep(Number($event))"');
     expect(view).toContain('missionRouteStop(incident, routing.from.value, routing.via.value,');
     expect(view).toContain('highlightRouteStop();');

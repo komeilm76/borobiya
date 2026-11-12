@@ -207,16 +207,24 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
   emit("ready", instance, MarkerClass);
   if (!props.routeActive) focusMembers();
 }
+function frameRoom(): void {
+  if (hasMarkers.value) focusMembers();
+  // Never leave the camera on a withdrawn participant's last known position.
+  else map.value?.easeTo({ center: props.center, zoom: 13, duration: 350 });
+}
 // Live room updates can change markers, but must not steal the camera from
-// active route planning/guidance on the rescuer's shared mission map.
-watch(presentRoles, (next, previous) => { if (next !== previous && cameraIntent.shouldAutoFrame(props.routeActive)) focusMembers(); });
+// active route planning/guidance or an explicitly explored part of the map.
+watch(presentRoles, (next, previous) => {
+  if (next === "" && previous && !props.routeActive) {
+    // A withdrawn final fix is a privacy boundary, even if someone moved the camera.
+    cameraIntent.reset();
+    frameRoom();
+  } else if (next !== previous && cameraIntent.shouldAutoFrame(props.routeActive)) frameRoom();
+});
 watch(() => props.routeActive, (active) => {
   if (active) return;
   cameraIntent.reset(); // Closing a private route intentionally restores the room overview.
-  // Closing the private route should not leave an unlabelled incident-centred map
-  // when nobody has voluntarily shared a location.
-  if (hasMarkers.value) focusMembers();
-  else map.value?.easeTo({ center: props.center, zoom: 13, duration: 350 });
+  frameRoom();
 });
 // The age clock ticks every second; a new array literal would rebuild three DOM-backed
 // markers per tick even when no fix or stale state changed. Sync-flush clears private

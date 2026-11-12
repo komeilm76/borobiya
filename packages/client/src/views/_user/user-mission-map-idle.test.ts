@@ -42,8 +42,8 @@ describe("mission map style restoration", () => {
   });
   it("shares a decoded geometry snapshot between camera and style restoration", () => {
     expect(view).toContain('const routeSnapshot = useMissionRouteGeometry(routing.selectedRoute);');
-    expect(view).toContain('if (routing.selectedRoute.value && routeSnapshot.value.bounds) {');
-    expect(view).toContain('map.fitBounds(routeSnapshot.value.bounds,');
+    expect(view).toContain('routing.selectedRoute.value ? routeSnapshot.value.bounds : null');
+    expect(view).toContain('map.fitBounds(camera.bounds,');
     expect(view).toContain('source.setData(routeSnapshot.value.data)');
     expect(view).not.toContain('decodeRoutePolyline(');
   });

@@ -529,13 +529,10 @@ function frameMissionRoute(): void {
   const incident = routing.visible.value ? routing.target.value?.incident : null;
   if (!map || !incident) return;
   pauseGuidanceFollow();
-  if (routing.selectedRoute.value && routeSnapshot.value.bounds) {
-    map.fitBounds(routeSnapshot.value.bounds, { padding: 60, maxZoom: 15, duration: 450 });
-  } else {
-    const camera = missionMapCamera(incident, routing.from.value, routing.via.value);
-    if (camera.kind === "both") map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 450 });
-    else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 450 });
-  }
+  const camera = missionMapCamera(incident, routing.from.value, routing.via.value,
+    routing.selectedRoute.value ? routeSnapshot.value.bounds : null);
+  if (camera.kind === "both") map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 450 });
+  else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 450 });
 }
 function highlightRouteStop(): void {
   const selected = routing.order.value[routing.step.value];
