@@ -27,7 +27,9 @@
     "deploy:check": "bun scripts/boro.ts deploy:check",
     "db:seed": "bun scripts/boro.ts db:seed",
     "db:reset": "bun scripts/boro.ts db:reset",
-    "clean": "bun scripts/boro.ts clean"
+    "clean": "bun scripts/boro.ts clean",
+    "preview": "bun scripts/preview.ts",
+    "preview:build": "bunx vite build --mode preview --config vite.preview.config.ts"
   },
   "dependencies": {
     "@vueuse/core": "^15.0.0",

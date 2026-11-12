@@ -22,6 +22,7 @@ This folder contains practical English documentation for Borobiya 2.0.0: a Bun 1
 
 - `AUTOMATION.md` documents the `boro` CLI, asset generation, CI workflow, doctor, check, verify and deployment checks.
 - `TESTING.md` describes the automated suite, its harness, focused commands and coverage intent.
+- `VISUAL_PREVIEW.md` describes the isolated visual preview server used for human design review of completed pages.
 - `LEGACY_REVIEW.md` records what was learned from the previous architecture, why the single-process rebuild is smaller, and how old mandatory feature families were reconciled with the new scope.
 - `STATUS.md` summarizes the implemented subsystems, the closed target matrix and the validation commands that define readiness.
 - `ACCEPTANCE.md` maps the original specification and roadmap targets to the current Bun/Vue implementation and records their closure.

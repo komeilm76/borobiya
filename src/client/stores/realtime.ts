@@ -35,6 +35,11 @@ export const useRealtimeStore = defineStore('realtime', () => {
    * @returns A promise resolved once the connection attempt settles.
    */
   async function connect(): Promise<void> {
+    if (import.meta.env.VITE_PREVIEW_DEMO === 'true') {
+      // The preview has no WebSocket endpoint; stay explicitly disconnected instead of retry-looping.
+      status.value = 'disconnected';
+      return;
+    }
     reset();
     unsubscribers.push(
       client.value.on('status', (value: RealtimeStatus) => {

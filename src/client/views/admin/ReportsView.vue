@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue';
 import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
+import { tryDownloadPreviewCsv } from '@/preview/demo-downloads.ts';
 
 /** Reports screen: status distribution and export links. */
 const admin = useAdminStore();
@@ -20,6 +21,10 @@ const exports = [
 onMounted(() => void admin.loadOverview());
 
 function download(href: string): void {
+  if (tryDownloadPreviewCsv(href)) {
+    toast.push('CSV ساختگی پیش‌نمایش دانلود شد.', 'info', 2200);
+    return;
+  }
   window.location.assign(href);
   toast.push('صدور فایل آغاز شد.', 'info', 2200);
 }

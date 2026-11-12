@@ -35,6 +35,8 @@ export default defineConfig({
       include: ['src/shared/**/*.ts', 'src/server/**/*.ts', 'src/client/**/*.ts', 'src/client/**/*.vue'],
       exclude: [
         'src/client/main.ts',
+        // The preview bundle entry mirrors main.ts and is exercised by `bun run preview`, not by unit tests.
+        'src/client/preview-main.ts',
         'src/client/env.d.ts',
         'src/server/index.ts',
         'src/client/service-worker/**'

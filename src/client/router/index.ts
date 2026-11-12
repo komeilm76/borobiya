@@ -200,9 +200,10 @@ export const routes: RouteRecordRaw[] = [
   }
 ];
 
-/** Application router instance. */
+/** Application router instance. The preview bundle is mounted under `/app/`. */
+const previewBase = import.meta.env.VITE_PREVIEW_DEMO === 'true' ? '/app/' : '/';
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(previewBase),
   routes,
   scrollBehavior: () => ({ top: 0 })
 });

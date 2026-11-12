@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue';
 import { VBtn, VTextField } from 'vuetify/components';
 import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
+import { tryDownloadPreviewCsv } from '@/preview/demo-downloads.ts';
 
 /** Audit log with a text filter and CSV export. */
 const admin = useAdminStore();
@@ -12,6 +13,10 @@ const entries = computed(() => admin.audit?.items ?? []);
 
 async function search(): Promise<void> {
   await admin.loadAudit({ q: query.value || undefined, limit: 100 });
+}
+
+function saveCsv(event: MouseEvent): void {
+  if (tryDownloadPreviewCsv('/_admin/audit.csv')) event.preventDefault();
 }
 
 onMounted(() => void admin.loadAudit());
@@ -25,7 +30,7 @@ onMounted(() => void admin.loadAudit());
         <div class="panel__filters">
           <VTextField v-model="query" density="compact" placeholder="جست‌وجو در رویداد" hide-details @keyup.enter="search" />
           <VBtn size="small" variant="tonal" @click="search">جست‌وجو</VBtn>
-          <a class="admin-action" href="/_admin/audit.csv" download>CSV</a>
+          <a class="admin-action" href="/_admin/audit.csv" download @click="saveCsv">CSV</a>
         </div>
       </header>
       <table class="admin-table">
