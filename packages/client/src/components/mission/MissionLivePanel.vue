@@ -98,10 +98,11 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, watch } from "vue";
-import type { Map as MapLibreMap, Marker } from "maplibre-gl";
+import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
+import { createLiveCameraIntent } from "@/mission/live-camera-intent";
 import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
 import { useMissionPresence } from "@/composables/use-mission-presence";
@@ -137,6 +138,8 @@ watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }, { flu
 const canPublish = computed(() => auth.user?.role === "admin" ||
   auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);
 const map = shallowRef<MapLibreMap | null>(null);
+const cameraIntent = createLiveCameraIntent();
+let detachCameraGesture: (() => void) | null = null;
 // MapCanvas supplies the constructor after its lazy MapLibre import finishes.
 let markerConstructor: typeof Marker | null = null;
 const hasMarkers = computed(() => Object.values(live.locations.value).some(Boolean));
@@ -182,12 +185,22 @@ function focusMembers(userInitiated = false) {
   if (!map.value) return;
   const camera = missionLiveCamera(Object.values(live.locations.value).filter((entry) => entry != null));
   if (!camera) return;
-  if (userInitiated) emit("camera-selected"); // Preserve this explicit view against GPS follow.
+  if (userInitiated) {
+    cameraIntent.reset(); // Explicit show-all restores automatic room framing.
+    emit("camera-selected"); // Preserve this explicit view against GPS follow.
+  }
   if (camera.kind === "single") map.value.easeTo({ center: camera.center, zoom: camera.zoom, duration: 350 });
   else map.value.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 350 });
 }
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
-  if (map.value !== instance) clearMarkers();
+  if (map.value !== instance) {
+    clearMarkers();
+    detachCameraGesture?.();
+    cameraIntent.reset();
+    const onMove = (event: MapMovementEvent) => { if (event.originalEvent) cameraIntent.noteGesture(); };
+    instance.on("movestart", onMove);
+    detachCameraGesture = () => instance.off("movestart", onMove);
+  }
   markerConstructor = MarkerClass;
   map.value = instance;
   syncMarkers();
@@ -196,9 +209,10 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
 }
 // Live room updates can change markers, but must not steal the camera from
 // active route planning/guidance on the rescuer's shared mission map.
-watch(presentRoles, (next, previous) => { if (next !== previous && !props.routeActive) focusMembers(); });
+watch(presentRoles, (next, previous) => { if (next !== previous && cameraIntent.shouldAutoFrame(props.routeActive)) focusMembers(); });
 watch(() => props.routeActive, (active) => {
   if (active) return;
+  cameraIntent.reset(); // Closing a private route intentionally restores the room overview.
   // Closing the private route should not leave an unlabelled incident-centred map
   // when nobody has voluntarily shared a location.
   if (hasMarkers.value) focusMembers();
@@ -210,6 +224,8 @@ watch(() => props.routeActive, (active) => {
 watch([() => live.locations.value, () => live.participantStatus.value.map((member) => member.fresh).join(",")],
   syncMarkers, { flush: "sync" });
 onBeforeUnmount(() => {
+  detachCameraGesture?.();
+  detachCameraGesture = null;
   clearMarkers();
   map.value = null;
   markerConstructor = null;

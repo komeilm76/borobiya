@@ -58,9 +58,11 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('navigation.recenter(); // A fresh fix recenters now; otherwise await the next GPS sample.');
     expect(view).toContain(":color=\"followingGps ? 'primary' : 'warning'\"");
     expect(view).toContain('دنبال‌کردن GPS متوقف است');
+    expect(view).toContain("followingGps ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'دوربین روی نمای انتخابی شماست؛ برای دنبال‌کردن دوبارهٔ GPS، دکمهٔ موقعیت را بزنید.'");
     expect(view).toContain(':aria-pressed="followingGps" :disabled="!mapReady"');
     expect(view).toContain('@camera-selected="pauseGuidanceFollow"');
-    expect(panel).toContain('if (userInitiated) emit("camera-selected");');
+    expect(panel).toContain('if (userInitiated) {');
+    expect(panel).toContain('emit("camera-selected"); // Preserve this explicit view against GPS follow.');
     expect(view).not.toContain('useOwnMapPosition'); // Never activate personal sharing or its watcher.
     expect(view).not.toContain('usePlaceSearch');
     expect(view).not.toContain('useMapHistory');

@@ -226,7 +226,7 @@
                   <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
                     @click="stopGuidance">توقف راهبری</v-btn>
                   <p v-if="navigation.active.value" role="status" class="text-caption mb-0">
-                    {{ navigation.fix.value ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'در انتظار موقعیت تازهٔ GPS…' }}
+                    {{ !navigation.fix.value ? 'در انتظار موقعیت تازهٔ GPS…' : followingGps ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'دوربین روی نمای انتخابی شماست؛ برای دنبال‌کردن دوبارهٔ GPS، دکمهٔ موقعیت را بزنید.' }}
                   </p>
                 </div>
                 <v-alert v-if="navigation.error.value" type="warning" variant="tonal" role="alert" class="mt-3">

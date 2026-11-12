@@ -25,7 +25,7 @@ describe("three-role mission live UI (T3.5.7)", () => {
     const canvas = readFileSync(new URL("../map/MapCanvas.vue", import.meta.url), "utf8");
     // A value import here pulls MapLibre into requester history even when the panel is hidden.
     expect(panel).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
-    expect(panel).toContain('import type { Map as MapLibreMap, Marker } from "maplibre-gl"');
+    expect(panel).toContain('import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl"');
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(panel).toContain('function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker)');
     expect(panel).toContain('markerConstructor = MarkerClass');
@@ -33,6 +33,17 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain('markers[role]?.remove()');
     expect(panel).toContain('markers[role]?.setLngLat([op.next.lon, op.next.lat])');
     expect(panel).toContain('markerConstructor = null');
+  });
+
+  it("preserves a manually panned room camera when a new member begins sharing", () => {
+    const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
+    expect(panel).toContain('instance.on("movestart", onMove);');
+    expect(panel).toContain('if (event.originalEvent) cameraIntent.noteGesture();');
+    expect(panel).toContain('detachCameraGesture = () => instance.off("movestart", onMove);');
+    expect(panel).toContain('detachCameraGesture?.();\n  detachCameraGesture = null;');
+    expect(panel).toContain('cameraIntent.shouldAutoFrame(props.routeActive)');
+    expect(panel).toContain('cameraIntent.reset(); // Explicit show-all restores automatic room framing.');
+    expect(panel).toContain('cameraIntent.reset(); // Closing a private route intentionally restores the room overview.');
   });
 
   it("keeps the publish action disabled and shows verification feedback while reconnect status is unknown", () => {
