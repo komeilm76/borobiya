@@ -292,17 +292,8 @@ onBeforeUnmount(() => {
 .live-panel--fullscreen .live-panel__map :deep(.map-canvas) {
   height: 100%; min-height: 0; border-radius: 0;
 }
-/* Rescuer compass uses the same action button as /_user/map, but sits on the
- * physical left beside the mission camera actions: route/status/team sheets
- * use the right edge or start above this rail on phones. Clear the safe area. */
-.live-panel--fullscreen .live-panel__map :deep(.maplibregl-ctrl-top-right) {
-  top: auto; right: auto; bottom: auto;
-  left: calc(.75rem + env(safe-area-inset-left, 0px));
-  inset-block-end: calc(5.75rem + env(safe-area-inset-bottom, 0px));
-  width: 48px;
-}
 .live-panel--fullscreen .live-panel__members {
-  position: absolute; z-index: 6; inset: auto 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px)) auto;
+  position: absolute; z-index: 6; inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
   width: min(27rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);

@@ -1,5 +1,6 @@
 <template>
-  <main class="mission-desk" :class="{ 'mission-desk--active': desk.activeMission.value }" dir="rtl" @keydown.esc="dismissTool">
+  <main class="mission-desk" :class="{ 'mission-desk--active': desk.activeMission.value,
+    'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool }" dir="rtl" @keydown.esc="dismissTool">
     <!-- No active mission means no private markers. Show the same full-viewport
          canvas for context, then replace it with the live canvas once assigned. -->
     <MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"
@@ -216,7 +217,8 @@
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
         </div>
         <div v-show="!pickingWaypoint && activeTool !== 'status' && activeTool !== 'team'"
-          class="mission-desk__map-focus" role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت">
+          class="mission-desk__map-focus" :class="{ 'mission-desk__map-focus--pair': navigation.active.value && routing.visible.value && !!routing.target.value }"
+          role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت">
           <v-btn v-if="navigation.active.value" :icon="followingGps ? 'mdi-crosshairs-gps' : 'mdi-navigation-variant'"
             :color="followingGps ? 'primary' : 'warning'" variant="flat"
             :aria-label="followingGps ? 'مرکز کردن موقعیت راهبری' : 'بازگشت به دنبال‌کردن GPS'"
@@ -824,12 +826,13 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
    remains. Its public canvas has no incident or live-room data. */
 .mission-desk:not(.mission-desk--active) { position: relative; height: 100dvh; min-height: 0; padding: 0; overflow: hidden; }
 .mission-desk__idle-map { position: absolute !important; inset: 0; width: 100%; height: 100%; min-height: 0 !important; border-radius: 0; }
-/* Park the same 48px compass on the physical left, clear of the centered
-   welcome card and the phone's safe-area/dock region. */
-.mission-desk__idle-map :deep(.maplibregl-ctrl-top-right) {
-  top: auto; right: auto; bottom: auto;
-  left: calc(.75rem + env(safe-area-inset-left, 0px));
-  inset-block-end: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+/* Both the idle and live MapCanvas use the map page's physical-right action
+   rail. The native control remains in the map for tap-to-north and drag/pitch. */
+.mission-desk :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+  position: fixed; z-index: 6;
+  top: auto; left: auto;
+  right: 1.25rem;
+  bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);
   width: 48px;
 }
 .mission-desk:not(.mission-desk--active) .mission-desk__shell {
@@ -865,7 +868,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--active .mission-desk__card,
 .mission-desk--active .mission-route {
   position: absolute; z-index: 8;
-  inset: auto 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px)) auto;
+  inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
   width: min(28rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   margin: 0; padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
@@ -906,16 +909,19 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance-copy strong { font-size: .87rem; }
 .mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
-/* Keep camera actions beside the shared 48px compass, clear of the dock and
-   planner; the entire rail stays below the full-width phone sheets. */
+/* Camera actions occupy the map page's next 48px slots below the compass.
+   The single-action case stays adjacent; two actions fill both lower slots. */
 .mission-desk__map-focus {
-  position: absolute; z-index: 9; left: calc(4.25rem + env(safe-area-inset-left, 0px));
-  bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
-  display: flex; gap: .5rem;
+  position: absolute; z-index: 9; right: 1.25rem;
+  bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);
+  display: flex; flex-direction: column; gap: .5rem;
+}
+.mission-desk__map-focus--pair {
+  bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
 }
 .mission-desk__map-focus :deep(.v-btn) {
-  width: 44px; min-width: 44px; height: 44px;
-  border: 1px solid var(--bb-color-outline); box-shadow: var(--bb-shadow-overlay);
+  width: 48px; min-width: 48px; height: 48px;
+  border: 1px solid var(--bb-color-outline); border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__dock {
@@ -954,11 +960,52 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 11;
   }
-  .mission-desk__dock { width: min(15rem, calc(100vw - 1.5rem)); }
+  /* Reserve the physical-right SOS target and its focus ring; a centered
+     15rem dock overlapped it on 320px phones. */
+  .mission-desk__dock {
+    left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;
+    width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
   .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
   .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
   .mission-desk__guidance--warning { flex-wrap: wrap; }
   .mission-desk__guidance--warning span { flex: 1 1 100%; }
+  /* Same right-hand 48px slots as the phone map, including side cutouts. */
+  .mission-desk :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mission-desk__map-focus {
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mission-desk__map-focus--pair { bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
+  /* A full-width route/status/team sheet begins 9.5rem above the bottom. Keep
+     all map actions in one row between that sheet and the dock, like the map's
+     route-preview rail; don't leave the compass behind the sheet. */
+  .mission-desk--tool-open :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mission-desk--tool-open .mission-desk__map-focus,
+  .mission-desk--tool-open .mission-desk__map-focus--pair {
+    right: calc(4.25rem + env(safe-area-inset-right, 0px));
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+    flex-direction: row;
+  }
+}
+@media (max-width: 599px) and (max-height: 360px) {
+  /* On very short phones a tall rail meets the heading/guidance. Spread the
+     controls across the right edge instead; the open-sheet row stays lower. */
+  .mission-desk:not(.mission-desk--tool-open) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+    right: calc(7.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mission-desk:not(.mission-desk--tool-open) .mission-desk__map-focus {
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+    flex-direction: row;
+  }
 }
 @media (max-width: 599px) and (max-height: 560px) {
   .mission-desk--active .mission-desk__card,

@@ -57,7 +57,8 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
   });
 
   it("adapts personal-map camera recovery to the private mission map without importing personal-map tools", () => {
-    expect(view).toContain('class="mission-desk__map-focus" role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت"');
+    expect(view).toContain('class="mission-desk__map-focus" :class="{ \'mission-desk__map-focus--pair\': navigation.active.value && routing.visible.value && !!routing.target.value }"');
+    expect(view).toContain('role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت"');
     expect(view).toContain('v-show="!pickingWaypoint && activeTool !== \'status\' && activeTool !== \'team\'"');
     expect(view).toContain('aria-label="نمایش محل حادثه و مسیر مأموریت"');
     expect(view).toContain('routing.selectedRoute.value ? routeSnapshot.value.bounds : null');
