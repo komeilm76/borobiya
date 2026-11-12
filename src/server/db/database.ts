@@ -423,6 +423,10 @@ export function openDatabase(config: Config): SqliteDatabase {
   ensureColumn(database, 'mission_offers', 'expired_at', 'INTEGER');
   // v5: backfill a leader membership for pre-team missions. The acceptor becomes the leader;
   // an accepted offer proves the acceptance path, otherwise treat the assignment as legacy.
+  // A mission whose active leader already exists (a leader designation landed before the
+  // responder_id fix and the stale owner's membership was later removed) keeps its leader —
+  // minting a second active leader would violate idx_mission_members_one_leader and refuse to
+  // boot the upgraded install; v6 then reconciles the operational owner onto the real leader.
   database.exec(`
     INSERT INTO mission_members(id, mission_id, user_id, role, assignment_source, assignment_status, created_at, updated_at)
     SELECT 'mm_' || m.id || '_' || m.responder_id, m.id, m.responder_id, 'leader',
@@ -431,6 +435,7 @@ export function openDatabase(config: Config): SqliteDatabase {
            'active', m.created_at, m.updated_at
     FROM missions m
     WHERE NOT EXISTS (SELECT 1 FROM mission_members mm WHERE mm.mission_id = m.id AND mm.user_id = m.responder_id AND mm.assignment_status = 'active')
+      AND NOT EXISTS (SELECT 1 FROM mission_members l WHERE l.mission_id = m.id AND l.role = 'leader' AND l.assignment_status = 'active')
   `);
   // Offer backfill for databases that predate the offers table: a named, dispatched SOS with no
   // offer row would otherwise be unacceptable. Idempotent, never re-creates declined/accepted rows.

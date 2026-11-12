@@ -20,6 +20,22 @@ The SQLite database is the source of truth. It contains users, sessions, securit
 
 Location retention is bounded by `LOCATION_RETENTION_HOURS`, and old durable events are purged by maintenance jobs. Realtime caches, tickets, talk floors, presence and static asset caches are reconstructible and do not need backup. Never back up ephemeral audio; audio is never stored.
 
+## Schema upgrades and migration notes
+
+The application opens the SQLite file and migrates it automatically at startup; there is no separate migration command. Migrations are additive, idempotent and never rewrite rows destructively, and `meta.schema_version` records the applied version (currently 8). Take a backup of the database and its WAL before the first start after any upgrade, and verify `schema_version` afterwards (`sqlite3 DATA_DIR/borobiya.sqlite 'select value from meta where key=\'schema_version\''`). Downgrade is not supported: a binary that predates a migration cannot read rows the newer schema expects, so roll back by restoring the pre-upgrade backup.
+
+The migration history, in order:
+
+- **v1 -> v2**: `sos_requests.photo_data_url` and `users.job_type_id` are added to pre-existing files (older 2.0.0 databases). `photo_data_url` holds nothing until the first photo upload.
+- **v3**: `job_types` catalog and `mission_offers` (one pending offer row per named responder). Databases that predate offers receive a synthetic pending offer for any still-dispatched SOS with a named responder, so the accept endpoint stays reachable. Declined or accepted rows are never recreated.
+- **v4**: `mission_offers.expired_at` records the exact expiry moment; terminal rows created earlier keep NULL (unknown expiry).
+- **v5**: mission teams — `support_requests`, `support_request_items`, `support_request_decisions`, `mission_requirements` and `mission_members` (unique active membership per mission and user, at most one active leader per mission). Existing missions are backfilled with a leader membership for their assigned responder; a genuine `offer_accept` history wins over the `legacy_backfill` marker. The backfill never mints a second active leader: a mission that already has one (a pre-fix designation whose stale owner was later removed) keeps it, and v6 reconciles the operational owner onto that leader.
+- **v6**: one-off reconciliation pass — if an active leader membership exists and the mission's operational owner does not match it, `missions.responder_id` and `sos_requests.assigned_responder_id` follow the leader. Finished missions are untouched.
+- **v7**: `location_shares.scope` — grants carry their explicitly selected detail set (`route` always; optional `motion` and `accuracy`) as a JSON array, or NULL for the pre-v7 full-detail behavior.
+- **v8**: the trip domain — `trips`, `trip_stops`, `group_trips`, `trip_invitations` and `saved_trips`. Additive tables only; no existing row is touched.
+
+A fresh install runs the same code path: the base schema already contains every table, and the `ensureColumn` guards are no-ops. Seeding demo users (`SEED_DEMO_USERS=1`) is a development convenience and is rejected in production; the database seeds the catalog, settings and the bootstrap administrator regardless.
+
 ## Startup and verification
 
 Start with `bun run start` or a process manager that runs `bun src/server/index.ts`. Confirm `/_public/health`, `/_public/openapi.json`, a protected route with an administrator session, an SVG tile response and a WebSocket upgrade. Watch logs for request IDs on failed responses. Graceful shutdown closes WebSocket peers, clears jobs and closes the database.

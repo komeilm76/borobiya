@@ -11,7 +11,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 ### Runtime
 
 - `Bun.serve` handles HTTP and WebSocket upgrades; the custom RFC 6455 implementation and the `node:http`/`node:stream` imports are gone.
-- `bun:sqlite` replaces `node:sqlite`; the schema, the idempotent `photo_data_url` migration and the transaction boundary are unchanged.
+- `bun:sqlite` replaces `node:sqlite`; the schema is managed by additive, idempotent migrations (schema v8) and every migration runs automatically at startup — see the schema-upgrade notes in `docs/DEPLOYMENT.md`. The v5 leader backfill was hardened so installs that already carry a pre-fix designated leader never mint a second active one; the operational owner reconciles onto the real leader. A legacy v1 database migrates without losing rows (verified by the suite).
 - `Bun.password` hashes with Argon2id. Stored hashes remain self-describing, so the format is verifiable and upgradable.
 - `Bun.file`, `Bun.write` and `Bun.Glob` replace every filesystem helper; `scripts/*.ts` run through `bun` and the `boro` shim only executes Bun.
 - `bun run build` clears the previous bundle before building, so a rebuild of unchanged sources is byte-identical instead of accumulating stale hashed chunks.
@@ -55,13 +55,13 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 
 `bun run check` is the gate: it builds the Vue bundle and the service worker, typechecks the Bun server (`tsc`), typechecks the Vue client (`vue-tsc --noEmit`), runs the English-only documentation and clean-rebuild guard, and executes the Vitest suite with coverage. `./boro doctor`, `./boro verify`, `bun run bench`, `bun run smoke`, `bun run acceptance` and `./boro deploy:check` complete the release gate.
 
-The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, trips and group rides, Vuetify component mounting, all 23 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
+The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, trips and group rides, the Stage-6 history categories, Vuetify component mounting, all 23 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
 
 Professional visual acceptance against the canonical PNG references remains a deliberately deferred human review: this release contains no browser-driven end-to-end sign-off, no screenshot comparison and no real-device testing.
 
 ### Operational notes
 
-Install Bun 1.4.4, set a unique `ADMIN_PASSWORD`, disable demo seeding, enable `COOKIE_SECURE=1`, configure exact allowed origins, terminate HTTPS at a trusted proxy and persist the SQLite data directory. Audio is never stored. Use graceful shutdown and back up the database and WAL together. See `docs/DEPLOYMENT.md` and `docs/OPERATIONS.md` for the full procedure.
+Back up the database and its WAL before the first start after upgrading (migrations are additive and automatic; there is no downgrade path other than restoring that backup). Install Bun 1.4.4, set a unique `ADMIN_PASSWORD`, disable demo seeding, enable `COOKIE_SECURE=1`, configure exact allowed origins, terminate HTTPS at a trusted proxy and persist the SQLite data directory. Audio is never stored. Use graceful shutdown and back up the database and WAL together. See `docs/DEPLOYMENT.md` and `docs/OPERATIONS.md` for the full procedure.
 
 ### Tag
 

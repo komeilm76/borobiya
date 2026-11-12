@@ -145,9 +145,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/06-history-details.png | partial | P2/M | Stage 6: inline detail for every history record — trips show the ranked stop list, members and start/end times, plus repeat-as-new-trip and save; requests show the server timeline; missions show rating/note; every record can spawn a scoped history-window share. No duration/stop/deviation statistics (no track recording exists) and not the designed modal. |
 | history/07-history-playback.png | missing | P2/H | No playback surface. The authorized endpoint is share-gated (`/_user/location/history/:userId`) and no track is recorded for one's own trips/missions, so the designed replay cannot be rendered honestly today; DF-04 applies whenever a playback surface lands. |
 | history/08-history-companion.png | missing | P2/M | No per-companion history; would additionally need companion-level aggregation the APIs do not expose today. |
-| history/09-history-loading.png | partial | P2/L | Inline loading text on detail expansion (an inline loading line); no designed skeleton screen. |
-| history/10-history-empty.png | partial | P2/L | Plain empty text renders on every history tab (trips/requests/missions/shares). |
-| history/11-history-error.png | partial | P2/M | Stage 6: per-tab error messages with a working retry button (trips, missions, shares). |
+| history/09-history-loading.png | partial | P2/L | An inline loading line on detail expansion; no designed skeleton list, no designed pagination indicator. |
+| history/10-history-empty.png | partial | P2/L | Plain empty text on every history tab. The designed route illustration, headline CTA and empty-state map card are absent. |
+| history/11-history-error.png | partial | P2/M | Stage 6: per-tab error messages with a working retry button (trips, missions, shares). The designed offline framing (cached-snapshot section, last-saved timestamp) is absent. |
 
 ## Mobile map — sharing (`design/map-page/companions/`, 10)
 
