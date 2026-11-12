@@ -26,11 +26,25 @@ import { useToast } from '../src/client/composables/useToast.ts';
  * state and actions on the *same* pinia instance the component resolves. Patching a store from
  * outside the render records nothing, because the component holds its own instance.
  */
+/**
+ * Admin screens seed their stores directly or spy on store actions; no test here depends on the
+ * network. Without a stub, relative-URL fetches resolve against the ambient document origin and a
+ * developer running `./boro dev` on :3000 answers them for real — the suite must not depend on,
+ * or alter, that server. A failing envelope matches what the components handle gracefully.
+ */
+function stubOfflineFetch(): void {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    JSON.stringify({ ok: false, requestId: 'req_offline', error: { code: 'offline', message: 'offline' } }),
+    { status: 503, headers: { 'content-type': 'application/json' } }
+  )));
+}
+
 async function render(
   component: unknown,
   name: string,
   seed?: (ctx: { admin: ReturnType<typeof useAdminStore>; sos: ReturnType<typeof useSosStore> }) => void
 ) {
+  stubOfflineFetch();
   const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
   await router.push({ name });
   await router.isReady();
@@ -205,6 +219,7 @@ describe('administrator reports export', () => {
 describe('responder history', () => {
   it('lists past requests with tracking codes and an empty state', async () => {
     const { wrapper } = await render(HistoryView, ROUTE_NAMES.history, ({ sos }) => {
+      vi.spyOn(sos, 'load').mockResolvedValue(undefined as never);
       sos.requests = [
         { id: 'sos_1', incidentLabel: 'آتش‌سوزی', createdAt: 1794136000000, status: 'completed', trackingCode: 4242 },
         { id: 'sos_2', incidentLabel: 'حادثه رانندگی', createdAt: 1794137000000, status: 'cancelled', trackingCode: 4243 }
@@ -218,6 +233,7 @@ describe('responder history', () => {
 
   it('offers the profile shortcut from the header', async () => {
     const { wrapper, router } = await render(HistoryView, ROUTE_NAMES.history, ({ sos }) => {
+      vi.spyOn(sos, 'load').mockResolvedValue(undefined as never);
       sos.requests = [] as never;
     });
     expect(wrapper.text()).toContain('درخواستی ثبت نشده است.');

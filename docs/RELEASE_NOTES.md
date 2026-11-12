@@ -47,7 +47,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - A contract test parses those interfaces and checks each against a live response, so a rename on either side fails the build.
 - The profile device list reads the fields the API actually returns (`sessionId`, `lastActiveAt`, `isCurrentDevice`), so names and timestamps appear and the current session cannot revoke itself; revoking another device now uses `DELETE /_user/devices/:sessionId` instead of a route that did not exist.
 - Password recovery checks the password policy before submitting, so a short or digit-free password is explained in place instead of being posted to earn an uninformative "Invalid request." from the server.
-- The Vitest suite is hermetic: `tests/setup.ts` strips the repository `.env` from the environment, so `./boro check` and `bunx --bun vitest` agree.
+- The Vitest suite is hermetic: `tests/setup.ts` strips the repository `.env` from the environment, so `./boro check` and `bunx --bun vitest` agree, and component suites stub `fetch` rather than resolving relative URLs against an ambient dev server.
 - Full authentication, recovery, onboarding, SOS, dispatch, mission, administration, CSV export and audit behavior, with the production safety guards (`SEED_DEMO_USERS=0`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, unique administrator password).
 - Service-worker versioned precache, stale-while-revalidate, private-route bypass and a bounded 256-entry tile cache.
 

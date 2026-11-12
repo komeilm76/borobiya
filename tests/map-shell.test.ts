@@ -88,10 +88,18 @@ beforeEach(() => {
   setActivePinia(createPinia());
   // Pin the clock so the hold gesture is deterministic.
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'requestAnimationFrame', 'cancelAnimationFrame'] });
+  // Profile-side background reads (devices, login history) are not the subject of this suite.
+  // Answer them with the same 401 envelope the production path produces, without touching a
+  // developer's dev server on :3000.
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(
+    JSON.stringify({ ok: false, requestId: 'req_map_shell', error: { code: 'UNAUTHORIZED', message: 'A valid session is required.' } }),
+    { status: 401, headers: { 'content-type': 'application/json' } }
+  )));
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   document.body.innerHTML = '';
 });
