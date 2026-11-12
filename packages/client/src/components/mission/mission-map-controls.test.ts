@@ -81,6 +81,27 @@ describe("mission map controls", () => {
     expect(viewStyle).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
   });
+  it("keeps the idle phone compass out of centered welcome/empty cards and clear of the top network control", () => {
+    const css = parse(missionMap).descriptor.styles[0]!.content;
+    const compiled = compileStyle({ filename: "UserMissionView.vue", id: "data-v-idle-compass", scoped: true, source: css });
+    const network = readFileSync(new URL("../shell/NetworkStatusIcon.vue", import.meta.url), "utf8");
+    expect(compiled.errors).toEqual([]);
+    expect(missionMap).toContain('v-if="!desk.activeMission.value" class="mission-desk__idle-map"');
+    expect(css).toContain('margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;');
+    expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
+    expect(network).toContain('width: 44px; height: 44px;');
+    const idle = css.lastIndexOf('.mission-desk:not(.mission-desk--active) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {');
+    expect(idle).toBeGreaterThan(css.indexOf('@media (max-width: 599px) and (max-height: 360px)'));
+    const rule = css.slice(idle, css.indexOf('}', idle));
+    expect(rule).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
+    expect(rule).toContain('right: calc(4rem + env(safe-area-inset-right, 0px));');
+    expect(rule).toContain('bottom: auto;');
+    expect(compiled.code).toContain('.mission-desk[data-v-idle-compass]:not(.mission-desk--active) .map-canvas--action-compass .maplibregl-ctrl-top-right');
+    // 44px network + 12px right inset + 8px gap => compass begins at 64px.
+    expect(0.75 * 16 + 44 + 8).toBe(4 * 16);
+    // The 48px compass finishes 12px before the first card starts at 4.5rem.
+    expect((.75 * 16 + 48) + 12).toBe(4.5 * 16);
+  });
   it("keeps members accessible without making automatic rescuer sharing look like a switch in the dock", () => {
     const start = missionMap.indexOf('<nav class="mission-desk__dock"');
     const dock = missionMap.slice(start, missionMap.indexOf('</nav>', start));

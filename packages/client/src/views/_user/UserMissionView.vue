@@ -1007,6 +1007,16 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     flex-direction: row;
   }
 }
+@media (max-width: 599px) {
+  /* No mission: the centered welcome and empty-state cards occupy the lower
+     map, so the normal action rail (and the short-phone row) can cover them.
+     Use the 48px gap beside the 44px network button, before the cards start. */
+  .mission-desk:not(.mission-desk--active) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+    top: calc(.75rem + env(safe-area-inset-top, 0px));
+    right: calc(4rem + env(safe-area-inset-right, 0px));
+    bottom: auto;
+  }
+}
 @media (max-width: 599px) and (max-height: 560px) {
   .mission-desk--active .mission-desk__card,
   .mission-desk--active .mission-route {
