@@ -30,6 +30,7 @@ This folder contains practical English documentation for Borobiya 2.0.0: a Bun 1
 - `OPERATIONS.md` is the startup, health, incident, backup, outage and release runbook.
 - `DESIGN_MATRIX.md` maps every canonical design image to `done`/`partial`/`missing`/`superseded`/`reference`/`deviation` with evidence notes — the coverage contract for the visual acceptance review.
 - `IMPLEMENTATION_PLAN.md` records the staged delivery (Stages 1-7) with per-stage exit criteria, verification numbers and the product decisions taken along the way.
+- `TRIP_TRACK_PROPOSAL.md` is the Stage D approval gate: the technical proposal for consented, trip-scoped GPS track recording. Not implemented until the product owner answers its decisions.
 
 ## Reading order
 

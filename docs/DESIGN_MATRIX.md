@@ -255,7 +255,7 @@ Code-vs-matrix audit of all 141 canonical rows; the matrix was confirmed as the 
 - Stale rows corrected: `mission/01-mission-ready-on`, `mission/02-mission-ready-off`, `profile/08-bookmarks`, `profile/09-bookmark-edit` — all four described shipped functionality as absent (readiness switch and saved-places UI are wired); now `partial` with accurate notes.
 - Spot checks confirmed accurate as written: `navigation/17` (no reorder UI), `sos/07`–`sos/11` and `sos/16` (no sending/pending/dispatched/en-route/arrived/offline surfaces), `admin-panel/services/*` (no edit/member-management UI), `admin-panel/dashboard/03-reports` (no deltas/period/donut), `admin-panel/states/01|04`, `history/05|07|08` (filter/playback/per-companion absent), `mission/13|19`, `companions/02|05|10`, `profile/06`, `auth/02|12`.
 - The 23 `done` rows were not re-verified visually; they remain "implemented and wired, pixel fidelity unverified".
-- Remaining `missing` work is enumerated by the matrix; several rows are product/architecture decisions rather than buildable screens (e.g. `history/07` playback is blocked until a trip-track recording decision — see the Stage D proposal, and DF-04).
+- Remaining `missing` work is enumerated by the matrix; several rows are product/architecture decisions rather than buildable screens (e.g. `history/07` playback is blocked until a trip-track recording decision — see `docs/TRIP_TRACK_PROPOSAL.md`, and DF-04).
 
 ## Design flaws found in the reference material (to fix or consciously keep)
 
