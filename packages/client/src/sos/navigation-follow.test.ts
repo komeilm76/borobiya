@@ -18,6 +18,15 @@ describe("route-follow camera math (T3.5.6)", () => {
     expect(routeBearing({ lat: 35.0001, lon: 51.004 }, corner)).toBeCloseTo(90, 1);
     expect(routeBearing({ lat: 35.004, lon: 51.01 }, corner)).toBeCloseTo(0, 1);
   });
+  it("chooses the locally nearest segment on both sides of the date line", () => {
+    const crossing: [number, number][] = [[179.99, 0], [-179.999, 0], [-179.999, 0.01]];
+    // The northbound leg is ~220m away in the adjacent world copy; the eastbound leg is ~550m away.
+    const fix = { lon: 179.999, lat: 0.005 };
+    expect(routeBearing(fix, crossing)).toBeCloseTo(0, 1);
+    expect(navigationArrowBearing(fix, crossing, "car")).toBeCloseTo(0, 1);
+    expect(navigationCamera(fix, crossing, "car").bearing).toBeCloseTo(0, 1);
+    expect(routeBearing({ lon: 179.9995, lat: 0 }, [[-179.999, 0], [179.999, 0]])).toBeCloseTo(270, 1);
+  });
   it("uses actual travel heading when reliable and moving, otherwise the route tangent", () => {
     const north: [number, number][] = [[51.38, 35.68], [51.38, 35.69]];
     const moving = { lat: 35.68, lon: 51.38, accuracy: 8, heading: 90, speed: 6 };

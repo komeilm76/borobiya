@@ -1,6 +1,7 @@
 import type { TransportProfile, RoutePoint } from "@/api/mission-routing";
 import type { OwnMapFix } from "@/composables/use-own-map-position";
 import { deviationThreshold } from "@/map/route-deviation";
+import { longitudeNear } from "@/map/longitude-bounds";
 
 export interface NavigationAnnouncementState {
   navigationPending: boolean;
@@ -45,12 +46,16 @@ export function estimateRemainingRouteSeconds(fix: RoutePoint & { accuracy?: num
     fix.accuracy === null || (fix.accuracy !== undefined &&
       (!Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 80))) return null;
   const latScale = Math.cos(fix.lat * Math.PI / 180);
-  const x = fix.lon * latScale, y = fix.lat;
+  const y = fix.lat;
   let nearest = Infinity, progress = 0, total = 0;
+  let previousLon = line[0]![0];
   for (let index = 1; index < line.length; index++) {
-    const a = line[index - 1]!, b = line[index]!;
-    const ax = a[0] * latScale, ay = a[1];
-    const dx = (b[0] - a[0]) * latScale, dy = b[1] - a[1];
+    const rawA = line[index - 1]!, rawB = line[index]!;
+    const nextLon = longitudeNear(rawB[0], previousLon);
+    const a = [previousLon, rawA[1]] as const, b = [nextLon, rawB[1]] as const;
+    const ax = previousLon * latScale, ay = a[1];
+    const dx = (nextLon - previousLon) * latScale, dy = b[1] - a[1];
+    const x = longitudeNear(fix.lon, previousLon) * latScale;
     const length2 = dx * dx + dy * dy;
     const fraction = length2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length2)) : 0;
     const separation = Math.hypot(x - ax - fraction * dx, y - ay - fraction * dy) * 111_195;
@@ -58,6 +63,7 @@ export function estimateRemainingRouteSeconds(fix: RoutePoint & { accuracy?: num
     // On a loop or crossing, favor the earlier segment when both are equally close.
     if (separation < nearest - 0.01) { nearest = separation; progress = total + length * fraction; }
     total += length;
+    previousLon = nextLon;
   }
   if (!Number.isFinite(total) || total <= 0 ||
     nearest > deviationThreshold(profile, fix.accuracy ?? 80)) return null;

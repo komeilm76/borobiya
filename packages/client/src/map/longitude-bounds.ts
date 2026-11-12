@@ -23,13 +23,16 @@ export function shortestLongitudeBounds(longitudes: readonly number[]): [number,
     : [sorted[gapIndex + 1]!, sorted[gapIndex]! + 360];
 }
 
+/** Shift a valid longitude to the nearest copy of an anchor (which may itself be unwrapped). */
+export function longitudeNear(lon: number, anchor: number): number {
+  return lon + 360 * Math.round((anchor - lon) / 360);
+}
+
 /** Keep successive GeoJSON line vertices in adjacent world copies, not 360° apart. */
 export function unwrapRouteLongitudes(points: readonly [number, number][]): [number, number][] {
   let previous: number | null = null;
   return points.map(([lon, lat]) => {
-    const normalized = canonicalLongitude(lon);
-    const adjusted = previous === null ? lon :
-      normalized + 360 * Math.round((previous - normalized) / 360);
+    const adjusted = previous === null ? lon : longitudeNear(lon, previous);
     previous = adjusted;
     return [adjusted, lat];
   });

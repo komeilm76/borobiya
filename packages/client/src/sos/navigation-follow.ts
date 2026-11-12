@@ -1,5 +1,6 @@
 import type { TransportProfile } from "@/api/mission-routing";
 import type { MissionMapPoint } from "./mission-map";
+import { longitudeNear } from "@/map/longitude-bounds";
 
 export type NavigationCamera = {
   center: [number, number];
@@ -22,19 +23,24 @@ export function routeBearing(position: MissionMapPoint, route: readonly [number,
   const latitudeScale = Math.cos(position.lat * Math.PI / 180);
   let closest = -1;
   let best = Infinity;
+  let previousLon = route[0]![0];
+  let fromLon = 0, toLon = 0;
   for (let i = 0; i < route.length - 1; i++) {
     const a = route[i]!, b = route[i + 1]!;
-    const dx = (b[0] - a[0]) * latitudeScale, dy = b[1] - a[1];
+    const nextLon = longitudeNear(b[0], previousLon);
+    const dx = (nextLon - previousLon) * latitudeScale, dy = b[1] - a[1];
     const length2 = dx * dx + dy * dy;
-    if (length2 < 1e-18) continue; // Repeated polyline vertices have no direction.
-    const x = (position.lon - a[0]) * latitudeScale, y = position.lat - a[1];
-    const fraction = Math.max(0, Math.min(1, (x * dx + y * dy) / length2));
-    const squared = (x - fraction * dx) ** 2 + (y - fraction * dy) ** 2;
-    if (squared < best) { best = squared; closest = i; }
+    if (length2 >= 1e-18) { // Repeated polyline vertices have no direction.
+      const x = (longitudeNear(position.lon, previousLon) - previousLon) * latitudeScale, y = position.lat - a[1];
+      const fraction = Math.max(0, Math.min(1, (x * dx + y * dy) / length2));
+      const squared = (x - fraction * dx) ** 2 + (y - fraction * dy) ** 2;
+      if (squared < best) { best = squared; closest = i; fromLon = previousLon; toLon = nextLon; }
+    }
+    previousLon = nextLon;
   }
   if (closest < 0) return 0;
-  const [fromLon, fromLatitude] = route[closest]!;
-  const [toLon, toLatitude] = route[closest + 1]!;
+  const fromLatitude = route[closest]![1];
+  const toLatitude = route[closest + 1]![1];
   const fromLat = fromLatitude * Math.PI / 180;
   const toLat = toLatitude * Math.PI / 180;
   const dLon = (toLon - fromLon) * Math.PI / 180;

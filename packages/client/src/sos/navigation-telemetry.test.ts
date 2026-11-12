@@ -40,6 +40,16 @@ describe("private navigation telemetry", () => {
     expect(formatRemainingTime(3700)).toBe("۱ ساعت و ۲ دقیقه");
   });
 
+  it("estimates date-line route progress locally and never claims a worldwide crossing is on-route", () => {
+    const crossing = [[179.999, 0], [-179.999, 0]] as const;
+    const remaining = estimateRemainingRouteSeconds({ lat: 0, lon: -179.9995, accuracy: 8 }, crossing, 400, "car");
+    expect(remaining).toBeGreaterThanOrEqual(100);
+    expect(remaining).toBeLessThanOrEqual(101); // Always round up; floating-point quarter points can be 100.000…
+
+    expect(estimateRemainingRouteSeconds({ lat: 0, lon: 0, accuracy: 8 }, crossing, 400, "car"))
+      .toBeNull();
+  });
+
   it("uses short Persian time units on a phone without rounding remaining time down", () => {
     expect(formatRemainingTimeCompact(0)).toBe("زیر ۱د");
     expect(formatRemainingTimeCompact(60)).toBe("۱د");
