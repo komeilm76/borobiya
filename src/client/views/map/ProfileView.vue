@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/auth.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useOfflineStore } from '@/stores/offline.ts';
 import { useMapStore } from '@/stores/map.ts';
+import { useTrackStore } from '@/stores/track.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
 import { errorMessage } from '@/api/client.ts';
@@ -14,6 +15,7 @@ const auth = useAuthStore();
 const settings = useSettingsStore();
 const offline = useOfflineStore();
 const map = useMapStore();
+const track = useTrackStore();
 const format = useFormatters();
 const toast = useToast();
 const devices = computed(() => auth.devices);
@@ -24,6 +26,8 @@ const visibleLogins = computed(() => (showAllLogins.value ? logins.value : login
 const isResponder = computed(() => auth.user?.role === 'responder');
 const ready = computed(() => Boolean(auth.user?.readyForMission));
 const readyBusy = ref(false);
+const recordTrack = computed(() => track.optIn);
+const trackBusy = computed(() => track.optInBusy);
 
 const editingName = ref(false);
 const nameDraft = ref('');
@@ -40,6 +44,16 @@ async function toggleReady(): Promise<void> {
     toast.push(errorMessage(caught), 'error', 3800);
   } finally {
     readyBusy.value = false;
+  }
+}
+
+async function toggleRecordTrack(): Promise<void> {
+  if (trackBusy.value) return;
+  try {
+    await track.setOptIn(!recordTrack.value);
+    toast.push(recordTrack.value ? 'ثبت مسیر فعال شد؛ در سفر یا مأموریت بعدی تأیید می‌پرسد.' : 'ثبت مسیر خاموش شد؛ هیچ نقطه‌ای ذخیره نمی‌شود.', 'success', 3000);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
   }
 }
 
@@ -161,6 +175,17 @@ async function remove(place: SavedPlaceView): Promise<void> {
       </div>
       <button type="button" class="ghost-button" :class="{ 'toggle-on': ready }" :disabled="readyBusy" role="switch" :aria-checked="ready" data-testid="ready-toggle" @click="toggleReady">
         {{ readyBusy ? '…' : ready ? 'آماده‌ام' : 'آماده نیستم' }}
+      </button>
+    </div>
+
+    <div class="info-card" data-testid="record-track-card">
+      <span class="mdi mdi-map-marker-path" aria-hidden="true" />
+      <div>
+        <strong>ثبت مسیر</strong>
+        <span>{{ recordTrack ? 'فعال؛ مسیر شما فقط در سفر/مأموریت و با تأیید شما ثبت می‌شود.' : 'غیرفعال؛ هیچ نقطهٔ مسیری ذخیره نمی‌شود.' }}</span>
+      </div>
+      <button type="button" class="ghost-button" :class="{ 'toggle-on': recordTrack }" :disabled="trackBusy" role="switch" :aria-checked="recordTrack" data-testid="record-track-toggle" @click="toggleRecordTrack">
+        {{ trackBusy ? '…' : recordTrack ? 'روشن' : 'خاموش' }}
       </button>
     </div>
 

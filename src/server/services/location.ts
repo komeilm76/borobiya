@@ -8,8 +8,8 @@ import { isValidPoint } from '../domain/geo.ts';
 import { HTTP_EVENTS, ROLES, WS_EVENTS } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
-/** Parses a stored scope JSON array; anything unexpected falls back to the full detail set. */
-function parseScope(value: unknown): ShareScopeDetail[] {
+/** Parses a stored scope JSON array; anything unexpected falls back to the full detail set. Exported for the track authorization path (Stage D). */
+export function parseScope(value: unknown): ShareScopeDetail[] {
   try {
     const parsed = JSON.parse(String(value ?? '[]'));
     if (!Array.isArray(parsed)) return [...SHARE_SCOPE_DETAILS];
@@ -28,8 +28,8 @@ interface LiveFix extends Point {
   recordedAt: number;
 }
 
-type ShareScopeDetail = 'route' | 'motion' | 'accuracy';
-const SHARE_SCOPE_DETAILS: readonly ShareScopeDetail[] = ['route', 'motion', 'accuracy'];
+export type ShareScopeDetail = 'route' | 'motion' | 'accuracy';
+export const SHARE_SCOPE_DETAILS: readonly ShareScopeDetail[] = ['route', 'motion', 'accuracy'];
 
 interface ShareInput {
   recipientId: string;
@@ -38,6 +38,12 @@ interface ShareInput {
   historyFrom?: number;
   historyTo?: number;
   scope?: ShareScopeDetail[];
+}
+
+/** Optional record-a-track context attached to a live fix (Stage D). */
+export interface TrackRecordContext {
+  type: 'trip' | 'mission';
+  id: string;
 }
 
 export interface LiveFixInput extends Point {
@@ -200,7 +206,7 @@ export class LocationService {
     return owners;
   }
 
-  publishLive(identity: AuthIdentity, fix: LiveFixInput, peer: Peer, requestId: string | undefined): void {
+  publishLive(identity: AuthIdentity, fix: LiveFixInput, peer: Peer, requestId: string | undefined, trackContext?: TrackRecordContext | null): void {
     const point: Point = { latitude: fix.latitude, longitude: fix.longitude };
     if (!isValidPoint(point)) throw badRequest('Coordinates are outside the valid range.');
     if (fix.accuracy < 0 || fix.accuracy > 100000) throw badRequest('Accuracy is outside the valid range.');
@@ -211,6 +217,14 @@ export class LocationService {
       accuracy: fix.accuracy, heading: fix.heading ?? null, speed: fix.speed ?? null, recordedAt
     };
     this.liveCache.set(identity.userId, value);
+    if (trackContext) {
+      // Track recording is best-effort and must never break the live path; failures are logged.
+      try {
+        this.ctx.services.track.recordPoint(identity, value, trackContext);
+      } catch (error) {
+        console.error('[track] recordPoint failed', error);
+      }
+    }
     const previousPersist = this.persistedAt.get(identity.userId) ?? 0;
     if (now - previousPersist >= 5_000) {
       this.ctx.repo.run(

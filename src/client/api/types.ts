@@ -9,6 +9,7 @@ export interface UserView {
   securityReady: boolean;
   mustCompleteSecurityQuestions: boolean;
   readyForMission: boolean;
+  recordTrack: boolean;
   averageRating: number;
   createdAt: number;
 }
@@ -136,6 +137,8 @@ export interface MissionView {
   ratingNote?: string | null;
   createdAt: number;
   updatedAt: number;
+  trackStatus?: TrackAvailability;
+  trackConsent?: TrackConsentDecision | null;
 }
 
 /** A user as returned by the recipient picker (`GET /_user/users/search`). */
@@ -463,6 +466,8 @@ export interface TripListItemView {
   updatedAt: number;
   startedAt: number | null;
   completedAt: number | null;
+  trackStatus?: TrackAvailability;
+  trackConsent?: TrackConsentDecision | null;
 }
 
 /** A full trip projection (`GET /_user/trips/:id`, and the create/patch responses). */
@@ -480,4 +485,48 @@ export interface TripInvitationInboxView {
   tripStatus: string;
   inviterUsername: string;
   createdAt: number;
+}
+
+
+/** Availability of replay data for a track context (trip or mission). */
+export type TrackAvailability = 'available' | 'expired' | 'none';
+/** The caller's recorded per-context consent decision. */
+export type TrackConsentDecision = 'accepted' | 'declined';
+
+/** One recorded fix of a track context (`GET /_user/trips/:id/track`). */
+export interface TrackPointView {
+  userId: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  recordedAt: number;
+}
+
+/** Persisted summary for one user's track inside a context (survives the point retention). */
+export interface TrackSummaryView {
+  userId: string;
+  username: string;
+  distanceM: number | null;
+  durationMs: number | null;
+  pointCount: number;
+  firstPointAt: number;
+  lastPointAt: number;
+  quality: 'ok' | 'insufficient_data';
+}
+
+/** Replay payload for a trip or mission track. */
+export interface TrackResponse {
+  contextType: 'trip' | 'mission';
+  contextId: string;
+  availability: TrackAvailability;
+  access: 'member' | 'participant' | 'share' | 'admin';
+  scope: Array<'route' | 'motion' | 'accuracy'> | null;
+  authorizedUntil: number | null;
+  retentionDays: number;
+  window: { from: number; to: number };
+  points: TrackPointView[];
+  summaries: TrackSummaryView[];
+  truncated: boolean;
 }

@@ -10,7 +10,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Shared protocol constants and pure geometry helpers in `src/shared` are imported by the Bun server, the Vue client and Vitest.
 - [x] A declarative route table generates OpenAPI and owns every body, query, auth and rate-limit declaration.
 - [x] One SQLite schema replaces the former PostgreSQL/PostGIS/Drizzle migration stack.
-- [x] Vue 3 `<script setup lang="ts">` SFCs, typed Vue Router 4 routes, Vuetify 3 via `vite-plugin-vuetify`, Tailwind CSS 4 without preflight and nine typed Pinia setup stores replace the hand-written browser modules.
+- [x] Vue 3 `<script setup lang="ts">` SFCs, typed Vue Router 4 routes, Vuetify 3 via `vite-plugin-vuetify`, Tailwind CSS 4 without preflight and ten typed Pinia setup stores (the tenth is the consented-track store, Stage D) replace the hand-written browser modules.
 - [x] Generated assets and the service-worker cache manifest are deterministic and timestamp-free, so unchanged builds do not dirty the checkout.
 - [x] Stage 3 shipped behind the same gate: mission teams with one active membership per (mission, user), an explicit leader for team missions, assisted (eligible-candidate) plus manual administrator staffing, support requests with create/review/approve/partially-approve/reject/withdraw and enforced hand-count-for-hand full approvals, removal-reason visibility restricted to administrators, and realtime publication to the `mission:<id>` audience (`mission.team.updated`, `support.request.created`, `support.request.reviewed`, `support.request.cancelled`).
 
@@ -28,9 +28,9 @@ This checklist maps the original technical specification and roadmap targets to 
 
 - [x] Deterministic offline SVG vector tiles replace Martin, Planetiler, PMTiles and MapLibre.
 - [x] Tile configuration, immutable ETags, content-versioned static assets and a bounded service-worker tile cache are implemented.
-- [x] Live location, bounded live/history sharing, revocation, expiry, snapshots and authorized history windows (scoped, share-gated point reads) are implemented; a replay surface is deliberately absent because no track is recorded for trips or missions.
+- [x] Live location, bounded live/history sharing, revocation, expiry, snapshots and authorized history windows (scoped, share-gated point reads) are implemented; consented track recording for trips and missions is implemented (Stage D) with participant-default replay, grant-scoped share replay and audit-logged administrator reads.
 - [x] Tapping the map selects a destination pin; the sheet shows coordinates and distance from the fix and saves it as a place; places are listed, edited inline and deleted from the profile screen.
-- [x] The history screen (Stage 6) groups finished trips, SOS requests, responder missions and audited location shares into day-grouped tabs with inline detail; any record can spawn a scoped history-window share. Filter, search, replay and companion-level aggregates are intentionally unimplemented (no recorded track, no aggregation endpoints).
+- [x] The history screen (Stage 6) groups finished trips, SOS requests, responder missions and audited location shares into day-grouped tabs with inline detail; any record can spawn a scoped history-window share. Filter, search and companion-level aggregates are intentionally unimplemented (no aggregation endpoints). Replay ships for contexts with a recorded track, gated on the two-step consent; contexts without one say so explicitly.
 - [x] One authenticated WebSocket carries durable events, presence, live fixes, snapshots, sync, talk state and binary audio.
 - [x] Reconnect uses one-use tickets and an event cursor; durable events are committed before publication.
 - [x] Private APIs are never cached by the service worker; static assets and SVG tiles are cached explicitly.

@@ -182,6 +182,11 @@ export class TripsService {
        ORDER BY t.updated_at DESC LIMIT 100`,
       ...(savedOnly ? [identity.userId, identity.userId] : [identity.userId]));
     const saved = this.savedBy(rows.map((row) => String(row.id)), identity.userId);
+    const trackStatuses = this.ctx.services.track.statusesFor('trip', rows.map((row) => String(row.id)));
+    const consentRows = this.ctx.repo.all<{ context_id: string; decision: string }>(
+      `SELECT context_id, decision FROM track_consents WHERE context_type='trip' AND user_id=? AND context_id IN (${rows.map(() => '?').join(',') || "''"})`,
+      identity.userId, ...rows.map((row) => String(row.id)));
+    const consents = new Map(consentRows.map((row) => [String(row.context_id), String(row.decision)]));
     const items = rows.map((row) => {
       const tripId = String(row.id);
       const stopCount = Number(this.ctx.repo.one<{ count: number }>(
@@ -201,7 +206,9 @@ export class TripsService {
         createdAt: Number(row.created_at),
         updatedAt: Number(row.updated_at),
         startedAt: row.started_at === null || row.started_at === undefined ? null : Number(row.started_at),
-        completedAt: row.completed_at === null || row.completed_at === undefined ? null : Number(row.completed_at)
+        completedAt: row.completed_at === null || row.completed_at === undefined ? null : Number(row.completed_at),
+        trackStatus: trackStatuses.get(tripId) ?? 'none',
+        trackConsent: consents.get(tripId) ?? null
       };
     });
     return { items, total: items.length };
@@ -210,7 +217,12 @@ export class TripsService {
   tripDetail(identity: AuthIdentity, tripId: string): Record<string, unknown> {
     const { trip, membership } = this.requireMember(tripId, identity);
     const saved = this.savedBy([tripId], identity.userId);
-    return this.baseProjection(trip, membership, saved, String(membership.role) === TRIP_MEMBER_ROLES.LEADER);
+    const projection = this.baseProjection(trip, membership, saved, String(membership.role) === TRIP_MEMBER_ROLES.LEADER);
+    return {
+      ...projection,
+      trackStatus: this.ctx.services.track.trackStatus('trip', tripId),
+      trackConsent: this.ctx.services.track.callerConsent(identity, 'trip', tripId)
+    };
   }
 
   myInvitations(identity: AuthIdentity): Record<string, unknown> {
@@ -332,11 +344,23 @@ export class TripsService {
   }
 
   completeTrip(identity: AuthIdentity, tripId: string): Record<string, unknown> {
-    return this.transition(identity, tripId, [TRIP_STATUS.ACTIVE], TRIP_STATUS.COMPLETED, { completed_at: this.ctx.clock() });
+    const result = this.transition(identity, tripId, [TRIP_STATUS.ACTIVE], TRIP_STATUS.COMPLETED, { completed_at: this.ctx.clock() });
+    try {
+      this.ctx.services.track.finalizeContext('trip', tripId);
+    } catch (error) {
+      console.error('[track] finalize after trip complete failed; maintenance job will retry', error);
+    }
+    return result;
   }
 
   cancelTrip(identity: AuthIdentity, tripId: string): Record<string, unknown> {
-    return this.transition(identity, tripId, [TRIP_STATUS.PLANNED, TRIP_STATUS.ACTIVE], TRIP_STATUS.CANCELLED, { completed_at: this.ctx.clock() });
+    const result = this.transition(identity, tripId, [TRIP_STATUS.PLANNED, TRIP_STATUS.ACTIVE], TRIP_STATUS.CANCELLED, { completed_at: this.ctx.clock() });
+    try {
+      this.ctx.services.track.finalizeContext('trip', tripId);
+    } catch (error) {
+      console.error('[track] finalize after trip cancel failed; maintenance job will retry', error);
+    }
+    return result;
   }
 
   invite(identity: AuthIdentity, tripId: string, inviteeId: string): Record<string, unknown> {

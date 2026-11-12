@@ -16,13 +16,13 @@ The application sets a strict CSP, frame denial, no-referrer policy, content-typ
 
 ## Data and backups
 
-The SQLite database is the source of truth. It contains users, sessions, security answers, recovery challenges, places, shares, location points, SOS requests, missions, groups, settings, alerts, audit rows and durable events. Place `DATA_DIR` on persistent storage with filesystem snapshots or a coordinated backup process. Because SQLite WAL mode is used for file-backed databases, copy the database and WAL together or use a SQLite-aware backup method.
+The SQLite database is the source of truth. It contains users, sessions, security answers, recovery challenges, places, shares, location points, SOS requests, missions, groups, settings, alerts, audit rows, durable events and — since v9 — consented track data (`track_points`, `track_consents`, `track_summaries`). Place `DATA_DIR` on persistent storage with filesystem snapshots or a coordinated backup process. Because SQLite WAL mode is used for file-backed databases, copy the database and WAL together or use a SQLite-aware backup method.
 
-Location retention is bounded by `LOCATION_RETENTION_HOURS`, and old durable events are purged by maintenance jobs. Realtime caches, tickets, talk floors, presence and static asset caches are reconstructible and do not need backup. Never back up ephemeral audio; audio is never stored.
+Location retention is bounded by `LOCATION_RETENTION_HOURS`, and old durable events are purged by maintenance jobs. Consented track points are purged by the same hourly maintenance pass once they age past `TRIP_TRACK_RETENTION_DAYS` (raw fixes only, 500 rows per batch, summaries persisted first and the purge refuses to touch a context whose summary cannot be written); summaries and trip/mission rows are kept. Realtime caches, tickets, talk floors, presence and static asset caches are reconstructible and do not need backup. Never back up ephemeral audio; audio is never stored.
 
 ## Schema upgrades and migration notes
 
-The application opens the SQLite file and migrates it automatically at startup; there is no separate migration command. Migrations are additive, idempotent and never rewrite rows destructively, and `meta.schema_version` records the applied version (currently 8). Take a backup of the database and its WAL before the first start after any upgrade, and verify `schema_version` afterwards (`sqlite3 DATA_DIR/borobiya.sqlite 'select value from meta where key=\'schema_version\''`). Downgrade is not supported: a binary that predates a migration cannot read rows the newer schema expects, so roll back by restoring the pre-upgrade backup.
+The application opens the SQLite file and migrates it automatically at startup; there is no separate migration command. Migrations are additive, idempotent and never rewrite rows destructively, and `meta.schema_version` records the applied version (currently 9). Take a backup of the database and its WAL before the first start after any upgrade, and verify `schema_version` afterwards (`sqlite3 DATA_DIR/borobiya.sqlite 'select value from meta where key=\'schema_version\''`). Downgrade is not supported: a binary that predates a migration cannot read rows the newer schema expects, so roll back by restoring the pre-upgrade backup.
 
 The migration history, in order:
 
@@ -33,6 +33,9 @@ The migration history, in order:
 - **v6**: one-off reconciliation pass — if an active leader membership exists and the mission's operational owner does not match it, `missions.responder_id` and `sos_requests.assigned_responder_id` follow the leader. Finished missions are untouched.
 - **v7**: `location_shares.scope` — grants carry their explicitly selected detail set (`route` always; optional `motion` and `accuracy`) as a JSON array, or NULL for the pre-v7 full-detail behavior.
 - **v8**: the trip domain — `trips`, `trip_stops`, `group_trips`, `trip_invitations` and `saved_trips`. Additive tables only; no existing row is touched.
+- **v9**: consented track recording — `track_points` (raw fixes, retention-purged), `track_consents` (per-context decisions) and `track_summaries` (distance/duration/quality that survives the raw points), plus `users.record_track` (account opt-in, default OFF). Additive; existing deployments simply start with recording off.
+
+Optional tuning: `TRIP_TRACK_RETENTION_DAYS` (default 180, 1–3650) bounds raw track-point retention; `TRIP_TRACK_ENABLED=false` disables consented recording globally for a deployment (the per-account opt-in and per-context prompt still gate everything when enabled). Both are read at startup; no other wiring is required.
 
 A fresh install runs the same code path: the base schema already contains every table, and the `ensureColumn` guards are no-ops. Seeding demo users (`SEED_DEMO_USERS=1`) is a development convenience and is rejected in production; the database seeds the catalog, settings and the bootstrap administrator regardless.
 

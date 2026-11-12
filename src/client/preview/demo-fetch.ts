@@ -105,7 +105,7 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
 
   /* ------------------------------------------------------ user: me */
   ['GET', /^\/_user\/me$/, () => (state.sessionActive ? envelope(currentUser()) : failure(401, 'UNAUTHORIZED', 'نشستی یافت نشد.'))],
-  ['PATCH', /^\/_user\/me$/, ({ body }) => envelope({ ...currentUser(), ...(body.username ? { username: String(body.username) } : {}) })],
+  ['PATCH', /^\/_user\/me$/, ({ body }) => envelope({ ...currentUser(), ...(body.username ? { username: String(body.username) } : {}), ...(body.recordTrack !== undefined ? { recordTrack: Boolean(body.recordTrack) } : {}) })],
   ['POST', /^\/_user\/ready$/, ({ body }) => {
     D.demoUser.readyForMission = Boolean(body.ready);
     return envelope({});
@@ -225,6 +225,19 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
   ['POST', /^\/_user\/trips\/[^/]+\/save$/, ({ body }) => envelope({ ...D.demoTripDetail, saved: Boolean(body.saved) })],
   ['POST', /^\/_user\/trips\/[^/]+\/invitations$/, () => envelope(D.demoTripDetail)],
   ['POST', /^\/_user\/trips\/[^/]+\/leave$/, () => envelope({ ok: true })],
+
+  /* ----------------------------------- user: track recording (Stage D) */
+  ['POST', /^\/_user\/trips\/[^/]+\/track-consent$/, () => envelope({ ok: true })],
+  ['POST', /^\/_user\/missions\/[^/]+\/track-consent$/, () => envelope({ ok: true })],
+  ['GET', /^\/_user\/trips\/([^/]+)\/track$/, ({ args }) =>
+    args[0] === 'trp_target' ? envelope(D.demoTripTrack) : failure(404, 'NOT_FOUND', 'سفری با این شناسه وجود ندارد.')],
+  ['GET', /^\/_user\/missions\/([^/]+)\/track$/, ({ args }) =>
+    args[0] === 'mis_hist' ? envelope(D.demoMissionTrack) : failure(404, 'NOT_FOUND', 'مأموریتی با این شناسه وجود ندارد.')],
+  ['GET', /^\/_admin\/tracks\/(trip|mission)\/([^/]+)$/, ({ args }) => {
+    if (args[0] === 'trip' && args[1] === 'trp_target') return envelope(D.demoTripTrack);
+    if (args[0] === 'mission' && args[1] === 'mis_hist') return envelope(D.demoMissionTrack);
+    return failure(404, 'NOT_FOUND', 'مسیری ثبت نشده است.');
+  }],
 
   /* ----------------------------------------------- user: realtime */
   ['POST', /^\/_user\/realtime\/ticket$/, () =>

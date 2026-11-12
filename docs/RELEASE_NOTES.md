@@ -1,17 +1,28 @@
 # Release notes
 
+## Unreleased — Stage D: consented track recording (2026-11-12)
+
+Consented GPS track recording for trips and responder missions, per the approved proposal in `docs/TRIP_TRACK_PROPOSAL.md` (the Stage D change set on this branch).
+
+- Schema v9 (additive): `track_points` (raw fixes under retention), `track_consents` (per-context decisions), `track_summaries` (persisted distance/duration/quality that survives the raw points) and `users.record_track` (account opt-in, default OFF).
+- Recording is double-gated: account opt-in plus a per-trip/per-mission prompt at start; declined decisions are persisted and never re-asked. Fixes worse than 100 m accuracy are dropped; teleports (>83 m/s) invalidate the computed summary (`insufficient_data`, NULL stats — never estimated).
+- Replay: context participants read the whole window; history-share recipients read only the sharer's points, scope-projected (route always; heading/speed and accuracy only when granted), until the grant expires or is revoked; everyone else gets 404. Administrators read through `GET /_admin/tracks/:contextType/:contextId`, which audit-logs `admin.track.read` with counts only.
+- Retention: `TRIP_TRACK_RETENTION_DAYS` (default 180) purges raw points in 500-row batches via the existing hourly maintenance job, only after summaries are persisted (fail-closed per context). Trip/mission rows and summaries are never purged by the job.
+- Client: a `track` store (VueUse-persisted opt-in mirror, mission-first consent prompt, throttled publisher fed by the geolocation watch, replay cache), a consent prompt and a recording indicator in the map shell, an account-level toggle on the profile screen, and an honest availability treatment (`available` / `expired` / `none`) with a schematic path view and per-member summary on the history screen.
+- `./boro verify` exits 0: 1224/1224 tests; coverage statements 94.02% / branches 87.25% / functions 94.62% / lines 96.22% (no gate lowered). `history/07-history-playback` and the recorded-statistics rows stay `missing` in the design matrix until a human accepts the recorded preview.
+
 ## Version 2.0.0 — Bun and Vue migration
 
 Release date: 2026-11-08. Branch: `arena/250278b6-borobiya`.
 
 ### Summary
 
-Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules of the 1.0.0 clean rebuild with a Bun-only runtime and a Vue 3 TypeScript application. One Bun process still serves the SPA, the JSON API, the offline SVG tiles and the realtime endpoint, but every runtime primitive is now Bun-native and every browser surface is a typed single-file component. The canonical design images under `design/` remain the visual contract, and the database schema is unchanged (`SCHEMA_VERSION = 2`).
+Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules of the 1.0.0 clean rebuild with a Bun-only runtime and a Vue 3 TypeScript application. One Bun process still serves the SPA, the JSON API, the offline SVG tiles and the realtime endpoint, but every runtime primitive is now Bun-native and every browser surface is a typed single-file component. The canonical design images under `design/` remain the visual contract, and the database schema evolves forward-only through additive migrations (currently `SCHEMA_VERSION = 9`).
 
 ### Runtime
 
 - `Bun.serve` handles HTTP and WebSocket upgrades; the custom RFC 6455 implementation and the `node:http`/`node:stream` imports are gone.
-- `bun:sqlite` replaces `node:sqlite`; the schema is managed by additive, idempotent migrations (schema v8) and every migration runs automatically at startup — see the schema-upgrade notes in `docs/DEPLOYMENT.md`. The v5 leader backfill was hardened so installs that already carry a pre-fix designated leader never mint a second active one; the operational owner reconciles onto the real leader. A legacy v1 database migrates without losing rows (verified by the suite).
+- `bun:sqlite` replaces `node:sqlite`; the schema is managed by additive, idempotent migrations (schema v9) and every migration runs automatically at startup — see the schema-upgrade notes in `docs/DEPLOYMENT.md`. The v5 leader backfill was hardened so installs that already carry a pre-fix designated leader never mint a second active one; the operational owner reconciles onto the real leader. A legacy v1 database migrates without losing rows (verified by the suite).
 - `Bun.password` hashes with Argon2id. Stored hashes remain self-describing, so the format is verifiable and upgradable.
 - `Bun.file`, `Bun.write` and `Bun.Glob` replace every filesystem helper; `scripts/*.ts` run through `bun` and the `boro` shim only executes Bun.
 - `bun run build` clears the previous bundle before building, so a rebuild of unchanged sources is byte-identical instead of accumulating stale hashed chunks.
@@ -23,7 +34,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - Vue 3.5 with `<script setup lang="ts">` in every view, layout and component; 23 views cover the four authentication screens, seven mobile map screens and eleven administrator screens (the seventh, `TripsView`, is the Stage 5 trips and group-rides surface). The history screen (Stage 6) groups finished trips, your SOS requests, responder missions and audited location shares into day-grouped tabs with inline detail and scoped history-window share creation.
 - Vue Router 4 with typed `ROUTE_NAMES`, lazy view imports and role-aware guards.
 - Vuetify 3 registered through `vite-plugin-vuetify`, compiled with the Borobiya design tokens; Tailwind CSS 4 through `@tailwindcss/vite` with preflight disabled so Vuetify's reset stays authoritative.
-- Nine Pinia setup stores (`auth`, `map`, `sos`, `realtime`, `admin`, `settings`, `offline`, `missionTeam`, `trips`) and VueUse for storage, online/network state, media queries, geolocation, debouncing and event listeners.
+- Ten Pinia setup stores (`auth`, `map`, `sos`, `realtime`, `admin`, `settings`, `offline`, `missionTeam`, `trips`, `track`) and VueUse for storage, online/network state, media queries, geolocation, debouncing and event listeners.
 - Motion is declarative first: `<Transition>` and `<TransitionGroup>` for routes, sheets and live lists, `motion-v` with `@vueuse/motion` variants for cards and the command palette, and GSAP for one coordinated reveal timeline. Every duration is `0` under `prefers-reduced-motion`.
 - The service worker is authored in TypeScript (`src/client/service-worker/sw.ts`) and compiled to the browser artifact at build time; `public/` is generated output and git-ignored.
 
@@ -55,7 +66,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 
 `bun run check` is the gate: it builds the Vue bundle and the service worker, typechecks the Bun server (`tsc`), typechecks the Vue client (`vue-tsc --noEmit`), runs the English-only documentation and clean-rebuild guard, and executes the Vitest suite with coverage. `./boro doctor`, `./boro verify`, `bun run bench`, `bun run smoke`, `bun run acceptance` and `./boro deploy:check` complete the release gate.
 
-The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, trips and group rides, the Stage-6 history categories, Vuetify component mounting, all 23 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
+The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, trips and group rides, the Stage-6 history categories, the Stage-D track recording gates (server suite, store gates and components), Vuetify component mounting, all 23 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
 
 Professional visual acceptance against the canonical PNG references remains a deliberately deferred human review: this release contains no browser-driven end-to-end sign-off, no screenshot comparison and no real-device testing.
 

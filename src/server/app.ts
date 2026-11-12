@@ -212,6 +212,8 @@ export async function createApp(overrides: ConfigOverrides = {}): Promise<Borobi
       try {
         context.services.location.expireShares();
         context.services.location.purgePoints(context.clock() - config.locationRetentionHours * 3_600_000);
+        const trackPurge = context.services.track.purgeExpiredTrackPoints();
+        if (trackPurge.blocked > 0) console.error(`[jobs] track purge blocked for ${trackPurge.blocked} context(s); raw points kept until summaries persist`);
         context.repo.purgeEventsOlderThan(new Date(context.clock() - 7 * 86_400_000).toISOString());
         context.services.sos.expireDueOffers();
       } catch (error) {

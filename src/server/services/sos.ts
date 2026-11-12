@@ -488,7 +488,7 @@ export class SosService {
     const sosAction = action === 'arrive' ? null : action;
     const sosTransition = sosAction ? transitionSos(String(mission.sosStatus), sosAction, identity.role) : null;
     if (sosTransition && !sosTransition.ok) throw conflict('The SOS state cannot follow this mission transition.', { reason: sosTransition.reason });
-    return this.ctx.uow.commit((tx) => {
+    const result = this.ctx.uow.commit((tx) => {
       const now = this.ctx.clock();
       const completedAt = transition.next === MISSION_STATUS.COMPLETED ? now : null;
       const cancelledAt = transition.next === MISSION_STATUS.CANCELLED ? now : null;
@@ -507,6 +507,14 @@ export class SosService {
       }, [`user:${mission.requester_id}`, `user:${mission.responder_id}`, 'role:admin', `mission:${missionId}`, `sos:${mission.sos_id}`]);
       return { ok: true, missionId, status: transition.next, sosStatus: sosTransition?.next ?? String(mission.sosStatus) };
     });
+    if (transition.next === MISSION_STATUS.COMPLETED || transition.next === MISSION_STATUS.CANCELLED) {
+      try {
+        this.ctx.services.track.finalizeContext('mission', missionId);
+      } catch (error) {
+        console.error('[track] finalize after mission end failed; maintenance job will retry', error);
+      }
+    }
+    return result;
   }
 
   rateMission(identity: AuthIdentity, missionId: string, rating: number, note: string | undefined): Record<string, unknown> {
@@ -531,7 +539,7 @@ export class SosService {
           OR EXISTS (SELECT 1 FROM mission_members mm WHERE mm.mission_id = m.id AND mm.user_id=? AND mm.assignment_status='active'))
         ORDER BY s.created_at DESC LIMIT ?`,
         identity.userId, identity.userId, identity.userId, Math.min(100, limit));
-    return { items: rows.map((row) => this.publicMission(row)), total: rows.length };
+    return { items: rows.map((row) => this.publicMission(row, identity.userId)), total: rows.length };
   }
 
   nearestResponders(point: Point, limit: number, incidentTypeId?: string): Record<string, unknown> {
@@ -616,14 +624,22 @@ export class SosService {
     };
   }
 
-  private publicMission(row: Record<string, any>): Record<string, unknown> {
+  private publicMission(row: Record<string, any>, viewerId?: string): Record<string, unknown> {
+    const missionId = String(row.missionId);
+    const consentRow = viewerId
+      ? this.ctx.repo.one<Record<string, any>>(
+        'SELECT decision FROM track_consents WHERE context_type=? AND context_id=? AND user_id=?',
+        'mission', missionId, viewerId)
+      : undefined;
     return {
       id: String(row.missionId), sosId: String(row.id), trackingCode: trackingCode(String(row.id)),
       status: String(row.missionStatus), responderId: String(row.missionResponderId),
       requesterId: String(row.requester_id), incidentLabel: String(row.incidentLabel),
       rating: row.missionRating === null || row.missionRating === undefined ? null : Number(row.missionRating),
       ratingNote: row.missionRatingNote ?? null,
-      createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
+      createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
+      trackStatus: this.ctx.services.track.trackStatus('mission', missionId),
+      ...(viewerId !== undefined ? { trackConsent: consentRow ? String(consentRow.decision) : null } : {})
     };
   }
 }

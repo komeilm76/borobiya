@@ -26,6 +26,10 @@ export interface Config {
   allowedOrigins: string[];
   frameAncestors: string[];
   locationRetentionHours: number;
+  /** Days raw trip/mission track points are kept; trip/mission rows and summaries are never purged. */
+  tripTrackRetentionDays: number;
+  /** Server-wide master switch for track recording; personal opt-in still required. */
+  tripTrackEnabled: boolean;
   /** Seconds a mission offer stays valid before it expires. */
   missionOfferTtlSeconds: number;
   wsHeartbeatMs: number;
@@ -212,6 +216,8 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     allowedOrigins: overrides.allowedOrigins ?? (env.ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).filter(Boolean),
     frameAncestors: (overrides.frameAncestors ?? frameAncestorSources(env.FRAME_ANCESTORS ?? '')).filter(validFrameAncestor),
     locationRetentionHours: overrides.locationRetentionHours ?? int(env.LOCATION_RETENTION_HOURS, 168, 1, 8760),
+    tripTrackRetentionDays: overrides.tripTrackRetentionDays ?? int(env.TRIP_TRACK_RETENTION_DAYS, 180, 1, 3650),
+    tripTrackEnabled: overrides.tripTrackEnabled ?? bool(env.TRIP_TRACK_ENABLED, true),
     missionOfferTtlSeconds: overrides.missionOfferTtlSeconds ?? int(env.MISSION_OFFER_TTL_SECONDS, 900, 30, 86400),
     wsHeartbeatMs: overrides.wsHeartbeatMs ?? int(env.WS_HEARTBEAT_MS, 25000, 1000, 120000),
     wsMaxFrameBytes: overrides.wsMaxFrameBytes ?? int(env.WS_MAX_FRAME_BYTES, 65536, 256, 1024 * 1024),

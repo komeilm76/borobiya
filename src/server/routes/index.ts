@@ -26,6 +26,9 @@ const RATE = {
 
 const optionalLimit = optional(number({ min: 1, max: 200, integer: true }));
 const optionalTimestamp = optional(number({ min: 0, max: Number.MAX_SAFE_INTEGER, integer: true }));
+const trackContextTypeValidator = oneOf(['trip', 'mission'] as const);
+const consentBody = shape({ decision: oneOf(['accepted', 'declined'] as const) });
+const trackQuery = shape({ from: optionalTimestamp, to: optionalTimestamp }, { allowUnknown: true });
 const nullableIdentifier: Validator<unknown> = (value, path) =>
   value === null ? null : (value === undefined ? undefined : identifier(value, path));
 
@@ -225,8 +228,8 @@ export function registerRoutes(router: Router<AppContext>): void {
 
   // User account and catalog.
   router.add({ method: 'GET', path: '/_user/me', auth: 'user', tags: ['user'], summary: 'Current account', handler: (ctx) => ok(ctx.app.services.users.me(actor(ctx))) });
-  router.add({ method: 'PATCH', path: '/_user/me', auth: 'user', body: shape({ username }), rate: RATE.mutation, tags: ['user'], summary: 'Change username', handler: (ctx) =>
-    ok(ctx.app.services.users.updateMe(actor(ctx), body<{ username: string }>(ctx).username)) });
+  router.add({ method: 'PATCH', path: '/_user/me', auth: 'user', body: shape({ username: optional(username), recordTrack: optional(boolean()) }), rate: RATE.mutation, tags: ['user'], summary: 'Change username or the track-recording preference', handler: (ctx) =>
+    ok(ctx.app.services.users.updateMe(actor(ctx), body<{ username?: string; recordTrack?: boolean }>(ctx))) });
   router.add({ method: 'GET', path: '/_user/devices', auth: 'user', tags: ['user'], summary: 'Active devices', handler: (ctx) => ok(ctx.app.services.users.devices(actor(ctx))) });
   router.add({ method: 'DELETE', path: '/_user/devices/:sessionId', auth: 'user', rate: RATE.mutation, tags: ['user'], summary: 'Revoke device', handler: (ctx) =>
     ok(ctx.app.services.users.revokeDevice(actor(ctx), ctx.params.sessionId)) });
@@ -296,6 +299,13 @@ export function registerRoutes(router: Router<AppContext>): void {
     ok(ctx.app.services.trips.cancelTrip(actor(ctx), ctx.params.tripId)) });
   router.add({ method: 'POST', path: '/_user/trips/:tripId/leave', auth: 'user', rate: RATE.mutation, tags: ['trips'], summary: 'Leave a trip (member)', handler: (ctx) =>
     ok(ctx.app.services.trips.leaveTrip(actor(ctx), ctx.params.tripId)) });
+  router.add({ method: 'POST', path: '/_user/trips/:tripId/track-consent', auth: 'user', body: consentBody, rate: RATE.mutation, tags: ['trips'], summary: 'Consent to recording this trip track', handler: (ctx) =>
+    ok(ctx.app.services.track.setConsent(actor(ctx), 'trip', ctx.params.tripId, body<{ decision: 'accepted' | 'declined' }>(ctx).decision)) });
+  router.add({ method: 'GET', path: '/_user/trips/:tripId/track', auth: 'user', query: trackQuery, tags: ['trips'], summary: 'Replay a trip track (members / share-scoped recipients)', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.track.readTrack(actor(ctx), 'trip', ctx.params.tripId,
+      input.from !== undefined ? Number(input.from) : undefined, input.to !== undefined ? Number(input.to) : undefined));
+  } });
   router.add({ method: 'POST', path: '/_user/trips/:tripId/invitations', auth: 'user', body: tripInviteBody, rate: RATE.mutation, tags: ['trips'], summary: 'Invite an account to a trip (leader)', handler: (ctx) =>
     ok(ctx.app.services.trips.invite(actor(ctx), ctx.params.tripId, body<{ inviteeId: string }>(ctx).inviteeId)) });
   router.add({ method: 'POST', path: '/_user/realtime/ticket', auth: 'user', rate: RATE.ticket, tags: ['realtime'], summary: 'Issue one-time WebSocket ticket', handler: (ctx) =>
@@ -338,6 +348,13 @@ export function registerRoutes(router: Router<AppContext>): void {
     const input = body<{ rating: number; note?: string }>(ctx);
     return ok(ctx.app.services.sos.rateMission(actor(ctx), ctx.params.id, input.rating, input.note));
   } });
+  router.add({ method: 'POST', path: '/_user/missions/:id/track-consent', auth: 'user', body: consentBody, rate: RATE.mutation, tags: ['mission'], summary: 'Consent to recording this mission track', handler: (ctx) =>
+    ok(ctx.app.services.track.setConsent(actor(ctx), 'mission', ctx.params.id, body<{ decision: 'accepted' | 'declined' }>(ctx).decision)) });
+  router.add({ method: 'GET', path: '/_user/missions/:id/track', auth: 'user', query: trackQuery, tags: ['mission'], summary: 'Replay a mission track (participants / share-scoped recipients)', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.track.readTrack(actor(ctx), 'mission', ctx.params.id,
+      input.from !== undefined ? Number(input.from) : undefined, input.to !== undefined ? Number(input.to) : undefined));
+  } });
 
   // Mission teams and support requests.
   router.add({ method: 'GET', path: '/_user/job-types', auth: 'user', tags: ['mission'], summary: 'Active job types (staffing forms)', handler: (ctx) =>
@@ -358,6 +375,10 @@ export function registerRoutes(router: Router<AppContext>): void {
   // Administration.
   router.add({ method: 'GET', path: '/_admin/overview', auth: 'admin', tags: ['admin'], summary: 'Operations overview', handler: (ctx) => ok(ctx.app.services.admin.overview()) });
   router.add({ method: 'GET', path: '/_admin/reports', auth: 'admin', tags: ['admin'], summary: 'Reports', handler: (ctx) => ok(ctx.app.services.admin.overview()) });
+  router.add({ method: 'GET', path: '/_admin/tracks/:contextType/:contextId', auth: 'admin', tags: ['admin'], summary: 'Audit-logged administrator read of a track (safeguarding)', handler: (ctx) => {
+    const parsed = trackContextTypeValidator(ctx.params.contextType, 'contextType');
+    return ok(ctx.app.services.track.adminReadTrack(actor(ctx), parsed, ctx.params.contextId));
+  } });
   router.add({ method: 'GET', path: '/_admin/dispatch', auth: 'admin', tags: ['admin'], summary: 'Dispatch board data', handler: (ctx) =>
     ok({ queue: ctx.app.services.sos.listSos(actor(ctx), SOS_STATUS.PENDING, 20), groups: ctx.app.services.admin.groups(), incidentTypes: ctx.app.services.admin.incidentTypes() }) });
   router.add({ method: 'GET', path: '/_admin/users', auth: 'admin', query: adminUsersQuery, tags: ['admin'], summary: 'Users', handler: (ctx) =>

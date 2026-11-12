@@ -4,7 +4,7 @@ import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -188,6 +188,42 @@ CREATE TABLE IF NOT EXISTS saved_trips (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at INTEGER NOT NULL,
   PRIMARY KEY (trip_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS track_points (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  context_type TEXT NOT NULL CHECK (context_type IN ('trip','mission')),
+  context_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  latitude REAL NOT NULL,
+  longitude REAL NOT NULL,
+  accuracy REAL NOT NULL,
+  heading REAL,
+  speed REAL,
+  recorded_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_track_points_context ON track_points(context_type, context_id, user_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_track_points_recorded ON track_points(recorded_at);
+CREATE TABLE IF NOT EXISTS track_consents (
+  context_type TEXT NOT NULL CHECK (context_type IN ('trip','mission')),
+  context_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  decision TEXT NOT NULL CHECK (decision IN ('accepted','declined')),
+  decided_at INTEGER NOT NULL,
+  PRIMARY KEY (context_type, context_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS track_summaries (
+  context_type TEXT NOT NULL CHECK (context_type IN ('trip','mission')),
+  context_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  distance_m REAL,
+  duration_ms INTEGER,
+  point_count INTEGER NOT NULL,
+  first_point_at INTEGER NOT NULL,
+  last_point_at INTEGER NOT NULL,
+  quality TEXT NOT NULL CHECK (quality IN ('ok','insufficient_data')),
+  computed_at INTEGER NOT NULL,
+  PRIMARY KEY (context_type, context_id, user_id)
 );
 CREATE TABLE IF NOT EXISTS saved_places (
   id TEXT PRIMARY KEY,
@@ -390,6 +426,9 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
  *       ('route' | 'motion' | 'accuracy'). NULL keeps the pre-v7 behaviour (every detail).
  *   v8: trips, trip_stops, group_trips, trip_invitations and saved_trips — the trip domain
  *       (Stage 5). Additive tables only; no existing row is touched.
+ *   v9: track recording (Stage D) — trip/mission-scoped consents, raw points and persisted
+ *       summaries (track_points, track_consents, track_summaries), plus users.record_track
+ *       (account opt-in, default 0). Additive only; no existing row is touched.
  *
  * @param config Runtime configuration.
  * @returns A ready Bun SQLite handle with WAL, foreign keys and a busy timeout.
@@ -450,6 +489,8 @@ export function openDatabase(config: Config): SqliteDatabase {
   if (!database.prepare("SELECT 1 FROM pragma_table_info('location_shares') WHERE name='scope'").get()) {
     database.exec('ALTER TABLE location_shares ADD COLUMN scope TEXT');
   }
+  // v9: account-level opt-in for trip/mission track recording; off by default.
+  ensureColumn(database, 'users', 'record_track', "INTEGER NOT NULL DEFAULT 0");
   // v6: the operational owner references must follow the active leader/membership. Reconcile
   // rows whose designation predates the fix; active leader wins, finished missions stay frozen.
   database.exec(`

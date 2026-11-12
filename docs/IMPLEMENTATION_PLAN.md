@@ -1,6 +1,6 @@
 # Borobiya 2.0.0 — Implementation Plan (Missions, Sharing Center, Trips, History)
 
-Status: Stage 2 landed (commit range d07c944..eb1cc6b); Stage 3 landed (8c7893c backend, e721106 client). Each stage ships as focused
+Status: Stages 2–7 landed; Stage D (consented track recording for trips and responder missions) landed on this branch. Each stage ships as focused
 commits on the working branch and is reported separately. This document is the live plan; it is
 updated as stages land.
 
@@ -86,6 +86,13 @@ Defaults adopted for open sub-decisions (flagged for owner review, not silently 
   via the configured map/routing infrastructure (inspect what is actually wired before choosing).
 - **Stage 6 — History.** Mission history and trip history as separate categories, detail views,
   user-controlled share scopes from history records, Sharing Center integration.
+- **Stage D — Consented track recording (trips and responder missions).** Account opt-in
+  (default OFF, `users.record_track`) plus a per-trip/per-mission consent prompt at start; recording
+  is gated on both and published best-effort on the `location.update` socket with a
+  `contextType`/`contextId` pair. Replay: context participants by default, history-share recipients
+  by window-covering grant with the grant's scope projection, audit-logged administrator read.
+  Retention `TRIP_TRACK_RETENTION_DAYS` (default 180) applies to raw points only; summaries are
+  persisted before purge (fail-closed); `insufficient_data` is never estimated.
 - **Stage 7 — Documentation and final review.** DESIGN_MATRIX/ACCEPTANCE/API/ADMIN/USER manuals,
   migration notes, authorization pass, backward-compatibility review, final report.
 
@@ -100,6 +107,28 @@ Defaults adopted for open sub-decisions (flagged for owner review, not silently 
 
 ## Stage log
 
+- Stage D (this commit): consented track recording end to end — schema v9 adds `track_points`,
+  `track_consents`, `track_summaries` and `users.record_track` (default OFF); a `TrackService`
+  records a fix only when the account opt-in is on, per-context consent is `accepted` and the
+  context is eligible (active trip, or a live mission for its participants); accuracy worse than
+  100 m is dropped; teleports (>83 m/s) invalidate the summary (`insufficient_data`, NULL stats,
+  never estimated). Replay `GET /_user/trips/:id/track` and `GET /_user/missions/:id/track` serve
+  participants (members / requester + responder + team) and window-covering history-share
+  recipients (sharer's points only, scope-projected route/motion/accuracy, `authorizedUntil`
+  reported); everyone else gets 404; administrators read through `GET /_admin/tracks/:type/:id`,
+  which writes `admin.track.read` with counts only (no coordinates). Trip detail/list and mission
+  projections carry `trackStatus` (`available`/`expired`/`none`) and the caller's consent decision;
+  terminal transitions (trip complete/cancel, mission complete/cancel) persist the summary before
+  retention; the hourly maintenance job purges raw points older than `TRIP_TRACK_RETENTION_DAYS`
+  (500-row batches, summaries first, fail-closed per context — a context whose summary cannot be
+  persisted keeps every point). Client: a `track` store (VueUse-persisted opt-in mirror,
+  mission-first prompt, throttled publisher fed by the geolocation watch, replay cache), a
+  consent prompt and a recording indicator in the map shell, an account-level toggle on the
+  profile screen, honest availability copy plus a schematic path and per-member summary on the
+  history screen (trips and missions), and client surfaces for the prompt, the indicator and replay are covered by `tests/track-store.test.ts` and `tests/track-components.test.ts`. `./boro verify`
+  exits 0: 1224/1224 tests, coverage statements 94.02% / branches 87.25% / functions 94.62% /
+  lines 96.22% (thresholds pass; no gate lowered). `history/07-history-playback` and the recorded
+  statistics stay `missing` in the design matrix until a human accepts the recorded preview.
 - Stage C (2026-11-08, this commit): design-reference review of all 141 canonical references. A code-vs-matrix audit confirmed the matrix as the single authority; all 141 canonical PNGs were verified 1:1 against the 141 matrix rows (no missing/extra/duplicated references). Four stale rows were corrected — `mission/01-mission-ready-on`, `mission/02-mission-ready-off` (readiness switch is wired on the profile screen), `profile/08-bookmarks`, `profile/09-bookmark-edit` (saved-places UI ships: list, inline edit, delete) — tally now done 23 / partial 70 / missing 31 / superseded 11 / reference 5 / deviation 1. Six state families were kept as separate rows; no row was flipped to `done` (visual acceptance remains a deferred human review, P5). Targeted code checks confirmed the remaining `missing` rows as accurate (navigation/17; sos/07–11, sos/16; admin services edit/members; admin reports; admin states 01/04; history/05/07/08; mission/13/19; companions/02/05/10; profile/06; auth/02/12). Playback (`history/07`) stays blocked on the Stage D trip-track recording decision. Method and findings are recorded in the "Stage C review log (2026-11-08)" section of `docs/DESIGN_MATRIX.md`.
 
 - Stage 7 (this commit): documentation and final review — a docs audit was run against the implementation (USER_MANUAL, ADMIN_MANUAL, ACCEPTANCE, STATUS, RELEASE_NOTES, DESIGN_MATRIX history rows 09-11 notes grounded in the canonical mockups: the designed skeleton list/pagination indicator, the empty-state illustration and CTA, and the cached-snapshot offline framing are all absent and stay marked partial). The served `/_public/openapi.json` was generated in-process and diffed against the 102 route registrations: 14 public (7 `/_public/*` readers and the 7 `/_auth/*` entry points), 49 user and 39 admin operations, security markers consistent, and every mutating route declares a rate bucket. A route authorization audit is recorded in `docs/SECURITY.md` ("Authorization audit (Stage 7)"): foreign/unknown ids answer 404 never 403, administrator-only projections never leave the admin surface, with the enforcing test suites named as evidence. The backward-compatibility review found and closed one gap: the v5 leader backfill minted a second active leader on pre-fix files whose stale owner's membership had been removed, violating `idx_mission_members_one_leader` and refusing the upgrade — the backfill now keeps an existing active leader (v6 reconciles the operational owner onto it), with two regression cases in tests/database.test.ts (pre-team designated leader; pre-team `offer_accept` backfill). Migration notes (v1 through v8, with pre-upgrade backup and `meta.schema_version` check) added to docs/DEPLOYMENT.md; docs/ACCEPTANCE.md no longer claims a replay surface that does not exist. USER_MANUAL, ADMIN_MANUAL, STATUS, RELEASE_NOTES, ACCEPTANCE, SECURITY, DEPLOYMENT, DESIGN_MATRIX and this plan updated. `./boro verify` exits 0: 1156/1156 tests, coverage statements 94.09% / branches 88.29% / functions 94.32% / lines 96.12% (thresholds pass; no gate lowered).

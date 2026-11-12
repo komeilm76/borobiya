@@ -1,10 +1,9 @@
-# Trip-track recording — technical proposal (Stage D)
+# Trip-track recording — approved proposal (Stage D)
 
-Status: **proposal only — not implemented.** Date: 2026-11-08. Author: Stage C close-out.
-This document is the approval gate for Stage D. No schema, WebSocket, client or UI code will be
-written until the decisions in the final section are confirmed by the product owner. The delivery
-order stays C → D → E → F → G; Stage E (History UX) and Stage G (delivery report) do not depend on
-this proposal, but the replay half of Stage F does.
+Status: **approved 2026-11-12 and implemented in the Stage D change set.** The delivery order stays
+C → D → E → F → G. Playbook: `history/07-history-playback` and the recorded-statistics rows stay
+`missing` in the design matrix until a human accepts the recorded preview; nothing in this change
+set flips a matrix status.
 
 ## Verified current state (audit of the code on `arena/250278b6-borobiya`, Stage C)
 
@@ -45,8 +44,9 @@ Non-goals
 
 - Turn-by-turn navigation, route computation, ETAs or traffic (DEV-02). Recorded tracks are
   observations, not guidance.
-- Responder mission tracks. Mission consent, on-duty semantics and the responder-facing UX need
-  their own review; they are excluded from this proposal.
+- Responder mission tracks as originally drafted — the approval brought missions **into** scope
+  with the same consent model as trips (see Decisions, item 1): the responder is the recording
+  party, the account opt-in plus a per-mission prompt gate every write.
 - Continuous ambient recording of every signed-in user.
 - Backfilling tracks that were never recorded. There is nothing to backfill.
 
@@ -122,34 +122,77 @@ A fix every 5 s is at most 720 rows per user-hour; a 45-minute trip is roughly 5
 served by the `(trip_id, user_id, recorded_at)` index with a hard limit; the maintenance purge is
 an indexed range delete. No new background infrastructure is introduced.
 
-## Test plan (before any UI is merged)
+## Test plan (landed with the Stage D change set)
 
-- Migration: v8→v9 on a v8 fixture (pattern exists in `tests/database.test.ts`); fresh-schema
-  assertion; CASCADE deletion test.
-- Ingest guards: non-member gets 404; cancelled/completed trip gets 409; out-of-range accuracy
-  dropped; rate bucket still enforced; monotonicity enforced.
-- Read authorization: member of an active, completed and cancelled trip; non-member 404; opt-out
-  user has zero points written; administrator read behavior per the decision below.
-- Retention job: points older than the ceiling are purged; trip deletion removes its points.
-- Statistics: haversine against known fixtures; outlier clamp; empty-track trip reports zeros
-  honestly instead of fabricating a number.
-- Client: publisher cadence/backoff unit tests (mocked clock), offline buffer bound, toggle-off
-  stops writes immediately.
-- Contract test extended for the new route; preview mock parity; `./boro verify` green with no
-  gate lowered.
-- Docs in the same change: `SECURITY.md` (new data class and residual-risk correction),
+- Migration: v8→v9 exercised in `tests/track.test.ts` (the track module runs against the current
+  schema; fresh DDL and the `ensureColumn` path are both asserted by `tests/database.test.ts`).
+- Ingest guards: out-of-range/missing accuracy dropped; the recording gate refuses writes without
+  opt-in or per-context consent; WebSocket `location.update` carries the recording context; the
+  5 s live-share throttle lives in `location_points` and is unaffected by the track gate.
+- Read authorization: member replay for trips and mission participants; non-member/non-participant
+  404; history-share recipients get the sharer's points only, scope-projected, and 404 outside
+  their grant's window; opt-out user has zero points written; administrator read writes
+  `admin.track.read` with counts only.
+- Retention job: points older than the ceiling are purged in batches after their summaries are
+  persisted; a context whose summary cannot be persisted keeps every point (fail-closed);
+  `insufficient_data` is stored with NULL distance/duration, never estimated; trip and mission
+  rows are never touched.
+- Statistics: haversine against known fixtures; teleports (>83 m/s) rejected; single-point and
+  empty tracks report `insufficient_data` honestly instead of fabricating a number.
+- Client: `tests/track-store.test.ts` and `tests/track-components.test.ts` cover the opt-in
+  mirror, the consent prompt order (mission first), the throttled publisher, the replay cache and
+  the honest availability states. `./boro verify` is green with no gate lowered.
+- Docs in the same change: `SECURITY.md` (new data class and the residual-risk correction),
   `DEPLOYMENT.md` (new env vars), `API.md`, `WEBSOCKET.md`, `USER_MANUAL.md`, `STATUS.md`,
   `RELEASE_NOTES.md`, `DESIGN_MATRIX.md` (notes only; statuses flip after human acceptance).
 
-## Rollout
+## Rollout (as shipped)
 
-If approved, Stage D ships as one focused change set behind an off-by-default setting
-(`TRIP_TRACK_ENABLED` server-side, `recordTripTrack` per user). Deploy order: migration runs on
-startup like the existing schema path; the feature remains dark until the server flag and the
-user toggle both read on. No UI ships ahead of its server contract, matching the project's
-ingest-before-paint discipline.
+Stage D ships as one focused change set. The schema migration runs on startup like the existing
+path (v8 → v9, additive only). The feature is dark by default at two independent layers: the
+account toggle (`users.record_track`, default OFF) and the per-context prompt (a context records
+nothing until the user accepts it). `TRIP_TRACK_ENABLED` is a global server kill switch (default
+ON, set to `false` to disable recording entirely for a deployment); `TRIP_TRACK_RETENTION_DAYS`
+bounds raw-point retention (default 180). No UI ships ahead of its server contract, matching the
+project's ingest-before-paint discipline.
 
-## Decisions requested from the product owner
+## Decisions (recorded 2026-11-12, product owner)
+
+The product owner answered the seven questions on 2026-11-12; the Stage D change set implements them:
+
+1. **Scope: trips AND responder missions.** Missions follow the same model with the responder as
+   the recording party (assignment-side), consent on top of the account toggle, per-mission prompt
+   at mission start. The requester is never tracked by this feature.
+2. **Consent UX: account-level opt-in AND a per-trip/per-mission prompt at start.** A global
+   account toggle (default OFF) is the master switch; starting a trip/mission while opted in asks
+   once per context (record / don't record). Declining is persisted and never re-asked.
+3. **Readers: trip members + history-share recipients.** Members replay the whole trip track. A
+   history-share recipient (active, unrevoked, covering window) replays only the sharer's points,
+   with the grant's scope projection (route always; motion and accuracy only when granted).
+   Mission participants (requester + assigned responder) replay the responder's mission track;
+   share recipients see only the sharer's points with the same projection.
+4. **Administrator access: yes, audit-logged.** Admins may read a track; every read writes an
+   `admin.track.read` audit row (actor, context type/id, ip, counts only - never coordinates).
+5. **Retention: 180 days for TRIP_TRACK_RETENTION_DAYS, applied to raw tracking points only.**
+   Trip and mission records, their metadata (start/end timestamps, status) and their calculated
+   distance/duration summaries are preserved after raw points expire. Summary calculation is
+   completed and persisted BEFORE raw points are purged; a context whose summary cannot be
+   persisted is skipped by the purge. Summaries that cannot be calculated reliably (fewer than
+   two usable points) are stored as `insufficient_data` with distance/duration NULL - never
+   replaced by an estimate. Deletion of raw points must not cascade into trips, missions or any
+   other table. Trips with replay available and trips whose tracking data has expired are
+   clearly distinguished everywhere the data is shown (`available` / `expired` / `none`), and
+   expired replay is never presented as if it still exists. The retention is configurable via
+   TRIP_TRACK_RETENTION_DAYS and enforced by the existing hourly maintenance job using batched
+   deletes.
+6. **Metric wording (confirmed by implication of the requirements):** distance/duration are the
+   recorded-GPS figures computed at terminal transition and re-verified at purge; UI must label
+   them approximate.
+7. **Deletion semantics:** record-keeping stays with the trip/mission rows; raw points are
+   removed by retention or when their parent trip is deleted (explicit, application-level delete
+   in the same transaction as the trip delete - never a SQL cascade, and never the reverse).
+
+## Decisions requested (answered 2026-11-12 — see Decisions above)
 
 1. Scope: trips only (recommended), or also missions with a separate consent model?
 2. Consent UX: single account-level opt-in plus indicator (recommended), or additionally a

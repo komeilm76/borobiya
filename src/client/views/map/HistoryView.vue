@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useSosStore } from '@/stores/sos.ts';
 import { useTripsStore } from '@/stores/trips.ts';
+import TrackReplayPanel from '@/components/TrackReplayPanel.vue';
 import { useAuthStore } from '@/stores/auth.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
@@ -246,6 +247,14 @@ function starRow(rating: number): number[] {
                   اعضا: {{ (tripDetail.members ?? []).map((member) => member.username).join('، ') }}
                 </p>
               </template>
+              <TrackReplayPanel
+                v-if="tripDetail"
+                context-type="trip"
+                :context-id="tripDetail.id"
+                :availability="tripDetail.trackStatus ?? 'none'"
+                :from="tripDetail.startedAt ?? tripDetail.createdAt"
+                :to="tripDetail.completedAt ?? tripDetail.updatedAt"
+              />
               <div class="history-detail__actions">
                 <button type="button" class="ghost-button" data-testid="history-trip-repeat" @click="repeatTrip">
                   <span class="mdi mdi-repeat" aria-hidden="true" /><span>تکرار این سفر</span>
@@ -352,6 +361,13 @@ function starRow(rating: number): number[] {
                 </div>
                 <p v-if="mission.ratingNote" class="sheet__status">یادداشت درخواست‌کننده: {{ mission.ratingNote }}</p>
                 <p v-else-if="mission.rating == null" class="sheet__status">هنوز امتیازی ثبت نشده است.</p>
+                <TrackReplayPanel
+                  context-type="mission"
+                  :context-id="mission.id"
+                  :availability="mission.trackStatus ?? 'none'"
+                  :from="mission.createdAt"
+                  :to="mission.updatedAt"
+                />
                 <div class="history-detail__actions">
                   <button type="button" class="ghost-button" :data-testid="`history-share-toggle-mis-${mission.id}`" @click="toggleShareFor(`mis:${mission.id}`)">
                     <span class="mdi mdi-share-variant" aria-hidden="true" /><span>اشتراک این بازه</span>

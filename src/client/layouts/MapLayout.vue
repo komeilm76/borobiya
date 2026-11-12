@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useEventListener, watchDebounced } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth.ts';
@@ -14,6 +14,9 @@ import { ROUTE_NAMES } from '@/router/index.ts';
 import { HTTP_EVENTS, WS_EVENTS } from '@shared/protocol.ts';
 import { useToast } from '@/composables/useToast.ts';
 import MapCanvas from '@/components/MapCanvas.vue';
+import TrackConsentPrompt from '@/components/TrackConsentPrompt.vue';
+import TrackRecordingIndicator from '@/components/TrackRecordingIndicator.vue';
+import { useTrackStore } from '@/stores/track.ts';
 
 /**
  * Mobile application shell: the map canvas stays mounted while the bottom sheet shows the
@@ -27,6 +30,7 @@ const map = useMapStore();
 const sos = useSosStore();
 const trips = useTripsStore();
 const realtime = useRealtimeStore();
+const track = useTrackStore();
 const offline = useOfflineStore();
 const motion = useMotionPreferences();
 const toast = useToast();
@@ -62,6 +66,10 @@ function onCenterOnMe(): void {
 }
 
 const unsubscribers: Array<() => void> = [];
+
+// Consented trajectory publishing: best-effort and gated inside the track store (opt-in +
+// per-context consent). The live location socket keeps working even when the gate refuses.
+watch(() => map.ownFix, (fix) => { if (fix) track.publishFix(fix); });
 
 onMounted(async () => {
   map.startLocation();
@@ -267,6 +275,9 @@ async function logout(): Promise<void> {
           <span>{{ tab.label }}</span>
         </RouterLink>
       </nav>
+
+      <TrackConsentPrompt />
+      <TrackRecordingIndicator />
 
       <MapCanvas />
 

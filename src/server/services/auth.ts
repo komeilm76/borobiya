@@ -344,6 +344,7 @@ export class AuthService {
       securityReady: Boolean(row.security_ready),
       mustCompleteSecurityQuestions: Boolean(row.must_complete_security_questions),
       readyForMission: Boolean(row.ready_for_mission),
+      recordTrack: Boolean(row.record_track),
       averageRating: Number(row.average_rating),
       createdAt: Number(row.created_at)
     };

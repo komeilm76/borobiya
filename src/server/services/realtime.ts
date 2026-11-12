@@ -6,7 +6,7 @@ import { badRequest, forbidden, HttpError, isHttpError } from '../core/errors.ts
 import { identifier, latitude, longitude, number, oneOf, optional, parse, positiveInteger, shape, text } from '../core/validate.ts';
 import { AUDIO, CACHE, ROLES, WS_EVENTS } from '../../shared/protocol.ts';
 import { TalkFloor, type TalkState } from './talk.ts';
-import type { LiveFixInput } from './location.ts';
+import type { LiveFixInput, TrackRecordContext } from './location.ts';
 import type { AppContext } from './context.ts';
 
 interface TicketRecord {
@@ -33,7 +33,9 @@ export class RealtimeService {
     accuracy: number({ min: 0, max: 100000 }),
     heading: optional(number({ min: 0, max: 360 })),
     speed: optional(number({ min: 0, max: 200 })),
-    recordedAt: optionalClock
+    recordedAt: optionalClock,
+    contextType: optional(oneOf(['trip', 'mission'] as const)),
+    contextId: optional(identifier)
   });
   private readonly subscribeSchema = shape({
     type: oneOf([WS_EVENTS.SUBSCRIBE]),
@@ -156,6 +158,13 @@ export class RealtimeService {
         }
         case WS_EVENTS.LOCATION_UPDATE: {
           const input = parse(this.locationSchema, message, 'message') as Record<string, any>;
+          if ((input.contextType === undefined) !== (input.contextId === undefined)) {
+            this.sendError(peer, 'INVALID_INPUT', 'contextType and contextId must be provided together.', undefined, input.requestId);
+            return;
+          }
+          const trackContext: TrackRecordContext | null = input.contextType && input.contextId
+            ? { type: input.contextType, id: String(input.contextId) }
+            : null;
           const limit = this.ctx.limiters.consume(
             { name: 'ws-location', capacity: 60, refillPerSecond: 1, windowMs: 60_000 },
             `${peer.identity.sessionId}:location`);
@@ -163,7 +172,7 @@ export class RealtimeService {
             this.sendError(peer, 'RATE_LIMITED', 'Location update rate exceeded.', { retryAfterMs: limit.retryAfterMs }, input.requestId);
             return;
           }
-          this.ctx.services.location.publishLive(peer.identity, input as LiveFixInput, peer, input.requestId);
+          this.ctx.services.location.publishLive(peer.identity, input as LiveFixInput, peer, input.requestId, trackContext);
           return;
         }
         case WS_EVENTS.TALK_START: {

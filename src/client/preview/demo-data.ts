@@ -26,7 +26,7 @@ export const LNG = 51.3312;
 /* ---------------------------------------------------------------- users */
 
 export const users = [
-  { id: DEMO_USER_ID, username: DEMO_USERNAME, role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: true, averageRating: 4.6, createdAt: T0 - 340 * DAY },
+  { id: DEMO_USER_ID, username: DEMO_USERNAME, role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: true, recordTrack: true, averageRating: 4.6, createdAt: T0 - 340 * DAY },
   { id: 'usr_reza', username: 'reza.m', role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: true, averageRating: 4.8, createdAt: T0 - 400 * DAY },
   { id: 'usr_maryam', username: 'maryam.a', role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: true, averageRating: 5.0, createdAt: T0 - 380 * DAY },
   { id: 'usr_nima', username: 'nima.t', role: 'responder', isActive: true, securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false, averageRating: 4.2, createdAt: T0 - 290 * DAY },
@@ -116,6 +116,59 @@ export const recordedTrack = Array.from({ length: 48 }, (_, index) => {
   };
 });
 
+/** Great-circle distance in metres (mirrors the server haversine). */
+function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6_371_000;
+  const toRad = (deg: number): number => (deg * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Track payloads served by the preview for the featured (recorded) trip and mission. */
+function buildTrackEnvelope(contextType: 'trip' | 'mission', contextId: string, startAt?: number, durationMs?: number): Record<string, unknown> {
+  const span = durationMs ?? 0;
+  const points = recordedTrack.map((point, index) => ({
+    userId: DEMO_USER_ID,
+    latitude: point.latitude,
+    longitude: point.longitude,
+    accuracy: point.accuracy,
+    heading: point.heading,
+    speed: point.speed,
+    recordedAt: startAt === undefined ? point.recordedAt
+      : startAt + Math.round((index / (recordedTrack.length - 1)) * span)
+  }));
+  let distanceM = 0;
+  for (let index = 1; index < points.length; index++) {
+    distanceM += haversineMeters(points[index - 1].latitude, points[index - 1].longitude, points[index].latitude, points[index].longitude);
+  }
+  const firstPointAt = points[0].recordedAt;
+  const lastPointAt = points[points.length - 1].recordedAt;
+  return {
+    contextType,
+    contextId,
+    availability: 'available',
+    access: 'member',
+    scope: null,
+    authorizedUntil: null,
+    retentionDays: 180,
+    window: { from: firstPointAt, to: lastPointAt },
+    points,
+    summaries: [
+      {
+        userId: DEMO_USER_ID, username: DEMO_USERNAME,
+        distanceM: Math.round(distanceM), durationMs: lastPointAt - firstPointAt,
+        pointCount: points.length, firstPointAt, lastPointAt, quality: 'ok'
+      }
+    ],
+    truncated: false
+  };
+}
+
+export const demoTripTrack = buildTrackEnvelope('trip', 'trp_target');
+export const demoMissionTrack = buildTrackEnvelope('mission', 'mis_hist', T0 - 2 * DAY + 11 * MIN, 74 * MIN);
+
 /* ---------------------------------------------------- SOS and missions */
 
 /** The offer currently addressed to the demo responder. */
@@ -174,14 +227,16 @@ export const supportRequestsForTeam = [
 /** A plain single-responder mission assigned to the demo responder (responder perspective). */
 export const plainMission = {
   id: 'mis_single', sosId: 'sos_single', trackingCode: 905, responderId: DEMO_USER_ID, requesterId: 'usr_parsa',
-  incidentLabel: 'پزشکی', status: 'on_the_way', createdAt: T0 - 31 * MIN, updatedAt: T0 - 4 * MIN
+  incidentLabel: 'پزشکی', status: 'on_the_way', createdAt: T0 - 31 * MIN, updatedAt: T0 - 4 * MIN,
+  trackStatus: 'none', trackConsent: 'accepted'
 };
 
 /** A completed mission the demo user ran as responder (history). */
 export const responderCompletedMission = {
   id: 'mis_hist', sosId: 'sos_hist', trackingCode: 871, responderId: DEMO_USER_ID, requesterId: 'usr_parsa',
   incidentLabel: 'تصادف', status: 'completed', rating: 4, ratingNote: 'رسیدن سریع، برخورد حرفه‌ای',
-  createdAt: T0 - 2 * DAY, updatedAt: T0 - 2 * DAY + 3 * HOUR
+  createdAt: T0 - 2 * DAY, updatedAt: T0 - 2 * DAY + 3 * HOUR,
+  trackStatus: 'available', trackConsent: 'accepted'
 };
 
 /** The request the demo user filed as a requester (history, rated). */
@@ -215,23 +270,27 @@ export const demoTrips = [
     id: 'trp_target', name: 'بازدید از ایستگاه تازه تأسیس شمال', status: 'completed', saved: true, role: 'leader',
     ownerId: DEMO_USER_ID, ownerUsername: DEMO_USERNAME, stopCount: 3, memberCount: 2,
     createdAt: T0 - 3 * DAY - 2 * HOUR, updatedAt: T0 - 3 * DAY + 2 * HOUR,
-    startedAt: T0 - 3 * DAY, completedAt: T0 - 3 * DAY + 92 * MIN
+    startedAt: T0 - 3 * DAY, completedAt: T0 - 3 * DAY + 92 * MIN,
+    trackStatus: 'available', trackConsent: 'accepted'
   },
   {
     id: 'trp_relay', name: 'تحویل تجهیزات به ایستگاه ۱۲', status: 'completed', saved: false, role: 'member',
     ownerId: 'usr_reza', ownerUsername: 'reza.m', stopCount: 2, memberCount: 3,
     createdAt: T0 - 8 * DAY, updatedAt: T0 - 8 * DAY + 5 * HOUR,
-    startedAt: T0 - 8 * DAY + 1 * HOUR, completedAt: T0 - 8 * DAY + 4 * HOUR
+    startedAt: T0 - 8 * DAY + 1 * HOUR, completedAt: T0 - 8 * DAY + 4 * HOUR,
+    trackStatus: 'expired', trackConsent: 'accepted'
   },
   {
     id: 'trp_round', name: 'گشت دوره‌ای منطقه ۷', status: 'planned', saved: false, role: 'leader',
     ownerId: DEMO_USER_ID, ownerUsername: DEMO_USERNAME, stopCount: 4, memberCount: 1,
-    createdAt: T0 - 2 * DAY, updatedAt: T0 - 2 * DAY, startedAt: null, completedAt: null
+    createdAt: T0 - 2 * DAY, updatedAt: T0 - 2 * DAY, startedAt: null, completedAt: null,
+    trackStatus: 'none', trackConsent: null
   },
   {
     id: 'trp_drill', name: 'تمرین امداد جاده‌ای (لغو شده)', status: 'cancelled', saved: true, role: 'leader',
     ownerId: DEMO_USER_ID, ownerUsername: DEMO_USERNAME, stopCount: 2, memberCount: 4,
-    createdAt: T0 - 11 * DAY, updatedAt: T0 - 11 * DAY + 3 * HOUR, startedAt: null, completedAt: null
+    createdAt: T0 - 11 * DAY, updatedAt: T0 - 11 * DAY + 3 * HOUR, startedAt: null, completedAt: null,
+    trackStatus: 'none', trackConsent: null
   }
 ];
 

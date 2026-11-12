@@ -61,6 +61,24 @@ describe('preview demo mock — every handler answers deterministically', () => 
     expect(after.data.mustCompleteSecurityQuestions).toBe(false);
   });
 
+  it('track consent and replay handlers serve the featured recorded contexts only', async () => {
+    const me = await (await call('PATCH', '/_user/me', { recordTrack: true })).json();
+    expect(me.data.recordTrack).toBe(true);
+    await ok200('POST', '/_user/trips/trp_target/track-consent', { decision: 'accepted' });
+    await ok200('POST', '/_user/missions/mis_hist/track-consent', { decision: 'accepted' });
+    const trip = await (await call('GET', '/_user/trips/trp_target/track')).json();
+    expect(trip.data.availability).toBe('available');
+    expect(trip.data.points.length).toBe(48);
+    expect(trip.data.summaries[0].username).toBe('saeed.k');
+    expect(trip.data.summaries[0].distanceM).toBeGreaterThan(0);
+    const mission = await (await call('GET', '/_user/missions/mis_hist/track')).json();
+    expect(mission.data.contextType).toBe('mission');
+    expect((await call('GET', '/_user/trips/trp_round/track')).status).toBe(404);
+    const admin = await (await call('GET', '/_admin/tracks/trip/trp_target')).json();
+    expect(admin.data.contextId).toBe('trp_target');
+    expect((await call('GET', '/_admin/tracks/trip/trp_round')).status).toBe(404);
+  });
+
   it('admin persona resolves the admin account; catalogs are stable', async () => {
     setPreviewPersona('admin');
     const me = await (await call('GET', '/_user/me')).json();

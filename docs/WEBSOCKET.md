@@ -16,7 +16,7 @@ Clients send `ping`, `subscribe`, `location.update`, `talk.start`, `talk.stop`, 
 
 ## Live location
 
-A `location.update` contains latitude, longitude, accuracy and optional heading, speed and recorded time. The server validates coordinates, rate-limits updates, stores the latest fix in a bounded cache, persists points at most every five seconds and sends `location.peer` only to active authorized recipients. The sender receives an acknowledgement with the recipient count. Revoking a share immediately invalidates cache entries and stops future fan-out.
+A `location.update` contains latitude, longitude, accuracy and optional heading, speed and recorded time. The server validates coordinates, rate-limits updates, stores the latest fix in a bounded cache, persists points at most every five seconds and sends `location.peer` only to active authorized recipients. The sender receives an acknowledgement with the recipient count. Revoking a share immediately invalidates cache entries and stops future fan-out. The message may additionally carry an optional `contextType` (`trip`|`mission`) and `contextId` pair (both or neither — one without the other is an `INVALID_INPUT` error); when present and the caller has accepted recording for that context (account opt-in plus per-context consent, accuracy no worse than 100 m), the fix is also written to the consented track store (see `docs/API.md`); otherwise recording is skipped silently and the live share path is unaffected.
 
 ## Push-to-talk
 

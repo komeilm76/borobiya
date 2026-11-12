@@ -88,7 +88,7 @@ describe('architecture guards', () => {
       expect(source, path.relative(ROOT, view)).toMatch(/<script setup lang="ts">/);
     }
     const stores = await glob(path.join(ROOT, 'src/client/stores'), '*.ts');
-    expect(stores.length).toBe(9);
+    expect(stores.length).toBe(10); // +1 for the consented-track store (Stage D)
     for (const store of stores) {
       const source = await Bun.file(store).text();
       expect(source, path.relative(ROOT, store)).toMatch(/defineStore\(/);

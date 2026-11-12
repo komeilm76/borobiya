@@ -68,7 +68,7 @@ In-app navigation preserves the chosen persona for the lifetime of the tab; a fu
 - Sharing Center: one live outbound share, one inbound history share, plus expired and revoked examples
 - Admin console: overview KPIs and trend, a dispatch queue with nearest responders and groups, two pending support requests with candidates and ineligibility reasons, alerts, audit log, settings, system health, and CSV exports — both CSVs are generated in the browser from the demo world (no server download happens)
 - Talk (`/_user/talk`) is listed as **Partially implemented**: the screen renders, but the real-time audio path needs a live server peer and microphone; it cannot be exercised meaningfully against fixtures
-- History does not replay travel routes: no track is recorded for any trip or mission yet (see the Stage D approval gate in `docs/TRIP_TRACK_PROPOSAL.md`)
+- History replays the recorded demo trip and the completed responder mission through the Stage D replay panel (schematic path plus per-member summary; the other completed trip shows the honest `expired` state). The designed map-animated playback surface does not exist and stays `missing` in the design matrix until a human accepts it; the preview is the review harness for that decision
 
 ## Keeping the preview honest
 

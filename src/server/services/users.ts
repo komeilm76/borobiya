@@ -159,14 +159,30 @@ export class UserService {
     });
   }
 
-  updateMe(identity: AuthIdentity, username: string): Record<string, unknown> {
-    const existing = this.ctx.repo.one('SELECT id FROM users WHERE username=? AND id<>?', username, identity.userId);
-    if (existing) throw conflict('Username is already taken.', { field: 'username', code: 'USERNAME_TAKEN' });
+  updateMe(identity: AuthIdentity, input: { username?: string; recordTrack?: boolean }): Record<string, unknown> {
+    if (input.username === undefined && input.recordTrack === undefined) {
+      throw badRequest('Provide a username or a track-recording preference.', { field: 'body' });
+    }
+    if (input.username !== undefined) {
+      const existing = this.ctx.repo.one('SELECT id FROM users WHERE username=? AND id<>?', input.username, identity.userId);
+      if (existing) throw conflict('Username is already taken.', { field: 'username', code: 'USERNAME_TAKEN' });
+    }
+    const now = this.ctx.clock();
     return this.ctx.uow.commit((tx) => {
-      tx.repo.run('UPDATE users SET username=?, updated_at=? WHERE id=?', username, this.ctx.clock(), identity.userId);
-      tx.event(HTTP_EVENTS.USER_UPDATED, { userId: identity.userId, username }, [`user:${identity.userId}`, 'role:admin']);
-      this.ctx.services.auth.invalidateUser(identity.userId);
-      return { ok: true, username };
+      if (input.username !== undefined) {
+        tx.repo.run('UPDATE users SET username=?, updated_at=? WHERE id=?', input.username, now, identity.userId);
+        tx.event(HTTP_EVENTS.USER_UPDATED, { userId: identity.userId, username: input.username }, [`user:${identity.userId}`, 'role:admin']);
+        this.ctx.services.auth.invalidateUser(identity.userId);
+      }
+      if (input.recordTrack !== undefined) {
+        tx.repo.run('UPDATE users SET record_track=?, updated_at=? WHERE id=?', input.recordTrack ? 1 : 0, now, identity.userId);
+        tx.repo.run(
+          'INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
+          identity.userId, 'user.record_track', `users:${identity.userId}`, identity.ip,
+          JSON.stringify({ recordTrack: input.recordTrack }), now);
+        this.ctx.services.auth.invalidateUser(identity.userId);
+      }
+      return { ok: true, username: input.username, recordTrack: input.recordTrack };
     });
   }
 
