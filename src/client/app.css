@@ -276,10 +276,11 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 .connection-badge[data-status='connecting'] { color: var(--warning); }
 
 /* Bottom sheet */
-.sheet { --sheet-visible: 52%; position: absolute; z-index: 16; left: 0; right: 0; bottom: 0; height: 76%; border-radius: var(--r32) var(--r32) 0 0; background: var(--surface); box-shadow: 0 -14px 40px rgba(18,42,42,.14); transform: translateY(calc(100% - var(--sheet-visible))); transition: transform .42s var(--ease); display: flex; flex-direction: column; }
-.sheet[data-detent='closed'] { --sheet-visible: 28%; }
-.sheet[data-detent='half'] { --sheet-visible: 52%; }
-.sheet[data-detent='open'] { --sheet-visible: 76%; }
+.sheet { position: absolute; z-index: 16; left: 0; right: 0; bottom: 0; height: 52%; border-radius: var(--r32) var(--r32) 0 0; background: var(--surface); box-shadow: 0 -14px 40px rgba(18,42,42,.14); transition: height .42s var(--ease); display: flex; flex-direction: column; overflow: hidden; }
+/* Detents set the visible window height directly. The sheet is anchored to the frame bottom, so a translateY-based detent always pushed the footer (the primary CTA) below the frame edge and clipped it — the head and body now reflow inside the visible height instead, with the body scrolling. */
+.sheet[data-detent='closed'] { height: 28%; }
+.sheet[data-detent='half'] { height: 52%; }
+.sheet[data-detent='open'] { height: 76%; }
 .sheet__handle { flex: 0 0 auto; width: 46px; height: 5px; margin: 10px auto 4px; border-radius: 999px; background: #B8C7C4; touch-action: none; }
 .sheet__inner { min-height: 0; flex: 1; display: flex; flex-direction: column; animation: sheetUp .32s var(--ease) both; }
 .sheet__head { flex: 0 0 auto; min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 20px 8px; }
@@ -416,7 +417,7 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 .talk-hold.is-holding { transform: scale(.94); box-shadow: 0 0 0 22px rgba(217,180,93,.28), var(--shadow-md); }
 
 /* Admin */
-body[data-mode='admin'] { background: #F7FAF9; }
+body[data-mode='admin'] { background: var(--surface-2); }
 :root[data-theme='dark'] body[data-mode='admin'] { background: #0B1314; }
 .admin-shell { min-height: 100vh; display: grid; grid-template-columns: 264px minmax(0, 1fr); direction: rtl; }
 .admin-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 16px; background: var(--surface); border-left: 1px solid var(--border); }
@@ -662,7 +663,7 @@ body[data-mode='admin'] { background: #F7FAF9; }
   .admin-page-head { flex-direction: column; }
   .admin-page-actions { width: 100%; }
   .admin-search span { display: none; }
-  .admin-search { width: 40px; justify-content: center; padding: 0; }
+  .admin-search { width: 40px; min-inline-size: 0; justify-content: center; padding: 0; }
   .admin-search kbd { display: none; }
   .kpi-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .kpi-card { min-height: 92px; padding: 12px; }
@@ -675,6 +676,11 @@ body[data-mode='admin'] { background: #F7FAF9; }
   .admin-filter-search input { width: 100%; }
   .admin-tabs { overflow-x: auto; }
   .admin-table { min-width: 640px; }
+  .panel:has(.admin-table) { overflow-x: auto; }
+  /* the job-type rows pair a flexible text cell with two actions; let the text take
+     the full row on small screens instead of collapsing to one word per line */
+  .admin-list > li { flex-wrap: wrap; row-gap: 8px; }
+  .admin-list > li > div { order: -1; }
   .admin-card--users .admin-card__body { overflow-x: auto; }
   .modal-pair, .checkbox-grid { grid-template-columns: 1fr; }
 }
@@ -907,3 +913,93 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 /* Team dispatch builder */
 .dispatch-team { display: grid; gap: 12px; margin: 8px 0; padding: 12px; border: 1px dashed var(--border); border-radius: var(--r16); background: var(--surface); }
 .dispatch-team__add { justify-self: start; font-size: 12px; }
+
+/* ---------- Admin console: the panel system the views actually use (Stage F) ---------- */
+/* The reference admin stylesheet section above (.admin-card, .kpi-card, .admin-table…) targeted an older markup; these rules style the current views with the same tokens. */
+.admin-page { display: grid; gap: 16px; align-content: start; }
+.admin-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.metric-card { display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: var(--r16); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+.metric-card > .mdi { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px; background: var(--primary-soft); color: var(--primary); font-size: 21px; }
+.metric-card small { display: block; color: var(--muted); font-size: 12px; }
+.metric-card strong { display: block; font-size: 24px; line-height: 30px; font-weight: 900; }
+.admin-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r16); box-shadow: var(--shadow-sm); padding: 16px 18px; min-width: 0; }
+.panel__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.panel__head h2 { margin: 0; font-size: 15px; font-weight: 800; }
+.panel__hint { color: var(--muted); font-size: 12px; }
+.panel__empty { margin: 0; padding: 18px 8px; text-align: center; color: var(--muted); font-size: 13px; }
+.panel__error { margin: 0; padding: 10px 12px; border-radius: var(--r12); background: rgba(175,52,56,.08); color: var(--danger); font-size: 12.5px; }
+.panel__filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.panel__toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; cursor: pointer; user-select: none; }
+.admin-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.admin-list > li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--row-line); border-radius: var(--r12); background: var(--surface-2); min-width: 0; }
+.admin-list strong { display: block; font-size: 13px; }
+.admin-list small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.admin-list .mdi { color: var(--muted); flex: 0 0 auto; }
+.admin-list > li > div { min-width: 0; flex: 1; }
+.admin-action { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.admin-action:hover { background: var(--surface-3); }
+.admin-select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 12.5px; }
+.admin-select--compact { min-height: 32px; font-size: 12px; }
+.stack-form { display: grid; gap: 12px; }
+.group-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px 16px; margin: 12px 0 0; padding: 0; list-style: none; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.legend i { width: 10px; height: 10px; border-radius: 3px; }
+.legend strong { color: var(--text); font-weight: 700; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--row-line); font-size: 13px; }
+.settings-row:last-child { border-bottom: 0; }
+.export-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.status-pill--neutral { background: var(--surface-3); color: var(--muted); }
+@media (max-width: 1100px) {
+  .admin-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-grid { grid-template-columns: minmax(0, 1fr); }
+}
+.panel__filters .v-text-field { max-width: 240px; }
+
+/* Must come after the base .admin-list > li > div rule (same specificity, so file
+   order decides): on small screens the job-type text cell takes the full row
+   instead of collapsing beside two action buttons. */
+@media (max-width: 620px) {
+  .admin-list > li > div { flex: 1 1 100%; }
+}
+
+/* Small spacing utilities used by the auth views */
+.mb-3 { margin-block-end: 12px; }
+.mt-3 { margin-block-start: 12px; }
+.my-3 { margin-block: 12px; }
+
+/* Device sessions list (profile sheet) — mirrors .login-row */
+.device-list { display: grid; gap: 8px; }
+.device-list li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r12); background: var(--surface-2); }
+.device-list li > .mdi { color: var(--muted); font-size: 18px; flex: 0 0 auto; }
+.device-list li > div { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.device-list strong { font-size: 13px; }
+.device-list small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+
+/* Sharing Center: recipient peers (the list itself had no reset/avatar styles) */
+.peer-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.peer-row__avatar { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); }
+
+/* Toast host: close affordance */
+.toast__close { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 8px; color: var(--muted); }
+.toast__close:hover { background: var(--surface-2); color: var(--text); }
+
+/* Command palette (Ctrl/Cmd+K): the scoped block only handled motion and size — the
+   panel chrome, backdrop, search row, results list and items were never styled. */
+.command-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(9, 32, 32, .45); backdrop-filter: blur(2px); overflow-y: auto; padding: 0 12px 24px; }
+.command-panel { background: var(--surface); border-radius: var(--r20); box-shadow: var(--shadow-lg); overflow: hidden; }
+.command-search { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--row-line); }
+.command-search .mdi { color: var(--muted); font-size: 20px; }
+.command-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 15px; }
+.command-search input::placeholder { color: var(--muted); }
+.command-search kbd { font-size: 11px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); background: var(--surface-2); }
+.command-list { list-style: none; margin: 0; padding: 8px; max-height: min(420px, 60vh); overflow-y: auto; }
+.command-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: var(--r12); text-align: start; color: var(--text); font-size: 13.5px; }
+.command-item .mdi { color: var(--primary); font-size: 18px; }
+.command-item small { margin-inline-start: auto; color: var(--muted); font-size: 10.5px; }
+.command-item:hover, .command-item.is-keyboard-active { background: var(--primary-soft); }
+.command-empty { margin: 0; padding: 20px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+.peer-row > .peer-row__avatar { color: var(--primary); }
+.peer-row > span:not(.peer-row__avatar) { flex: 1; min-width: 0; display: grid; gap: 2px; }

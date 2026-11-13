@@ -220,6 +220,9 @@ async function logout(): Promise<void> {
 @media (max-width: 1100px) {
   .admin-shell { grid-template-columns: minmax(0, 1fr); }
   .admin-sidebar { display: none; }
+  /* scoped rules out-specify the global compaction, so repeat it here: the search
+     button collapses to an icon and the top bar stops overflowing on small screens */
+  .admin-search { min-inline-size: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   .bb-admin-panel-enter-active,

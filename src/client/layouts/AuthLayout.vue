@@ -58,6 +58,9 @@ const pageMotion = computed<Record<string, unknown>>(() => ({
   display: grid;
   grid-template-columns: minmax(0, 460px) minmax(0, 1fr);
   min-block-size: 100vh;
+  /* cap the shell at the viewport so the panel scrolls internally instead of the document,
+     which clipped the register form's CTA at first paint on short screens */
+  block-size: 100vh;
   background: var(--surface-2);
 }
 .auth-brand {
@@ -81,7 +84,9 @@ const pageMotion = computed<Record<string, unknown>>(() => ({
 .auth-brand h1 { font-size: 30px; font-weight: 700; }
 .auth-brand ul { display: grid; gap: 12px; padding: 0; list-style: none; }
 .auth-brand li { display: flex; align-items: center; gap: 10px; font-size: 15px; }
-.auth-panel { display: grid; place-items: center; padding: 32px 20px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.auth-panel { display: flex; flex-direction: column; align-items: center; padding: 32px 20px calc(32px + env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
+/* margin auto keeps short forms vertically centred while taller forms (register) start at the top instead of clipping under an unbounded place-items:center */
+.auth-panel__inner { margin-block: auto; }
 .auth-panel__inner { inline-size: min(440px, 100%); display: grid; gap: 16px; }
 .auth-panel__heading { font-size: 20px; font-weight: 600; }
 .bb-view-enter-active,

@@ -70,8 +70,8 @@ async function saveDestination(): Promise<void> {
 <template>
   <div class="sheet__head">
     <div>
-      <strong>مقصد انتخاب‌شده</strong>
-      <span>حرکت از موقعیت کنونی</span>
+      <strong>{{ destination ? 'مقصد انتخاب‌شده' : 'مقصدتان را انتخاب کنید' }}</strong>
+      <span>{{ destination ? 'حرکت از موقعیت کنونی' : 'روی نقشه بزنید یا یکی از مکان‌های شما' }}</span>
     </div>
     <button type="button" class="sheet__expand" aria-label="باز کردن شیت" @click="map.setDetent(map.detent === 'open' ? 'half' : 'open')">
       <span class="mdi mdi-chevron-up" aria-hidden="true" />

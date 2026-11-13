@@ -12,6 +12,10 @@ export default defineConfig((env) =>
     typeof baseConfig === 'function' ? baseConfig(env) : baseConfig,
     defineConfig({
       base: '/app/',
+      // The Vite root for this build is src/client (inherited from the base config), so the
+      // repo-root `.env.preview` (VITE_PREVIEW_DEMO=true) would not be picked up; point envDir
+      // at the repo root so the router compiles its `/app/` base and the demo bundle is honest.
+      envDir: fileURLToPath(new URL('.', import.meta.url)),
       build: {
         outDir: fileURLToPath(new URL('./build/preview-app', import.meta.url)),
         emptyOutDir: true,

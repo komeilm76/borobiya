@@ -540,8 +540,8 @@ function starRow(rating: number): number[] {
   cursor: pointer;
 }
 .history-chip.is-active {
-  background: var(--brand, #0f6fff);
-  border-color: var(--brand, #0f6fff);
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .history-summary {

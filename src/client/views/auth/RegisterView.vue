@@ -103,11 +103,11 @@ async function submit(): Promise<void> {
 
 <style scoped>
 .auth-card { background: var(--surface); padding: 20px; border-radius: var(--r20); box-shadow: var(--shadow-sm); }
-.auth-grid { display: grid; gap: 4px; margin-block-end: 8px; }
+.auth-grid { display: grid; gap: 4px; margin-block-end: 6px; }
 .auth-grid label { font-size: 13px; color: var(--muted); }
 .auth-grid--question { grid-template-columns: 96px minmax(0, 1fr); align-items: start; }
-.auth-question { display: grid; gap: 6px; }
-.auth-card__section { margin: 14px 0 8px; font-size: 14px; font-weight: 600; }
+.auth-question { display: grid; gap: 4px; }
+.auth-card__section { margin: 10px 0 6px; font-size: 14px; font-weight: 600; }
 .auth-card__links { margin-block-start: 12px; font-size: 13px; text-align: center; }
 .auth-card__links a { color: var(--primary); }
 </style>
