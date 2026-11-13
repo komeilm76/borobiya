@@ -45,6 +45,18 @@ export const SEVERITY_LABELS: Record<string, string> = {
   high: 'شدید'
 };
 
+/** status-pill tone for a SOS severity (accepted colors from the sos design parts). */
+export const SEVERITY_TONES: Record<string, string> = {
+  low: 'status-pill status-pill--success',
+  medium: 'status-pill status-pill--warning',
+  high: 'status-pill status-pill--danger'
+};
+
+/** pill class for a SOS severity, defaulting to warning for unknowns. */
+export function severityTone(severity: string): string {
+  return SEVERITY_TONES[severity] ?? 'status-pill status-pill--warning';
+}
+
 /** Persian label for a lifecycle status, falling back to the raw value for unknowns. */
 export function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;

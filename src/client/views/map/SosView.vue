@@ -23,9 +23,9 @@ const toast = useToast();
 
 const steps = ['شرح حادثه', 'موقعیت', 'عکس', 'بازبینی'];
 const severities = [
-  { id: 'low', label: 'کم', detail: 'کمک ضروری نیست', color: '#2C7A57' },
-  { id: 'medium', label: 'متوسط', detail: 'رسیدگی لازم است', color: '#B57A12' },
-  { id: 'high', label: 'شدید', detail: 'خطر جانی', color: '#AF3438' }
+  { id: 'low', label: 'کم', detail: 'کمک ضروری نیست', color: 'var(--success)' },
+  { id: 'medium', label: 'متوسط', detail: 'رسیدگی لازم است', color: 'var(--warning)' },
+  { id: 'high', label: 'شدید', detail: 'خطر جانی', color: 'var(--danger)' }
 ] as const;
 
 const draft = computed(() => sos.draft);

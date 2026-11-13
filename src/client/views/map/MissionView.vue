@@ -9,7 +9,7 @@ import { haversineMeters } from '@shared/geo.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
 import type { SosView } from '@/api/types.ts';
-import { SEVERITY_LABELS, statusLabel } from '@/utils/status.ts';
+import { SEVERITY_LABELS, severityTone, statusLabel } from '@/utils/status.ts';
 import MissionTeamPanel from '@/components/mission/MissionTeamPanel.vue';
 import SupportRequestPanel from '@/components/mission/SupportRequestPanel.vue';
 
@@ -259,7 +259,7 @@ async function decline(offer: SosView): Promise<void> {
             <strong>{{ offer.incidentLabel }}</strong>
             <small>{{ offer.description }}</small>
           </div>
-          <span class="status-pill status-pill--danger">{{ SEVERITY_LABELS[offer.severity] }}</span>
+          <span :class="severityTone(offer.severity)">{{ SEVERITY_LABELS[offer.severity] }}</span>
         </div>
         <ul class="offer-facts">
           <li v-if="!offer.isManual"><span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" /> دقت {{ format.distance(offer.accuracy) }}</li>

@@ -24,6 +24,9 @@ const DEFAULT_JOB_TYPES = [
 const policyLabel = (value: string): string => (value === 'all' ? 'بدون شرط آمادگی' : 'فقط آماده‌ها');
 const formError = ref<string | null>(null);
 const users = computed(() => admin.users?.items ?? []);
+const ROLE_LABEL: Record<string, string> = { user: 'کاربر', responder: 'امدادگر', admin: 'مدیر' };
+const roleLabel = (value: string): string => ROLE_LABEL[value] ?? value;
+const initials = (username: string): string => (username || '؟').replace(/^([A-Za-z0-9_])([A-Za-z0-9_])?.*$/, '$1$2').toUpperCase();
 const roles = [
   { title: 'همه نقش‌ها', value: '' },
   { title: 'کاربر', value: 'user' },
@@ -99,7 +102,7 @@ onMounted(() => {
           <select v-model="role" class="admin-select" aria-label="نقش" @change="search">
             <option v-for="item in roles" :key="item.value" :value="item.value">{{ item.title }}</option>
           </select>
-          <VBtn size="small" variant="tonal" @click="search">جست‌وجو</VBtn>
+          <VBtn size="small" color="primary" @click="search">جست‌وجو</VBtn>
         </div>
       </header>
       <table class="admin-table">
@@ -108,8 +111,13 @@ onMounted(() => {
         </thead>
         <tbody>
           <tr v-for="item in users" :key="item.id">
-            <td>{{ item.username }}</td>
-            <td>{{ item.role }}</td>
+            <td>
+              <span class="admin-cell-user">
+                <span class="admin-cell-user__avatar" aria-hidden="true">{{ initials(item.username) }}</span>
+                <span class="admin-cell-user__name">{{ item.username }}</span>
+              </span>
+            </td>
+            <td>{{ roleLabel(item.role) }}</td>
             <td>
               <select v-if="item.role === 'responder'" class="admin-select admin-select--compact" :value="item.jobTypeId ?? ''"
                       :aria-label="`نوع شغل ${item.username}`" data-testid="user-job-type" @change="changeJobType(item.id, ($event.target as HTMLSelectElement).value)">
@@ -153,4 +161,11 @@ onMounted(() => {
       </form>
     </article>
   </section>
+
 </template>
+
+<style scoped>
+.admin-cell-user { display: inline-flex; align-items: center; gap: 10px; }
+.admin-cell-user__avatar { inline-size: 34px; block-size: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-size: 11px; font-weight: 800; }
+.admin-cell-user__name { font-weight: 600; }
+</style>

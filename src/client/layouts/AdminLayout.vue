@@ -25,19 +25,38 @@ const settings = useSettingsStore();
 const motion = useMotionPreferences();
 const palette = useCommandPalette(() => []);
 
-const navigation = [
-  { name: ROUTE_NAMES.adminOverview, label: 'نمای کلی', icon: 'view-dashboard-outline' },
-  { name: ROUTE_NAMES.adminDispatch, label: 'اعزام', icon: 'bullseye-arrow' },
-  { name: ROUTE_NAMES.adminSupportRequests, label: 'درخواست‌های نیرو', icon: 'account-multiple-check-outline' },
-  { name: ROUTE_NAMES.adminReports, label: 'گزارش‌ها', icon: 'file-chart-outline' },
-  { name: ROUTE_NAMES.adminUsers, label: 'کاربران', icon: 'account-multiple-outline' },
-  { name: ROUTE_NAMES.adminGroups, label: 'گروه‌ها', icon: 'account-group-outline' },
-  { name: ROUTE_NAMES.adminIncidents, label: 'نوع حادثه', icon: 'alert-circle-outline' },
-  { name: ROUTE_NAMES.adminJobTypes, label: 'نوع شغل', icon: 'briefcase-account-outline' },
-  { name: ROUTE_NAMES.adminAudit, label: 'رویدادها', icon: 'clipboard-text-outline' },
-  { name: ROUTE_NAMES.adminAlerts, label: 'هشدارها', icon: 'bell-alert-outline' },
-  { name: ROUTE_NAMES.adminSettings, label: 'تنظیمات', icon: 'wrench-outline' }
+/** Sidebar sections mirror the reference information architecture. */
+const sections = [
+  {
+    label: 'عملیات',
+    items: [
+      { name: ROUTE_NAMES.adminOverview, label: 'نمای کلی', icon: 'view-dashboard-outline' },
+      { name: ROUTE_NAMES.adminDispatch, label: 'اعزام', icon: 'bullseye-arrow' },
+      { name: ROUTE_NAMES.adminSupportRequests, label: 'درخواست‌های نیرو', icon: 'account-multiple-check-outline' },
+      { name: ROUTE_NAMES.adminReports, label: 'گزارش‌ها', icon: 'file-chart-outline' }
+    ]
+  },
+  {
+    label: 'مدیریت',
+    items: [
+      { name: ROUTE_NAMES.adminUsers, label: 'کاربران', icon: 'account-multiple-outline' },
+      { name: ROUTE_NAMES.adminGroups, label: 'گروه‌ها', icon: 'account-group-outline' },
+      { name: ROUTE_NAMES.adminIncidents, label: 'نوع حادثه', icon: 'alert-circle-outline' },
+      { name: ROUTE_NAMES.adminJobTypes, label: 'نوع شغل', icon: 'briefcase-account-outline' }
+    ]
+  },
+  {
+    label: 'سامانه',
+    items: [
+      { name: ROUTE_NAMES.adminAudit, label: 'رویدادها', icon: 'clipboard-text-outline' },
+      { name: ROUTE_NAMES.adminAlerts, label: 'هشدارها', icon: 'bell-alert-outline' },
+      { name: ROUTE_NAMES.adminSettings, label: 'تنظیمات', icon: 'wrench-outline' }
+    ]
+  }
 ] as const;
+const ROLE_LABEL: Record<string, string> = { admin: 'مدیر سیستم', responder: 'امدادگر', user: 'کاربر' };
+const roleLabel = computed(() => ROLE_LABEL[auth.user?.role ?? ''] ?? 'کاربر');
+const initials = computed(() => (auth.user?.username ?? '؟').replace(/^(\w)(\w)?.*$/, '$1$2').toUpperCase());
 
 const unsubscribers: Array<() => void> = [];
 const openAlerts = computed(() => admin.alerts.filter((alert) => !alert.resolvedAt).length);
@@ -87,21 +106,31 @@ async function logout(): Promise<void> {
         </div>
       </div>
       <nav class="admin-nav">
-        <RouterLink
-          v-for="item in navigation"
-          :key="item.name"
-          :to="{ name: item.name }"
-          class="admin-nav__item"
-          :class="{ 'is-active': route.name === item.name }"
-          :aria-current="route.name === item.name ? 'page' : undefined"
-        >
-          <span :class="['mdi', `mdi-${item.icon}`]" aria-hidden="true" />
-          <span>{{ item.label }}</span>
-          <b v-if="item.name === ROUTE_NAMES.adminAlerts && openAlerts" class="admin-nav__badge">{{ openAlerts }}</b>
-          <b v-else-if="item.name === ROUTE_NAMES.adminSupportRequests && pendingSupportRequests" class="admin-nav__badge" data-testid="support-requests-badge">{{ pendingSupportRequests }}</b>
-        </RouterLink>
+        <section v-for="section in sections" :key="section.label" class="admin-nav__section">
+          <h2 class="admin-nav__label">{{ section.label }}</h2>
+          <RouterLink
+            v-for="item in section.items"
+            :key="item.name"
+            :to="{ name: item.name }"
+            class="admin-nav__item"
+            :class="{ 'is-active': route.name === item.name }"
+            :aria-current="route.name === item.name ? 'page' : undefined"
+          >
+            <span :class="['mdi', `mdi-${item.icon}`]" aria-hidden="true" />
+            <span>{{ item.label }}</span>
+            <b v-if="item.name === ROUTE_NAMES.adminAlerts && openAlerts" class="admin-nav__badge">{{ openAlerts }}</b>
+            <b v-else-if="item.name === ROUTE_NAMES.adminSupportRequests && pendingSupportRequests" class="admin-nav__badge" data-testid="support-requests-badge">{{ pendingSupportRequests }}</b>
+          </RouterLink>
+        </section>
       </nav>
       <div class="admin-sidebar__footer">
+        <div class="admin-usercard">
+          <span class="admin-usercard__avatar" aria-hidden="true">{{ initials }}</span>
+          <span class="admin-usercard__meta">
+            <strong>{{ auth.user?.username }}</strong>
+            <small>{{ roleLabel }}</small>
+          </span>
+        </div>
         <button type="button" class="admin-link-button" @click="settings.cycle()">
           <span class="mdi mdi-theme-light-dark" aria-hidden="true" /><span>پوسته</span>
         </button>
@@ -120,9 +149,13 @@ async function logout(): Promise<void> {
         <div class="admin-topbar__actions">
           <button type="button" class="admin-search" aria-label="جست‌وجوی فرمان" @click="palette.show()">
             <span class="mdi mdi-magnify" aria-hidden="true" />
-            <span>جست‌وجو…</span>
+            <span>جستجوی کاربر، مأموریت یا حادثه…</span>
             <kbd>Ctrl K</kbd>
           </button>
+          <RouterLink class="admin-bell" :to="{ name: ROUTE_NAMES.adminAlerts }" :aria-label="openAlerts ? `هشدارها — ${openAlerts} باز` : 'هشدارها'">
+            <span class="mdi mdi-bell-outline" aria-hidden="true" />
+            <i v-if="openAlerts" class="admin-bell__dot" aria-hidden="true" />
+          </RouterLink>
           <span v-if="realtime.status === 'connected'" class="status-pill status-pill--success">زنده</span>
           <span v-else class="status-pill status-pill--neutral">اتصال مجدد…</span>
         </div>
@@ -157,7 +190,9 @@ async function logout(): Promise<void> {
 .admin-sidebar__brand { display: flex; gap: 10px; align-items: center; font-size: 18px; }
 .admin-sidebar__brand .mdi { font-size: 26px; color: var(--primary); }
 .admin-sidebar__brand small { display: block; font-size: 11px; color: var(--muted); }
-.admin-nav { display: grid; gap: 4px; overflow-y: auto; }
+.admin-nav { display: grid; gap: 14px; overflow-y: auto; }
+.admin-nav__section { display: grid; gap: 4px; }
+.admin-nav__label { margin: 0 12px 2px; font-size: 10.5px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
 .admin-nav__item {
   display: flex;
   align-items: center;
@@ -185,6 +220,14 @@ async function logout(): Promise<void> {
   font: inherit;
 }
 .admin-link-button:hover { background: var(--surface-3); color: var(--text); }
+.admin-usercard { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--r12); background: var(--surface-2); border: 1px solid var(--border); }
+.admin-usercard__avatar { inline-size: 38px; block-size: 38px; display: grid; place-items: center; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-size: 13px; font-weight: 800; }
+.admin-usercard__meta { display: grid; gap: 1px; min-inline-size: 0; }
+.admin-usercard__meta strong { font-size: 13px; }
+.admin-usercard__meta small { font-size: 10.5px; color: var(--muted); }
+.admin-bell { position: relative; display: grid; place-items: center; inline-size: 40px; block-size: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; }
+.admin-bell:hover { background: var(--surface-3); }
+.admin-bell__dot { position: absolute; inset-block-start: 9px; inset-inline-end: 10px; inline-size: 9px; block-size: 9px; border-radius: 50%; background: var(--danger); border: 2px solid var(--surface-2); }
 .admin-main { display: flex; flex-direction: column; min-inline-size: 0; }
 .admin-topbar {
   display: flex;

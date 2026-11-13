@@ -122,8 +122,8 @@ describe('offline store', () => {
     window.dispatchEvent(new Event('offline'));
     await vi.waitFor(() => expect(offline.offline).toBe(true));
 
-    // `public/app.css` keys `.connection-badge` on `[data-offline]`; without this attribute the
-    // badge looks identical offline and online.
+    // The offline banner keys off `[data-offline]` on the document element; without this
+    // attribute the offline state is invisible to CSS (the connection-badge rules were removed).
     await vi.waitFor(() => expect(document.documentElement.getAttribute('data-offline')).toBe('true'));
 
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });

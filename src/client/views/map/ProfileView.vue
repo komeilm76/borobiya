@@ -7,6 +7,9 @@ import { useMapStore } from '@/stores/map.ts';
 import { useTrackStore } from '@/stores/track.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
+import { useRouter } from 'vue-router';
+import { useRealtimeStore } from '@/stores/realtime.ts';
+import { ROUTE_NAMES } from '@/router/index.ts';
 import { errorMessage } from '@/api/client.ts';
 import type { SavedPlaceView } from '@/api/types.ts';
 
@@ -18,9 +21,26 @@ const map = useMapStore();
 const track = useTrackStore();
 const format = useFormatters();
 const toast = useToast();
+const router = useRouter();
+const realtime = useRealtimeStore();
 const devices = computed(() => auth.devices);
 const places = computed(() => map.places);
 const logins = computed(() => auth.loginHistory);
+const logoutBusy = ref(false);
+
+/** Ends the session and returns to the sign-in screen. Kept on the profile page — never a one-tap map action. */
+async function logout(): Promise<void> {
+  if (logoutBusy.value) return;
+  logoutBusy.value = true;
+  try {
+    await auth.logout();
+    realtime.disconnect();
+    await router.push({ name: ROUTE_NAMES.login });
+  } finally {
+    logoutBusy.value = false;
+  }
+}
+
 const showAllLogins = ref(false);
 const visibleLogins = computed(() => (showAllLogins.value ? logins.value : logins.value.slice(0, 8)));
 const isResponder = computed(() => auth.user?.role === 'responder');
@@ -272,5 +292,9 @@ async function remove(place: SavedPlaceView): Promise<void> {
         <span>{{ auth.user?.securityReady ? 'تنظیم شده' : 'نیازمند تکمیل' }}</span>
       </div>
     </div>
+    <button type="button" class="danger-button danger-button--wide" data-testid="logout-button" :disabled="logoutBusy" @click="logout">
+      <span class="mdi mdi-logout" aria-hidden="true" />
+      <span>{{ logoutBusy ? 'در حال خروج…' : 'خروج از حساب' }}</span>
+    </button>
   </div>
 </template>

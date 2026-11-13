@@ -266,3 +266,74 @@ AuthLayout). Map/admin/guides phases are not complete and are tracked below as p
 - Visual approval remains with the human reviewer; no merge/tag/release.
 - Commits this pass: Phase-B/auth/RTL edits are uncommitted pending this report; CI state at
   the time of writing is green at `17df4bf` (docs-only commit that precedes these edits).
+
+## 13. Fifth pass (2026-11-13, continued) — non-auth clusters: pages, components, materials
+
+Scope this pass: every route except the auth family (accepted), the shared shells, the
+shared stylesheets, and the design-system refs that pin them. RTL correctness across Vuetify
+controls landed earlier this session (§12) and is assumed below.
+
+### Bugs found and fixed
+
+- **Map overlay carried a one-tap «خروج» (logout) round-control** (`MapLayout.vue`): a
+  mis-tap target on the safety screen, absent from every ref. Kept — but ONLY because
+  `tests/map-shell.test.ts` pins it — AND paired with the corrective fix: ProfileView now has
+  the ref-backed red «خروج از حساب» danger button at the sheet bottom (`data-testid="logout-button"`),
+  ending the session and routing to login (socket disconnected). The map-overlay button stays
+  until the pin is retired with the owner's agreement; both paths now exist.
+- **Mission offer severity pill was always red** (`MissionView.vue`): `status-pill--danger`
+  unconditionally for کم/متوسط/شدید. New `severityTone()` in `utils/status.ts` maps
+  low→success, medium→warning, high→danger — measured dot colours in `sos/03-sos-compose.png`
+  are exactly #28724F/#8C5609/#AF3438.
+- **SOS severity dots used colours matching no reference** (`SosView.vue`): hard-coded
+  #2C7A57 (admin swatch) and #B57A12 (--amber) for low/medium. Now `var(--success)` /
+  `var(--warning)`; high already `#AF3438` → `var(--danger)`.
+- **Admin sidebar/topbar vs `dashboard/01-overview.png`**: added the reference information
+  architecture — section groups (عملیات / مدیریت / سامانه), bottom user card
+  (avatar initials «AD» + username + role label), bell button linking to «هشدارها» with a red
+  dot when open alerts exist, and the reference search placeholder «جستجوی کاربر، مأموریت یا حادثه…».
+  No test-pinned selectors changed (`.admin-nav__item`, aria-current, `.admin-nav__badge`,
+  `.admin-search[aria-label=جست‌وجوی فرمان]`, `.admin-link-button` all intact).
+- **Admin users table** (`users/01-list.png`): avatar-initial circles added to the کاربر cell,
+  raw enum role column now renders Persian labels (امدادگر / کاربر / مدیر), and the «جست‌وجو»
+  action is solid primary instead of Vuetify tonal (which rendered near-black).
+- **Dead CSS purged**: 27 rules unreachable from any client/server/test source removed
+  (auth stepper/recovery/panel remnants, connection-badge, error-panel, queue-card, live-chip,
+  admin-dispatch/queue/filter/tabs/map/button, segmented-control, talk-hold, offline/report
+  panels). The `stores.test.ts` comment that cited the removed `.connection-badge[data-offline]`
+  contract was updated to describe the surviving `data-offline` attribute mechanism.
+  Map chips (24) vs admin chips (12) both retained — correct per their own refs.
+- **Duplicated CSS comment** in the 620px media query (pre-existing) deduplicated.
+
+### Token conflict evidence, now complete
+
+Exact-pixel scans across ALL refs (all 141): `#28724F`/`#8C5609` appear only in map-page
+refs (incl. colors.png), `#2C7A57`/`#A9690B` only in admin-panel refs (incl. the printed
+swatches in foundations). `#8A4B0F` (mission brown) appears in BOTH families and the mission
+rail refs (mission-state.png is dominated by it); map colors.png does NOT print it but
+several mission/history refs use it. `app.css` ships `--mission: #8A4B0F` unused; map ships
+`--success/--warning` as the map values. The success/warning conflict remains
+**OPEN — owner decision required** (admin wins / map wins / scoped `.admin-shell` override).
+No token values were changed this pass.
+
+### Verification
+
+`./boro verify` exit 0 (1232/1232). `bun run preview:build` exit 0; full capture suite
+(46 screens + 12 `-ref` ref-viewport captures) regenerated and visually spot-checked
+(map, sos, mission, sharing, history, profile, admin overview/users) — no regressions;
+map-shell clock drift only on the map pages.
+
+### Deliberately not changed (owner decisions, not bugs)
+
+- Map idle shows the sheet at 'half' detent (`tests/stores.test.ts` pins it); refs depict the
+  collapsed search-pill state — a product call with test evidence behind it.
+- The assigned-mission (server-dispatch) model vs the ref's open-offer marketplace with
+  countdown timer — product scope; tracked in DESIGN_MATRIX mission rows.
+- Mission offer severity, requester phone, and distance stat cards from `mission/03` are not
+  all present (server sends a leaner offer view) — recorded in matrix.
+- One-tap map logout retained pending owner decision (see above).
+- Admin KPI delta badges, live-map card on overview, bulk actions, pagination, avatars with
+  phone numbers, and CSV export from `users/01-list.png`/`dashboard/01-overview.png` are
+  feature builds, not fixes; matrix rows stand.
+- Visual approval remains with the human reviewer; DESIGN_MATRIX rows unchanged; no
+  merge/tag/release. Commits this pass are pushed to `arena/250278b6-borobiya`.

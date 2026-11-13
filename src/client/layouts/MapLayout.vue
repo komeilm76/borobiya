@@ -246,6 +246,7 @@ async function retrySearch(): Promise<void> {
   await runSearch(query.value);
 }
 
+
 async function logout(): Promise<void> {
   await auth.logout();
   realtime.disconnect();
@@ -367,6 +368,8 @@ async function logout(): Promise<void> {
         <button type="button" class="round-control" aria-label="مرکز نقشه" @click="onCenterOnMe">
           <span class="mdi mdi-crosshairs-gps" aria-hidden="true" />
         </button>
+        <!-- The one-tap logout is pinned by tests/map-shell.test.ts; the refs place logout on
+             the profile page instead. Both paths exist — see REPORT-2026-11-13-STAGE-G.md §13. -->
         <button type="button" class="round-control" aria-label="خروج" @click="logout">
           <span class="mdi mdi-logout" aria-hidden="true" />
         </button>
