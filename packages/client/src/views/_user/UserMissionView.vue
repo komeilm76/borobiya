@@ -1,6 +1,7 @@
 <template>
   <main class="mission-desk" :class="{ 'mission-desk--active': desk.activeMission.value,
-    'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool }" dir="rtl" @keydown.esc="dismissTool">
+    'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
+    'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
     <!-- No active mission means no private markers. Show the same full-viewport
          canvas for context, then replace it with the live canvas once assigned. -->
     <MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"
@@ -64,10 +65,12 @@
                   <small>مأموریت فعال · {{ routeSection === 'plan' ? 'برنامه‌ریزی سفر' : routeSection === 'transport' ? 'انتخاب وسیله' : 'انتخاب مسیر' }}</small>
                   <h2>{{ routeSection === 'plan' ? 'مسیر تا محل حادثه' : routeSection === 'transport' ? 'وسیلهٔ حرکت' : 'مسیرهای پیشنهادی' }}</h2>
                 </div>
+                <v-btn v-if="navigation.active.value" icon="mdi-stop-circle-outline" variant="tonal" color="error"
+                  aria-label="توقف راهبری" title="توقف راهبری" @click="stopGuidance" />
                 <v-btn v-if="routeSection !== 'plan'" icon="mdi-arrow-right" variant="text" color="primary"
                   aria-label="بازگشت به برنامهٔ سفر" @click="closeRouteSection()" />
-                <v-btn v-else-if="routing.from.value || routing.via.value.length" icon="mdi-delete-outline" variant="text" color="error"
-                  :disabled="navigation.active.value || !routing.target.value || routing.targetLoading.value"
+                <v-btn v-else-if="(routing.from.value || routing.via.value.length) && !navigation.active.value" icon="mdi-delete-outline" variant="text" color="error"
+                  :disabled="!routing.target.value || routing.targetLoading.value"
                   aria-label="درخواست پاک کردن مسیر" @click="routeDeleteConfirmOpen = true" />
                 <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند" @click="closeTool('route')" />
               </header>
@@ -77,20 +80,9 @@
                 <v-btn v-if="!routing.target.value" size="small" variant="text" @click="routing.open()">تلاش دوباره</v-btn>
               </v-alert>
               <template v-if="routing.target.value">
-                <div v-if="routeSection === 'plan'" class="mission-route__endpoints" aria-label="مبدأ و مقصد">
-                  <div class="mission-route__endpoint">
-                    <span class="mission-route__endpoint-mark" aria-hidden="true">۱</span>
-                    <div><small>مبدأ مسیر</small><strong>{{ routing.from.value ? 'موقعیت ثبت‌شده برای مسیریابی' : 'پس از دریافت موقعیت مشخص می‌شود' }}</strong>
-                      <bdi v-if="routing.from.value" dir="ltr">{{ routing.from.value.lat.toFixed(5) }}, {{ routing.from.value.lon.toFixed(5) }}</bdi>
-                    </div>
-                  </div>
-                  <div class="mission-route__endpoint">
-                    <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">۲</span>
-                    <div><small>مقصد نهایی</small><strong>محل حادثه</strong>
-                      <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
-                    </div>
-                  </div>
-                </div>
+                <v-alert v-if="routeSection === 'plan' && navigation.error.value" type="warning" variant="tonal" role="alert" class="my-3">
+                  {{ navigation.error.value }}
+                </v-alert>
                 <section v-if="routeSection === 'plan'" class="mission-route__decision" aria-label="گام بعدی مسیر">
                   <template v-if="routing.selectedRoute.value">
                     <div class="mission-route__decision-heading">
@@ -120,9 +112,20 @@
                       @click="routing.findRoutes()">{{ routing.from.value ? 'محاسبهٔ دوبارهٔ مسیر' : 'دریافت موقعیت و مسیر' }}</v-btn>
                   </template>
                 </section>
-                <v-alert v-if="routeSection === 'plan' && navigation.error.value" type="warning" variant="tonal" role="alert" class="my-3">
-                  {{ navigation.error.value }}
-                </v-alert>
+                <div v-if="routeSection === 'plan'" class="mission-route__endpoints" aria-label="مبدأ و مقصد">
+                  <div class="mission-route__endpoint">
+                    <span class="mission-route__endpoint-mark" aria-hidden="true">۱</span>
+                    <div><small>مبدأ مسیر</small><strong>{{ routing.from.value ? 'موقعیت ثبت‌شده برای مسیریابی' : 'پس از دریافت موقعیت مشخص می‌شود' }}</strong>
+                      <bdi v-if="routing.from.value" dir="ltr">{{ routing.from.value.lat.toFixed(5) }}, {{ routing.from.value.lon.toFixed(5) }}</bdi>
+                    </div>
+                  </div>
+                  <div class="mission-route__endpoint">
+                    <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">۲</span>
+                    <div><small>مقصد نهایی</small><strong>محل حادثه</strong>
+                      <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
+                    </div>
+                  </div>
+                </div>
                 <div v-if="routeSection === 'plan' && routing.from.value && !navigation.active.value" class="mission-route__route-actions d-flex flex-wrap ga-2">
                   <v-btn v-if="routing.selectedRoute.value" color="primary" variant="tonal" rounded="lg"
                     :disabled="routing.loading.value" @click="routing.findRoutes()">محاسبهٔ دوبارهٔ مسیر</v-btn>
@@ -791,7 +794,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-route__heading { min-width: 0; flex: 1; }
 .mission-route__heading small { display: block; font-size: .8rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
 .mission-route__emblem { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-primary), .15); color: rgb(var(--v-theme-primary)); }
-.mission-route__header :deep(.v-btn) { flex: none; min-width: 40px; }
+.mission-route__header :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }
 .mission-route__header h2 { margin: 0; font-size: 1.08rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mission-route__endpoints { display: grid; gap: .45rem; margin-bottom: .85rem; }
 .mission-route__endpoint { display: flex; align-items: center; gap: .7rem; min-width: 0; padding: .55rem .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
@@ -1134,6 +1137,18 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk--active .mission-route {
     max-height: max(5rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
+  /* An open planner needs more than a header-only 5rem sliver. It temporarily
+     replaces the redundant stage/banner at the top, not the map or SOS below. */
+  .mission-desk--route-open .mission-route {
+    top: calc(.75rem + env(safe-area-inset-top, 0px));
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: none;
+  }
+  .mission-desk--route-open .mission-desk__map-heading { visibility: hidden; }
+  .mission-desk--route-open .mission-desk__guidance { visibility: hidden; }
+  .mission-desk--route-open .mission-route__header { gap: .4rem; padding: .55rem .75rem; }
+  .mission-desk--route-open .mission-route__emblem { display: none; }
+  .mission-desk--route-open .mission-route__heading small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
 :global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active)) { background: var(--bb-color-inset); }
 
