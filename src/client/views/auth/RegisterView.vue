@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth.ts';
 import { errorMessage } from '@/api/client.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { passwordIssue, passwordIssueMessage } from '@/composables/usePasswordPolicy.ts';
+import AuthHeading from '@/components/AuthHeading.vue';
 
 /**
  * Registration requires five distinct catalog-backed security questions; the server
@@ -71,13 +72,12 @@ async function submit(): Promise<void> {
 <template>
   <VCard class="auth-card" flat>
     <form @submit.prevent="submit">
+      <AuthHeading eyebrow="شروع همراهی" title="ساخت حساب جدید" icon="mdi-account-plus-outline" />
       <div class="auth-grid">
-        <label for="reg-username">نام کاربری</label>
-        <VTextField id="reg-username" v-model="username" name="username" autocomplete="username" placeholder="user.name" :disabled="busy" />
-        <label for="reg-password">گذرواژه</label>
-        <VTextField id="reg-password" v-model="password" name="password" type="password" autocomplete="new-password" :disabled="busy" />
-        <label for="reg-confirm">تکرار گذرواژه</label>
-        <VTextField id="reg-confirm" v-model="confirm" name="confirm" type="password" autocomplete="new-password" :disabled="busy" />
+        <VTextField id="reg-username" v-model="username" name="username" autocomplete="username" label="نام کاربری" placeholder="user.name" prepend-inner-icon="mdi-at" :disabled="busy" />
+        <VTextField id="reg-password" v-model="password" name="password" type="password" autocomplete="new-password" label="گذرواژه" prepend-inner-icon="mdi-lock-outline" :disabled="busy" />
+        <p class="auth-hint">۱۲ تا ۱۲۸ نویسه؛ حروف، عدد و نشانه.</p>
+        <VTextField id="reg-confirm" v-model="confirm" name="confirm" type="password" autocomplete="new-password" label="تکرار گذرواژه" prepend-inner-icon="mdi-lock-check-outline" :disabled="busy" />
       </div>
       <h3 class="auth-card__section">پنج پرسش امنیتی برای بازیابی</h3>
       <div v-for="(question, index) in questions.slice(0, 5)" :key="question.id" class="auth-grid auth-grid--question">
@@ -104,9 +104,10 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.auth-card { background: var(--surface); padding: 20px; border-radius: var(--r20); box-shadow: var(--shadow-sm); }
-.auth-grid { display: grid; gap: 4px; margin-block-end: 6px; }
+.auth-card { background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
+.auth-grid { display: grid; gap: 10px; margin-block-end: 6px; }
 .auth-grid label { font-size: 13px; color: var(--muted); }
+.auth-hint { margin: -6px 2px 0; font-size: 11px; color: var(--muted); }
 .auth-grid--question { grid-template-columns: 96px minmax(0, 1fr); align-items: start; }
 .auth-question { display: grid; gap: 4px; }
 .auth-card__section { margin: 10px 0 6px; font-size: 14px; font-weight: 600; }

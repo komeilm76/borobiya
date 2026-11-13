@@ -1,0 +1,261 @@
+# Delivery report — Stages B through G (2026-11-13)
+
+Branch `arena/250278b6-borobiya`, PR [#6](https://github.com/komeilm76/borobiya/pull/6) (**open, not merged, no tag, no GitHub release**), base `main`. This report covers the preview server (Stage B), the design-reference review (Stage C), consented track recording (Stage D), history discovery (Stage E), visual and functional acceptance (Stage F), and this close-out (Stage G). Dates: D on 2026-11-11/12, E on 2026-11-12, F/G on 2026-11-13.
+
+## 1. Implementation status
+
+| Stage | Commit | Status | Summary |
+|---|---|---|---|
+| B — visual preview server | (earlier) | Done | `build/preview-app` (git-ignored) served by `bun scripts/preview.ts` on port **4173**; homepage lists every genuinely completed page; every page reachable directly at `/app/<route>?persona=<admin\|user\|onboarding>`; realistic fake data; red demo badge when built with `VITE_PREVIEW_DEMO=true`. |
+| C — design reference review | (earlier) | Done | 141 canonical references under `design/` cross-referenced and kept honest in `docs/DESIGN_MATRIX.md`. Counts **now**: 23 done, 75 partial, 25 missing, 12 superseded, 5 reference, 1 deviation (plus per-row notes). No row flips to `done` without human visual acceptance. |
+| D — consented track recording | `b0b3328` | Done & verified | Trips and responder missions; see §5. |
+| E — history discovery (minimal) | `5d24aa4` | Done & verified | Date-range chips, status/lifecycle chips, resettable empty states, per-tab summary lines, unfiltered badge totals. Vehicle/companions/toggles deliberately omitted (no backing data); `history/05` stays `partial` until human acceptance. |
+| F — visual & functional acceptance | `80d93fd`, `faa2cf5` | Done (human sign-off pending) | 46 captures (23 pages × desktop 1280×900 / mobile 390×844) regenerated from the final build into `/home/user/visual-acceptance/`. Material defects found by inspecting the running app were fixed; see §3 and §4. |
+| G — this report | untracked | Done | — |
+
+## 2. Test and CI results
+
+- `./boro verify` — **exit 0**: Vue + SW build, server `tsc`, client `vue-tsc --noEmit`, documentation guards (English-only docs, design image count, legacy-path absence), and the full Vitest suite: **1232/1232 passed** (96 files). Coverage: statements 94.07% / branches 87.42% / functions 94.62% / lines 96.24% — thresholds pass, no gate lowered.
+- Note: the Stage E stage-log entry had quoted Persian chip labels and tripped `check-docs` (English-only); labels were restated in English in `faa2cf5` (meaning unchanged).
+- One regression was caught and fixed in Stage F: `map-shell.test.ts` documents that the **profile** screen keeps the **history** tab highlighted in the pill (three of seven screens are not tabs themselves). An earlier preview-only experiment reverted that; it was restored in `faa2cf5` and the question is flagged for the owner (§7).
+- CI on PR #6 ("Borobiya quality gate"): latest run **pass** (1m8s). The branch is mergeable.
+
+## 3. Visual acceptance — what was reviewed (and what "reviewed" means)
+
+Every one of the 46 captures was opened and inspected against the running preview (not mockups). **No page is visually approved** — visual approval is a human judgment (Stage F contract). "Reviewed" below means inspected + material defects fixed + re-compared on the final build.
+
+| Page | desktop | mobile | Notes |
+|---|---|---|---|
+| login | reviewed | reviewed | Simplified vs design (recorded partial); renders cleanly both viewports. |
+| register | reviewed | reviewed | Tall form scrolls; CTA no longer clipped at first paint (auth-panel fix). |
+| recovery | reviewed | reviewed | Fine (simplified treatment, recorded partial). |
+| onboarding | reviewed | reviewed | Fine (simplified treatment). |
+| map | reviewed | reviewed | Saved-places sheet; sheet detents reworked (footer/CTA no longer pushed below frame). |
+| sos | reviewed | reviewed | Step rail + severity grid render; CTA visible. |
+| mission | reviewed | reviewed | Mission sheet + lifecycle rail; RTL OK. |
+| talk | reviewed | reviewed | Known divergent vs reference (recorded; unfixed). |
+| sharing | reviewed | reviewed | Create-share panel verified interactively (search/radios/duration); peers list styled. |
+| history | reviewed | reviewed | Filter chips now use `--primary` (was an undefined `#0f6fff` fallback). |
+| trips | reviewed | reviewed | Fine. |
+| profile | reviewed | reviewed | Device-sessions row was unstyled/overlapping — fixed and verified. Sheet clips at detent but scrolls (by design). |
+| adminOverview | reviewed | reviewed | KPI/chart/rows fine; mobile top bar no longer overflows (was 426px vs 390px viewport). |
+| adminDispatch | reviewed | reviewed | Fine. |
+| adminSupportRequests | reviewed | reviewed | Filter chips wrap; cards readable. |
+| adminReports | reviewed | reviewed | CSV buttons fit; earlier perceived clipping was the demo badge overlay. |
+| adminUsers | reviewed | reviewed | Table scrolls inside panel ≤1100px; page no longer overflows. |
+| adminGroups | reviewed | reviewed | Known divergent vs reference (recorded; unfixed). |
+| adminIncidents | reviewed | reviewed | Fine. |
+| adminJobTypes | reviewed | reviewed | Policy text collapsed to one word per line — fixed (full-row text cell on small screens). |
+| adminAudit | reviewed | reviewed | Toolbar fits; search capped at 240px (placeholder truncates ~90px — cosmetic). |
+| adminAlerts | reviewed | reviewed | Fine. |
+| adminSettings | reviewed | reviewed | Fine. |
+
+Interactive spot-checks: Ctrl/Cmd+K command palette (was effectively unstyled — fixed and verified open/keyboard-active states), share-create search flow, register tall-form scroll, map sheet detents, admin mobile scrollWidth (all 390px).
+
+### Defects fixed in Stage F (commits `80d93fd`, `faa2cf5`)
+
+1. Bottom sheet detents used `translateY`, permanently pushing the footer/CTA below the frame edge (clipped, and content under it unreachable). Detents now set the visible window height (28/52/76%) with the body scrolling inside — verified on mission/sos CTAs.
+2. Auth panel: `place-items:center` + unbounded height clipped the register CTA at first paint; now a flex column with internal scroll and auto-margin centring.
+3. Admin console ≤1100px: the scoped `.admin-search` rule out-specified the global compaction, overflowing the top bar on 390px (scrollWidth 426–438). Repeated the rule in the scoped block — now 390px everywhere (probe-verified on all 11 admin pages).
+4. Admin tables wrapped in `.panel:has(.admin-table){overflow-x:auto}` below 1100px (verified `scrollWidth > clientWidth`, RTL-scrollable).
+5. `.admin-list` job-type rows collapsed beside two action buttons; text now takes the full row on ≤620px.
+6. Missing styles added: admin page primitives (~25 selectors, session 2), command palette chrome (backdrop/panel/search/items), device-sessions list (it rendered overlapping inline text), peer-list avatar, toast close button, `mb-3`/`mt-3`/`my-3`.
+7. History filter chips `--primary`; map sheet title/subtitle reflect idle vs destination state; admin body background uses `--surface-2`; preview build picks up repo-root `.env.preview` (`envDir`).
+8. Docs guard regression (Persian labels in English-only docs) — restated in English.
+9. MapLayout profile tab experiment **reverted** (kept the tested, documented history-pill contract).
+
+## 4. Design-reference coverage and discrepancies
+
+- 141 canonical references (154 PNGs minus 13 `_generator/_preview-*.png`): **23 done · 75 partial · 25 missing · 12 superseded · 5 reference · 1 deviation** (registry in `docs/DESIGN_MATRIX.md`).
+- Deliberate, documented deviations: recovery-unknown-account enumeration resistance (matrix row 06); turn-by-turn trip planning superseded by the simplified SOS→mission workflow; Stage E history filter omits vehicle/companions/toggles (no data — will not flip to `done` until human acceptance).
+- Known unfixed divergences (recorded, partial): login (top bar/heading lockup/social variants missing), talk screen, adminGroups density, bottom-sheet 28/52/76 detents never pixel-validated against `bottom-sheet.png`, dark-theme surfaces not re-validated this cycle.
+- Superseded stage: the legacy multi-service roadmap (PostGIS/OSRM/Android/Docker) is superseded, not skipped — see `docs/ACCEPTANCE.md` "Legacy feature scope reconciliation".
+
+## 5. Trip tracking — what shipped, retention, migration
+
+- **Consent model**: account-level opt-in `users.record_track` (default **OFF**) + explicit per-context consent decision (`track_consents`) + active-context gating (a live trip, or a live mission the user participates in). Accuracy worse than the configured bound is rejected (`src/server/services/track.ts`).
+- **Readers**: the trip/mission participants and recipients within the share scope; administrator track reads are audit-logged. No public exposure.
+- **Retention**: raw points only. `TRIP_TRACK_RETENTION_DAYS` (default **180**, clamped 1–3650). An hourly batched purge deletes expired raw points; **before any purge, per-context trip/mission summaries are computed and persisted** (`track_summaries`: distance, duration, point count, first/last fix, quality) so distance/duration survive the point horizon. If summary computation fails for a context, its points are **kept** (fail-closed, logged) rather than silently deleted.
+- **Migration**: additive only — schema v9 creates `track_points`, `track_consents`, `track_summaries` (+ indices) and `users.record_track` via `ensureColumn(... DEFAULT 0)`. Existing rows keep working; no destructive migration; summaries persist before purge so re-planning is safe. Down-migration not required by the change.
+- Full rationale: `docs/TRIP_TRACK_PROPOSAL.md` and the "Stage log" in `docs/IMPLEMENTATION_PLAN.md`.
+
+## 6. Running the visual preview (start here)
+
+```bash
+bun install                 # once
+bun run preview:build       # build/preview-app (git-ignored; REQUIRED after any client patch)
+bun scripts/preview.ts --skip-build   # serves http://localhost:4173
+```
+
+Then open `http://localhost:4173/` — the preview homepage lists every completed page.
+Direct entries (personas): `?persona=admin` (operations console), `?persona=onboarding` (security-question onboarding), `?anon=1` (logged-out auth pages). The bundle is built with `VITE_PREVIEW_DEMO=true`, so a red **نمایش با دادگان ساختگی** (fake data) badge shows on every screen — expected, and it intentionally occludes the bottom-inline-end corner in captures.
+
+Data is deterministic fake data (SVG tiles, seeded demo users/missions/trips). Current server in this workspace is live on **127.0.0.1:4173** (`/app/...` routes return 200). Captures: `/home/user/visual-acceptance/*.png` (46 files, regenerated 2026-11-13 from the final build).
+
+## 7. Remaining limitations, risks, incomplete work
+
+- **No human visual approval on any page yet.** All 46 pages are reviewed-by-agent only; approval flips matrix rows and is explicitly the owner's call.
+- Admin data tables at ≤1100px scroll horizontally inside their panel (deliberate minimal fix, not a designed responsive table); job-type/audit/users tables are dense.
+- Admin mobile top bar shows the status pill + collapsed search icon (no full search field) — fine but cramped.
+- Register taller than a phone viewport scrolls (expected); the demo badge overlaps the CTA in captures (demo-only).
+- Profile keeps the history pill highlighted per the tested contract — if the owner prefers no pill on profile, that is a one-line change plus the test expectation; flagged, not changed.
+- Dark theme had a smoke check this cycle (map/history/sos/admin); the white-on-light chrome and admin active-item contrast bugs it surfaced are fixed. A full dark-theme audit and the reduced-motion capture pass remain open.
+- 75 partial + 25 missing matrix rows remain; none of them silently redefined (see `docs/DESIGN_MATRIX.md`).
+- Coverage dip vs 94.14% statements last report (94.07%) — within noise, thresholds pass.
+- CI run for the final commit (`faa2cf5`) passed as of 2026-11-13; PR #6 stays **open and unmerged**; effective `main` is untouched.
+- `REPORT-2026-11-12-STAGES-6-7.md` (earlier session report) remains untracked and is intentionally not committed.
+
+## 8. Items needing your review / decision
+
+1. **Merge decision for PR #6** (open, mergeable, CI green). No tag/release will be created without explicit instruction.
+2. **Human visual acceptance** walk-through — the tooling is ready (`capture.mjs`, `shot.mjs`, `shotm.mjs` in `/home/user/visual-tools/`, output in `/home/user/visual-acceptance/`).
+3. **Profile parent-tab contract** (history pill highlighted on `/_user/profile`) — keep as tested, or change code + test together.
+4. Whether `history/05` flips to `done` after your pass, and the dark-theme/contrast review.
+5. The three recorded reference divergences (login, talk, adminGroups) — fix in a follow-up or re-scope explicitly.
+6. Release call for 2.0.0 (IMPLEMENTATION_PLAN Stage 7) — deliberately untouched; E/F/G do not rename or skip it.
+
+## 9. PR / release state
+
+PR #6 "Migrate runtime to Bun 1.4.4 and client to Vue 3 (2.0.0)" — **OPEN**, `MERGEABLE`, not draft, base `main`, head `arena/250278b6-borobiya`, latest quality-gate run **pass**. No merge, no tag, no GitHub release created. Commits on the branch: `b0b3328` (Stage D), `5d24aa4` (Stage E), `80d93fd` (Stage F visual acceptance pass), `faa2cf5` (docs-guard + parent-tab contract fix), `6c319dc` (second pass: dark-theme chrome, toast dismissal, dead utilities), `e67b180` (design-matrix second-pass log). CI green on the latest commit.
+
+
+## 10. Second pass (2026-11-13, continued) — reference comparison and bug hunt
+
+The owner asked to check the completed pages against the design images and fix bugs. Work done:
+
+- **Systematic comparison** of all 46 captures against the canonical references, family by family
+  (auth 16, map design-system/navigation/sos/mission/history/sharing/profile, admin console), plus a
+  dark-theme smoke check and a scripted interactive bug hunt (23-route console/page/request sweep:
+  zero errors; 11 interaction checks: all green after correcting two test expectations to the
+  documented demo/preview and Vuetify behaviors).
+- **Bugs found and fixed** (`6c319dc`): toast close buttons were unclickable (`pointer-events`
+  root with no child opt-in); hard-coded light translucent chrome (`.quick-chip`, `.round-control`,
+  `.connection-badge`, `.live-chip`, `.admin-topbar`) became light-on-light in dark theme — dark
+  twins added; the admin sidebar active item used `--primary-deep` on `--primary-soft` (invisible in
+  dark) — now `--primary`; `.mt-2` (SOS screen) resolved to nothing (Vuetify helpers not bundled) —
+  defined; dead `#sos-description` rule removed. All verified on the rebuilt preview (46 captures
+  regenerated; dark map/history/sos/admin legible; `./boro verify` exit 0, 1232/1232, coverage
+  94.14% / 87.4% / 94.52% / 96.25%).
+- **Checked and deliberately kept**: profile keeps the history pill highlighted (tested contract);
+  the admin topbar "اتصال مجدد…" pill copy is the documented disconnected state pinned by
+  `tests/admin-layout.test.ts` (the preview has no WebSocket; the fake-data badge frames it);
+  `#sos-description` removed, `.placement-armed`/`.is-spinning`/`.char-count` confirmed styled;
+  demo-auth accepts any credential by design (persona follows username — the auth error path is not
+  previewable; server-side rejection is tested); the SOS description minimum is enforced at submit,
+  by design (documented in code).
+- **Comparison outcome**: every remaining reference↔implementation gap is a recorded matrix row
+  (75 partial / 25 missing / 12 superseded); no status was flipped. The most visible ones for your
+  acceptance walk-through: login vs `01-login.png` (no top bar/lockup), auth mobile (brand panel
+  hidden rather than the designed compact strip), bottom-sheet detents unvalidated, mission offer
+  red banner absent, admin overview without operations map/alerts/group-availability column, admin
+  reports without deltas/period/donut, admin users without avatars/last-login, no admin skeletons.
+  Auth composition and the mobile brand strip were intentionally not rebuilt — that scope decision
+  belongs to you.
+- **CI**: PR #6 quality gate is green at `e67b180`. PR remains open; no merge, no tag, no release.
+
+Files changed in this pass: `src/client/app.css`, `src/client/layouts/AdminLayout.vue`,
+`docs/DESIGN_MATRIX.md`. The preview server is still live on 127.0.0.1:4173; the visual-acceptance
+captures are current for the final build.
+
+## 11. Third pass (2026-11-13, continued) — defects from direct inspection
+
+The sweep continued after §10 with a close read of the register/onboarding, the admin users list
+against `users/01-list.png`, the SOS composer against `sos/19` (validation), and the dark theme.
+All fixes verified on the rebuilt preview; all 46 captures were regenerated at each rebuild and
+the final set was pixel-diffed against the pre-purge captures (identical except the live
+status-bar clock).
+
+- **Security-question selects rendered dirty-but-blank** (`a752276`): `ref(['',…])` seeded
+  Vuetify selects with a present-but-unknown value — no placeholder, no combobox affordance, a
+  "dirty" empty field. Slots now initialize to `null` and map to `''` only at the payload
+  boundary (server still sees five positions). Verified in both pages' captures.
+- **Dark-mode map tiles rendered light** (`da43856`): the tiles are `<img>`s with inline
+  positioning and never carried `map-tile`, so the dark filter authored for them never ran.
+  The class is applied; dark map screenshot verified.
+- **Dead legacy design system** (`45d1d05`): roughly 400 lines of unreachable CSS from a
+  superseded iteration removed from `app.css` (admin KPI/card/modal/stepper set, auth chrome,
+  POI/overlay marker classes, skeleton/shimmer, unused toast variants, orphaned keyframes),
+  keeping Vuetify runtime classes and the dynamically constructed `toast--${tone}` variants.
+  LightningCSS parse + rebuild + capture diff + `./boro verify` (exit 0) all clean.
+- **Evaluated, deliberately not changed**: the SOS short-description gate lives at submit by
+  design — `tests/sos-view.test.ts` pins click-then-explain behavior, so the `sos/19`
+  disabled-button composition stays a product decision; `admin users` parity gaps remain the
+  recorded matrix rows (230–232); the SOS description minimum, demo-auth, and the admin
+  topbar disconnected pill remain as previously documented.
+- **Verification**: `./boro verify` exit 0 (coverage 94.06 / 87.39 / 94.62 / 96.24); 46/46
+  captures regenerated at each rebuild; map-shell pages pixel-identical apart from the clock.
+  Commits: `a752276`, `da43856`, `45d1d05` — CI green through `da43856`; the `45d1d05` run and
+  this report's commit are pending at the time of writing.
+- **CI note for the record**: build-time pipes in this session masked exit codes once; builds
+  are now checked unpiped (`preview:build` exit 0 confirmed for `45d1d05`).
+
+## 12. Fourth pass (2026-11-13, continued) — Wave-1 design-system tokens, RTL mirroring, auth cluster
+
+This pass began the "Comprehensive UI Visual Audit & Pixel-Accurate Design Implementation"
+mandate. Scope executed this session: Phase A inventory refresh, Phase B (design-system
+tokens/foundations), and Phase D (auth cluster: login, register, recovery, onboarding +
+AuthLayout). Map/admin/guides phases are not complete and are tracked below as pending.
+
+### Systemic fixes (all pages affected, all verified by rebuild + capture)
+
+- **Vuetify controls were laid out LTR on an RTL page** — `createVuetify` never declared the
+  RTL locale, so field icons sat on the leading edge, labels hugged the left, and the password
+  eye toggle mirrored wrong. `plugins/vuetify.ts` now declares `locale: { locale: 'fa', rtl: { fa: true } }`
+  with the `fa` messages pack. All 1232 tests still pass; every capture regenerated. This is the
+  single highest-leverage correctness fix for the whole surface: no per-view patching was
+  required, and no LTR exception remains anywhere in the tree.
+- **Button/CTA radius pinned to the design value (14px)** — per-row left-edge PIL scans of
+  two independent refs (map controls.png, sos CTAs) agree on ≈14px: `--r14: 14px` added,
+  `.primary-button`/`.ghost-button`/`.danger-button` moved to it, `--v-border-radius-lg: 11px`
+  per admin foundations (admin button floor 11), `--r11: 11px` added; `.admin-action` and
+  `.admin-select` use `var(--r11)`; dead `.field` rule removed.
+- **Sheet handle + danger CTA + round controls** — `.sheet__handle` (64×5 pill) renders in
+  `MapLayout` (was missing entirely vs `bottom-sheet.png`); `SosView` submit now uses the
+  `.primary-button--danger` variant added to `app.css`; `.round-control` is a true 50% circle.
+
+### Auth cluster rebuilt to the references (refs at 1440×900 / 1440×1400 / 1440×1000)
+
+- `AuthLayout` rewritten: floating top bar (brand link `/assets/logo.svg` + «بورو بیا», home
+  pill «صفحه اصلی», circular theme-toggle via `settings.cycle()` with `mdi-weather-night` /
+  `mdi-weather-sunny`), 5fr/6fr split card (radius `--r26`), trailing brand panel
+  (165° teal gradient, per-screen badge pill with yellow dot, two-line headline with yellow
+  accent line, radar art, glass «حساب شما امن می‌ماند» card) and leading form panel.
+- Brand copy is authored per screen in typed route meta (`router/index.ts` `RouteMeta.brand`):
+  login «ورود امن به بورو بیا»/«یا هم، آماده‌تر هستیم.»; register «یک قدم تا همراهی»/«حسابی امن،
+  همراهی نزدیک.»; recovery «بازیابی امن حساب»/«دوباره به حسابتان برسید.»; onboarding
+  «یک مرحله ضروری»/«از حسابتان بهتر محافظت کنید.».
+- New `components/AuthHeading.vue` (icon tile + eyebrow + title lockup) used by all four views;
+  eyebrow/title steps (مرحله ۱/۲/۳ از ۳, تکمیل راه‌اندازی حساب) match the ref compositions.
+  Register keeps the «پیج پنج پرسش» security-question factory and `#reg-*` ids; recovery keeps
+  `.auth-card__question` rows (tests updated only for the renamed step heading: `.auth-heading__title`);
+  onboarding keeps `.auth-card__hint` («پنج پرسش» substring preserved).
+- Ref-viewport captures (`visual-acceptance/*-ref.png`) now exist for all four auth screens via
+  an extended capture harness; they render on-brand: warm sage stage wash, split card, floating
+  labels, trailing icons — visually compared against `design/auth/01-login.png`,
+  `03-register.png` (content is the «مرحله ۱ از ۳» variant; filename/content offset noted again),
+  `05-recovery-account.png`, `11-onboarding.png`.
+- Note on ref artifacts: the refs depict a different logo mark (teal rounded-square plus); the
+  repo's own `/assets/logo.svg` compass is kept deliberately — swapping brand marks is a
+  product decision, not a CSS fix.
+
+### Verification
+
+- `./boro verify` exit 0 (1232/1232 tests; coverage 94.14 / 87.45 / 94.49 / 96.25).
+- `bun run preview:build` exit 0; full capture suite clean (46 screens) plus 4 `-ref` captures.
+- Icons added to the shipped WM subset requirement were checked against
+  `design/icons/icons.json` (comment-question-outline replaces shield-question-outline, which
+  is not shipped).
+
+### Not done / open
+
+- Phase B: admin foundations swatch deltas (success `#2C7A57`, warning `#A9690B`, mission
+  `#8A4B0F`) are flagged but unconfirmed — the refs may have been misread; needs a second
+  look with the eyedropper before changing `app.css` tokens. Map chips (24px vs admin 12px)
+  are both correct in their own contexts; no change.
+- Phase C (log evidence), Phase D remainder (admin panel per-screen pass vs its 22 refs,
+  map pages vs 69 refs, guides, profile, mission, history), Phase E (tablet/mobile sweep with
+  ref viewports), Phase F (before/after composite set) — all pending.
+- DESIGN_MATRIX rows flip only with human visual acceptance; none flipped this pass.
+- Visual approval remains with the human reviewer; no merge/tag/release.
+- Commits this pass: Phase-B/auth/RTL edits are uncommitted pending this report; CI state at
+  the time of writing is green at `17df4bf` (docs-only commit that precedes these edits).

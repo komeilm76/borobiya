@@ -284,6 +284,8 @@ async function logout(): Promise<void> {
 
       <Transition name="bb-sheet" mode="out-in" :duration="motion.base.value">
         <section :key="String(route.name)" class="sheet" :data-detent="map.detent">
+          <!-- Grab handle per the bottom-sheet reference; purely decorative. -->
+          <div class="sheet__handle" aria-hidden="true" />
           <RouterView />
         </section>
       </Transition>

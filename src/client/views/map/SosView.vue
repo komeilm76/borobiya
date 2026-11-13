@@ -255,7 +255,7 @@ async function submit(): Promise<void> {
     >
       <span>ادامه</span><span class="mdi mdi-arrow-left" aria-hidden="true" />
     </button>
-    <button v-else type="button" class="primary-button" :disabled="sos.submitting" @click="submit">
+    <button v-else type="button" class="primary-button primary-button--danger" :disabled="sos.submitting" @click="submit">
       <span>ارسال درخواست امداد</span><span class="mdi mdi-send" aria-hidden="true" />
     </button>
   </div>

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth.ts';
 import { errorMessage } from '@/api/client.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { passwordIssue, passwordIssueMessage } from '@/composables/usePasswordPolicy.ts';
+import AuthHeading from '@/components/AuthHeading.vue';
 
 /**
  * Five-question password recovery: account lookup, three challenge answers, then a
@@ -26,7 +27,14 @@ const newPassword = ref('');
 const error = ref<string | null>(null);
 const busy = ref(false);
 
-const stepTitle = computed(() => (step.value === 'account' ? 'نام کاربری' : step.value === 'answers' ? 'پاسخ پرسش‌ها' : 'گذرواژه تازه'));
+const stepTitle = computed(() => (step.value === 'account' ? 'حسابتان را پیدا کنید' : step.value === 'answers' ? 'پاسخ پرسش‌ها' : 'گذرواژه تازه'));
+const stepEyebrow = computed(() => (step.value === 'account' ? 'مرحله ۱ از ۳' : step.value === 'answers' ? 'مرحله ۲ از ۳' : 'مرحله ۳ از ۳'));
+const stepIcon = computed(() => (step.value === 'account' ? 'mdi-shield-account-outline' : step.value === 'answers' ? 'mdi-comment-question-outline' : 'mdi-shield-lock-outline'));
+const stepSub = computed(() => (step.value === 'account'
+  ? 'نام کاربری حساب را وارد کنید تا پرسش‌های امنیتی نمایش داده شوند.'
+  : step.value === 'answers'
+    ? 'به هر سه پرسش پاسخ دهید؛ حساب نامشخص می‌ماند تا همه درست باشند.'
+    : 'گذرواژه تازه را وارد کنید و آن را در جایی مطمئن یادداشت کنید.'));
 
 async function startAccount(): Promise<void> {
   busy.value = true;
@@ -79,7 +87,8 @@ async function reset(): Promise<void> {
 
 <template>
   <VCard class="auth-card" flat>
-    <h3 class="auth-card__section">{{ stepTitle }}</h3>
+    <AuthHeading :eyebrow="stepEyebrow" :title="stepTitle" :icon="stepIcon" />
+    <p class="auth-card__sub">{{ stepSub }}</p>
     <VForm v-if="step === 'account'" @submit.prevent="startAccount">
       <VTextField v-model="username" name="username" label="نام کاربری" autocomplete="username" :disabled="busy" />
       <VBtn type="submit" block color="primary" class="mt-3" :loading="busy">دریافت پرسش‌ها</VBtn>
@@ -103,8 +112,8 @@ async function reset(): Promise<void> {
 </template>
 
 <style scoped>
-.auth-card { background: var(--surface); padding: 22px; border-radius: var(--r20); box-shadow: var(--shadow-sm); }
-.auth-card__section { margin-block-end: 12px; font-size: 15px; font-weight: 600; }
+.auth-card { background: transparent; padding: 0; border-radius: 0; box-shadow: none; }
+.auth-card__sub { margin: -8px 0 4px; font-size: 12.5px; color: var(--muted); line-height: 1.9; }
 .auth-card__question { display: grid; gap: 4px; margin-block-end: 10px; }
 .auth-card__question label { font-size: 13px; color: var(--muted); }
 .auth-card__links { margin-block-start: 12px; text-align: center; font-size: 13px; }

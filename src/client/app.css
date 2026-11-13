@@ -32,7 +32,9 @@
   --map-land: #F0F2EC;
   --map-water: #B6D7E4;
   --map-park: #D3E6C6;
-  --r8: 8px; --r12: 12px; --r16: 16px; --r20: 20px; --r26: 26px; --r32: 32px;
+  --r8: 8px; --r11: 11px; --r12: 12px; --r14: 14px; --r16: 16px; --r20: 20px; --r26: 26px; --r32: 32px;
+  /* Vuetify's rounded: 'lg' scale; admin foundations spec buttons/chips at 11px, map field/button radii measure ~14px — 11 keeps framework controls consistent with the admin floor while custom buttons carry r14. */
+  --v-border-radius-lg: 11px;
   --shadow-sm: 0 2px 10px rgba(18,42,42,.07);
   --shadow-md: 0 12px 32px rgba(18,42,42,.11);
   --shadow-lg: 0 28px 80px rgba(18,42,42,.16);
@@ -95,7 +97,7 @@ bdi, [dir='ltr'] { direction: ltr; unicode-bidi: isolate; }
 .status-pill--warning { background: rgba(140,86,9,.11); color: var(--warning); }
 .status-pill--danger { background: rgba(175,52,56,.10); color: var(--danger); }
 .error-panel .mdi { font-size: 22px; }
-.primary-button, .ghost-button, .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: var(--r8); font-weight: 700; transition: transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease); }
+.primary-button, .ghost-button, .danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: var(--r14); font-weight: 700; transition: transform .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease); }
 .primary-button { background: var(--primary); color: #fff; box-shadow: 0 8px 20px rgba(14,102,102,.18); }
 
 :root[data-theme='dark'] .primary-button { color: #082222; }
@@ -103,6 +105,9 @@ bdi, [dir='ltr'] { direction: ltr; unicode-bidi: isolate; }
 .primary-button:active:not(:disabled) { transform: translateY(1px); }
 .primary-button--wide { width: 100%; }
 .ghost-button { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+.primary-button--danger { background: var(--danger); border-color: transparent; color: #fff; box-shadow: 0 8px 20px rgba(175,52,56,.22); }
+.primary-button--danger:hover:not(:disabled) { box-shadow: 0 12px 26px rgba(175,52,56,.3); }
+:root[data-theme='dark'] .primary-button--danger { color: #2A080A; }
 .danger-button { background: rgba(175,52,56,.10); color: var(--danger); border: 1px solid rgba(175,52,56,.2); }
 .text-link { display: inline-flex; align-items: center; gap: 6px; color: var(--primary); font-size: 12.5px; font-weight: 600; padding: 6px; }
 /* Authentication */
@@ -111,7 +116,6 @@ body[data-mode='auth'] { min-height: 100vh; background: radial-gradient(ellipse 
 :root[data-theme='dark'] body[data-mode='auth'] { background: radial-gradient(ellipse at 100% 0%, rgba(14,77,77,.22), transparent 42%), radial-gradient(ellipse at 0% 100%, rgba(49,109,134,.14), transparent 46%), #0B1213; }
 .intro-shield > .mdi { font-size: 28px; color: #BFE4DE; }
 .auth-panel { background: var(--surface); display: grid; place-items: center; padding: 44px 60px; }
-.field { position: relative; display: block; height: 52px; margin: 12px 0; border: 1px solid var(--border); border-radius: var(--r8); background: var(--surface); transition: border .2s var(--ease), box-shadow .2s var(--ease); }
 .field:focus-within { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(14,102,102,.13); }
 .field input { width: 100%; height: 100%; border: 0; outline: 0; background: transparent; padding: 0 44px 0 16px; font-size: 14.5px; }
 .text-link { color: var(--primary); }
@@ -160,7 +164,7 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 .right-controls { position: absolute; z-index: 10; display: grid; gap: 12px; }
 .right-controls { right: 16px; top: 128px; justify-items: center; }
 .right-controls .round-control:nth-child(2) { margin-top: 260px; }
-.round-control { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: rgba(255,255,255,.97); color: var(--primary); box-shadow: var(--shadow-md); font-size: 22px; transition: transform .2s var(--ease); }
+.round-control { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.97); color: var(--primary); box-shadow: var(--shadow-md); font-size: 22px; transition: transform .2s var(--ease); }
 .round-control:hover { transform: translateY(-2px); }
 .compass-control .mdi { font-size: 17px; transform: rotate(45deg); }
 .avatar-control { position: relative; width: 58px; height: 58px; border-radius: var(--r16); background: var(--primary-soft); color: var(--primary); font-size: 21px; font-weight: 900; box-shadow: var(--shadow-md); }
@@ -183,11 +187,12 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 .connection-badge[data-status='disconnected'], .connection-badge[data-status='error'] { color: var(--danger); }
 .connection-badge[data-status='connecting'] { color: var(--warning); }
 /* Bottom sheet */
-.sheet { position: absolute; z-index: 16; left: 0; right: 0; bottom: 0; height: 52%; border-radius: var(--r32) var(--r32) 0 0; background: var(--surface); box-shadow: 0 -14px 40px rgba(18,42,42,.14); transition: height .42s var(--ease); display: flex; flex-direction: column; overflow: hidden; }
+.sheet { position: absolute; z-index: 16; left: 0; right: 0; bottom: 0; height: 52%; border-radius: var(--r26) var(--r26) 0 0; background: var(--surface); box-shadow: 0 -14px 40px rgba(18,42,42,.14); transition: height .42s var(--ease); display: flex; flex-direction: column; overflow: hidden; }
 /* Detents set the visible window height directly. The sheet is anchored to the frame bottom, so a translateY-based detent always pushed the footer (the primary CTA) below the frame edge and clipped it — the head and body now reflow inside the visible height instead, with the body scrolling. */
 .sheet[data-detent='closed'] { height: 28%; }
 .sheet[data-detent='half'] { height: 52%; }
 .sheet[data-detent='open'] { height: 76%; }
+.sheet__handle { flex: 0 0 auto; width: 64px; height: 5px; margin: 10px auto 0; border-radius: 999px; background: var(--border); }
 .sheet__head { flex: 0 0 auto; min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 20px 8px; }
 .sheet__head > div { display: grid; gap: 1px; text-align: right; }
 .sheet__head strong { font-size: 17px; line-height: 26px; }
@@ -199,7 +204,7 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 .sheet__body--sos { padding-inline: 16px; }
 .sheet__subtitle { font-size: 13px; font-weight: 700; color: var(--text); margin: 14px 0 6px; }
 .sheet__status { color: var(--muted); font-size: 12.5px; margin: 10px 0; }
-.sheet__footer { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--row-line); background: var(--surface); border-radius: 0 0 var(--r32) var(--r32); }
+.sheet__footer { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--row-line); background: var(--surface); border-radius: 0 0 var(--r26) var(--r26); }
 .sheet__footer .primary-button { flex: 1; }
 .sheet__footer--sos { flex-wrap: wrap; }
 .sheet__footer--sos .primary-button { order: -1; }
@@ -577,9 +582,9 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 .admin-list small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
 .admin-list .mdi { color: var(--muted); flex: 0 0 auto; }
 .admin-list > li > div { min-width: 0; flex: 1; }
-.admin-action { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.admin-action { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border-radius: var(--r11); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; white-space: nowrap; }
 .admin-action:hover { background: var(--surface-3); }
-.admin-select { min-height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 12.5px; }
+.admin-select { min-height: 36px; padding: 0 10px; border-radius: var(--r11); border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 12.5px; }
 .admin-select--compact { min-height: 32px; font-size: 12px; }
 .stack-form { display: grid; gap: 12px; }
 .group-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }

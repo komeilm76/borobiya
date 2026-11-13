@@ -15,6 +15,8 @@ declare module 'vue-router' {
     label?: string;
     /** MDI icon name for navigation entries. */
     icon?: string;
+    /** Brand panel copy for the auth shell, designed per screen. */
+    brand?: { badge: string; headlineA: string; headlineB: string; sub: string };
   }
 }
 
@@ -60,25 +62,25 @@ export const routes: RouteRecordRaw[] = [
     path: '/_auth/login',
     name: ROUTE_NAMES.login,
     component: () => import('@/views/auth/LoginView.vue'),
-    meta: { layout: 'auth', access: 'guest', label: 'ورود' }
+    meta: { layout: 'auth', access: 'guest', label: 'ورود', brand: { badge: 'ورود امن به بورو بیا', headlineA: 'یا هم،', headlineB: 'آماده‌تر هستیم.', sub: 'وارد حساب خود شوید تا با همراهان‌تان در ارتباط بمانید و در زمان نیاز، سریع‌تر به کمک برسید.' } }
   },
   {
     path: '/_auth/register',
     name: ROUTE_NAMES.register,
     component: () => import('@/views/auth/RegisterView.vue'),
-    meta: { layout: 'auth', access: 'guest', label: 'ثبت‌نام' }
+    meta: { layout: 'auth', access: 'guest', label: 'ثبت‌نام', brand: { badge: 'یک قدم تا همراهی', headlineA: 'حسابی امن،', headlineB: 'همراهی نزدیک.', sub: 'با ساخت حساب به شبکه‌ای از همراهان محلی می‌پیوندید؛ پرسش‌های امنیتی، سپر بازیابی حسابتان هستند.' } }
   },
   {
     path: '/_auth/recovery',
     name: ROUTE_NAMES.recovery,
     component: () => import('@/views/auth/RecoveryView.vue'),
-    meta: { layout: 'auth', access: 'guest', label: 'بازیابی رمز' }
+    meta: { layout: 'auth', access: 'guest', label: 'بازیابی رمز', brand: { badge: 'بازیابی امن حساب', headlineA: 'دوباره به', headlineB: 'حسابتان برسید.', sub: 'نام کاربری را وارد کنید؛ پرسش‌های امنیتی‌تان نمایش داده می‌شوند تا هویت‌تان تأیید شود.' } }
   },
   {
     path: '/_auth/onboarding',
     name: ROUTE_NAMES.onboarding,
     component: () => import('@/views/auth/OnboardingView.vue'),
-    meta: { layout: 'auth', access: 'user', label: 'تکمیل پرسش‌های امنیتی' }
+    meta: { layout: 'auth', access: 'user', label: 'تکمیل پرسش‌های امنیتی', brand: { badge: 'یک مرحله ضروری', headlineA: 'از حسابتان', headlineB: 'بهتر محافظت کنید.', sub: 'پنج پرسشی که فقط شما جوابشان را می‌دانید؛ اگر گذرواژه را فراموش کنید، همین‌ها حسابتان را باز می‌کنند.' } }
   },
   {
     path: '/_user/map',

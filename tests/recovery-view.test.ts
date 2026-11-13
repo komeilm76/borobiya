@@ -73,7 +73,7 @@ async function render() {
 
 /** The step heading doubles as the only reliable way to tell which step is showing. */
 function heading(wrapper: Awaited<ReturnType<typeof render>>['wrapper']): string {
-  return wrapper.find('.auth-card__section').text();
+  return wrapper.find('.auth-heading__title').text();
 }
 
 /** Types into a field found by its visible label, falling back to its `name` attribute. */
@@ -131,7 +131,7 @@ describe('recovery flow', () => {
   it('starts on the account step with a username field', async () => {
     stubApi(() => json({}));
     const { wrapper } = await render();
-    expect(heading(wrapper)).toBe('نام کاربری');
+    expect(heading(wrapper)).toBe('حسابتان را پیدا کنید');
     expect(wrapper.findAll('input')).toHaveLength(1);
     expect(wrapper.text()).toContain('دریافت پرسش‌ها');
     wrapper.unmount();
@@ -217,7 +217,7 @@ describe('recovery flow', () => {
     await flushPromises();
 
     expect(wrapper.find('.v-alert').text()).toContain('بعداً تلاش کنید.');
-    expect(heading(wrapper)).toBe('نام کاربری');
+    expect(heading(wrapper)).toBe('حسابتان را پیدا کنید');
     const button = wrapper.find('button[type="submit"]');
     expect(button.attributes('disabled')).toBeUndefined();
     wrapper.unmount();

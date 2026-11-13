@@ -1,6 +1,7 @@
 import 'vuetify/styles';
 import { createVuetify } from 'vuetify';
 import { aliases, mdi } from 'vuetify/iconsets/mdi';
+import { fa } from 'vuetify/locale';
 
 /**
  * Vuetify instance configured with the Borobiya design tokens.
@@ -9,6 +10,8 @@ import { aliases, mdi } from 'vuetify/iconsets/mdi';
  */
 export const vuetify = createVuetify({
   icons: { defaultSet: 'mdi', aliases, sets: { mdi } },
+  /** The whole app is RTL Persian; Vuetify needs the locale flag to mirror its controls. */
+  locale: { locale: 'fa', rtl: { fa: true }, messages: { fa } },
   theme: {
     defaultTheme: 'borobiyaLight',
     themes: {

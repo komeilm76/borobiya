@@ -5,6 +5,7 @@ import { VAlert, VBtn, VCard, VSelect, VTextField } from 'vuetify/components';
 import { useAuthStore } from '@/stores/auth.ts';
 import { errorMessage } from '@/api/client.ts';
 import { landingRoute } from '@/router/index.ts';
+import AuthHeading from '@/components/AuthHeading.vue';
 
 /**
  * Forced onboarding for administrator-created accounts: five distinct questions must be
@@ -41,7 +42,8 @@ async function submit(): Promise<void> {
 
 <template>
   <VCard class="auth-card" flat>
-    <p class="auth-card__hint">برای ادامه، پنج پرسش امنیتی متفاوت را انتخاب و پاسخ دهید.</p>
+    <AuthHeading eyebrow="تکمیل راه‌اندازی حساب" title="پرسش‌های امنیتی شما" icon="mdi-shield-key-outline" />
+    <p class="auth-card__hint">پنج پرسش امنیتی متفاوت را انتخاب و پاسخ دهید؛ پاسخ‌ها را فقط شما می‌دانید.</p>
     <form @submit.prevent="submit">
       <div v-for="index in 5" :key="index" class="auth-card__question">
         <VSelect v-model="selected[index - 1]" :items="options" density="compact" placeholder="پرسش امنیتی" :disabled="busy" />
@@ -54,7 +56,7 @@ async function submit(): Promise<void> {
 </template>
 
 <style scoped>
-.auth-card { background: var(--surface); padding: 22px; border-radius: var(--r20); box-shadow: var(--shadow-sm); }
+.auth-card { background: transparent; padding: 0; border-radius: 0; box-shadow: none; display: grid; gap: 12px; }
 .auth-card__hint { font-size: 13px; color: var(--muted); margin-block-end: 12px; }
 .auth-card__question { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-block-end: 8px; }
 </style>
