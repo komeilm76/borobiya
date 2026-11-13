@@ -1,5 +1,17 @@
-# Runtime dependencies
+# Runtime dependencies (installed by `bun install`)
 node_modules/
+
+# Generated browser build output (produced by `bun run build`, never edited by hand)
+public/js/
+public/sw.js
+public/index.html
+public/app.css
+public/manifest.webmanifest
+public/assets/icons.css
+public/assets/logo.svg
+public/assets/favicon.svg
+public/assets/fonts/
+public/assets/cache-manifest.json
 
 # Local state and secrets
 .env
@@ -20,9 +32,15 @@ dist/
 design/**/_generator/__pycache__/
 design/**/_generator/.venv/
 
+# Scratch directories created by tooling during test runs
+tmp/
+
 # Tooling and OS artifacts
 .DS_Store
 Thumbs.db
-npm-debug.log*
+*-debug.log*
 __pycache__/
 *.pyc
+
+# Generated visual-preview bundle (produced by `bun run preview:build`)
+build/

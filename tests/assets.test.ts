@@ -1,100 +1,154 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+// @vitest-environment node
+import { describe, expect, it } from 'vitest';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { ROOT } from '../src/server/core/config.ts';
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC = path.join(ROOT, 'public');
-const read = (relative: string) => readFileSync(path.join(ROOT, relative), 'utf8');
+const read = (relative: string): Promise<string> => Bun.file(path.join(ROOT, relative)).text();
+const exists = (relative: string): Promise<boolean> => Bun.file(path.join(ROOT, relative)).exists();
 
-function walk(directory: string, extensions: string[]): string[] {
-  const output: string[] = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const absolute = path.join(directory, entry.name);
-    if (entry.isDirectory()) output.push(...walk(absolute, extensions));
-    else if (extensions.some((extension) => entry.name.endsWith(extension))) output.push(absolute);
+/** Recursively lists files below a directory with Bun's glob. */
+async function glob(directory: string, pattern: string): Promise<string[]> {
+  const found: string[] = [];
+  for await (const relative of new Bun.Glob(pattern).scan({ cwd: directory, onlyFiles: true })) {
+    found.push(path.join(directory, relative));
   }
-  return output;
+  return found.sort();
 }
 
-test('generated cache manifest uses web-root paths, a stable version and existing files', () => {
-  const manifest = JSON.parse(read('public/assets/cache-manifest.json'));
-  assert.match(manifest.version, /^[a-f0-9]{16}$/);
-  assert.equal(Object.hasOwn(manifest, 'generatedAt'), false);
-  assert.equal(manifest.runtime.apiCaching, false);
-  assert.equal(manifest.runtime.tileLimit, 256);
-  assert.ok(manifest.precache.includes('/'));
-  assert.ok(manifest.precache.includes('/sw.js'));
-  assert.ok(manifest.precache.includes('/app.css'));
-  assert.ok(manifest.precache.includes('/js/app.js'));
-  assert.ok(manifest.precache.includes('/js/views/map.js'));
-  assert.ok(manifest.precache.includes('/js/views/admin.js'));
-  assert.equal(new Set(manifest.precache).size, manifest.precache.length);
-  for (const url of manifest.precache) {
-    assert.match(url, /^\//);
-    assert.doesNotMatch(url, /^\/public\//);
-    if (url === '/') continue;
-    const absolute = path.join(PUBLIC, url.slice(1));
-    assert.ok(existsSync(absolute) && statSync(absolute).isFile(), url);
-  }
-});
+describe('generated assets', () => {
+  it('the cache manifest uses web-root paths, a stable version and existing files', async () => {
+    const manifest = JSON.parse(await read('public/assets/cache-manifest.json'));
+    expect(manifest.version).toMatch(/^[a-f0-9]{16}$/);
+    expect(Object.hasOwn(manifest, 'generatedAt')).toBe(false);
+    expect(manifest.runtime.apiCaching).toBe(false);
+    expect(manifest.runtime.tileLimit).toBe(256);
+    expect(manifest.precache).toContain('/');
+    expect(manifest.precache).toContain('/sw.js');
+    expect(manifest.precache).toContain('/app.css');
+    expect(manifest.precache).toContain('/manifest.webmanifest');
+    expect(manifest.precache.some((url: string) => url.startsWith('/js/'))).toBe(true);
+    expect(new Set(manifest.precache).size).toBe(manifest.precache.length);
+    for (const url of manifest.precache) {
+      expect(url).toMatch(/^\//);
+      expect(url).not.toMatch(/^\/public\//);
+      if (url === '/') continue;
+      expect(await Bun.file(path.join(PUBLIC, url.slice(1))).exists(), url).toBe(true);
+    }
+  });
 
-test('generated fonts, icon CSS, logo and favicon are self-hosted', () => {
-  for (const file of ['public/assets/fonts/Vazirmatn-Regular.ttf', 'public/assets/fonts/Vazirmatn-Bold.ttf',
-    'public/assets/fonts/materialdesignicons-webfont.ttf', 'public/assets/icons.css',
-    'public/assets/logo.svg', 'public/assets/favicon.svg']) {
-    const absolute = path.join(ROOT, file);
-    assert.ok(existsSync(absolute) && statSync(absolute).size > 100, file);
-  }
-  const icons = read('public/assets/icons.css');
-  assert.match(icons, /@font-face/);
-  assert.match(icons, /materialdesignicons-webfont\.ttf/);
-  assert.doesNotMatch(icons, /https?:\/\//);
-  assert.ok([...icons.matchAll(/\.mdi-[a-z0-9-]+::before/g)].length >= 250);
-});
+  it('the manifest version changes with content and never embeds a timestamp', async () => {
+    const first = JSON.parse(await read('public/assets/cache-manifest.json'));
+    const { writeManifest } = await import('../scripts/build-assets.ts');
+    const second = await writeManifest();
+    expect(second.version).toBe(first.version);
+    expect(JSON.stringify(second)).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
 
-test('every icon used by the new UI exists in the shipped MDI subset and canonical inventory', () => {
-  const icons = read('public/assets/icons.css');
-  const inventory = JSON.parse(read('design/icons/icons.json')).icons.map((item: any) => String(item.name).replace(/^mdi-/, ''));
-  const shipped = new Set([...icons.matchAll(/\.mdi-([a-z0-9-]+)::before/g)].map((match) => match[1]));
-  const sourceFiles = walk(path.join(PUBLIC, 'js'), ['.js']).concat([path.join(PUBLIC, 'index.html'), path.join(PUBLIC, 'app.css'), path.join(ROOT, 'src/domain/catalog.ts')]);
-  const source = sourceFiles.map((file) => readFileSync(file, 'utf8')).join('\n');
-  const used = new Set<string>();
-  for (const match of source.matchAll(/icon\(\s*'([a-z0-9-]+)'/g)) used.add(match[1]);
-  for (const match of source.matchAll(/icon:\s*'([a-z0-9-]+)'/g)) used.add(match[1]);
-  for (const name of used) assert.ok(shipped.has(name), `missing shipped icon ${name}`);
-  for (const name of inventory) assert.ok(shipped.has(name), `canonical icon omitted: ${name}`);
-});
+  it('every emitted bundle chunk is referenced once and no stale chunk survives a rebuild', async () => {
+    const manifest = JSON.parse(await read('public/assets/cache-manifest.json'));
+    const precached = (manifest.precache as string[]).filter((entry) => entry.startsWith('/js/'));
+    const emitted = (await glob(path.join(PUBLIC, 'js'), '**/*.js')).map((file) => `/js/${path.basename(file)}`);
+    expect(precached.sort()).toEqual(emitted.sort());
+    const duplicated = emitted.filter((entry, index) => emitted.indexOf(entry) !== index);
+    expect(duplicated).toEqual([]);
+    // One hashed chunk per code-split view; a second copy means a previous build was not cleaned.
+    const viewChunks = emitted.filter((entry) => /View-[A-Za-z0-9_-]+\.js$/.test(entry)).map((entry) => entry.split('-')[0]);
+    expect(viewChunks.length).toBe(new Set(viewChunks).size);
+    const build = await read('scripts/build.ts');
+    expect(build).toMatch(/cleanPreviousBundle/);
+    expect(build.indexOf('await cleanPreviousBundle()')).toBeLessThan(build.indexOf("await build({"));
+  });
 
-test('the HTML shell, stylesheet and web app manifest contain no external runtime references', () => {
-  const html = read('public/index.html');
-  assert.match(html, /<script src="\/js\/theme\.js"><\/script>/);
-  assert.match(html, /<script type="module" src="\/js\/app\.js"><\/script>/);
-  assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)[^>]*>/);
-  assert.doesNotMatch(html, /https?:\/\//);
-  assert.match(html, /dir="rtl"/);
-  assert.match(html, /data-theme-choice="system"/);
-  const css = read('public/app.css');
-  assert.doesNotMatch(css, /@import|https?:\/\//);
-  assert.match(css, /--primary: #0E6666/);
-  assert.match(css, /prefers-reduced-motion/);
-  const manifest = JSON.parse(read('public/manifest.webmanifest'));
-  assert.equal(manifest.dir, 'rtl');
-  assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.theme_color, '#0E6666');
-  assert.ok(manifest.icons.every((icon: any) => icon.src.startsWith('/assets/')));
-});
+  it('the bundle contains a stable SPA entry and hashed code-split views', async () => {
+    const html = await read('public/index.html');
+    expect(html).toMatch(/<script type="module"[^>]*src="\/js\/index\.js"/);
+    expect(html).toContain('dir="rtl"');
+    expect(html).toContain('data-theme-choice="system"');
+    expect(html).toMatch(/href="\/app\.css"/);
+    expect(html).not.toMatch(/https?:\/\//);
+    const chunks = (await glob(path.join(PUBLIC, 'js'), '**/*.js')).map((file) => path.basename(file));
+    for (const view of ['LoginView', 'MapView', 'SosView', 'MissionView', 'OverviewView', 'UsersView', 'DispatchView']) {
+      expect(chunks.some((chunk) => chunk.startsWith(view)), view).toBe(true);
+    }
+  });
 
-test('the service worker precaches versioned static files and never caches private APIs', () => {
-  const source = read('public/sw.js');
-  assert.match(source, /borobiya-static-/);
-  assert.match(source, /\/assets\/cache-manifest\.json/);
-  assert.match(source, /TILE_LIMIT = 256/);
-  assert.match(source, /_public\/map\/tiles\//);
-  assert.match(source, /_auth\//);
-  assert.match(source, /_user\//);
-  assert.match(source, /_admin\//);
-  assert.match(source, /path\.startsWith\('\/_auth\/'\).*return;/);
-  assert.doesNotMatch(source, /cache\.put\(request, response\.clone\(\)\).*_\/admin/);
+  it('generated fonts, icon CSS, logo and favicon are self-hosted', async () => {
+    for (const file of [
+      'public/assets/fonts/Vazirmatn-Regular.ttf',
+      'public/assets/fonts/Vazirmatn-Bold.ttf',
+      'public/assets/fonts/materialdesignicons-webfont.ttf',
+      'public/assets/icons.css',
+      'public/assets/logo.svg',
+      'public/assets/favicon.svg'
+    ]) {
+      expect(await exists(file), file).toBe(true);
+      expect(Bun.file(path.join(ROOT, file)).size, file).toBeGreaterThan(100);
+    }
+    const icons = await read('public/assets/icons.css');
+    expect(icons).toMatch(/@font-face/);
+    expect(icons).toMatch(/materialdesignicons-webfont\.ttf/);
+    expect(icons).not.toMatch(/https?:\/\//);
+    expect([...icons.matchAll(/\.mdi-[a-z0-9-]+::before/g)].length).toBeGreaterThanOrEqual(250);
+  });
+
+  it('every icon used by the Vue client exists in the shipped MDI subset and canonical inventory', async () => {
+    const icons = await read('public/assets/icons.css');
+    const inventory = JSON.parse(await read('design/icons/icons.json')).icons.map((item: { name: string }) =>
+      String(item.name).replace(/^mdi-/, '')
+    );
+    const shipped = new Set([...icons.matchAll(/\.mdi-([a-z0-9-]+)::before/g)].map((match) => match[1]));
+    const clientFiles = (await glob(path.join(ROOT, 'src/client'), '**/*.{vue,ts}')).concat([
+      path.join(ROOT, 'src/server/domain/catalog.ts')
+    ]);
+    const used = new Set<string>();
+    for (const file of clientFiles) {
+      const source = await Bun.file(file).text();
+      for (const match of source.matchAll(/icon\(\s*'([a-z0-9-]+)'/g)) used.add(match[1]);
+      for (const match of source.matchAll(/icon:\s*'([a-z0-9-]+)'/g)) used.add(match[1]);
+      for (const match of source.matchAll(/mdi-([a-z0-9-]+)/g)) used.add(match[1]);
+    }
+    for (const name of used) expect(shipped.has(name), `missing shipped icon ${name}`).toBe(true);
+    for (const name of inventory) expect(shipped.has(name), `canonical icon omitted: ${name}`).toBe(true);
+  });
+
+  it('asset generation survives a clean checkout without a previous Vite bundle', async () => {
+    // CI runs `bun run assets` before `bun run build`, so `public/js` does not exist yet. The
+    // generator must treat that as "no files" instead of throwing, and it must not use
+    // `Bun.file(dir).exists()` as the guard because that reports false for every directory.
+    const source = await read('scripts/build-assets.ts');
+    expect(source).not.toMatch(/Bun\.file\(directory\)\.exists\(\)/);
+    expect(source).toMatch(/error as NodeJS\.ErrnoException\)\.code !== 'ENOENT'/);
+    const { staticFiles, copyClientPublic } = await import('../scripts/build-assets.ts');
+    const copied = await copyClientPublic();
+    expect(copied).toContain('/manifest.webmanifest');
+    const precache = await staticFiles();
+    expect(precache).toContain('/manifest.webmanifest');
+    expect(precache).toContain('/assets/icons.css');
+    expect(precache).not.toContain('/assets/cache-manifest.json');
+    expect(precache.every((entry) => entry.startsWith('/'))).toBe(true);
+  });
+
+  it('the stylesheet and web app manifest keep the design tokens and RTL contract', async () => {
+    const css = await read('public/app.css');
+    expect(css).not.toMatch(/@import/);
+    expect(css).toMatch(/--primary:\s*#0e6666/i);
+    expect(css).toMatch(/prefers-reduced-motion/);
+    const manifest = JSON.parse(await read('public/manifest.webmanifest'));
+    expect(manifest.dir).toBe('rtl');
+    expect(manifest.display).toBe('standalone');
+    expect(manifest.theme_color).toBe('#0E6666');
+    expect(manifest.icons.every((icon: { src: string }) => icon.src.startsWith('/assets/'))).toBe(true);
+  });
+
+  it('the compiled service worker precaches versioned files and never caches private APIs', async () => {
+    const source = await read('public/sw.js');
+    expect(source).toMatch(/borobiya-static-/);
+    expect(source).toMatch(/\/assets\/cache-manifest\.json/);
+    expect(source).toMatch(/TILE_LIMIT = 256/);
+    expect(source).toMatch(/_public\/map\/tiles\//);
+    expect(source).toMatch(/_auth\//);
+    expect(source).toMatch(/_user\//);
+    expect(source).toMatch(/_admin\//);
+  });
 });

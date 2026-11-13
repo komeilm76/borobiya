@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+@import '../app.css';
+
+/*
+ * Tailwind v4 integration notes
+ * ----------------------------
+ * Tailwind's preflight reset would otherwise override Vuetify's component styles (it removes
+ * button backgrounds, list styles and border defaults that Vuetify relies on). Borobiya layers
+ * Tailwind *without* preflight and keeps Vuetify's reset authoritative, which is the documented
+ * reason this project uses Tailwind v4 through `@tailwindcss/vite` rather than v3 + PostCSS.
+ */
+@layer base, components, utilities;
+
+/* Design tokens are mirrored as Tailwind theme values so utilities and CSS variables agree. */
+@theme {
+  --color-primary: #0e6666;
+  --color-primary-deep: #0a4b4b;
+  --color-danger: #af3438;
+  --color-success: #28724f;
+  --color-warning: #8c560b;
+  --color-info: #316d86;
+  --color-mission: #8a4b0f;
+  --color-amber: #b57a12;
+  --color-map-land: #f0f2ec;
+  --color-map-water: #b6d7e4;
+  --color-map-park: #d3e6c6;
+  --font-sans: 'Vazirmatn', system-ui, sans-serif;
+  --radius-card: 20px;
+  --shadow-card: 0 12px 32px rgba(18, 42, 42, 0.11);
+}
+
+/* RTL-aware logical utilities used across the layout. */
+@layer utilities {
+  .bb-admin-sidebar { inline-size: 264px; }
+  .bb-admin-topbar { block-size: 68px; }
+  .bb-admin-pad { padding: 28px; }
+}
+
+/* Reduced motion is enforced globally; Vue transitions and motion-v also read the preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

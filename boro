@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
+# Borobiya automation entrypoint. Every command runs through Bun; nothing here needs Node.js.
 set -eu
-exec node "$(dirname "$0")/scripts/boro.mjs" "$@"
+exec bun "$(dirname "$0")/scripts/boro.ts" "$@"

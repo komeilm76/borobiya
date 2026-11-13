@@ -1,12 +1,12 @@
 # Documentation index
 
-This folder contains practical English documentation for the clean Borobiya rebuild. Each file is written for a specific audience: developers, operators, end users, administrators and reviewers. The canonical visual contract is documented separately under `design/`; this folder explains how the implemented system works and how to operate it.
+This folder contains practical English documentation for Borobiya 2.0.0: a Bun 1.4.4 runtime with a Vue 3 TypeScript client. Each file is written for a specific audience: developers, operators, end users, administrators and reviewers. The canonical visual contract is documented separately under `design/`; this folder explains how the implemented system works and how to operate it.
 
 ## Start here
 
 - `DEVELOPMENT.md` describes local prerequisites, environment variables, generated assets, watch mode and debugging.
 - `DEPLOYMENT.md` covers production configuration, HTTPS, process startup, database location, backups and health checks.
-- `USER_MANUAL.md` explains the mobile account, map, SOS, mission, companion, talk, history and profile workflows.
+- `USER_MANUAL.md` explains the mobile account, map, SOS, mission, sharing, talk, history and profile workflows.
 - `ADMIN_MANUAL.md` explains the desktop overview, dispatch board, users, groups, reports, audit, alerts and settings.
 
 ## Technical references
@@ -14,7 +14,7 @@ This folder contains practical English documentation for the clean Borobiya rebu
 - `ARCHITECTURE.md` defines layers, dependency direction, the transaction/event boundary and runtime topology.
 - `API.md` documents envelopes, authentication, endpoint groups, validation and error behavior.
 - `WEBSOCKET.md` documents one-use tickets, hello, durable sync, presence, rooms, live location and binary audio.
-- `SECURITY.md` documents CSP, CORS, CSRF, sessions, password hashing, recovery, rate limits and data protection.
+- `SECURITY.md` documents CSP, CORS, CSRF, sessions, password hashing, recovery, rate limits, data protection and the Stage 7 route authorization audit.
 - `PERFORMANCE.md` documents bounded caches, compression, SQLite pragmas, WebSocket limits and service-worker caching.
 - `DESIGN_SYSTEM.md` summarizes colors, typography, spacing, components, responsive behavior and accessibility.
 
@@ -22,11 +22,15 @@ This folder contains practical English documentation for the clean Borobiya rebu
 
 - `AUTOMATION.md` documents the `boro` CLI, asset generation, CI workflow, doctor, check, verify and deployment checks.
 - `TESTING.md` describes the automated suite, its harness, focused commands and coverage intent.
-- `LEGACY_REVIEW.md` records what was learned from the previous architecture, why the clean rebuild is smaller, and how old mandatory feature families were reconciled with the new scope.
+- `VISUAL_PREVIEW.md` describes the isolated visual preview server used for human design review of completed pages.
+- `LEGACY_REVIEW.md` records what was learned from the previous architecture, why the single-process rebuild is smaller, and how old mandatory feature families were reconciled with the new scope.
 - `STATUS.md` summarizes the implemented subsystems, the closed target matrix and the validation commands that define readiness.
-- `ACCEPTANCE.md` maps the original specification and roadmap targets to the clean rebuild and records their closure.
-- `RELEASE_NOTES.md` records the 1.0.0 clean-rebuild release and its validation evidence.
+- `ACCEPTANCE.md` maps the original specification and roadmap targets to the current Bun/Vue implementation and records their closure.
+- `RELEASE_NOTES.md` records the 2.0.0 Bun and Vue migration, the preserved behavior and the validation evidence.
 - `OPERATIONS.md` is the startup, health, incident, backup, outage and release runbook.
+- `DESIGN_MATRIX.md` maps every canonical design image to `done`/`partial`/`missing`/`superseded`/`reference`/`deviation` with evidence notes — the coverage contract for the visual acceptance review.
+- `IMPLEMENTATION_PLAN.md` records the staged delivery (Stages 1-7) with per-stage exit criteria, verification numbers and the product decisions taken along the way.
+- `TRIP_TRACK_PROPOSAL.md` records the approved Stage D design and its binding decisions: consented GPS track recording for trips and responder missions, implemented on this branch (schema v9, replay API, retention purge, client prompt/indicator/replay).
 
 ## Reading order
 

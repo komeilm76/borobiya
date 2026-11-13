@@ -1,6 +1,6 @@
 # Realtime protocol
 
-The browser keeps exactly one authenticated WebSocket. Native RFC 6455 framing is implemented in `src/core/websocket.ts`; there is no Socket.IO dependency. The endpoint is `/ws`, and the protocol version is one.
+The browser keeps exactly one authenticated WebSocket. The endpoint is served by a `Bun.serve` WebSocket upgrade handler in `src/server/core/websocket.ts`; there is no Socket.IO or `ws` package. The endpoint is `/ws`, and the protocol version is one.
 
 ## Connection
 
@@ -12,11 +12,11 @@ On connect the server sends `hello` with protocol version, connection ID, user I
 
 Clients send `ping`, `subscribe`, `location.update`, `talk.start`, `talk.stop`, `snapshot` and `sync`. The server replies with `pong`, `ack`, `error`, `snapshot`, `presence`, `talk.state`, `location.peer` and `event` messages. Every command may carry a `requestId`; acknowledgements and typed errors echo it. Unknown command types return an `INVALID_INPUT` error rather than closing the connection.
 
-`sync` accepts `since` and `limit` and returns a `snapshot` with `kind: "sync"`, the filtered durable events and the new cursor. Event audiences are `all`, `user:<id>`, `role:<role>`, `session:<id>`, `sos:<id>`, `mission:<id>` and `talk:<id>`. The repository filters catch-up events so a client cannot read another user's private events.
+`sync` accepts `since` and `limit` and returns a `snapshot` with `kind: "sync"`, the filtered durable events and the new cursor. Event audiences are `all`, `user:<id>`, `role:<role>`, `session:<id>`, `sos:<id>`, `mission:<id>` and `talk:<id>`. Mission team changes and support-request outcomes are published as durable events to the `mission:<id>` audience (`mission.team.updated`, `support.request.created`, `support.request.reviewed`, `support.request.cancelled`). The repository filters catch-up events so a client cannot read another user's private events.
 
 ## Live location
 
-A `location.update` contains latitude, longitude, accuracy and optional heading, speed and recorded time. The server validates coordinates, rate-limits updates, stores the latest fix in a bounded cache, persists points at most every five seconds and sends `location.peer` only to active authorized recipients. The sender receives an acknowledgement with the recipient count. Revoking a share immediately invalidates cache entries and stops future fan-out.
+A `location.update` contains latitude, longitude, accuracy and optional heading, speed and recorded time. The server validates coordinates, rate-limits updates, stores the latest fix in a bounded cache, persists points at most every five seconds and sends `location.peer` only to active authorized recipients. The sender receives an acknowledgement with the recipient count. Revoking a share immediately invalidates cache entries and stops future fan-out. The message may additionally carry an optional `contextType` (`trip`|`mission`) and `contextId` pair (both or neither — one without the other is an `INVALID_INPUT` error); when present and the caller has accepted recording for that context (account opt-in plus per-context consent, accuracy no worse than 100 m), the fix is also written to the consented track store (see `docs/API.md`); otherwise recording is skipped silently and the live share path is unaffected.
 
 ## Push-to-talk
 
