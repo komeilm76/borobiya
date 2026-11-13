@@ -46,27 +46,17 @@
         <div v-if="fullscreen" class="live-panel__room-heading">
           <h2>اعضای مأموریت</h2>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل اعضای مأموریت" @click="emit('close-room')" />
-          <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
-            {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
-          </v-chip>
-          <p>موقعیت امدادگر در مأموریت فعال خودکار است؛ موقعیت دیگر اعضا با انتخاب خودشان در اتاق نمایش داده می‌شود.</p>
-          <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
-            prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
-        </div>
-        <template v-if="fullscreen">
-          <v-alert v-if="live.error.value" type="warning" variant="tonal" role="alert">
-            {{ live.error.value }} <v-btn size="small" variant="text" @click="live.start()">تلاش دوباره</v-btn>
-          </v-alert>
-          <div class="d-flex flex-wrap ga-2" role="status" aria-live="polite">
-            <v-chip size="small" variant="tonal" :color="presence.requester.value === 'online' ? 'success' : 'warning'">
-              اتصال درخواست‌کننده: {{ missionPresenceLabel[presence.requester.value] }}
+          <div class="live-panel__room-tools">
+            <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
+              {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
             </v-chip>
-            <v-chip size="small" variant="tonal" :color="presence.rescuer.value === 'online' ? 'success' : 'warning'">
-              اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
-            </v-chip>
-            <small>وضعیت اتصال، مستقل از اشتراک موقعیت مأموریت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
+            <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
+              prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
           </div>
-        </template>
+        </div>
+        <v-alert v-if="fullscreen && live.error.value" type="warning" variant="tonal" role="alert">
+          {{ live.error.value }} <v-btn size="small" variant="text" @click="live.start()">تلاش دوباره</v-btn>
+        </v-alert>
         <div v-for="member in live.participantStatus.value" :key="member.role" class="live-panel__member">
           <span class="live-panel__dot" :class="member.role" />
           <div>
@@ -77,8 +67,26 @@
           <v-chip :color="member.fresh ? 'success' : 'grey'" variant="tonal" size="small">
             {{ !member.entry ? 'اشتراک آغاز نشده' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
           </v-chip>
+          <v-btn v-if="fullscreen" icon="mdi-crosshairs-gps" variant="tonal" color="primary"
+            :disabled="!member.fresh || !map"
+            :aria-label="`نمایش موقعیت تازهٔ ${member.role === 'requester' ? 'درخواست‌کننده' : member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز'} روی نقشه`"
+            :title="member.fresh ? 'نمایش موقعیت تازه روی نقشه' : 'موقعیت تازه‌ای برای نمایش روی نقشه نیست'"
+            @click="focusMember(member.role)" />
         </div>
-        <p class="live-panel__note">این نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
+        <div v-if="fullscreen" class="live-panel__presence-chips" role="status" aria-live="polite">
+          <v-chip size="small" variant="tonal" :color="presence.requester.value === 'online' ? 'success' : 'warning'">
+            اتصال درخواست‌کننده: {{ missionPresenceLabel[presence.requester.value] }}
+          </v-chip>
+          <v-chip size="small" variant="tonal" :color="presence.rescuer.value === 'online' ? 'success' : 'warning'">
+            اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
+          </v-chip>
+        </div>
+        <details v-if="fullscreen" class="live-panel__presence-details">
+          <summary>راهنمای اتصال و موقعیت</summary>
+          <p>وضعیت اتصال، مستقل از اشتراک موقعیت مأموریت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</p>
+          <p>نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. موقعیت قدیمی برای راهبری مناسب نیست و فقط موقعیت تازه را می‌توان روی نقشه مرکز کرد.</p>
+        </details>
+        <p v-else class="live-panel__note">این نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
         <template v-if="fullscreen">
           <p class="live-panel__note" role="status">
             {{ missionShare.sharing && missionShare.mission?.id === mission.id
@@ -109,6 +117,7 @@ import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
+import { freshMissionMemberCamera } from "@/mission/member-focus";
 import { createLiveCameraIntent } from "@/mission/live-camera-intent";
 import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
@@ -198,9 +207,18 @@ function focusMembers(userInitiated = false) {
   if (userInitiated) {
     cameraIntent.reset(); // Explicit show-all restores automatic room framing.
     emit("camera-selected"); // Preserve this explicit view against GPS follow.
+    if (props.fullscreen) emit("close-room"); // Reveal the points rather than covering them with the sheet.
   }
   if (camera.kind === "single") map.value.easeTo({ center: camera.center, zoom: camera.zoom, duration: 350 });
   else map.value.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 350 });
+}
+function focusMember(role: Role): void {
+  const center = freshMissionMemberCamera(live.participantStatus.value, role);
+  if (!center || !map.value) return;
+  cameraIntent.noteGesture(); // Do not auto-frame a later peer over the selected member.
+  emit("camera-selected"); // An intentional selection suspends route GPS follow.
+  if (props.fullscreen) emit("close-room"); // The sheet otherwise covers the centered marker on phones.
+  map.value.easeTo({ center, zoom: 15, duration: 350 });
 }
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
   if (map.value !== instance) {
@@ -263,8 +281,10 @@ onBeforeUnmount(() => {
 .live-panel--routing .live-panel__map { height: min(50dvh, 450px); min-height: 310px; }
 .live-panel--routing .live-panel__map :deep(.map-canvas) { min-height: 0; }
 .live-panel__members { display: grid; gap: 12px; align-content: start; }
-.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: var(--bb-radius-nested, 16px); background: rgba(31,121,102,.06); }
+.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
 .live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.live-panel__member :deep(.v-btn) { flex: none; min-width: 44px; height: 44px; }
+.live-panel__member :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .live-panel__member strong { font-size: .85rem; }.live-panel__member small { font-size: 0.82rem; opacity: .78; }
 .live-panel__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }.live-panel__dot.requester { background: #dc593b; }.live-panel__dot.rescuer { background: #16826c; }.live-panel__dot.admin { background: #5555ae; }
 @container (min-width: 721px) { .live-panel--routing .live-panel__map { position: sticky; top: 16px; z-index: 1; } }
@@ -300,8 +320,15 @@ onBeforeUnmount(() => {
   background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
 }
 .live-panel__room-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.live-panel__room-heading h2 { flex: 1 1 auto; font-size: 1.05rem; }
-.live-panel__room-heading p { width: 100%; font-size: .85rem; line-height: 1.6; }
+.live-panel__room-heading h2 { flex: 1 1 auto; margin: 0; font-size: 1.05rem; }
+.live-panel__room-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.live-panel__presence-details { padding: .7rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); font-size: .82rem; line-height: 1.6; }
+.live-panel__presence-details summary { cursor: pointer; color: rgb(var(--v-theme-primary)); font-weight: 800; }
+.live-panel__presence-details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.live-panel__presence-details p { margin: .5rem 0 0; }
+.live-panel__presence-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.live-panel--fullscreen .live-panel__member { padding: .6rem .7rem; }
+.live-panel--fullscreen .live-panel__member > .v-chip { max-width: 100%; }
 @media (max-width: 599px) {
   .live-panel--fullscreen .live-panel__members {
     inset-inline: .75rem; width: auto;
