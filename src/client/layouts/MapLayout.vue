@@ -46,8 +46,8 @@ const tabs = [
 const activeTab = computed(() => {
   const name = String(route.name);
   if (name === ROUTE_NAMES.sos || name === ROUTE_NAMES.talk) return ROUTE_NAMES.map;
-  // The profile is entered from the avatar control, not the selector; no tab is its parent.
-  if (name === ROUTE_NAMES.profile) return null;
+  // Profile is not a tab either; the documented contract keeps the history tab highlighted.
+  if (name === ROUTE_NAMES.profile) return ROUTE_NAMES.history;
   return name;
 });
 
