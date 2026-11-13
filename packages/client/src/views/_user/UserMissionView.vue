@@ -275,12 +275,21 @@
         </div>
         <nav class="mission-desk__dock" aria-label="ابزارهای مأموریت">
           <button id="mission-tool-status" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'status' }"
+            :aria-label="`وضعیت مأموریت: ${currentStatusLabel}؛ ${activeTool === 'status' ? 'بستن' : 'باز کردن'} پنل وضعیت`"
             :aria-expanded="activeTool === 'status'" aria-controls="mission-status-panel"
-            @click="toggleTool('status')"><v-icon icon="mdi-clipboard-text-outline" size="22" aria-hidden="true" />وضعیت</button>
-          <button id="mission-tool-route" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'route' }"
+            @click="toggleTool('status')">
+            <v-icon icon="mdi-clipboard-text-outline" size="22" aria-hidden="true" /><strong>وضعیت</strong>
+            <small aria-hidden="true">{{ currentStatusLabel }}</small>
+          </button>
+          <button id="mission-tool-route" type="button"
+            :class="{ 'mission-desk__dock-active': activeTool === 'route', 'mission-desk__dock-warning': routeCue.tone === 'warning', 'mission-desk__dock-ready': routeCue.tone === 'ready' }"
+            :aria-label="`مسیر مأموریت: ${routeCue.label}؛ ${activeTool === 'route' ? 'بستن' : 'باز کردن'} پنل مسیر`"
             :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
             :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
-            @click="toggleTool('route')"><v-icon icon="mdi-routes" size="22" aria-hidden="true" />مسیر</button>
+            @click="toggleTool('route')">
+            <v-icon icon="mdi-routes" size="22" aria-hidden="true" /><strong>مسیر</strong>
+            <small aria-hidden="true">{{ routeCue.label }}</small>
+          </button>
         </nav>
       </div>
     </div>
@@ -350,6 +359,7 @@ import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { createMissionRouteWorkspace, type RouteWorkspaceSection } from "@/mission/route-workspace";
 import { missionMapCamera, missionRouteStop } from "@/sos/mission-map";
 import { incidentDistanceMetres } from "@/mission/incident-distance";
+import { missionRouteCue } from "@/mission/route-cue";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
 import { useRouteElevationCharts } from "@/sos/route-elevation-charts";
@@ -560,6 +570,17 @@ const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
 // The GPS watcher clears fix immediately on timeout, denial, background or Stop.
 // Do not substitute the saved route origin or an old member marker here.
 const incidentDistance = computed(() => incidentDistanceMetres(navigation.fix.value, routing.target.value?.incident ?? null));
+const routeCue = computed(() => missionRouteCue({
+  blocked: !!desk.terminalHold.value || !!desk.error.value,
+  routeError: !!routing.error.value,
+  navigationError: !!navigation.error.value,
+  navigationActive: navigation.active.value,
+  freshFix: !!navigation.fix.value,
+  targetLoading: routing.targetLoading.value,
+  routeLoading: routing.loading.value,
+  hasRoute: !!routing.selectedRoute.value,
+  hasTarget: !!routing.target.value
+}));
 function confirmMissionTransport(mode: TransportProfile): void {
   if (routeSection.value !== "transport" || !desk.activeMission.value || navigation.active.value ||
     !transportProfiles.some((option) => option.value === mode)) return;
@@ -638,11 +659,16 @@ function syncRouteMap(): void {
     return marker;
   });
   // A square ! pin cannot be mistaken for the requester's orange live-location marker.
-  const incidentPin = document.createElement("div");
+  const incidentPin = document.createElement("button");
+  incidentPin.type = "button";
   incidentPin.className = "mission-desk__incident-pin";
   incidentPin.textContent = "!";
-  incidentPin.setAttribute("role", "img");
-  incidentPin.setAttribute("aria-label", "محل حادثه");
+  incidentPin.setAttribute("aria-label", "محل حادثه؛ باز کردن برنامهٔ مسیر");
+  incidentPin.setAttribute("aria-disabled", String(pickingWaypoint.value));
+  incidentPin.addEventListener("click", (event) => {
+    event.stopPropagation(); // A marker tap must not also insert a waypoint through the map.
+    if (!pickingWaypoint.value) openRouteWorkspace();
+  });
   incidentMarker = new MarkerClass({ element: incidentPin, anchor: "bottom" })
     .setLngLat([incident.lon, incident.lat]).addTo(map);
   // A planned origin is a snapshot, not the rescuer's live/consented location.
@@ -724,6 +750,9 @@ function releaseRouteMap(): void {
 }
 watch(() => [routing.visible.value, routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const,
   () => syncRouteMap(), { flush: "sync" });
+watch(pickingWaypoint, (picking) => {
+  incidentMarker?.getElement().setAttribute("aria-disabled", String(picking));
+}, { flush: "sync" });
 watch(() => navigation.active.value, (active) => {
   if (active) pickingWaypoint.value = false;
   else followingGps.value = true; // Never carry a paused camera into another mission/watch.
@@ -786,7 +815,9 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-route__legend { margin: 10px 0; font-size: .82rem; line-height: 1.7; }
 .mission-desk__map-hint { position: absolute; z-index: 2; inset-inline: 12px; bottom: 32px; width: fit-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-surface); font-size: .85rem; }
 .mission-desk__map-hint button { margin-inline-start: 12px; color: rgb(var(--v-theme-primary)); text-decoration: underline; font: inherit; font-weight: 700; }
-:global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; }
+:global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; cursor: pointer; }
+:global(.mission-desk__incident-pin:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
+:global(.mission-desk__incident-pin[aria-disabled="true"]) { cursor: default; }
 :global(.mission-desk__incident-pin::after) { content: ''; position: absolute; top: 100%; border-inline: 6px solid transparent; border-top: 8px solid #b91c1c; }
 :global(.mission-desk__selected-stop) { outline: 3px solid #fbbf24; outline-offset: 4px; border-radius: 50%; }
 .mission-route__header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
@@ -1023,10 +1054,18 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__dock button {
-  display: grid; place-items: center; flex: 1 1 0; gap: 1px; min-width: 0; min-height: 54px;
+  display: grid; grid-template-rows: 22px auto auto; align-content: center; place-items: center;
+  flex: 1 1 0; gap: 1px; min-width: 0; min-height: 64px; padding: 3px 5px;
   border: 0; border-radius: var(--bb-radius-nested, 16px); background: transparent;
-  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font-family: inherit; font-size: .82rem; font-weight: 700; line-height: 1.3;
+  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font-family: inherit; line-height: 1.2;
 }
+.mission-desk__dock button strong { font-size: .82rem; }
+.mission-desk__dock button small {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .8rem; font-weight: 600;
+}
+.mission-desk__dock .mission-desk__dock-warning { box-shadow: inset 3px 0 rgb(var(--v-theme-warning)); }
+.mission-desk__dock .mission-desk__dock-ready { box-shadow: inset 3px 0 rgb(var(--v-theme-primary)); }
 .mission-desk__dock .mission-desk__dock-active {
   background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary));
 }
