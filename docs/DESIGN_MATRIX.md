@@ -141,7 +141,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/02-history-missions.png | partial | P2/H | Stage 6: dedicated missions tab with 'mine as requester' and 'mine as responder' sub-tabs, day grouping and expandable details; no designed summary chips, search or filter yet. |
 | history/03-history-missions-agent.png | partial | P2/M | Stage 6: responder missions live in the 'mine as responder' sub-tab with localized status and the granted rating (star row and numeric rating) and its note; no dedicated agent dashboard view. |
 | history/04-history-companions.png | partial | P2/M | The history screen (shares tab) and the Sharing Center list every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
-| history/05-history-filter.png | missing | P2/M | No filter UI; pending a product decision on what recorded history exists to filter. |
+| history/05-history-filter.png | partial | P2/M | Stage E (2026-11-12): date-range (today / 7 days / 30 days / all) and status chips ship on every history tab (share lifecycle chips for shares), with per-tab filtered empty states and reset, plus an honest per-tab summary line (filtered count; recorded-trip count where trackStatus is `available`; rated-mission average). The designed bottom-sheet grouping (vehicle type, companions, "recorded only" / "emergency only" toggles) is deliberately absent: the vehicle/companion dimensions have no backing data in history records today and the two toggles duplicate filters no record distinguishes. The status stays `partial` (designed sheet not pixel-matched) and flips to `done` only after a human accepts the recorded preview — visual acceptance is never automated. |
 | history/06-history-details.png | partial | P2/M | Stage 6: inline detail for every history record — trips show the ranked stop list, members and start/end times, plus repeat-as-new-trip and save; requests show the server timeline; missions show rating/note; every record can spawn a scoped history-window share. Stage D (2026-11-12): recorded tracks render an explicit availability state, a schematic path and a per-member distance/duration summary (missions and trips); deviation statistics remain absent and this is not the designed modal. |
 | history/07-history-playback.png | missing | P2/H | Stage D records consented tracks and ships an authorization-aware replay panel (participants by default; window-covering history-share recipients scope-projected with the grant expiry shown; `available`/`expired`/`none` stated explicitly). The designed map-animated playback surface does not exist and this row stays `missing` until a human accepts the recorded preview — visual acceptance is never automated. DF-04 was addressed in the replay panel and is retained in the register for the designed surface. |
 | history/08-history-companion.png | missing | P2/M | No per-companion history; would additionally need companion-level aggregation the APIs do not expose today. |
@@ -245,7 +245,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 ## Summary tally (canonical 141)
 
-Counts over the 141 canonical rows above: `done` 23, `partial` 70, `missing` 31, `superseded` 11, `reference` 5, intentional `deviation` 1.
+Counts over the 141 canonical rows above: `done` 23, `partial` 71, `missing` 30, `superseded` 11, `reference` 5, intentional `deviation` 1.
 
 ## Stage C review log (2026-11-08)
 
@@ -253,9 +253,13 @@ Code-vs-matrix audit of all 141 canonical rows; the matrix was confirmed as the 
 
 - Integrity check: the 141 canonical PNGs on disk (154 files minus the 13 `_generator/_preview-*.png` artifacts) map 1:1 onto the 141 matrix rows; no missing, extra or duplicated references.
 - Stale rows corrected: `mission/01-mission-ready-on`, `mission/02-mission-ready-off`, `profile/08-bookmarks`, `profile/09-bookmark-edit` — all four described shipped functionality as absent (readiness switch and saved-places UI are wired); now `partial` with accurate notes.
-- Spot checks confirmed accurate as written: `navigation/17` (no reorder UI), `sos/07`–`sos/11` and `sos/16` (no sending/pending/dispatched/en-route/arrived/offline surfaces), `admin-panel/services/*` (no edit/member-management UI), `admin-panel/dashboard/03-reports` (no deltas/period/donut), `admin-panel/states/01|04`, `history/05|07|08` (filter/playback/per-companion absent), `mission/13|19`, `companions/02|05|10`, `profile/06`, `auth/02|12`.
+- Spot checks confirmed accurate as written (Stage C, 2026-11-08): `navigation/17` (no reorder UI), `sos/07`–`sos/11` and `sos/16` (no sending/pending/dispatched/en-route/arrived/offline surfaces), `admin-panel/services/*` (no edit/member-management UI), `admin-panel/dashboard/03-reports` (no deltas/period/donut), `admin-panel/states/01|04`, `history/07|08` (playback/per-companion absent; `history/05` changed by Stage E — see the Stage E review log), `mission/13|19`, `companions/02|05|10`, `profile/06`, `auth/02|12`.
 - The 23 `done` rows were not re-verified visually; they remain "implemented and wired, pixel fidelity unverified".
 - Remaining `missing` work is enumerated by the matrix; several rows are product/architecture decisions rather than buildable screens (e.g. `history/07` playback: the trip-track recording decision is approved and implemented — see `docs/TRIP_TRACK_PROPOSAL.md` (2026-11-12) — and the row stays `missing` until a human accepts the recorded preview in the visual preview).
+
+## Stage E review log (2026-11-12)
+
+History discovery landed as a deliberately minimal filter layer (see `docs/IMPLEMENTATION_PLAN.md` Stage E entry): date range and status chips on all three history tabs (share lifecycle chips on shares), honest filter-emptied empty states with one-click reset, and a per-tab summary line. `history/05` moves `missing` → `partial` on code evidence (a filter UI now exists and is wired to real, loaded records); the designed bottom sheet's vehicle/companion groups and toggles stay unimplemented for lack of backing data, and the row flips to `done` only after human visual acceptance. No other rows change; the tally is `done` 23, `partial` 71, `missing` 30. `history/07` and `history/08` stay `missing`.
 
 ## Stage D review log (2026-11-12)
 

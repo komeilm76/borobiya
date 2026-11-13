@@ -433,3 +433,112 @@ describe('mission details and scoped shares', () => {
     wrapper.unmount();
   });
 });
+
+describe('filters (Stage E)', () => {
+  it('date range filter empties the trips list and the reset button restores it', async () => {
+    stubFetch(defaultHandler());
+    const wrapper = await render();
+    await wrapper.find('[data-testid="history-tab-trips"]').trigger('click');
+    await flushPromises();
+    // The finished fixture trip is 3 days old: not "today", but inside 7 days.
+    await wrapper.find('[data-testid="history-range-today"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-trip-trp_1"]').exists()).toBe(false);
+    const empty = wrapper.find('[data-testid="history-trips-empty"]');
+    expect(empty.exists()).toBe(true);
+    expect(empty.text()).toContain('هیچ رکوردی با این فیلترها نیست.');
+
+    await wrapper.find('[data-testid="history-filter-reset-trips"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-trip-trp_1"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('week range keeps a 3-day-old trip visible; status filter narrows trips', async () => {
+    stubFetch(defaultHandler());
+    const wrapper = await render();
+    await wrapper.find('[data-testid="history-tab-trips"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="history-range-week"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-trip-trp_1"]').exists()).toBe(true);
+
+    // The only finished fixture trip is completed, so filtering by cancelled empties the list.
+    await wrapper.find('[data-testid="history-status-cancelled"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-trip-trp_1"]').exists()).toBe(false);
+    await wrapper.find('[data-testid="history-status-completed"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-trip-trp_1"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('missions subtab filters by date and summarises the rated average', async () => {
+    stubFetch(defaultHandler());
+    const wrapper = await render();
+    // Default tab is missions, but the default subtab is "requests" — switch to missions.
+    await wrapper.find('[data-testid="history-subtab-missions"]').trigger('click');
+    await flushPromises();
+    // The fixture mission completed 25h ago, so "today" hides it.
+    expect(wrapper.find('[data-testid="history-summary"]').text()).toContain('میانگین امتیاز');
+    await wrapper.find('[data-testid="history-range-today"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-missions-empty"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="history-range-week"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-summary"]').text()).toContain('میانگین امتیاز');
+    expect(wrapper.find('[data-testid="history-mission-msn_1"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('requests subtab empties under a mismatched status filter and resets cleanly', async () => {
+    stubFetch(defaultHandler());
+    const wrapper = await render();
+    await wrapper.find('[data-testid="history-subtab-requests"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-request-sos_1"]').exists()).toBe(true);
+    // REQUEST fixture is completed: filtering cancelled hides it.
+    await wrapper.find('[data-testid="history-status-cancelled"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-request-sos_1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="history-requests-empty"]').text()).toContain('هیچ رکوردی با این فیلترها نیست.');
+    await wrapper.find('[data-testid="history-filter-reset-requests"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-request-sos_1"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('shares tab filters by lifecycle state with honest empty states', async () => {
+    stubFetch(defaultHandler());
+    const wrapper = await render();
+    await wrapper.find('[data-testid="history-tab-shares"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="history-summary"]').text()).toContain('فعال از');
+
+    await wrapper.find('[data-testid="history-share-state-revoked"]').trigger('click');
+    await flushPromises();
+    const rows = wrapper.findAll('[data-testid="history-share-row"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toContain('قطع‌شده');
+
+    // No revoked fixture exists once filtered to expired → honest empty state.
+    await wrapper.find('[data-testid="history-share-state-expired"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('[data-testid="history-share-row"]')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="history-shares-empty"]').text()).toContain('هیچ اشتراکی با این فیلترها نیست.');
+    await wrapper.find('[data-testid="history-filter-reset-shares"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('[data-testid="history-share-row"]')).toHaveLength(2);
+    wrapper.unmount();
+  });
+
+  it('keeps tab totals unfiltered while lists are filtered', async () => {
+    stubFetch(defaultHandler());
+    const wrapper = await render();
+    await wrapper.find('[data-testid="history-range-today"]').trigger('click');
+    await flushPromises();
+    // The missions tab badge still counts the underlying records.
+    expect(wrapper.find('[data-testid="history-tab-missions"]').text()).toContain('۲');
+    wrapper.unmount();
+  });
+});

@@ -89,6 +89,37 @@ function groupByDay<T>(items: T[], time: (item: T) => number): DayGroup<T>[] {
     .map(([key, group]) => ({ key, label: dayLabel(key), items: [...group].sort((a, b) => time(b) - time(a)) }));
 }
 
+/* ---------- filters (Stage E): date range + status, minimal and practical ---------- */
+const DATE_RANGE_OPTIONS = [
+  { value: 'today', label: 'امروز' },
+  { value: 'week', label: '۷ روز اخیر' },
+  { value: 'month', label: '۳۰ روز اخیر' },
+  { value: 'all', label: 'همه' }
+] as const;
+type DateRange = typeof DATE_RANGE_OPTIONS[number]['value'];
+const dateRange = ref<DateRange>('all');
+const statusFilter = ref<'all' | 'completed' | 'cancelled'>('all');
+const shareStateFilter = ref<'all' | 'active' | 'expired' | 'revoked'>('all');
+const filtersActive = computed(() => dateRange.value !== 'all' || statusFilter.value !== 'all' || shareStateFilter.value !== 'all');
+
+function inRange(ts: number): boolean {
+  if (dateRange.value === 'all') return true;
+  if (dateRange.value === 'today') return ts >= startOfDay(Date.now());
+  const windowMs = dateRange.value === 'week' ? 7 * 86_400_000 : 30 * 86_400_000;
+  return Date.now() - ts <= windowMs;
+}
+const isCancelledLike = (status: string): boolean => status === 'cancelled' || status === 'expired';
+function matchesStatus(status: string): boolean {
+  if (statusFilter.value === 'all') return true;
+  if (statusFilter.value === 'completed') return status === 'completed';
+  return isCancelledLike(status);
+}
+function resetFilters(): void {
+  dateRange.value = 'all';
+  statusFilter.value = 'all';
+  shareStateFilter.value = 'all';
+}
+
 /* ---------- trips category ---------- */
 const TRIP_STATUS_LABEL: Record<string, string> = {
   planned: 'برنامه‌ریزی‌شده', active: 'در حال انجام', completed: 'تکمیل‌شده', cancelled: 'لغوشده'
@@ -98,11 +129,49 @@ const SEVERITY_LABEL: Record<string, string> = { low: 'کم', medium: 'متوس�
 const EVENT_ACTION_LABEL: Record<string, string> = { assign: 'اعزام', accept: 'پذیرش', arrive: 'رسیدن', start: 'شروع', complete: 'تکمیل', cancel: 'لغو' };
 
 const finishedTrips = computed(() => trips.trips.filter((trip) => trip.status === 'completed' || trip.status === 'cancelled'));
-const tripGroups = computed(() => groupByDay(finishedTrips.value, (trip) => trip.startedAt ?? trip.createdAt));
 const tripCount = computed(() => finishedTrips.value.length);
 const missionCount = computed(() => history.value.length + missions.value.length);
-const requestGroups = computed(() => groupByDay(history.value, (item) => item.createdAt));
-const missionGroups = computed(() => groupByDay(missions.value, (item) => item.updatedAt));
+
+/* Filtered views drive the lists; the tab badges keep the totals. */
+const filteredTrips = computed(() =>
+  finishedTrips.value.filter((trip) => inRange(trip.startedAt ?? trip.createdAt) && matchesStatus(trip.status)));
+const filteredRequests = computed(() =>
+  history.value.filter((item) => inRange(item.createdAt) && matchesStatus(item.status)));
+const filteredMissions = computed(() =>
+  missions.value.filter((mission) => inRange(mission.updatedAt) && matchesStatus(mission.status)));
+const shareState = (share: ShareView): 'active' | 'expired' | 'revoked' => share.state ?? 'active';
+const filteredShares = computed(() =>
+  shareHistory.value.filter((share) => shareStateFilter.value === 'all' || shareState(share) === shareStateFilter.value));
+const filterEmptied = computed(() => {
+  if (!filtersActive.value) return false;
+  if (activeTab.value === 'trips') return finishedTrips.value.length > 0 && filteredTrips.value.length === 0;
+  if (activeTab.value === 'shares') return shareHistory.value.length > 0 && filteredShares.value.length === 0;
+  const universe = missionsView.value === 'requests' ? history.value : missions.value;
+  const filtered = missionsView.value === 'requests' ? filteredRequests.value : filteredMissions.value;
+  return universe.length > 0 && filtered.length === 0;
+});
+const tripGroups = computed(() => groupByDay(filteredTrips.value, (trip) => trip.startedAt ?? trip.createdAt));
+const requestGroups = computed(() => groupByDay(filteredRequests.value, (item) => item.createdAt));
+const missionGroups = computed(() => groupByDay(filteredMissions.value, (item) => item.updatedAt));
+
+/** One honest, per-tab summary line: counts the filter actually shows, plus recorded/rating facts when they exist. */
+const summaryLine = computed(() => {
+  if (activeTab.value === 'trips') {
+    const recorded = filteredTrips.value.filter((trip) => trip.trackStatus === 'available').length;
+    return `${format.number(filteredTrips.value.length)} سفر${recorded ? ` · ${format.number(recorded)} سفر با مسیر ثبت‌شده` : ''}`;
+  }
+  if (activeTab.value === 'shares') {
+    const active = filteredShares.value.filter((share) => shareState(share) === 'active').length;
+    return `${format.number(active)} فعال از ${format.number(filteredShares.value.length)} اشتراک`;
+  }
+  if (missionsView.value === 'requests') {
+    return `${format.number(filteredRequests.value.length)} درخواست`;
+  }
+  const rated = filteredMissions.value.filter((mission) => mission.rating != null);
+  if (!rated.length) return `${format.number(filteredMissions.value.length)} مأموریت`;
+  const average = rated.reduce((sum, mission) => sum + Number(mission.rating ?? 0), 0) / rated.length;
+  return `${format.number(filteredMissions.value.length)} مأموریت · میانگین امتیاز ${format.number(average.toFixed(1))} از ۵ (${format.number(rated.length)} ارزیابی)`;
+});
 
 /* ---------- expansion and share windows ---------- */
 const expanded = ref<string | null>(null);
@@ -220,6 +289,24 @@ function starRow(rating: number): number[] {
       </button>
     </div>
 
+    <div class="history-filters" data-testid="history-filters">
+      <div class="history-filter-row" role="group" aria-label="بازه زمانی">
+        <button v-for="option in DATE_RANGE_OPTIONS" :key="option.value" type="button" class="history-chip" :class="{ 'is-active': dateRange === option.value }" :aria-pressed="dateRange === option.value" :data-testid="`history-range-${option.value}`" @click="dateRange = option.value">{{ option.label }}</button>
+      </div>
+      <div v-if="activeTab !== 'shares'" class="history-filter-row" role="group" aria-label="وضعیت">
+        <button type="button" class="history-chip" :class="{ 'is-active': statusFilter === 'all' }" :aria-pressed="statusFilter === 'all'" data-testid="history-status-all" @click="statusFilter = 'all'">همه</button>
+        <button type="button" class="history-chip" :class="{ 'is-active': statusFilter === 'completed' }" :aria-pressed="statusFilter === 'completed'" data-testid="history-status-completed" @click="statusFilter = 'completed'">تکمیل‌شده</button>
+        <button type="button" class="history-chip" :class="{ 'is-active': statusFilter === 'cancelled' }" :aria-pressed="statusFilter === 'cancelled'" data-testid="history-status-cancelled" @click="statusFilter = 'cancelled'">لغوشده</button>
+      </div>
+      <div v-else class="history-filter-row" role="group" aria-label="وضعیت اشتراک">
+        <button type="button" class="history-chip" :class="{ 'is-active': shareStateFilter === 'all' }" :aria-pressed="shareStateFilter === 'all'" data-testid="history-share-state-all" @click="shareStateFilter = 'all'">همه</button>
+        <button type="button" class="history-chip" :class="{ 'is-active': shareStateFilter === 'active' }" :aria-pressed="shareStateFilter === 'active'" data-testid="history-share-state-active" @click="shareStateFilter = 'active'">فعال</button>
+        <button type="button" class="history-chip" :class="{ 'is-active': shareStateFilter === 'expired' }" :aria-pressed="shareStateFilter === 'expired'" data-testid="history-share-state-expired" @click="shareStateFilter = 'expired'">منقضی‌شده</button>
+        <button type="button" class="history-chip" :class="{ 'is-active': shareStateFilter === 'revoked' }" :aria-pressed="shareStateFilter === 'revoked'" data-testid="history-share-state-revoked" @click="shareStateFilter = 'revoked'">قطع‌شده</button>
+      </div>
+      <p class="history-summary" data-testid="history-summary">{{ summaryLine }}</p>
+    </div>
+
     <!-- ===== Trips ===== -->
     <template v-if="activeTab === 'trips'">
       <p v-if="trips.error" class="sheet__status share-error" data-testid="history-trips-error">{{ trips.error }}</p>
@@ -278,7 +365,10 @@ function starRow(rating: number): number[] {
           </li>
         </ul>
       </template>
-      <p v-if="!finishedTrips.length && !trips.error" class="sheet__status">هنوز سفری تکمیل یا لغو نشده است.</p>
+      <template v-if="!tripGroups.length && !trips.error">
+        <p class="sheet__status" data-testid="history-trips-empty">{{ filterEmptied ? 'هیچ رکوردی با این فیلترها نیست.' : 'هنوز سفری تکمیل یا لغو نشده است.' }}</p>
+        <button v-if="filterEmptied" type="button" class="ghost-button" data-testid="history-filter-reset-trips" @click="resetFilters">حذف فیلترها</button>
+      </template>
     </template>
 
     <!-- ===== Missions ===== -->
@@ -337,7 +427,10 @@ function starRow(rating: number): number[] {
             </li>
           </ul>
         </template>
-        <p v-if="!history.length && !sos.error" class="sheet__status">درخواستی ثبت نشده است.</p>
+        <template v-if="!filteredRequests.length && !sos.error">
+          <p class="sheet__status" data-testid="history-requests-empty">{{ filterEmptied ? 'هیچ رکوردی با این فیلترها نیست.' : 'درخواستی ثبت نشده است.' }}</p>
+          <button v-if="filterEmptied" type="button" class="ghost-button" data-testid="history-filter-reset-requests" @click="resetFilters">حذف فیلترها</button>
+        </template>
       </template>
 
       <template v-else>
@@ -385,7 +478,10 @@ function starRow(rating: number): number[] {
             </li>
           </ul>
         </template>
-        <p v-if="!missions.length && !sos.error" class="sheet__status">مأموریتی ثبت نشده است.</p>
+        <template v-if="!filteredMissions.length && !sos.error">
+          <p class="sheet__status" data-testid="history-missions-empty">{{ filterEmptied ? 'هیچ رکوردی با این فیلترها نیست.' : 'مأموریتی ثبت نشده است.' }}</p>
+          <button v-if="filterEmptied" type="button" class="ghost-button" data-testid="history-filter-reset-missions" @click="resetFilters">حذف فیلترها</button>
+        </template>
       </template>
     </template>
 
@@ -394,7 +490,7 @@ function starRow(rating: number): number[] {
       <p v-if="sharesFailed" class="sheet__status share-error" data-testid="history-shares-error">فهرست اشتراک‌ها دریافت نشد.</p>
       <button v-if="sharesFailed" type="button" class="ghost-button" data-testid="history-shares-retry" @click="loadShares">تلاش دوباره</button>
       <ul class="history-list">
-        <li v-for="share in shareHistory" :key="share.id" class="history-row" data-testid="history-share-row">
+        <li v-for="share in filteredShares" :key="share.id" class="history-row" data-testid="history-share-row">
           <span class="mdi mdi-map-marker-path" aria-hidden="true" />
           <div>
             <strong>{{ share.kind === 'live' ? 'اشتراک زنده' : 'بازه تاریخچه' }} با {{ shareCounterpart(share) }}</strong>
@@ -403,7 +499,10 @@ function starRow(rating: number): number[] {
           <span :class="SHARE_STATE_TONE[share.state ?? 'active']">{{ SHARE_STATE_LABEL[share.state ?? 'active'] }}</span>
         </li>
       </ul>
-      <p v-if="!shareHistory.length && !sharesFailed" class="sheet__status">هنوز اشتراکی ثبت نشده است.</p>
+      <template v-if="!filteredShares.length && !sharesFailed">
+        <p class="sheet__status" data-testid="history-shares-empty">{{ filterEmptied ? 'هیچ اشتراکی با این فیلترها نیست.' : 'هنوز اشتراکی ثبت نشده است.' }}</p>
+        <button v-if="filterEmptied" type="button" class="ghost-button" data-testid="history-filter-reset-shares" @click="resetFilters">حذف فیلترها</button>
+      </template>
     </template>
   </div>
 </template>
@@ -414,6 +513,41 @@ function starRow(rating: number): number[] {
   grid-template-columns: repeat(3, 1fr);
   gap: 6px;
   margin-block: 4px 12px;
+}
+.history-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--r12, 12px);
+  background: var(--surface-2);
+}
+.history-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.history-chip {
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.35));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.history-chip.is-active {
+  background: var(--brand, #0f6fff);
+  border-color: var(--brand, #0f6fff);
+  color: #fff;
+}
+.history-summary {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
 }
 .history-tab {
   display: flex;
