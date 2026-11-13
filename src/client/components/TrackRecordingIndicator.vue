@@ -34,19 +34,22 @@ async function stop(): Promise<void> {
 <style scoped>
 .track-rec {
   position: absolute;
-  inset-block-start: 96px;
-  inset-inline-start: 12px;
+  inset-block-start: 116px; /* below the 44px top pill (top: 64px) + 8px breathing room */
+  inset-inline: 0;
+  margin-inline: auto;
+  inline-size: max-content;
   z-index: 25;
   display: inline-flex;
   gap: 8px;
   align-items: center;
-  max-inline-size: min(280px, calc(100% - 24px));
+  max-inline-size: min(340px, calc(100% - 24px));
   padding: 6px 10px;
   border-radius: 999px;
-  background: var(--surface-1);
+  background: var(--surface);
   border: 1px solid var(--danger);
+  box-shadow: var(--shadow-md);
   font-size: 11px;
-  color: var(--text-1);
+  color: var(--text);
 }
 .track-rec__dot {
   inline-size: 8px;

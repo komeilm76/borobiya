@@ -134,11 +134,11 @@ const pointCount = computed(() => response.value?.points.length ?? 0);
   background: var(--surface-2);
   border: 1px solid var(--line-1, var(--surface-3));
 }
-.track-replay__meta { margin: 0; font-size: 11px; color: var(--text-2); line-height: 1.8; }
+.track-replay__meta { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.8; }
 .track-replay__summaries { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .track-replay__summaries li { display: grid; gap: 2px; }
-.track-replay__summaries small { color: var(--text-2); line-height: 1.8; }
+.track-replay__summaries small { color: var(--muted); line-height: 1.8; }
 .track-replay__map { inline-size: 100%; block-size: 140px; border-radius: var(--r8, 8px); background: var(--map-land); border: 1px solid var(--line-1, var(--surface-3)); }
-.track-replay__caption { margin: 0; font-size: 11px; color: var(--text-2); }
+.track-replay__caption { margin: 0; font-size: 11px; color: var(--muted); }
 .track-replay__error { display: flex; gap: 8px; align-items: center; color: var(--danger); font-size: 12px; }
 </style>

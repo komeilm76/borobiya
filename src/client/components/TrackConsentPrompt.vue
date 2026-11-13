@@ -47,7 +47,7 @@ async function decide(decision: 'accepted' | 'declined'): Promise<void> {
 <style scoped>
 .track-consent {
   position: absolute;
-  inset-block-start: 96px;
+  inset-block-start: 116px; /* below the 44px top pill (top: 64px) + 8px breathing room */
   inset-inline: 12px;
   z-index: 30;
   display: flex;
@@ -55,7 +55,7 @@ async function decide(decision: 'accepted' | 'declined'): Promise<void> {
   align-items: flex-start;
   padding: 12px;
   border-radius: var(--r16);
-  background: var(--surface-1);
+  background: var(--surface);
   border: 1px solid var(--primary);
   box-shadow: var(--shadow-lg);
   font-size: 12px;

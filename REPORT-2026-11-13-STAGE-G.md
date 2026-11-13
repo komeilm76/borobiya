@@ -414,3 +414,74 @@ unchanged after the CSS cleanup.
   only the id there, and resolving names client-side would fabricate data.
 - Admin CSV export keeps raw action keys on purpose (machine-readable output).
 - DESIGN_MATRIX untouched; PR stays open; no merge/tag/release; visual approval = human.
+
+## §15 — Seventh pass (2026-11-13, continued): recording indicator placement, undefined CSS tokens, oval icons
+
+Scope: two defects reported after the sixth pass — the mission track-recording pill overlapping the
+top navigation, and "icons rendering as ovals instead of circles" in some sections. Bug-hunt, no
+new features; DESIGN_MATRIX unchanged; PR stays open; visual approval remains the owner's call.
+
+### Fixed (client-visible)
+
+1. **TrackRecordingIndicator overlapped the top pill.** The pill
+   (`.top-pill`, `top: 64px; height: 44px`) owns y≈64–108; the indicator was
+   `inset-block-start: 96px; z-index: 25`, so it painted 12px over the active «تاریخچه» tab and
+   crossed the avatar tile. The indicator is now anchored `inset-block-start: 116px` (pill bottom
+   + 8px) and centered horizontally (`inset-inline: 0; margin-inline: auto; inline-size:
+   max-content`) instead of pinned to the inline-start edge, where it collided with the right-hand
+   map controls (edge controls start at y≈128).
+2. **Two components referenced CSS custom properties that do not exist anywhere** —
+   `var(--surface-1)` (TrackRecordingIndicator, TrackConsentPrompt) and `var(--text-1)` /
+   `var(--text-2)` (indicator, consent prompt, TrackReplayPanel) — so their backgrounds computed
+   to transparent and body text inherited instead of using the intended muted tone. On the light
+   map that meant the recording pill was see-through with weak text contrast.
+   - `var(--surface-1)` → `var(--surface)` (indicator, consent prompt), plus `box-shadow:
+     var(--shadow-md)` on the indicator for separation from the map;
+   - `var(--text-1)` → `var(--text)`; `var(--text-2)` → `var(--muted)` (4 occurrences).
+   A full sweep of `var(--*)` references vs definitions across `src/client` shows the remaining
+   undefined names all carry fallbacks (`--line-1`, `--muted-ink`, `--bb-route-duration`).
+3. **The same overlap affected TrackConsentPrompt** (`inset-block-start: 96px; inset-inline: 12px`
+   → `inset-block-start: 116px`); it is full-width under the pill and was clipping the same tabs.
+4. **Oval (stretched-circle) icons in the saved-places rows.** `.place-row > .mdi:first-child` is a
+   fixed 34×34 circle (`border-radius: 50%`), but the generic `.place-row span { flex: 1 }`
+   rule also matched it, so `flex-basis: 0; flex-grow: 1` stretched the "circle" to fill the row
+   (~129×34px on the map sheet, ~102×34px on profile → ellipse). Home / work / hospital place-row
+   icons on the map sheet and the profile saved-places list all rendered as ovals.
+   - `.place-row span` → `.place-row span:not(.mdi)`;
+   - `.place-row > .mdi:first-child` now carries `flex: none` (mirrors the existing
+     `.peer-row > span:not(.peer-row__avatar)` pattern used elsewhere in the same stylesheet).
+
+### Verified
+
+- Automated oval sweep (elements with `border-radius ≥ 40%` and |w−h| > 2px) over 27 page/viewport
+  combinations — mobile light + dark (map/sos/mission), desktop admin (overview/users/groups/
+  alerts/dispatch/settings/audit/reports), desktop auth (login/register/recovery), mobile user
+  cluster, onboarding: **before** the fix, 6 ovals (map ×3, profile ×3, all the place-row icons);
+  **after**, **0 ovals** everywhere. (First scan attempt used wrong routes and hit the catalog
+  redirect — rerun with the `/app` history prefix; results above are the correct runs.)
+- `mission-mobile.png` re-inspected: indicator sits fully below the pill, centered, solid white
+  surface, red border/stop/dot — no overlap with pill, avatar tile, or tabs.
+- `map-mobile.png` re-inspected: home/briefcase/hospital icons render as true circles.
+- `./boro verify` exit 0 — 96 files / 1235 tests, statement coverage **94.09%** (gate ≥94%).
+- `bun run preview:build` exit 0; capture suite regenerated (**58 OK, 0 FAIL**).
+- KPI squircle chips and the `rounded` auth/map presence tiles (`--r16`) are intentional
+  rounded-square design, **not** ovals — left unchanged. SOS severity dots and rail step circles
+  were measured ≈13px and are circular. `peer-row__avatar` is a fixed 38px `50%` circle and was
+  already correct. `CommandPalette`'s `clip-path: inset(50%)` is the standard visually-hidden
+  pattern, not a shape bug.
+
+### Carried-over notes from §14 (omitted there)
+
+- The drawer fix in `ced3417` also made the drawer content grow past the viewport so it scrolls
+  instead of clipping the footer (`.admin-drawer :deep(.admin-nav-content) { block-size: auto;
+  min-block-size: 100% }`), and compacted the topbar below 620px: the operator paragraph hides
+  (`.admin-topbar p { display: none }`) and the title goes `15px` + `nowrap`. Verified on
+  SupportRequests only — other admin screens were not individually re-checked at that width.
+- AdminLayout still wires `useCommandPalette(() => [])` — the palette opens empty by design until
+  a command source is implemented; intentionally unchanged.
+
+### Not changed / open
+
+- Token conflict (`--success`/`--warning` map-vs-admin) remains the owner's decision (§4/d5d78a5).
+- DESIGN_MATRIX untouched; PR #6 open and unmerged; no tag/release; visual approval = human.
+- Other admin screens at ≤620px not re-inspected (only SupportRequests verified) — flagged, not claimed done.
