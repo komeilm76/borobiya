@@ -136,9 +136,9 @@ export const PREVIEW_PAGES: PreviewPage[] = [
   },
   {
     id: 'adminReports', name: 'گزارش‌ها', section: 'admin', route: '/_admin/reports', persona: 'admin', status: 'ready',
-    summary: 'توزیع وضعیت درخواست‌ها و خروجی CSV ساختگی (کاربران و رویدادها).',
-    testHints: ['نمودار توزیع وضعیت', 'دانلود CSV کاربران (ساختگی)', 'دانلود CSV رویدادها (ساختگی)'],
-    limitation: 'گزارش‌ساز پیشرفته وجود ندارد؛ این صفحه فقط توزیع وضعیت و دو خروجی CSV دارد.'
+    summary: 'شاخص‌های کلیدی بازهٔ انتخابی با تغییر نسبت به بازهٔ پیشین، نمودار روند درخواست/مأموریت، سهم گروه‌ها، تفکیک نوع حادثه و جدول عملکرد گروه‌ها؛ خروجی CSV.',
+    testHints: ['تعویض بازهٔ ۷/۳۰/۹۰ روز', 'کارت‌های شاخص با تغییر نسبت به بازهٔ قبل', 'نمودار روند و نمودار میله‌ای نوع حادثه', 'دانلود CSV کاربران (ساختگی)'],
+    limitation: 'نمودارها بدون زوم و بدون drill-down هستند؛ عددهای پیش‌نمایش ساختگی‌اند و در سرور واقعی از پایگاه داده محاسبه می‌شوند.'
   },
   {
     id: 'adminUsers', name: 'کاربران', section: 'admin', route: '/_admin/users', persona: 'admin', status: 'ready',
@@ -147,8 +147,8 @@ export const PREVIEW_PAGES: PreviewPage[] = [
   },
   {
     id: 'adminGroups', name: 'گروه‌های خدمت', section: 'admin', route: '/_admin/groups', persona: 'admin', status: 'ready',
-    summary: 'گروه‌ها با ظرفیت، رنگ، پوشش حادثه و اعضا؛ ساخت و ویرایش گروه.',
-    testHints: ['گروه‌های موجود و اعضا', 'ساخت گروه جدید (نمایشی)', 'تغییر ظرفیت']
+    summary: 'گروه‌ها با ظرفیت، رنگ، پوشش حادثه و اعضا؛ ساخت، ویرایش و مدیریت اعضای گروه.',
+    testHints: ['گروه‌های موجود و اعضا', 'ساخت گروه جدید (نمایشی)', 'ویرایش نام، رنگ، ظرفیت و وضعیت', 'افزودن/حذف عضو از گروه']
   },
   {
     id: 'adminIncidents', name: 'انواع حادثه', section: 'admin', route: '/_admin/incidents', persona: 'admin', status: 'ready',

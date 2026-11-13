@@ -53,7 +53,7 @@ export const SEVERITY_TONES: Record<string, string> = {
 };
 
 /** Persian label for a responder group lifecycle status. */
-export const GROUP_STATUS_LABELS: Record<string, string> = { active: 'فعال', inactive: 'غیرفعال' };
+export const GROUP_STATUS_LABELS: Record<string, string> = { active: 'فعال', paused: 'متوقف', inactive: 'غیرفعال' };
 
 /** Persian label for a group status, falling back to the raw value for unknowns. */
 export function groupStatusLabel(status: string): string {

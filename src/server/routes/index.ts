@@ -105,6 +105,9 @@ const historyQuery: Validator<unknown> = shape({ from: optionalTimestamp, to: op
 const searchQuery: Validator<unknown> = shape({
   q: text({ min: 1, max: 32 }), role: optional(oneOf(ROLE_VALUES)), limit: optionalLimit
 }, { allowUnknown: true });
+const reportsQuery: Validator<unknown> = shape({
+  days: optional(number({ min: 7, max: 92, integer: true }))
+}, { allowUnknown: true });
 const adminUsersQuery: Validator<unknown> = shape({
   q: optional(text({ min: 1, max: 32 })), role: optional(oneOf(ROLE_VALUES)),
   active: optional(boolean()), page: optional(number({ min: 1, max: 10000, integer: true })),
@@ -374,7 +377,8 @@ export function registerRoutes(router: Router<AppContext>): void {
 
   // Administration.
   router.add({ method: 'GET', path: '/_admin/overview', auth: 'admin', tags: ['admin'], summary: 'Operations overview', handler: (ctx) => ok(ctx.app.services.admin.overview()) });
-  router.add({ method: 'GET', path: '/_admin/reports', auth: 'admin', tags: ['admin'], summary: 'Reports', handler: (ctx) => ok(ctx.app.services.admin.overview()) });
+  router.add({ method: 'GET', path: '/_admin/reports', auth: 'admin', query: reportsQuery, tags: ['admin'], summary: 'Reports', handler: (ctx) =>
+    ok(ctx.app.services.admin.reports(Number(query<Record<string, unknown>>(ctx).days ?? 30))) });
   router.add({ method: 'GET', path: '/_admin/tracks/:contextType/:contextId', auth: 'admin', tags: ['admin'], summary: 'Audit-logged administrator read of a track (safeguarding)', handler: (ctx) => {
     const parsed = trackContextTypeValidator(ctx.params.contextType, 'contextType');
     return ok(ctx.app.services.track.adminReadTrack(actor(ctx), parsed, ctx.params.contextId));
@@ -399,6 +403,8 @@ export function registerRoutes(router: Router<AppContext>): void {
     created(ctx.app.services.admin.createGroup(actor(ctx), body<any>(ctx))) });
   router.add({ method: 'PATCH', path: '/_admin/groups/:id', auth: 'admin', body: groupBody, rate: RATE.mutation, tags: ['admin'], summary: 'Update service group', handler: (ctx) =>
     ok(ctx.app.services.admin.updateGroup(actor(ctx), ctx.params.id, body<any>(ctx))) });
+  router.add({ method: 'GET', path: '/_admin/groups/:id/members', auth: 'admin', tags: ['admin'], summary: 'Group members', handler: (ctx) =>
+    ok(ctx.app.services.admin.groupMembers(ctx.params.id)) });
   router.add({ method: 'POST', path: '/_admin/groups/:id/members', auth: 'admin', body: shape({ userId: identifier, role: oneOf(['leader', 'member'] as const) }), rate: RATE.mutation, tags: ['admin'], summary: 'Add group member', handler: (ctx) => {
     const input = body<{ userId: string; role: string }>(ctx);
     return ok(ctx.app.services.admin.addGroupMember(actor(ctx), ctx.params.id, input.userId, input.role));

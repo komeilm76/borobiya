@@ -269,6 +269,33 @@ Consented trip/mission track recording landed (see `docs/IMPLEMENTATION_PLAN.md`
 - `history/07` stays `missing`: the designed map-animated playback surface does not exist; a schematic, authorization-aware replay panel shipped instead. Status flips only after a human accepts the recorded preview (`docs/VISUAL_PREVIEW.md`), never from this log.
 - No other rows change; DF-04 is annotated as addressed in the register above. The tally remains `done` 23, `partial` 70, `missing` 31, `superseded` 11, `reference` 5, `deviation` 1.
 
+## Stage H review log (2026-11-13)
+
+Code-evidence audit for this stage (no status changes; every row stays as written until a human
+accepts the recorded preview):
+
+- `admin-panel/dashboard/03-reports.png` — UI + server payload now exist on this branch. New
+  `GET /_admin/reports?days=7|30|90` computes every figure from the database for the requested
+  window (total requests, average response seconds from the recorded accept event, acceptance
+  rate from decided offers, cancellation count) and deltas against the equal previous window;
+  deltas are `null` when the previous window is empty. The page ships four KPI cards with delta
+  lines, an SVG 7/30/90-day requests-vs-missions trend, a group-share donut (each group's own
+  color), an incidents-by-type bar chart, a group-performance table with a documented
+  grade (excellent/good/average/weak labels shown in the UI) (rating >= 4.7 & acceptance >= 95 / >= 4.4 & >= 90 / >= 4.0 & >= 80),
+  and period chips. Status stays `missing` until human visual acceptance.
+- `admin-panel/services/02-group-edit.png` — the groups screen now has an inline edit panel per
+  group (name, color, capacity, status, incident coverage chips) backed by `PATCH /_admin/groups/:id`
+  with client-side pre-validation mirroring the server rules. Status stays `missing`.
+- `admin-panel/services/03-members.png` — the groups screen now has a per-group roster panel
+  (leader pinned first, presence dot, job type, rating, two-step remove) backed by new
+  `GET /_admin/groups/:id/members` (roster rows expose `membership`, presence, rating and job type —
+  no join timestamp exists in the schema, so none is shown), `POST /_admin/groups/:id/members`
+  (responder/admin only) and `DELETE /_admin/groups/:id/members/:userId`. Candidate search excludes
+  current members. Status stays `missing`.
+- `admin-panel/services/01-groups.png` — unchanged status `partial`; its note (list + create, no
+  edit) is now stale — edit exists; the row should be re-read when the owner adjudicates.
+- Counts remain: `done` 23, `partial` 71, `missing` 30, `superseded` 11, `reference` 5, `deviation` 1.
+
 ## Design flaws found in the reference material (to fix or consciously keep)
 
 | ID | Reference | Flaw | Recommendation |

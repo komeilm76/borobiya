@@ -641,3 +641,52 @@ against the build. No DESIGN_MATRIX flips; PR #6 stays open; visual approval rem
 - SOS dock / SOS-button light-mode pixel parity with refs — visual acceptance item (human).
 - DESIGN_MATRIX untouched (23/75/25/12, owner-only); PR #6 open; no merge/tag/release;
   visual approval = human.
+## 18. Stage H — Not-started/incomplete pages and services (2026-11-13)
+
+Branch `arena/250278b6-borobiya`, same open PR #6. Scope: the not-yet-built admin reporting surface and the group member-management gap, both adjudicated as buildable without owner decisions.
+
+**Shipped (untracked as of this entry being written):**
+
+- `GET /_admin/reports?days=7|30|90` (`reportsQuery`, admin-auth): every number computed from
+  SQLite for the requested window — total requests, average response seconds (recorded `accept` disposition),
+  acceptance rate (decided `mission_offers`), cancellation count — and deltas against the equal previous
+  window; deltas are `null` when the previous window has no data. 7-day (extendable to 92) trend of requests
+  vs missions, incidents-by-type counts, per-group performance rows (requests attributed via
+  `sos_requests.assigned_group_id`, offers accepted/decided, average accept latency, average mission rating)
+  and `groupRequestTotal`. Response-time and rating fields are `null` (not zero) when unmeasured.
+- New `GET /_admin/groups/:id/members` roster endpoint (leader pinned first; presence via the realtime
+  service; exposes membership role, job type, rating and active flag — the schema has no join timestamp, so
+  none is invented). Group edit (`PATCH /_admin/groups/:id`) and member add/remove
+  (`POST`/`DELETE .../members[/:userId]`) were already server-ready; the client had no UI.
+- Reports screen (`adminReports`) rebuilt: four KPI cards with previous-window delta lines, 7/30/90-day
+  period chips, an inline SVG trend (both series share one scale), a group-share donut that reuses each
+  group's own color, incidents-by-type bars, a group-performance table with documented grade thresholds,
+  and preserved CSV export links. Empty windows render explicit empty states; nothing is shown as measured
+  when it is not.
+- Groups screen (`adminGroups`) gains per-group toggles for an inline edit panel (name, color, capacity,
+  status, incident coverage chips — coverage required, mirroring the server rule) and a members panel
+  (leader badge, presence dot, job type, rating, two-step remove, candidate search excluding current members).
+- Preview fixtures: deterministic `adminReportsFor(days)`, full `GroupMemberView` rosters, `_admin/reports`
+  and member CRUD handlers stubbed; registry catalog entries for `adminReports` and `adminGroups` updated.
+  The demo `swim` icon was rejected by the shipped icon subset and replaced with `waves`.
+- `GROUP_STATUS_LABELS` gains the `paused` label (server already accepts it).
+- View fixtures in `tests/views.test.ts` updated to the real reports payload shape;
+  `tests/admin-overview-view.test.ts` rewritten for the new screen contract.
+
+**Verification:** `./boro verify` exit **0** — 1263 tests passed (was 1240), coverage statements **94.11%**
+/ branches 87.19% / lines 96.24% (no gate lowered; margin over the 94% statement gate is ~0.11pp — flagged
+for the owner; the new attribution test in `tests/admin-reports-members.test.ts` exists partly to cover
+those branches). Docs guard clean; build, `tsc`, `vue-tsc` and all packaging steps green.
+
+**Visual verification (inspection only, not approval):** light/dark desktop and light mobile captures of
+both screens were opened and inspected (1280×900, 390×844): RTL layout holds, sidebar active state correct,
+KPI/donut/table/grade chips legible in both themes, no horizontal overflow on mobile. No page is visually
+approved — that remains the human gate.
+
+**Deliberately not done:** all DESIGN_MATRIX rows for these pages remain `missing`/`partial` in
+`docs/DESIGN_MATRIX.md`; statuses flip only after human visual acceptance (Stage H review log added, no
+rows changed). Remaining matrix items (e.g. `admin-panel/states/04-offline`, `admin-panel/users/*`,
+`mission/*`, `history/07|08`, `navigation/*`, `companions/*`) were not in this stage's scope and are mostly
+owner decisions or human-gated. The reference PNG `design/admin-panel/dashboard/03-reports.png` also shows
+completed-missions and satisfaction deltas with values the database cannot yet distinguish; what ships is
+one honest delta per KPI, documented in the Stage H matrix log.

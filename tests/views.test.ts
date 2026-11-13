@@ -59,7 +59,14 @@ const FIXTURES: Record<string, unknown> = {
   '/_admin/alerts': { items: [] },
   '/_admin/audit': { items: [] },
   '/_admin/dispatch': { items: [] },
-  '/_admin/reports': { items: [], summary: {} },
+  '/_admin/reports': {
+    days: 30, periodStart: Date.now() - 29 * 86_400_000, periodEnd: Date.now(),
+    kpis: { totalRequests: 12, requestsDeltaPct: 8, avgResponseSeconds: 252, avgResponseDeltaSeconds: 38, acceptanceRate: 92, acceptanceRateDeltaPct: 2, cancelledMissions: 1, cancelledDeltaPct: null },
+    trend: [{ day: '2026-11-01', requests: 4, missions: 3 }, { day: '2026-11-02', requests: 8, missions: 6 }],
+    incidentTypes: [{ label: 'آتش‌سوزی', color: '#c2410c', icon: 'fire', count: 7 }],
+    groups: [{ id: 'grp_medical', name: 'گروه امداد پزشکی', color: '#AF3438', requests: 9, avgResponseSeconds: 234, acceptanceRate: 96, ratingAvg: 4.8 }],
+    groupRequestTotal: 9, serverTime: Date.now()
+  },
   '/_admin/settings': { items: [] },
   '/_admin/support-requests': { items: [], total: 0 },
   '/_admin/system/health': { status: 'ok', uptimeSeconds: 1, database: {}, realtime: {}, talk: {} },

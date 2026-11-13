@@ -225,6 +225,62 @@ export interface GroupView {
   memberIds?: string[];
 }
 
+/** One member row in the admin group-roster panel. */
+export interface GroupMemberView {
+  userId: string;
+  username: string;
+  /** Membership role inside the group (leader/member). */
+  membership: string;
+  accountRole: Role;
+  active: boolean;
+  averageRating: number;
+  readyForMission: boolean;
+  jobTypeLabel: string | null;
+  online: boolean;
+}
+
+/** KPI block computed for the selected reports window (deltas vs the previous equal window; null when the previous window is empty). */
+export interface ReportsKpis {
+  totalRequests: number;
+  requestsDeltaPct: number | null;
+  avgResponseSeconds: number | null;
+  /** Positive means faster than the previous window. */
+  avgResponseDeltaSeconds: number | null;
+  acceptanceRate: number | null;
+  /** Percentage-point change vs the previous window. */
+  acceptanceRateDeltaPct: number | null;
+  cancelledMissions: number;
+  cancelledDeltaPct: number | null;
+}
+
+/** One day in the requests/missions trend. */
+export interface ReportsTrendPoint { day: string; requests: number; missions: number }
+/** One incident-type bucket. */
+export interface ReportsIncidentType { label: string; color: string; icon: string; count: number }
+/** One service-group performance row (requests attributed via `assigned_group_id`). */
+export interface ReportsGroupRow {
+  id: string;
+  name: string;
+  color: string;
+  requests: number;
+  avgResponseSeconds: number | null;
+  acceptanceRate: number | null;
+  ratingAvg: number | null;
+}
+
+/** The `/_admin/reports` payload — every number is computed for the requested window. */
+export interface ReportsView {
+  days: number;
+  periodStart: number;
+  periodEnd: number;
+  kpis: ReportsKpis;
+  trend: ReportsTrendPoint[];
+  incidentTypes: ReportsIncidentType[];
+  groups: ReportsGroupRow[];
+  groupRequestTotal: number;
+  serverTime: number;
+}
+
 /** An operational alert. */
 export interface AlertView {
   id: string;

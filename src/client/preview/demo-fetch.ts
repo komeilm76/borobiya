@@ -245,6 +245,14 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
 
   /* ----------------------------------------------------- admin: read */
   ['GET', /^\/_admin\/overview$/, () => envelope(A.adminOverview)],
+  ['GET', /^\/_admin\/reports$/, ({ query }) =>
+    envelope(A.adminReportsFor(Number(query.get('days') ?? '30')))],
+  ['GET', /^\/_admin\/groups\/([^/]+)\/members$/, ({ args }) =>
+    items((A.adminGroupMembers[args[0]] ?? []).map((member) => ({ ...member })))],
+  ['POST', /^\/_admin\/groups\/([^/]+)\/members$/, ({ args, body }) =>
+    envelope({ ok: true, groupId: args[0], userId: String(body.userId ?? '') })],
+  ['DELETE', /^\/_admin\/groups\/([^/]+)\/members\/([^/]+)$/, ({ args }) =>
+    envelope({ ok: true, groupId: args[0], userId: args[1] })],
   ['GET', /^\/_admin\/dispatch$/, () =>
     envelope({
       queue: { items: [...A.dispatchQueue], total: A.dispatchQueue.length, page: 1, limit: 50 },

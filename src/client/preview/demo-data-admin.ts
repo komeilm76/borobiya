@@ -18,9 +18,22 @@ export const adminGroups = [
   { id: 'grp_east', name: 'گروه شرق (غیرفعال)', color: '#B57A12', capacity: 6, status: 'inactive', incidentIds: ['inc_fire'], memberCount: 0, coverageCount: 0, memberIds: [] as string[] }
 ];
 
-export const adminGroupMembers: Record<string, Array<{ userId: string; username: string }>> = {
-  grp_north: [{ userId: 'usr_reza', username: 'reza.m' }, { userId: 'usr_samira', username: 'samira.r' }, { userId: 'usr_nima', username: 'nima.t' }, { userId: 'usr_leila', username: 'leila.n' }],
-  grp_central: [{ userId: 'usr_maryam', username: 'maryam.a' }, { userId: 'usr_demo', username: 'saeed.k' }, { userId: 'usr_hadi', username: 'hadi.e' }, { userId: 'usr_reza', username: 'reza.m' }, { userId: 'usr_nima', username: 'nima.t' }]
+/** Roster rows mirroring `GET /_admin/groups/:id/members` (leader first). */
+export const adminGroupMembers: Record<string, Array<{ userId: string; username: string; membership: string; accountRole: string; active: boolean; averageRating: number; readyForMission: boolean; jobTypeLabel: string | null; online: boolean }>> = {
+  grp_north: [
+    { userId: 'usr_leila', username: 'leila.n', membership: 'leader', accountRole: 'responder', active: true, averageRating: 4.4, readyForMission: true, jobTypeLabel: 'آتش‌نشان', online: true },
+    { userId: 'usr_reza', username: 'reza.m', membership: 'member', accountRole: 'responder', active: true, averageRating: 4.8, readyForMission: true, jobTypeLabel: 'آتش‌نشان', online: true },
+    { userId: 'usr_samira', username: 'samira.r', membership: 'member', accountRole: 'responder', active: true, averageRating: 4.6, readyForMission: true, jobTypeLabel: 'پارامدیک', online: true },
+    { userId: 'usr_nima', username: 'nima.t', membership: 'member', accountRole: 'responder', active: true, averageRating: 4.2, readyForMission: false, jobTypeLabel: 'آتش‌نشان', online: false }
+  ],
+  grp_central: [
+    { userId: 'usr_maryam', username: 'maryam.a', membership: 'leader', accountRole: 'responder', active: true, averageRating: 5.0, readyForMission: true, jobTypeLabel: 'پارامدیک', online: true },
+    { userId: 'usr_demo', username: 'saeed.k', membership: 'member', accountRole: 'responder', active: true, averageRating: 4.0, readyForMission: true, jobTypeLabel: 'فوریت‌های پزشکی', online: true },
+    { userId: 'usr_hadi', username: 'hadi.e', membership: 'member', accountRole: 'responder', active: false, averageRating: 3.8, readyForMission: false, jobTypeLabel: 'پارامدیک', online: false },
+    { userId: 'usr_reza', username: 'reza.m', membership: 'member', accountRole: 'responder', active: true, averageRating: 4.8, readyForMission: true, jobTypeLabel: 'آتش‌نشان', online: true },
+    { userId: 'usr_nima', username: 'nima.t', membership: 'member', accountRole: 'responder', active: true, averageRating: 4.2, readyForMission: false, jobTypeLabel: 'آتش‌نشان', online: false }
+  ],
+  grp_east: []
 };
 
 /* ------------------------------------------- admin dispatch queue ------- */
@@ -187,3 +200,54 @@ export const systemHealth = {
   map: { tiles: 1421 },
   serverTime: T0
 };
+/* --------------------------------------------------- admin reports ------ */
+
+/**
+ * Deterministic `/_admin/reports` payload for the preview. Numbers are fiction; the shape mirrors
+ * the server exactly, and `days` re-derives the series so the period selector stays coherent.
+ */
+export function adminReportsFor(daysInput: number): Record<string, unknown> {
+  const days = Math.min(92, Math.max(7, Math.floor(Number(daysInput) || 30)));
+  const since = T0 - (T0 % DAY) - (days - 1) * DAY;
+  const trend = Array.from({ length: days }, (_, index) => {
+    const seed = (index * 37 + 13) % 17;
+    const requests = 6 + seed;
+    const missions = Math.max(0, Math.round(requests * 0.62) - (seed % 3));
+    return { day: new Date(since + index * DAY).toISOString().slice(0, 10), requests, missions };
+  });
+  const totalRequests = trend.reduce((sum, point) => sum + point.requests, 0);
+  const scale = days / 30;
+  const groups = [
+    { id: 'grp_north', name: 'تیم شعله شمال', color: '#0E6666', requests: Math.round(96 * scale), avgResponseSeconds: 234, acceptanceRate: 96, ratingAvg: 4.8 },
+    { id: 'grp_central', name: 'امداد مرکزی', color: '#AF3438', requests: Math.round(71 * scale), avgResponseSeconds: 260, acceptanceRate: 93, ratingAvg: 4.6 },
+    { id: 'grp_east', name: 'گروه شرق (غیرفعال)', color: '#B57A12', requests: Math.round(14 * scale), avgResponseSeconds: 451, acceptanceRate: 74, ratingAvg: 3.6 }
+  ];
+  const groupRequestTotal = groups.reduce((sum, group) => sum + group.requests, 0);
+  return {
+    days,
+    periodStart: since,
+    periodEnd: T0,
+    kpis: {
+      totalRequests,
+      requestsDeltaPct: 8,
+      avgResponseSeconds: 252,
+      avgResponseDeltaSeconds: 38,
+      acceptanceRate: 92,
+      acceptanceRateDeltaPct: 2,
+      cancelledMissions: Math.max(1, Math.round(3 * scale)),
+      cancelledDeltaPct: -25
+    },
+    trend,
+    incidentTypes: [
+      { label: 'آتش‌سوزی', color: '#c2410c', icon: 'fire', count: Math.round(184 * scale) },
+      { label: 'پزشکی', color: '#af3438', icon: 'medical-bag', count: Math.round(152 * scale) },
+      { label: 'غرق‌شدگی', color: '#316D86', icon: 'waves', count: Math.round(96 * scale) },
+      { label: 'تصادف', color: '#b45309', icon: 'car', count: Math.round(84 * scale) },
+      { label: 'نجات و امداد', color: '#0e6666', icon: 'hand-heart-outline', count: Math.round(61 * scale) },
+      { label: 'سایر', color: '#6b7280', icon: 'dots-horizontal', count: Math.round(26 * scale) }
+    ],
+    groups,
+    groupRequestTotal,
+    serverTime: T0
+  };
+}

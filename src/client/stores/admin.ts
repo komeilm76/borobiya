@@ -1,17 +1,19 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
-import { errorMessage, get, patch, post, put } from '@/api/client.ts';
+import { del, errorMessage, get, patch, post, put } from '@/api/client.ts';
 import type {
   AdminJobTypeView,
   AdminMissionOfferView,
   AdminUserView,
   AlertView,
   AuditEntryView,
+  GroupMemberView,
   GroupView,
   IncidentTypeView,
   ListView,
   NearestResponderView,
   OverviewView,
+  ReportsView,
   SettingView,
   SosView
 } from '@/api/types.ts';
@@ -43,6 +45,10 @@ export const useAdminStore = defineStore('admin', () => {
   const dispatchQueue = ref<ListView<SosView> | null>(null);
   const users = ref<ListView<AdminUserView> | null>(null);
   const groups = ref<GroupView[]>([]);
+  /** Per-group roster, loaded lazily when the members panel opens. */
+  const groupMembers = ref<Record<string, GroupMemberView[]>>({});
+  /** The /_admin/reports payload for the selected window. */
+  const reports = ref<ReportsView | null>(null);
   const alerts = ref<AlertView[]>([]);
   const audit = ref<ListView<AuditEntryView> | null>(null);
   const settings = ref<SettingView[]>([]);
@@ -114,6 +120,30 @@ export const useAdminStore = defineStore('admin', () => {
   async function updateUser(userId: string, input: { active?: boolean; role?: string; jobTypeId?: string | null }): Promise<void> {
     await patch(`/_admin/users/${userId}`, input);
     await loadUsers();
+  }
+
+  /** Loads the roster of one service group (leader first). */
+  async function loadGroupMembers(groupId: string): Promise<void> {
+    const result = await guard(() => get<{ items: GroupMemberView[] }>(`/_admin/groups/${groupId}/members`));
+    if (result) groupMembers.value = { ...groupMembers.value, [groupId]: result.items ?? [] };
+  }
+
+  /** Adds a responder to a service group. */
+  async function addGroupMember(groupId: string, userId: string, role: 'leader' | 'member'): Promise<void> {
+    await post(`/_admin/groups/${groupId}/members`, { userId, role });
+    await Promise.all([loadGroups(), loadGroupMembers(groupId)]);
+  }
+
+  /** Removes a user from a service group. */
+  async function removeGroupMember(groupId: string, userId: string): Promise<void> {
+    await del(`/_admin/groups/${groupId}/members/${userId}`);
+    await Promise.all([loadGroups(), loadGroupMembers(groupId)]);
+  }
+
+  /** Loads the reports payload for a window (7, 30 or 90 days). */
+  async function loadReports(days = 30): Promise<void> {
+    const result = await guard(() => get<ReportsView>('/_admin/reports', { days: String(days) }));
+    if (result) reports.value = result;
   }
 
   /** Loads service groups. */
@@ -241,6 +271,8 @@ export const useAdminStore = defineStore('admin', () => {
     dispatchQueue,
     users,
     groups,
+    groupMembers,
+    reports,
     alerts,
     audit,
     settings,
@@ -258,6 +290,10 @@ export const useAdminStore = defineStore('admin', () => {
     loadGroups,
     createGroup,
     updateGroup,
+    loadGroupMembers,
+    addGroupMember,
+    removeGroupMember,
+    loadReports,
     loadAlerts,
     resolveAlert,
     loadAudit,

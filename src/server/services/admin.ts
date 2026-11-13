@@ -192,6 +192,157 @@ export class AdminService {
     return { items, total: items.length };
   }
 
+  /**
+   * Membership detail for one service group: who is on it, in which role, with the responder
+   * context the console needs to staff or re-route. `groups()` carries only ids for the dispatch
+   * board; this is the roster the members panel renders.
+   */
+  groupMembers(groupId: string): Record<string, unknown> {
+    this.assertGroup(groupId);
+    const rows = this.ctx.repo.all<Record<string, any>>(
+      `SELECT gm.user_id, gm.role AS membership, u.username, u.role AS accountRole, u.active,
+              u.average_rating, u.ready_for_mission, jt.label AS jobTypeLabel
+       FROM group_members gm
+       JOIN users u ON u.id = gm.user_id
+       LEFT JOIN job_types jt ON jt.id = u.job_type_id
+       WHERE gm.group_id = ?
+       ORDER BY CASE gm.role WHEN 'leader' THEN 0 ELSE 1 END, u.username`, groupId);
+    return {
+      items: rows.map((row) => ({
+        userId: String(row.user_id),
+        username: String(row.username),
+        membership: String(row.membership),
+        accountRole: String(row.accountRole),
+        active: Boolean(row.active),
+        averageRating: Number(row.average_rating ?? 0),
+        readyForMission: Boolean(row.ready_for_mission),
+        jobTypeLabel: row.jobTypeLabel ? String(row.jobTypeLabel) : null,
+        online: this.ctx.services.realtime.isUserOnline(String(row.user_id))
+      })),
+      total: rows.length
+    };
+  }
+
+  /**
+   * Honest per-period projections for the reports screen — every number is computed from the
+   * database for the requested window, and deltas compare against the immediately preceding window
+   * of the same length. Deltas are null when the previous window has no data (no invented trends).
+   */
+  reports(daysInput: number = 30): Record<string, unknown> {
+    const days = Math.min(92, Math.max(7, Math.floor(Number(daysInput) || 30)));
+    const now = this.ctx.clock();
+    const DAY = 86_400_000;
+    const dayStart = now - (now % DAY);
+    const since = dayStart - (days - 1) * DAY;
+    const prevSince = since - days * DAY;
+
+    const countBetween = (table: string, column: string, from: number, to?: number): number => {
+      const row = to === undefined
+        ? this.ctx.repo.one<{ c: number }>(`SELECT COUNT(*) AS c FROM ${table} WHERE ${column} >= ?`, from)
+        : this.ctx.repo.one<{ c: number }>(`SELECT COUNT(*) AS c FROM ${table} WHERE ${column} >= ? AND ${column} < ?`, from, to);
+      return Number(row?.c ?? 0);
+    };
+    const avgResponseBetween = (from: number, to?: number): number | null => {
+      const row = to === undefined
+        ? this.ctx.repo.one<{ avg: number | null }>(
+            `SELECT AVG((me.created_at - s.created_at) / 1000.0) AS avg FROM missions m
+             JOIN sos_requests s ON s.id = m.sos_id
+             JOIN mission_events me ON me.mission_id = m.id AND me.action = 'accept'
+             WHERE me.created_at >= ?`, from)
+        : this.ctx.repo.one<{ avg: number | null }>(
+            `SELECT AVG((me.created_at - s.created_at) / 1000.0) AS avg FROM missions m
+             JOIN sos_requests s ON s.id = m.sos_id
+             JOIN mission_events me ON me.mission_id = m.id AND me.action = 'accept'
+             WHERE me.created_at >= ? AND me.created_at < ?`, from, to);
+      return row?.avg === null || row?.avg === undefined ? null : Math.round(Number(row.avg));
+    };
+    const offerStatsBetween = (from: number, to?: number): { accepted: number; decided: number; rate: number | null } => {
+      const rows = to === undefined
+        ? this.ctx.repo.all<Record<string, any>>(
+            `SELECT status, COUNT(*) AS c FROM mission_offers WHERE created_at >= ? GROUP BY status`, from)
+        : this.ctx.repo.all<Record<string, any>>(
+            `SELECT status, COUNT(*) AS c FROM mission_offers WHERE created_at >= ? AND created_at < ? GROUP BY status`, from, to);
+      const byStatus = Object.fromEntries(rows.map((row) => [String(row.status), Number(row.c)]));
+      const accepted = byStatus.accepted ?? 0;
+      const decided = (byStatus.accepted ?? 0) + (byStatus.declined ?? 0) + (byStatus.expired ?? 0);
+      return { accepted, decided, rate: decided > 0 ? Math.round((accepted * 100) / decided) : null };
+    };
+
+    const totalRequests = countBetween('sos_requests', 'created_at', since);
+    const prevRequests = countBetween('sos_requests', 'created_at', prevSince, since);
+    const avgResponseSeconds = avgResponseBetween(since);
+    const prevAvgResponseSeconds = avgResponseBetween(prevSince, since);
+    const offers = offerStatsBetween(since);
+    const prevOffers = offerStatsBetween(prevSince, since);
+    const cancelledMissions = countBetween('missions', 'cancelled_at', since);
+    const prevCancelledMissions = countBetween('missions', 'cancelled_at', prevSince, since);
+
+    const trend = Array.from({ length: days }, (_, index) => {
+      const start = since + index * DAY;
+      const end = start + DAY;
+      return {
+        day: new Date(start).toISOString().slice(0, 10),
+        requests: countBetween('sos_requests', 'created_at', start, end),
+        missions: countBetween('missions', 'created_at', start, end)
+      };
+    });
+
+    const incidentTypes = this.ctx.repo.all<Record<string, any>>(
+      `SELECT i.label, i.color, i.icon, COUNT(*) AS c FROM sos_requests s
+       JOIN incident_types i ON i.id = s.incident_type_id
+       WHERE s.created_at >= ?
+       GROUP BY i.id ORDER BY c DESC LIMIT 12`, since)
+      .map((row) => ({ label: String(row.label), color: String(row.color), icon: String(row.icon), count: Number(row.c) }));
+
+    const groupRows = this.ctx.repo.all<Record<string, any>>(
+      `SELECT g.id, g.name, g.color,
+         (SELECT COUNT(*) FROM sos_requests s WHERE s.assigned_group_id = g.id AND s.created_at >= ?) AS requests,
+         (SELECT AVG((me.created_at - s.created_at) / 1000.0) FROM missions m
+           JOIN sos_requests s ON s.id = m.sos_id
+           JOIN mission_events me ON me.mission_id = m.id AND me.action = 'accept'
+           WHERE s.assigned_group_id = g.id AND me.created_at >= ?) AS avgResponseSeconds,
+         (SELECT COUNT(*) FROM mission_offers o JOIN sos_requests s ON s.id = o.sos_id
+           WHERE s.assigned_group_id = g.id AND o.created_at >= ? AND o.status = 'accepted') AS offersAccepted,
+         (SELECT COUNT(*) FROM mission_offers o JOIN sos_requests s ON s.id = o.sos_id
+           WHERE s.assigned_group_id = g.id AND o.created_at >= ? AND o.status IN ('accepted','declined','expired')) AS offersDecided,
+         (SELECT AVG(m.rating) FROM missions m JOIN sos_requests s ON s.id = m.sos_id
+           WHERE s.assigned_group_id = g.id AND s.created_at >= ? AND m.rating IS NOT NULL) AS ratingAvg
+       FROM service_groups g ORDER BY g.rank`, since, since, since, since, since);
+    const groups = groupRows.map((row) => {
+      const decided = Number(row.offersDecided ?? 0);
+      const accepted = Number(row.offersAccepted ?? 0);
+      return {
+        id: String(row.id), name: String(row.name), color: String(row.color),
+        requests: Number(row.requests ?? 0),
+        avgResponseSeconds: row.avgResponseSeconds === null || row.avgResponseSeconds === undefined ? null : Math.round(Number(row.avgResponseSeconds)),
+        acceptanceRate: decided > 0 ? Math.round((accepted * 100) / decided) : null,
+        ratingAvg: row.ratingAvg === null || row.ratingAvg === undefined ? null : Math.round(Number(row.ratingAvg) * 10) / 10
+      };
+    });
+    const groupRequestTotal = groups.reduce((sum, group) => sum + group.requests, 0);
+
+    return {
+      days,
+      periodStart: since,
+      periodEnd: now,
+      kpis: {
+        totalRequests,
+        requestsDeltaPct: prevRequests > 0 ? Math.round(((totalRequests - prevRequests) * 100) / prevRequests) : null,
+        avgResponseSeconds,
+        avgResponseDeltaSeconds: avgResponseSeconds !== null && prevAvgResponseSeconds !== null ? prevAvgResponseSeconds - avgResponseSeconds : null,
+        acceptanceRate: offers.rate,
+        acceptanceRateDeltaPct: offers.rate !== null && prevOffers.rate !== null ? offers.rate - prevOffers.rate : null,
+        cancelledMissions,
+        cancelledDeltaPct: prevCancelledMissions > 0 ? Math.round(((cancelledMissions - prevCancelledMissions) * 100) / prevCancelledMissions) : null
+      },
+      trend,
+      incidentTypes,
+      groups,
+      groupRequestTotal,
+      serverTime: now
+    };
+  }
+
   incidentTypes(): Record<string, unknown> {
     const rows = this.ctx.repo.all<Record<string, any>>('SELECT * FROM incident_types ORDER BY rank');
     return { items: rows.map((row) => ({ id: String(row.id), label: String(row.label), icon: String(row.icon), color: String(row.color) })), total: rows.length };

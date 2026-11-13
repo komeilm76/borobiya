@@ -41,14 +41,31 @@ const OVERVIEW = {
   serverTime: 1794136000000
 };
 
-/** Installs a fetch double that answers the overview endpoint with the real shape. */
-function stubOverview(): void {
+/** The reports payload exactly as the server serializes it. */
+const REPORTS = {
+  days: 30,
+  periodStart: 1794136000000 - 29 * 86_400_000,
+  periodEnd: 1794136000000,
+  kpis: {
+    totalRequests: 30, requestsDeltaPct: 8, avgResponseSeconds: 250, avgResponseDeltaSeconds: 40,
+    acceptanceRate: 92, acceptanceRateDeltaPct: 2, cancelledMissions: 2, cancelledDeltaPct: null
+  },
+  trend: [{ day: '2026-11-06', requests: 8, missions: 5 }, { day: '2026-11-07', requests: 12, missions: 9 }, { day: '2026-11-08', requests: 10, missions: 7 }],
+  incidentTypes: [{ label: 'آتش‌سوزی', color: '#c2410c', icon: 'fire', count: 18 }],
+  groups: [{ id: 'grp_1', name: 'گروه پزشکی', color: '#AF3438', requests: 24, avgResponseSeconds: 234, acceptanceRate: 96, ratingAvg: 4.8 }],
+  groupRequestTotal: 24,
+  serverTime: 1794136000000
+};
+
+/** Installs a fetch double that answers the overview and reports endpoints with the real shapes. */
+function stubOverview(options: { reports?: unknown } = {}): void {
+  const reports = options.reports ?? REPORTS;
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
       const path = url.split('?')[0];
-      const data = path === '/_admin/overview' ? OVERVIEW : { items: [], total: 0 };
+      const data = path === '/_admin/overview' ? OVERVIEW : path === '/_admin/reports' ? reports : { items: [], total: 0 };
       return new Response(JSON.stringify({ ok: true, requestId: 'req_ov', data }), {
         status: 200,
         headers: { 'content-type': 'application/json' }
@@ -83,37 +100,35 @@ afterEach(() => {
 });
 
 describe('administrator reports', () => {
-  it('lists one row per status with its count, not an empty state', async () => {
+  it('renders the real KPI figures and group rows, not an empty state', async () => {
     stubOverview();
     const wrapper = await render(ReportsView, ROUTE_NAMES.adminReports);
-    const rows = wrapper.findAll('.admin-list li');
-    expect(rows).toHaveLength(3);
 
-    const text = wrapper.text();
-    // Raw enums must never reach the UI; the rows render the Persian status labels.
-    expect(text).toContain('در انتظار');
-    expect(text).toContain('اعزام‌شده');
-    expect(text).toContain('تکمیل‌شده');
-    // Counts are Persian-set digits; the numbers themselves must appear.
-    expect(text).toContain('۲');
-    expect(text).toContain('۳');
-    // The empty state must not appear while there is data to report.
+    const kpis = wrapper.find('[data-testid="reports-kpis"]');
+    expect(kpis.text()).toContain('۳۰'); // totalRequests
+    expect(kpis.text()).toContain('۹۲'); // acceptanceRate
+    // Counts are Persian-set digits and the donut legend names the group.
+    const donut = wrapper.find('[data-testid="reports-donut"]');
+    expect(donut.text()).toContain('گروه پزشکی');
+    // Group performance row renders with its grade pill.
+    expect(wrapper.find('[data-testid="reports-groups"]').text()).toContain('عالی');
+    // No empty state while there is data to report.
     expect(wrapper.find('.panel__empty').exists()).toBe(false);
     wrapper.unmount();
   });
 
-  it('still shows the empty state when the server reports no requests', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ ok: true, requestId: 'req_ov', data: { ...OVERVIEW, statusCounts: {} } }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
-      )
-    );
+  it('states the empty case when the server reports no window data', async () => {
+    stubOverview({
+      reports: {
+        ...REPORTS,
+        kpis: { totalRequests: 0, requestsDeltaPct: null, avgResponseSeconds: null, avgResponseDeltaSeconds: null, acceptanceRate: null, acceptanceRateDeltaPct: null, cancelledMissions: 0, cancelledDeltaPct: null },
+        incidentTypes: [],
+        groups: [],
+        groupRequestTotal: 0
+      }
+    });
     const wrapper = await render(ReportsView, ROUTE_NAMES.adminReports);
-    expect(wrapper.find('.panel__empty').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="reports-donut"]').text()).toContain('در این بازه درخواستی به گروهی اعزام نشده است');
     wrapper.unmount();
   });
 });
