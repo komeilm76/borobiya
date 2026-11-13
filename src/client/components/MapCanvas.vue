@@ -130,6 +130,7 @@ const scaleLabel = computed(() => {
       <img
         v-for="tile in tiles"
         :key="tile.key"
+        class="map-tile"
         :src="tile.url"
         :style="{ insetInlineStart: `${tile.left}px`, insetBlockStart: `${tile.top}px` }"
         alt=""
