@@ -281,3 +281,36 @@ Consented trip/mission track recording landed (see `docs/IMPLEMENTATION_PLAN.md`
 | DF-06 | navigation/* (except 16-17) | The navigation family contradicts the offline/deterministic-tile architecture and the documented product scope; keeping it as silent reference invites accidental scope creep. | Keep files as visual identity reference; exclude from acceptance scope. Explicit product decision (Stage 5) brought 16-multi-destination (partial) and 17-destination-reordering (missing) back into scope as the Trips screen; the rest stays excluded. |
 | DF-07 | design/icons vs client | Client consumes generated subset; canonical set allows aliases. Verify in P5 that no ad-hoc icon appears outside the inventory. | Guard via existing asset test; extend if needed. |
 | DF-08 | map-page/navigation/02 | The 350-metre scale bar appears only in the press-hold reference, not in idle. | Treat the scale bar as a permanent map affordance if confirmed with the design owner; otherwise drop. |
+
+## Stage F second pass (2026-11-13) — agent comparison sweep, no approvals
+
+All 46 captures (23 pages, desktop and mobile) were compared against the canonical references,
+family by family (auth, map shell, sos/mission/talk/sharing/trips/history, admin console), plus a
+dark-theme smoke check and an interactive bug hunt. No row flips status; visual approval remains a
+human call. Defects found and fixed (commit `6c319dc`): toast close buttons unclickable
+(`.toast-root` opted out of pointer events and no child re-enabled them); hard-coded light
+translucent chrome turned light-on-light in dark theme (`.quick-chip`, `.round-control`,
+`.connection-badge`, `.live-chip`, `.admin-topbar` — dark twins added, mirroring the existing
+top-pill/search-bar pattern); the admin sidebar active item used `--primary-deep` on
+`--primary-soft` (near-invisible in dark) now uses `--primary`; the `.mt-2` utility used by the SOS
+step screen was never generated (Vuetify spacing helpers are not bundled) — now defined; obsolete
+`#sos-description` rule removed. The profile parent-tab experiment was reverted to the documented,
+tested history-pill contract (`faa2cf5`).
+
+Still divergent by recorded decision, none accepted visually: login vs `01-login.png` (no designed
+top bar, back-to-home, welcome/heading lockup, field icons, divider/social row); bottom-sheet
+`28/52/76` detents unvalidated against `bottom-sheet.png`; mission offer red banner and the
+3-column dispatch board (`mission/03`, `admin-panel/dashboard/02`) absent; admin overview lacks the
+operations map, group-availability column, alerts panel and refresh/report actions
+(`admin-panel/dashboard/01`); admin reports lack KPI deltas/period selector/donut
+(`03-reports`); users table lacks avatars/phone/last-login (`admin-panel/users/01-list`); no admin
+skeleton loading states (`admin-panel/states/01`) and no dedicated offline surface (`04-offline`);
+`history/05` stays `partial` until a human accepts the recorded preview. Auth family keeps its
+`partial` rows; the desktop auth composition and mobile brand-strip collapse were deliberately not
+rebuilt in this pass — changes of that scope belong to the human visual-acceptance decision.
+
+Preview limitation: the fake-data demo fetch authenticates any credential (persona follows the
+username), so the auth error path is not previewable; wrong-password rejection is covered by the
+server tests. Console/page/request sweeps of all 23 routes and the interactive flows (register
+validation, SOS wizard steps, history chips + reset, share search, job-type validation, device
+revoke toggle, toast dismissal, admin dispatch open, profile rename, talk press-hold) are clean.
