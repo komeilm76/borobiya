@@ -190,8 +190,17 @@
           :open="activeTool === 'route' && routeSection === 'transport'" :show-search="false"
           @confirm="confirmMissionTransport" @close="closeRouteSection()" />
         <header class="mission-desk__map-heading" aria-label="مأموریت فعال">
-          <h1>مأموریت من</h1>
-          <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
+          <h1 class="sr-only">مأموریت من</h1>
+          <button id="mission-status-trigger" type="button" class="mission-desk__status-trigger"
+            :aria-label="`وضعیت مأموریت: ${currentStatusLabel}؛ مرحلهٔ ${(activeStep + 1).toLocaleString('fa-IR')} از ${steps.length.toLocaleString('fa-IR')}؛ ${activeTool === 'status' ? 'بستن' : 'باز کردن'} پنل وضعیت`"
+            aria-controls="mission-status-panel" :aria-expanded="activeTool === 'status'"
+            @click="toggleTool('status', 'mission-status-trigger')">
+            <small>مأموریت من · مرحلهٔ {{ (activeStep + 1).toLocaleString('fa-IR') }} از {{ steps.length.toLocaleString('fa-IR') }}</small>
+            <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
+            <span class="mission-desk__stage-track" aria-hidden="true">
+              <i v-for="(step, index) in steps" :key="step.status" :class="{ 'mission-desk__stage--reached': index <= activeStep }" />
+            </span>
+          </button>
           <v-btn id="mission-tool-team" icon="mdi-account-group-outline" variant="text" size="small"
             :aria-label="activeTool === 'team' ? 'بستن پنل اعضای مأموریت' : 'نمایش اعضای مأموریت'"
             :title="activeTool === 'team' ? 'بستن اعضای مأموریت' : 'نمایش اعضای مأموریت'"
@@ -343,6 +352,7 @@ const mapReady = ref(false);
 const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
+let statusFocusOrigin = "mission-tool-status";
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
 const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
@@ -423,19 +433,22 @@ function openRouteWorkspace(): void {
   activeTool.value = "route";
   void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
-function toggleTool(tool: "status" | "route" | "team"): void {
+function toggleTool(tool: "status" | "route" | "team", focusOrigin?: string): void {
   if (routeDeleteConfirmOpen.value) return;
   if (pickingWaypoint.value) pickingWaypoint.value = false;
-  if (activeTool.value === tool) { closeTool(tool); return; }
+  if (activeTool.value === tool) { closeTool(tool, focusOrigin); return; }
   if (tool === "route") { openRouteWorkspace(); return; }
   if (activeTool.value === "route") closeRouteSection();
+  if (tool === "status") statusFocusOrigin = focusOrigin ?? "mission-tool-status";
   activeTool.value = tool;
   void nextTick(() => document.getElementById(`mission-${tool}-panel`)?.focus({ preventScroll: true }));
 }
-function closeTool(tool: "status" | "route" | "team"): void {
+function closeTool(tool: "status" | "route" | "team", focusOrigin?: string): void {
   if (tool === "route") closeRouteSection();
+  const focusTarget = focusOrigin ?? (tool === "status" ? statusFocusOrigin : `mission-tool-${tool}`);
+  if (tool === "status") statusFocusOrigin = "mission-tool-status";
   activeTool.value = null;
-  void nextTick(() => document.getElementById(`mission-tool-${tool}`)?.focus({ preventScroll: true }));
+  void nextTick(() => document.getElementById(focusTarget)?.focus({ preventScroll: true }));
 }
 function dismissTool(): void {
   if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return; }
@@ -653,6 +666,7 @@ function closeRoutes(): void {
   navigation.dismissError();
   routing.reset();
   activeTool.value = null;
+  statusFocusOrigin = "mission-tool-status";
   pickingWaypoint.value = false;
   waypointError.value = "";
   draggingWaypoint = null;
@@ -888,7 +902,22 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-heading h1 { margin: 0; font-size: .9rem; font-weight: 800; }
-.mission-desk__map-heading span { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: .8rem; }
+.mission-desk__status-trigger {
+  display: grid; flex: 1; min-width: 0; min-height: 44px; gap: 2px;
+  padding: .15rem .25rem; border: 0; border-radius: 10px;
+  background: transparent; color: rgb(var(--v-theme-on-surface));
+  text-align: start; font: inherit; cursor: pointer;
+}
+.mission-desk__status-trigger:hover { background: var(--bb-color-inset); }
+.mission-desk__status-trigger:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.mission-desk__status-trigger small { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 700; }
+.mission-desk__status-trigger > span[role="status"] { font-size: .88rem; font-weight: 800; }
+.mission-desk__status-trigger small, .mission-desk__status-trigger > span[role="status"] {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mission-desk__stage-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; margin-top: 3px; }
+.mission-desk__stage-track i { height: 3px; border-radius: 3px; background: var(--bb-color-outline); }
+.mission-desk__stage-track .mission-desk__stage--reached { background: rgb(var(--v-theme-primary)); }
 .mission-desk__map-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 .mission-desk__guidance {
   position: absolute; z-index: 7; top: calc(4.5rem + env(safe-area-inset-top, 0px));
