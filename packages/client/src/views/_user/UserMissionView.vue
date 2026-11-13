@@ -250,7 +250,11 @@
           <span class="mission-desk__guidance-symbol" aria-hidden="true"><v-icon icon="mdi-navigation-variant" /></span>
           <div class="mission-desk__guidance-copy">
             <strong>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'راهبری GPS فعال است' : 'دنبال‌کردن نقشه متوقف است' }}</strong>
-            <small v-if="routing.selectedRoute.value">{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }} مسیر برنامه‌ریزی‌شده · زمان رسیدن زنده در دسترس نیست</small>
+            <small v-if="incidentDistance !== null" class="mission-desk__direct-distance" aria-live="off"
+              :aria-label="`فاصلهٔ مستقیم تقریبی تا محل حادثه: ${formatRouteDistance(incidentDistance)}`">
+              <bdi>{{ formatRouteDistance(incidentDistance) }}</bdi> · مستقیم تا حادثه (تقریبی)
+            </small>
+            <small v-if="routing.selectedRoute.value" class="mission-desk__planned-distance">{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }} مسیر برنامه‌ریزی‌شده · زمان رسیدن زنده در دسترس نیست</small>
           </div>
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
         </div>
@@ -342,6 +346,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { createMissionRouteWorkspace, type RouteWorkspaceSection } from "@/mission/route-workspace";
 import { missionMapCamera, missionRouteStop } from "@/sos/mission-map";
+import { incidentDistanceMetres } from "@/mission/incident-distance";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
 import { useRouteElevationCharts } from "@/sos/route-elevation-charts";
@@ -549,6 +554,9 @@ const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
   (camera) => { if (followingGps.value) routeMap?.easeTo(camera); }, undefined,
   () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
+// The GPS watcher clears fix immediately on timeout, denial, background or Stop.
+// Do not substitute the saved route origin or an old member marker here.
+const incidentDistance = computed(() => incidentDistanceMetres(navigation.fix.value, routing.target.value?.incident ?? null));
 function confirmMissionTransport(mode: TransportProfile): void {
   if (routeSection.value !== "transport" || !desk.activeMission.value || navigation.active.value ||
     !transportProfiles.some((option) => option.value === mode)) return;
@@ -987,6 +995,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .mission-desk__guidance-copy strong { font-size: .87rem; }
 .mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
+.mission-desk__direct-distance { color: rgb(var(--v-theme-primary)); font-weight: 800; }
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
 /* Camera actions occupy the map page's next 48px slots below the compass.
    The single-action case stays adjacent; two actions fill both lower slots. */
@@ -1102,12 +1111,13 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
   .mission-desk__guidance--active { top: calc(5.25rem + env(safe-area-inset-top, 0px)); }
   .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
-  /* Keep the complete safety copy available to assistive tech, while the
-     visible short-phone banner shows its state and real Stop action. */
-  .mission-desk__guidance--active .mission-desk__guidance-copy small {
+  /* A fresh direct-distance cue remains visible beside Stop. Keep the longer
+     planned-route disclaimer available to screen readers without crowding this row. */
+  .mission-desk__guidance--active .mission-desk__planned-distance {
     position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
+  .mission-desk__direct-distance { line-height: 1.25; }
 }
 @media (max-width: 599px) {
   /* No mission: the centered welcome and empty-state cards occupy the lower

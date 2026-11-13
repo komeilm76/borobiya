@@ -26,7 +26,8 @@ describe("mission guidance over the full-screen map", () => {
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(css).toContain('.mission-desk__guidance--warning :deep(.v-btn) { min-height: 44px; height: auto; }');
     expect(css).toContain('overflow: hidden;');
-    expect(css).toContain('.mission-desk__guidance--active .mission-desk__guidance-copy small');
+    expect(css).toContain('.mission-desk__guidance--active .mission-desk__planned-distance');
+    expect(css).toContain('.mission-desk__direct-distance { line-height: 1.25; }');
     expect(css).toContain('clip: rect(0, 0, 0, 0);'); // Still available to assistive tech.
     // Height 320 and 560: banner ends before the 48px bottom-row controls, with a 12px gap.
     for (const height of [320, 360, 560]) {
