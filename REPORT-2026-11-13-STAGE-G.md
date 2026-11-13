@@ -248,10 +248,17 @@ AuthLayout). Map/admin/guides phases are not complete and are tracked below as p
 
 ### Not done / open
 
-- Phase B: admin foundations swatch deltas (success `#2C7A57`, warning `#A9690B`, mission
-  `#8A4B0F`) are flagged but unconfirmed — the refs may have been misread; needs a second
-  look with the eyedropper before changing `app.css` tokens. Map chips (24px vs admin 12px)
-  are both correct in their own contexts; no change.
+- Phase B: **CONFIRMED reference conflict — human decision required.** Exact-pixel scans:
+  map `colors.png` swatches `#28724F` (success), `#8C5609` (warning), no mission token; admin
+  `01-foundations.png` prints `#2C7A57` (success), `#A9690B` (warning), `#8A4B0F` (mission,
+  «تأکید مأموریت امداد، نمودار» — relief-mission emphasis/charts) under its swatches. Both are
+  deliberate, both are equal-authority design-system refs, and they cannot both be satisfied by
+  one token set. `app.css` still ships the map set (`#28724F`/`#8C5609`, no mission token) — no
+  tokens were changed. Decision needed: either (a) admin foundations wins and `:root` gains
+  `--success: #2C7A57; --warning: #A9690B; --mission: #8A4B0F` (map then drifts), or
+  (b) map wins (admin drifts), or (c) scoped override — admin shell uses the admin set locally,
+  map keeps the map set. Option (c) preserves both refs without global churn. Record the call
+  here when made; `./boro verify` and both capture suites must be re-checked after it.
 - Phase C (log evidence), Phase D remainder (admin panel per-screen pass vs its 22 refs,
   map pages vs 69 refs, guides, profile, mission, history), Phase E (tablet/mobile sweep with
   ref viewports), Phase F (before/after composite set) — all pending.
