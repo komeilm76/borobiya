@@ -5,6 +5,7 @@ import { useFormatters } from '@/composables/useFormatters.ts';
 import { DESIGN_TOKENS } from '@/stores/settings.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 import { revealTimeline } from '@/motion/index.ts';
+import { statusLabel, statusTone } from '@/utils/status.ts';
 
 /** Administrator overview: KPI cards, the status trend chart and recent requests. */
 const admin = useAdminStore();
@@ -19,7 +20,7 @@ const kpis = computed(() => {
   const openAlerts = admin.overview?.alerts?.length ?? 0;
   return [
     { key: 'requestsToday', label: 'درخواست امروز', icon: 'alarm-light-outline', value: Number(source.requestsToday ?? 0) },
-    { key: 'activeMissions', label: 'مأموریت جاری', icon: 'web', value: Number(source.activeMissions ?? 0) },
+    { key: 'activeMissions', label: 'مأموریت جاری', icon: 'crosshairs-gps', value: Number(source.activeMissions ?? 0) },
     { key: 'onlineResponders', label: 'امدادگر آنلاین', icon: 'account-check-outline', value: Number(source.onlineResponders ?? 0) },
     { key: 'openAlerts', label: 'هشدار باز', icon: 'bell-alert-outline', value: openAlerts }
   ];
@@ -83,7 +84,7 @@ onMounted(async () => {
               <strong>{{ item.incidentLabel }}</strong>
               <small>{{ format.dateTime(item.createdAt) }}</small>
             </div>
-            <span class="status-pill status-pill--neutral">{{ item.status }}</span>
+            <span :class="statusTone(item.status)">{{ statusLabel(item.status) }}</span>
           </li>
         </ul>
         <p v-if="!recent.length" class="panel__empty">درخواستی ثبت نشده است.</p>

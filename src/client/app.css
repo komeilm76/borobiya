@@ -257,12 +257,6 @@ body[data-mode='admin'] { background: var(--surface-2); }
 :root[data-theme='dark'] body[data-mode='admin'] { background: #0B1314; }
 .admin-shell { min-height: 100vh; display: grid; grid-template-columns: 264px minmax(0, 1fr); direction: rtl; }
 .admin-sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 16px; background: var(--surface); border-left: 1px solid var(--border); }
-.admin-nav { flex: 1; overflow-y: auto; display: grid; align-content: start; gap: 18px; }
-.admin-nav__item { position: relative; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-radius: 11px; color: var(--muted); font-size: 13.5px; transition: background .2s var(--ease), color .2s var(--ease); }
-.admin-nav__item .mdi { font-size: 19px; }
-.admin-nav__item:hover { background: var(--surface-2); color: var(--text); }
-.admin-nav__item.is-active { background: var(--primary-soft); color: var(--primary); font-weight: 700; }
-.admin-nav__item.is-active i { position: absolute; right: 0; width: 4px; height: 22px; border-radius: 4px 0 0 4px; background: var(--primary); }
 .admin-main { min-width: 0; display: flex; flex-direction: column; }
 .admin-topbar { height: 68px; flex: 0 0 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 28px; background: rgba(255,255,255,.65); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); }
 
@@ -292,21 +286,17 @@ body[data-mode='admin'] { background: var(--surface-2); }
 .command-list button > span { flex: 1; }
 /* Responsive */
 @media (max-width: 1100px) {
-  .admin-shell { grid-template-columns: 220px minmax(0,1fr); }
   .admin-content { padding: 20px; }
 }
+/* The fixed sidebar is hidden at 1100px and navigation moves into the off-canvas
+   drawer; the old row-layout compaction for it was dead and hid the drawer's labels. */
 @media (max-width: 900px)  {
-  .admin-shell { grid-template-columns: 1fr; }
-  .admin-sidebar { position: relative; height: auto; flex-direction: row; align-items: center; gap: 16px; padding: 12px 16px; border-left: 0; border-bottom: 1px solid var(--border); overflow-x: auto; }
-  .admin-nav { display: flex; gap: 8px; }
-  .admin-nav__item span { display: none; }
-  .admin-nav__item { min-width: 44px; justify-content: center; padding: 0; }
   .admin-topbar { padding: 0 16px; }
   .admin-search { width: min(360px, 45vw); }
 }
 @media (max-width: 620px)  {
   .admin-content { padding: 16px; }
-  .admin-search span { display: none; }
+  .admin-search span:not(.mdi) { display: none; }
   .admin-search { width: 40px; min-inline-size: 0; justify-content: center; padding: 0; }
   .admin-search kbd { display: none; }
   .admin-filters { display: grid; grid-template-columns: 1fr 1fr; }
@@ -564,10 +554,7 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
   .admin-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-grid { grid-template-columns: minmax(0, 1fr); }
 }
-.panel__filters .v-text-field { max-width: 240px; }
-/* Must come after the base .admin-list > li > div rule (same specificity, so file
-   order decides): on small screens the job-type text cell takes the full row
-   instead of collapsing beside two action buttons. */
+.panel__filters .v-text-field { flex: 0 0 auto; width: 240px; min-width: 170px; }
 /* Must come after the base .admin-list > li > div rule (same specificity, so file
    order decides): on small screens the job-type text cell takes the full row
    instead of collapsing beside two action buttons. */

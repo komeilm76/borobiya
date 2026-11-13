@@ -5,6 +5,7 @@ import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
 import { useMissionTeamStore } from '@/stores/missionTeam.ts';
+import { SEVERITY_LABELS, groupStatusLabel } from '@/utils/status.ts';
 import type { AdminJobTypeView, NearestResponderView, SosView } from '@/api/types.ts';
 
 /** Dispatch board: pending SOS requests on the right, groups on the left. */
@@ -16,6 +17,7 @@ const queue = computed(() => admin.dispatchQueue?.items ?? []);
 
 /** active groups that actually have members — the server refuses everything else. */
 const staffedGroups = computed(() => admin.groups.filter((group) => group.status === 'active' && (group.memberIds?.length ?? 0) > 0));
+const severityLabel = (value: string): string => SEVERITY_LABELS[value] ?? value;
 
 /**
  * The panel is deliberately explicit: the dispatcher picks the group, then ticks the responders.
@@ -218,7 +220,7 @@ onMounted(() => void admin.loadDispatch());
         <li>
           <span class="mdi mdi-alarm-light-outline" aria-hidden="true" />
           <div>
-            <strong>{{ item.incidentLabel }} · {{ item.severity }}</strong>
+            <strong>{{ item.incidentLabel }} · {{ severityLabel(item.severity) }}</strong>
             <small>{{ item.description }}</small>
           </div>
           <button type="button" class="admin-action" data-testid="open-dispatch" @click="openPanel(item)">{{ openId === item.id ? 'بستن' : 'اعزام' }}</button>
@@ -351,7 +353,7 @@ onMounted(() => void admin.loadDispatch());
           <i class="group-dot" :style="{ background: group.color }" />
           <div>
             <strong>{{ group.name }}</strong>
-            <small>ظرفیت {{ format.number(group.capacity) }} · {{ group.status }}</small>
+            <small>ظرفیت {{ format.number(group.capacity) }} · {{ groupStatusLabel(group.status) }}</small>
           </div>
           <span class="status-pill status-pill--neutral">{{ format.number(group.incidentIds.length) }} نوع</span>
         </li>

@@ -43,6 +43,7 @@ async function logout(): Promise<void> {
 
 const showAllLogins = ref(false);
 const visibleLogins = computed(() => (showAllLogins.value ? logins.value : logins.value.slice(0, 8)));
+const ROLE_LABELS: Record<string, string> = { user: 'کاربر', responder: 'امدادگر', admin: 'مدیر' };
 const isResponder = computed(() => auth.user?.role === 'responder');
 const ready = computed(() => Boolean(auth.user?.readyForMission));
 const readyBusy = ref(false);
@@ -162,7 +163,7 @@ async function remove(place: SavedPlaceView): Promise<void> {
   <div class="sheet__head">
     <div>
       <strong>{{ auth.user?.username ?? 'کاربر' }}</strong>
-      <span>{{ auth.user?.role }} · امتیاز {{ format.number(auth.user?.averageRating ?? 0) }}</span>
+      <span>{{ ROLE_LABELS[auth.user?.role ?? ''] ?? auth.user?.role }} · امتیاز {{ format.number(auth.user?.averageRating ?? 0) }}</span>
     </div>
     <button type="button" class="sheet__expand" aria-label="تغییر پوسته" @click="settings.cycle()">
       <span class="mdi mdi-theme-light-dark" aria-hidden="true" />

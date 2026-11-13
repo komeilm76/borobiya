@@ -337,3 +337,80 @@ map-shell clock drift only on the map pages.
   feature builds, not fixes; matrix rows stand.
 - Visual approval remains with the human reviewer; DESIGN_MATRIX rows unchanged; no
   merge/tag/release. Commits this pass are pushed to `arena/250278b6-borobiya`.
+
+## §14 — Sixth pass (2026-11-13): raw-enum/icon purity, settings-preview fidelity, mobile admin navigation
+
+Scope: PNG-vs-page sweep of the admin console and user cluster, plus a mobile shell audit.
+All 141 refs were not re-litigated; this is a bug-hunt pass over what the capture suite renders.
+
+### Fixed (client-visible)
+
+1. **Raw enums leaking into the admin UI** (the recurring bug class):
+   - `OverviewView` «درخواست‌های اخیر» status pill now renders `statusLabel()`/`statusTone()`
+     (was the raw `SOS_STATUS` key in a neutral pill).
+   - `ReportsView` «توزیع وضعیت درخواست‌ها» rows render `statusLabel()` (was raw keys).
+   - `AlertsView` kind column now maps `responder_offline`/`location_stale`
+     (the two kinds the demo fixtures actually emit) plus coverage/sos/mission_offers_expired;
+     fallback keeps the raw kind rather than inventing a translation.
+   - `AuditView` action column maps the audit actions the server emits (`mission_offer_accept`,
+     `support_request_approved`, `user_ready_toggle`, `admin_login`, `mission_complete`,
+     `share_create`, plus the `admin.ts`/`sos.ts`/`teams.ts` families) to Persian labels;
+     unmapped actions render verbatim — inventing a translation misstates the event.
+   - `DispatchView` queue severity/group status and `GroupsView` group status go through
+     `SEVERITY_LABELS`/`groupStatusLabel()` (new exports in `utils/status.ts`).
+   - `ProfileView` header role renders Persian (`ROLE_LABELS`), was `auth.user?.role`.
+   - `HistoryView` mission severity now uses the shared `SEVERITY_LABELS`
+     (high: «شدید», matching the rest of the app; was a local copy with «زیاد»).
+2. **«مأموریت جاری» KPI icon** was `mdi-web` (a browser glyph) → `mdi-crosshairs-gps`
+   (verified present in the shipped icon subset).
+3. **Incident/job-type identifier rows** now read «شناسه: inc_fire» / «شناسه: jt_fire»,
+   matching how the incident-types reference prints its keys (`شناسه: medical`).
+4. **Settings screen showed five invented setting keys** (`dispatch_radius_m`,
+   `offer_ttl_seconds`, `offline_alert_minutes`, `max_team_size`, `location_stale_minutes`)
+   that the real server neither seeds nor accepts on PUT — the preview was lying about the
+   operational surface. Demo fixtures now mirror the server seed exactly
+   (`sos_auto_dispatch`, `default_dispatch_radius_m`, `mission_ready_required`,
+   `maintenance_mode`) and the form labels all four. `mission_ready_required` added to
+   the boolean validator (`'0'`/`'1'` rule).
+5. **Health panel read `health.dataVersion`** — a field that only exists on the *public*
+   health endpoint; the admin payload (`services/admin.systemHealth()`) has `serverTime`,
+   not `dataVersion`, so the row always rendered «—». Row replaced with «زمان سرور»
+   (`mdi-clock-outline`) fed by `health.serverTime`; «کاربران» (`database.users`) and
+   «اتصال‌های زنده» (`realtime.connections`) unchanged and now fed by a demo fixture that
+   matches the real shape (`database: repo.stats()`, `realtime: hub+realtime stats()`).
+6. **Admin had no navigation at ≤1100px** — the sidebar was `display: none` with no
+   alternative, stranding phone/tablet operators. AdminLayout now has a hamburger in the
+   topbar that toggles an off-canvas drawer (`role="dialog"`, `aria-modal`, Escape/backdrop/
+   route-change close, `aria-expanded` on the trigger). The nav markup moved into
+   `components/AdminNav.vue`, rendered by both the fixed sidebar and the drawer so they
+   cannot drift; tests pin the 11 destinations, `aria-current`, drawer open/Escape/backdrop/
+   route-close, and that the drawer renders full labels (not icons-only).
+7. **Search button rendered as a blank rounded box on mobile** — the global compaction rule
+   `.admin-search span { display:none }` also hid the magnifier (a `<span>`); selector fixed
+   to `span:not(.mdi)` (same bug class fixed for `.admin-search span` on desktop).
+8. **Legacy ≤900px `.admin-nav` compaction** hid the drawer's labels (dead rules from when the
+   sidebar compressed to icons); removed, along with the duplicated global `.admin-nav*` block
+   (scoped `AdminNav.vue` is now the single owner) and the dead ≤1100px `.admin-shell` column.
+9. **Filter inputs collapsed to ~55px** carrying only «جسس» of their placeholder —
+   `.panel__filters .v-text-field` now gets `flex: 0 0 auto; width: 240px; min-width: 170px`
+   (Vuetify's own flex sizing won over the previous `flex: 0 1 240px`).
+10. **A11y contract test** updated to read `AdminNav.vue` for the navigation-landmark
+    assertions (markup moved out of AdminLayout; shell keeps the `<aside>` landmarks).
+
+### Verified
+
+`./boro verify` exit 0 — 96 files / 1235 tests, statement coverage 94.02% (≥94% gate).
+`bun run preview:build` exit 0; capture suite regenerated (58 OK, 0 FAIL); drawer flow
+checked in a real browser (11 items, Escape closes). Checks: admin desktop/mobile captures
+reviewed for all twelve admin screens; user-cluster spot checks clean; desktop sidebar
+unchanged after the CSS cleanup.
+
+### Notes / not changed
+
+- Red «پیش‌نمایش با دادگان ساختگی» pill is the intentional preview contract (previews must
+  never look like real data) — kept, `pointer-events: none`.
+- Tokens (`--success`/`--warning` map-vs-admin conflict) untouched — still owner's decision.
+- `target` column in the audit view renders raw ids (e.g. `sos_1`) by design; the server sends
+  only the id there, and resolving names client-side would fabricate data.
+- Admin CSV export keeps raw action keys on purpose (machine-readable output).
+- DESIGN_MATRIX untouched; PR stays open; no merge/tag/release; visual approval = human.

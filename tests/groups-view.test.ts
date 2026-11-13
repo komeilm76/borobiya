@@ -131,7 +131,7 @@ describe('group list', () => {
     const first = wrapper.find('.admin-list li');
     expect(first.text()).toContain('گروه امداد پزشکی');
     expect(first.text()).toMatch(/۲ عضو/);
-    expect(first.text()).toContain('active');
+    expect(first.text()).toContain('فعال');
     wrapper.unmount();
   });
 

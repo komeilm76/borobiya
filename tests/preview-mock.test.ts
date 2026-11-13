@@ -207,7 +207,7 @@ describe('preview demo mock — every handler answers deterministically', () => 
 
     const settings = await ok200('GET', '/_admin/settings');
     expect(settings.data.items.length).toBeGreaterThan(0);
-    await ok200('PUT', '/_admin/settings', { dispatch_radius_m: '2500' });
+    await ok200('PUT', '/_admin/settings', { default_dispatch_radius_m: '2500' });
     await ok200('GET', '/_admin/system/health');
 
     const pending = await ok200('GET', '/_admin/support-requests?status=pending&limit=1');

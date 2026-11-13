@@ -67,7 +67,10 @@ describe('accessibility contract', () => {
     }
     expect(router).toMatch(/createWebHistory/);
     const layouts = await read('src/client/layouts/AdminLayout.vue');
-    expect(layouts).toMatch(/aria-current/);
+    // The navigation lives in AdminNav (rendered by both the sidebar and the small-screen
+    // drawer); the shell keeps the landmarks. Check the pair, not one file.
+    const nav = await read('src/client/components/AdminNav.vue');
+    expect(nav).toMatch(/aria-current/);
     expect(layouts).toMatch(/<aside/);
   });
 

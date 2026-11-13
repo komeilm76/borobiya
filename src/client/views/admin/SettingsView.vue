@@ -15,12 +15,13 @@ const formError = ref<string | null>(null);
 const settings = computed(() => admin.settings);
 
 /** The settings the server accepts as `'0'` or `'1'`. */
-const BOOLEAN_KEYS = ['sos_auto_dispatch', 'maintenance_mode'];
+const BOOLEAN_KEYS = ['sos_auto_dispatch', 'mission_ready_required', 'maintenance_mode'];
 
 /** How each setting is described in the form, so a raw key is not the only label. */
 const LABELS: Record<string, string> = {
   sos_auto_dispatch: 'اعزام خودکار',
   default_dispatch_radius_m: 'شعاع اعزام (متر)',
+  mission_ready_required: 'الزام آماده‌باش برای مأموریت',
   maintenance_mode: 'حالت نگهداری'
 };
 
@@ -98,7 +99,7 @@ onMounted(async () => {
       <ul class="admin-list">
         <li><span class="mdi mdi-database" aria-hidden="true" /><div><strong>کاربران</strong><small>{{ format.number(Number((health.database as any)?.users ?? 0)) }}</small></div></li>
         <li><span class="mdi mdi-lan-connect" aria-hidden="true" /><div><strong>اتصال‌های زنده</strong><small>{{ format.number(Number((health.realtime as any)?.connections ?? 0)) }}</small></div></li>
-        <li><span class="mdi mdi-memory" aria-hidden="true" /><div><strong>نسخه داده</strong><small>{{ String(health.dataVersion ?? '—') }}</small></div></li>
+        <li><span class="mdi mdi-clock-outline" aria-hidden="true" /><div><strong>زمان سرور</strong><small>{{ health.serverTime ? format.dateTime(Number(health.serverTime)) : '—' }}</small></div></li>
       </ul>
     </article>
   </section>

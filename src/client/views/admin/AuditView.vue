@@ -8,7 +8,47 @@ import { tryDownloadPreviewCsv } from '@/preview/demo-downloads.ts';
 /** Audit log with a text filter and CSV export. */
 const admin = useAdminStore();
 const format = useFormatters();
-const query = ref('');
+/** Persian labels for audit actions — raw dotted enums must never reach the UI. */
+const ACTION_LABELS: Record<string, string> = {
+  'user.create': 'ایجاد کاربر',
+  'user.update': 'ویرایش کاربر',
+  'user_ready_toggle': 'تغییر آماده‌باش',
+  'group.create': 'ایجاد گروه امداد',
+  'group.update': 'ویرایش گروه امداد',
+  'group.member.add': 'افزودن عضو گروه',
+  'group.member.remove': 'حذف عضو گروه',
+  'alert.resolve': 'بستن هشدار',
+  'settings.update': 'تغییر تنظیمات',
+  'job-type.create': 'ایجاد نوع خدمت',
+  'job-type.update': 'ویرایش نوع خدمت',
+  'job-type.delete': 'حذف نوع خدمت',
+  'incident-type.create': 'ایجاد نوع حادثه',
+  'incident-type.update': 'ویرایش نوع حادثه',
+  'mission_offer_accept': 'پذیرش پیشنهاد مأموریت',
+  'support_request_created': 'ثبت درخواست پشتیبانی',
+  'support_request_approved': 'تأیید درخواست پشتیبانی',
+  'support_request_rejected': 'رد درخواست پشتیبانی',
+  'support_request_cancelled': 'لغو درخواست پشتیبانی',
+  'sos.requeued': 'بازگرداندن SOS به صف',
+  'mission_team.dispatched': 'اعزام تیمی',
+  'mission_requirements.updated': 'بروزرسانی نیازمندی‌های مأموریت',
+  'mission_offer.expired': 'انقضای پیشنهاد مأموریت',
+  'mission_offer.superseded': 'جایگزینی پیشنهاد مأموریت',
+  'mission_member.added': 'افزودن عضو مأموریت',
+  'mission_member.removed': 'حذف عضو مأموریت',
+  'mission_leader.designated': 'تعیین رهبر مأموریت',
+  'mission_complete': 'تکمیل مأموریت',
+  'location_share.created': 'ایجاد اشتراک موقعیت',
+  'location_share.revoked': 'لغو اشتراک موقعیت',
+  'admin.track.read': 'مشاهده مسیر',
+  'user.record_track': 'ثبت مسیر',
+  'track.consent': 'رضایت ردیابی',
+  'admin_login': 'ورود مدیر',
+  'share_create': 'ایجاد اشتراک',
+  'assign': 'اعزام'
+};
+// Unmapped actions render verbatim — inventing a translation would misstate what happened.
+const actionLabel = (action: string): string => ACTION_LABELS[action] ?? action;const query = ref('');
 const entries = computed(() => admin.audit?.items ?? []);
 
 async function search(): Promise<void> {
@@ -39,7 +79,7 @@ onMounted(() => void admin.loadAudit());
           <tr v-for="entry in entries" :key="entry.id">
             <td>{{ format.dateTime(entry.createdAt) }}</td>
             <td>{{ entry.actorUsername ?? '—' }}</td>
-            <td>{{ entry.action }}</td>
+            <td>{{ actionLabel(entry.action) }}</td>
             <td>{{ entry.target }}</td>
           </tr>
         </tbody>

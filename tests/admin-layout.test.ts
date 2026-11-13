@@ -165,6 +165,46 @@ describe('navigation', () => {
   });
 });
 
+describe('small-screen navigation', () => {
+  it('opens the drawer from the hamburger and closes it on Escape', async () => {
+    const { wrapper } = await render();
+    expect(wrapper.find('.admin-drawer').exists()).toBe(false);
+
+    await wrapper.find('.admin-menu-button').trigger('click');
+    expect(wrapper.find('.admin-drawer').exists()).toBe(true);
+    // The drawer must carry the full labeled destinations, not icon-only dots.
+    expect(wrapper.find('.admin-drawer').text()).toContain('اعزام');
+    expect(wrapper.find('.admin-drawer').text()).toContain('تنظیمات');
+    expect(wrapper.find('.admin-menu-button').attributes('aria-expanded')).toBe('true');
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(wrapper.find('.admin-drawer').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('closes the drawer when the backdrop is clicked', async () => {
+    const { wrapper } = await render();
+    await wrapper.find('.admin-menu-button').trigger('click');
+    expect(wrapper.find('.admin-drawer').exists()).toBe(true);
+
+    await wrapper.find('.admin-drawer-backdrop').trigger('click');
+    expect(wrapper.find('.admin-drawer').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('closes the drawer when the route changes', async () => {
+    const { wrapper, router } = await render();
+    await wrapper.find('.admin-menu-button').trigger('click');
+    expect(wrapper.find('.admin-drawer').exists()).toBe(true);
+
+    await router.push({ name: ROUTE_NAMES.adminUsers });
+    await flushPromises();
+    expect(wrapper.find('.admin-drawer').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
 describe('alert badge', () => {
   it('counts only unresolved alerts', async () => {
     const { wrapper } = await render();

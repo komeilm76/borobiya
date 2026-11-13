@@ -8,6 +8,15 @@ import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 /** Operational alerts, with resolve actions and severity tones. */
 const admin = useAdminStore();
 const format = useFormatters();
+/** Persian labels for alert kinds — raw enums must never reach the UI. */
+const ALERT_KIND_LABELS: Record<string, string> = {
+  coverage: 'پوشش',
+  sos: 'درخواست امداد',
+  mission_offers_expired: 'پایان پیشنهادها',
+  responder_offline: 'آفلاین‌بودن امدادگر',
+  location_stale: 'موقعیت قدیمی'
+};
+const alertKindLabel = (kind: string): string => ALERT_KIND_LABELS[kind] ?? kind;
 const motion = useMotionPreferences();
 const includeResolved = ref(false);
 const alerts = computed(() => admin.alerts);
@@ -34,7 +43,7 @@ onMounted(reload);
           <span :class="['mdi', alert.severity === 'danger' ? 'mdi-alert-circle-outline' : 'mdi-alert-outline']" aria-hidden="true" />
           <div>
             <strong>{{ alert.message }}</strong>
-            <small>{{ alert.kind }} · {{ format.dateTime(alert.createdAt) }}</small>
+            <small>{{ alertKindLabel(alert.kind) }} · {{ format.dateTime(alert.createdAt) }}</small>
           </div>
           <button v-if="!alert.resolvedAt" type="button" class="admin-action" @click="admin.resolveAlert(alert.id)">بستن</button>
           <span v-else class="status-pill status-pill--neutral">بسته شده</span>

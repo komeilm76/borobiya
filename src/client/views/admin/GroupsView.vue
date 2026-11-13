@@ -5,6 +5,7 @@ import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
+import { groupStatusLabel } from '@/utils/status.ts';
 
 /** Service group management with capacity and incident coverage. */
 const admin = useAdminStore();
@@ -70,7 +71,7 @@ onMounted(async () => {
           <i class="group-dot" :style="{ background: group.color }" />
           <div>
             <strong>{{ group.name }}</strong>
-            <small>ظرفیت {{ format.number(group.capacity) }} · {{ group.status }}</small>
+            <small>ظرفیت {{ format.number(group.capacity) }} · {{ groupStatusLabel(group.status) }}</small>
           </div>
           <span class="status-pill status-pill--neutral">{{ format.number(group.memberCount) }} عضو</span>
         </li>

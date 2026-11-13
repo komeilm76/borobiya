@@ -90,9 +90,10 @@ describe('administrator reports', () => {
     expect(rows).toHaveLength(3);
 
     const text = wrapper.text();
-    expect(text).toContain('pending');
-    expect(text).toContain('dispatched');
-    expect(text).toContain('completed');
+    // Raw enums must never reach the UI; the rows render the Persian status labels.
+    expect(text).toContain('در انتظار');
+    expect(text).toContain('اعزام‌شده');
+    expect(text).toContain('تکمیل‌شده');
     // Counts are Persian-set digits; the numbers themselves must appear.
     expect(text).toContain('۲');
     expect(text).toContain('۳');

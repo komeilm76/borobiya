@@ -26,7 +26,7 @@ const SETTINGS = [
 const HEALTH = {
   database: { users: 4, missions: 2 },
   realtime: { connections: 3 },
-  dataVersion: '2026-11-08-bun-1'
+  serverTime: 1_789_257_000_000
 };
 
 /** Builds a success envelope. */
@@ -213,11 +213,11 @@ describe('health snapshot', () => {
     const text = wrapper.text();
     expect(text).toContain('کاربران');
     expect(text).toContain('اتصال‌های زنده');
-    expect(text).toContain('2026-11-08-bun-1');
+    expect(text).toContain('زمان سرور');
     wrapper.unmount();
   });
 
-  it('falls back to a dash when the version is missing rather than rendering undefined', async () => {
+  it('falls back to a dash when the server time is missing rather than rendering undefined', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: RequestInfo | URL) => {

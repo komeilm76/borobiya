@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { useRouter } from 'vue-router';
-import { statusLabel, statusTone } from '@/utils/status.ts';
+import { SEVERITY_LABELS, statusLabel, statusTone } from '@/utils/status.ts';
 import { get, errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
 import HistorySharePanel from '@/components/history/HistorySharePanel.vue';
@@ -125,7 +125,6 @@ const TRIP_STATUS_LABEL: Record<string, string> = {
   planned: 'برنامه‌ریزی‌شده', active: 'در حال انجام', completed: 'تکمیل‌شده', cancelled: 'لغوشده'
 };
 const TRIP_ROLE_LABEL: Record<string, string> = { leader: 'رهبر', member: 'عضو' };
-const SEVERITY_LABEL: Record<string, string> = { low: 'کم', medium: 'متوسط', high: 'زیاد' };
 const EVENT_ACTION_LABEL: Record<string, string> = { assign: 'اعزام', accept: 'پذیرش', arrive: 'رسیدن', start: 'شروع', complete: 'تکمیل', cancel: 'لغو' };
 
 const finishedTrips = computed(() => trips.trips.filter((trip) => trip.status === 'completed' || trip.status === 'cancelled'));
@@ -393,14 +392,14 @@ function starRow(rating: number): number[] {
                 <span class="mdi mdi-alert-circle-outline" aria-hidden="true" />
                 <span class="history-row__text">
                   <strong>{{ item.incidentLabel }}</strong>
-                  <small>{{ format.dateTime(item.createdAt) }} · شدت {{ SEVERITY_LABEL[item.severity] ?? item.severity }}</small>
+                  <small>{{ format.dateTime(item.createdAt) }} · شدت {{ SEVERITY_LABELS[item.severity] ?? item.severity }}</small>
                 </span>
                 <span :class="statusTone(item.status)">{{ statusLabel(item.status) }}</span>
               </button>
               <div v-if="expanded === `req:${item.id}`" class="history-detail" data-testid="history-request-detail">
                 <p class="sheet__status">{{ item.description }}</p>
                 <p class="sheet__status">
-                  ردیابی: {{ format.number(item.trackingCode) }} · شدت: {{ SEVERITY_LABEL[item.severity] ?? item.severity }}
+                  ردیابی: {{ format.number(item.trackingCode) }} · شدت: {{ SEVERITY_LABELS[item.severity] ?? item.severity }}
                   <span v-if="item.isManual" class="status-pill status-pill--warning">موقعیت دستی</span>
                 </p>
                 <p v-if="requestDetailLoading" class="sheet__status">در حال دریافت گزارش…</p>

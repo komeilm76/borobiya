@@ -165,22 +165,25 @@ export const adminAudit = [
 
 /* ------------------------------------------------------- settings ------ */
 
+/* Mirror the server seed exactly (src/server/db/database.ts + SETTINGS_KEYS); the preview must not
+   invent keys the real settings endpoint would reject on save. */
 export const adminSettings = [
-  { key: 'dispatch_radius_m', value: '2500', updatedAt: T0 - 30 * DAY },
-  { key: 'offer_ttl_seconds', value: '120', updatedAt: T0 - 30 * DAY },
-  { key: 'offline_alert_minutes', value: '30', updatedAt: T0 - 20 * DAY },
-  { key: 'max_team_size', value: '6', updatedAt: T0 - 15 * DAY },
-  { key: 'location_stale_minutes', value: '10', updatedAt: T0 - 10 * DAY }
+  { key: 'sos_auto_dispatch', value: '0', updatedAt: T0 - 30 * DAY },
+  { key: 'default_dispatch_radius_m', value: '5000', updatedAt: T0 - 30 * DAY },
+  { key: 'mission_ready_required', value: '1', updatedAt: T0 - 20 * DAY },
+  { key: 'maintenance_mode', value: '0', updatedAt: T0 - 15 * DAY }
 ];
 
 /* ------------------------------------------------- system health ------- */
 
+/* Shape mirrors `services/admin.systemHealth()`: repo.stats() under `database`,
+   hub+realtime stats under `realtime`, and `serverTime` — no `dataVersion` (that lives on the
+   public health endpoint only). */
 export const systemHealth = {
   status: 'ok',
   uptimeSeconds: 512345,
-  version: '2.0.0-preview',
-  database: { reachable: true, latencyMs: 2 },
-  tiles: { mode: 'offline', estimatedTiles: 1421 },
-  sockets: { clients: 4 },
-  jobs: { pending: 0 }
+  database: { users: 128, sessions: 37, shares: 12, sosRequests: 864, missions: 421, alerts: 2, events: 51200, locationPoints: 9021 },
+  realtime: { connections: 4, users: 4, sessions: 4, rooms: 2, framesIn: 312, framesOut: 486, onlineUsers: 4, onlineSessions: 4 },
+  map: { tiles: 1421 },
+  serverTime: T0
 };

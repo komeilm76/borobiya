@@ -21,7 +21,7 @@ onMounted(() => void admin.loadIncidentTypes());
       <ul class="admin-list">
         <li v-for="item in items" :key="item.id">
           <i class="group-dot" :style="{ background: item.color }" />
-          <div><strong>{{ item.label }}</strong><small>{{ item.id }}</small></div>
+          <div><strong>{{ item.label }}</strong><small>شناسه: {{ item.id }}</small></div>
           <span :class="['mdi', `mdi-${item.icon}`]" aria-hidden="true" />
         </li>
       </ul>

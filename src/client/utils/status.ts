@@ -52,6 +52,14 @@ export const SEVERITY_TONES: Record<string, string> = {
   high: 'status-pill status-pill--danger'
 };
 
+/** Persian label for a responder group lifecycle status. */
+export const GROUP_STATUS_LABELS: Record<string, string> = { active: 'فعال', inactive: 'غیرفعال' };
+
+/** Persian label for a group status, falling back to the raw value for unknowns. */
+export function groupStatusLabel(status: string): string {
+  return GROUP_STATUS_LABELS[status] ?? status;
+}
+
 /** pill class for a SOS severity, defaulting to warning for unknowns. */
 export function severityTone(severity: string): string {
   return SEVERITY_TONES[severity] ?? 'status-pill status-pill--warning';

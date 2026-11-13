@@ -82,7 +82,7 @@ onMounted(() => void reload());
         <li v-for="item in sortedItems" :key="item.id">
           <span :class="['mdi', item.offerPolicy === 'all' ? 'mdi-account-check-outline' : 'mdi-account-clock-outline']" aria-hidden="true" />
           <div>
-            <strong>{{ item.label }} <small style="opacity:.65">{{ item.id }}</small></strong>
+            <strong>{{ item.label }} <small style="opacity:.65">شناسه: {{ item.id }}</small></strong>
             <small>{{ policyLabel(item.offerPolicy) }} · {{ format.number(item.memberCount) }} امدادگر فعال</small>
           </div>
           <button type="button" class="admin-action" data-testid="job-type-policy-toggle"

@@ -4,6 +4,7 @@ import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
 import { tryDownloadPreviewCsv } from '@/preview/demo-downloads.ts';
+import { statusLabel } from '@/utils/status.ts';
 
 /** Reports screen: status distribution and export links. */
 const admin = useAdminStore();
@@ -37,7 +38,7 @@ function download(href: string): void {
       <ul class="admin-list">
         <li v-for="item in statuses" :key="item.status">
           <span class="mdi mdi-chart-bar" aria-hidden="true" />
-          <div><strong>{{ item.status }}</strong><small>{{ format.number(item.count) }} مورد</small></div>
+          <div><strong>{{ statusLabel(item.status) }}</strong><small>{{ format.number(item.count) }} مورد</small></div>
         </li>
       </ul>
       <p v-if="!statuses.length" class="panel__empty">داده‌ای برای گزارش نیست.</p>
