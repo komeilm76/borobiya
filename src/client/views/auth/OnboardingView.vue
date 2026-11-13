@@ -12,7 +12,8 @@ import { landingRoute } from '@/router/index.ts';
  */
 const router = useRouter();
 const auth = useAuthStore();
-const selected = ref<string[]>(['', '', '', '', '']);
+// null keeps VSelect's placeholder visible; '' would render the field blank-but-dirty.
+const selected = ref<Array<string | null>>([null, null, null, null, null]);
 const answers = ref<string[]>(['', '', '', '', '']);
 const error = ref<string | null>(null);
 const busy = ref(false);
@@ -26,7 +27,8 @@ async function submit(): Promise<void> {
   busy.value = true;
   error.value = null;
   try {
-    await auth.completeSecurityQuestions(selected.value.map((questionId, index) => ({ questionId, answer: answers.value[index] ?? '' })));
+    // Unanswered slots stay '' so the server sees five positions and can name the gap.
+    await auth.completeSecurityQuestions(selected.value.map((questionId, index) => ({ questionId: questionId ?? '', answer: answers.value[index] ?? '' })));
     const user = auth.user;
     await router.push({ name: landingRoute(user?.role, false) });
   } catch (caught) {

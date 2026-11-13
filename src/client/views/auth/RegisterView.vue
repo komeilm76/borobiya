@@ -16,7 +16,7 @@ const auth = useAuthStore();
 const username = ref('');
 const password = ref('');
 const confirm = ref('');
-const selected = ref<string[]>(['', '', '', '', '']);
+const selected = ref<Array<string | null>>([null, null, null, null, null]);
 const answers = ref<string[]>(['', '', '', '', '']);
 const error = ref<string | null>(null);
 const busy = ref(false);
@@ -55,7 +55,9 @@ async function submit(): Promise<void> {
   }
   busy.value = true;
   try {
-    const payload = selected.value.map((questionId, index) => ({ questionId, answer: answers.value[index] ?? '' }));
+    // Slots are all non-null here (the some() check above blocks this path otherwise);
+    // the ?? '' keeps the payload type string-only if that invariant ever moves.
+    const payload = selected.value.map((questionId, index) => ({ questionId: questionId ?? '', answer: answers.value[index] ?? '' }));
     const user = await auth.register(username.value.trim().toLowerCase(), password.value, payload);
     await router.push({ name: user.role === 'admin' ? ROUTE_NAMES.adminOverview : ROUTE_NAMES.map });
   } catch (caught) {
