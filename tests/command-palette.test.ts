@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { defineComponent, effectScope, h, nextTick } from 'vue';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
 import CommandPalette from '../src/client/components/CommandPalette.vue';
-import { useCommandPalette, type CommandEntry } from '../src/client/composables/useCommandPalette.ts';
+import { useCommandPalette, commandPaletteOpen, type CommandEntry } from '../src/client/composables/useCommandPalette.ts';
 import { useAuthStore } from '../src/client/stores/auth.ts';
 import { useSettingsStore } from '../src/client/stores/settings.ts';
 import { useSosStore } from '../src/client/stores/sos.ts';
@@ -90,11 +90,15 @@ async function mountPalette() {
 }
 
 afterEach(() => {
+  commandPaletteOpen.value = false;
   document.body.innerHTML = '';
   vi.unstubAllGlobals();
 });
 
 beforeEach(() => {
+  // The real component binds its open state to the shared module ref, which outlives each mount
+  // in this file — reset it so one test's Ctrl+K does not flip the next test's starting state.
+  commandPaletteOpen.value = false;
   setActivePinia(createPinia());
   vi.restoreAllMocks();
   vi.stubGlobal(

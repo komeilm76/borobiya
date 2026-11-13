@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { useEventListener } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useOfflineStore } from '@/stores/offline.ts';
@@ -27,11 +28,21 @@ const devices = computed(() => auth.devices);
 const places = computed(() => map.places);
 const logins = computed(() => auth.loginHistory);
 const logoutBusy = ref(false);
+/** Logout is irreversible and can strand an SOS responder: confirm against the canonical dialog (design: profile/06-logout-confirm). */
+const logoutConfirmOpen = ref(false);
+const currentDevice = computed(() => devices.value.find((device) => device.isCurrentDevice) ?? null);
 
-/** Ends the session and returns to the sign-in screen. Kept on the profile page — never a one-tap map action. */
 async function logout(): Promise<void> {
+  logoutConfirmOpen.value = true;
+}
+
+/** Confirmed logout: actually end the session and return to the sign-in screen. */
+async function confirmLogout(): Promise<void> {
   if (logoutBusy.value) return;
   logoutBusy.value = true;
+  // Close the dialog before the network and navigation settle: it must never linger as a dead
+  // overlay on the sign-in screen if the push itself hangs.
+  logoutConfirmOpen.value = false;
   try {
     await auth.logout();
     realtime.disconnect();
@@ -42,6 +53,10 @@ async function logout(): Promise<void> {
 }
 
 const showAllLogins = ref(false);
+/** Escape closes the logout confirmation (same contract as the admin drawer). */
+useEventListener(window, 'keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && logoutConfirmOpen.value) logoutConfirmOpen.value = false;
+});
 const visibleLogins = computed(() => (showAllLogins.value ? logins.value : logins.value.slice(0, 8)));
 const ROLE_LABELS: Record<string, string> = { user: 'کاربر', responder: 'امدادگر', admin: 'مدیر' };
 const isResponder = computed(() => auth.user?.role === 'responder');
@@ -293,9 +308,55 @@ async function remove(place: SavedPlaceView): Promise<void> {
         <span>{{ auth.user?.securityReady ? 'تنظیم شده' : 'نیازمند تکمیل' }}</span>
       </div>
     </div>
+    <div v-if="logoutConfirmOpen" class="logout-confirm" role="presentation">
+      <div class="logout-confirm__scrim" aria-hidden="true" @click="logoutConfirmOpen = false" />
+      <section class="logout-confirm__panel" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title" aria-describedby="logout-confirm-body" data-testid="logout-confirm">
+        <span class="logout-confirm__icon mdi mdi-logout" aria-hidden="true" />
+        <strong id="logout-confirm-title" class="logout-confirm__title">از حساب خارج می‌شوید؟</strong>
+        <p id="logout-confirm-body" class="logout-confirm__body">نشست همین دستگاه پایان می‌یابد؛ دستگاه‌های دیگر خارج نمی‌شوند.</p>
+        <p v-if="currentDevice" class="logout-confirm__device">
+          <span class="mdi mdi-monitor" aria-hidden="true" />
+          <span>{{ currentDevice.deviceName }} · آخرین فعالیت {{ format.dateTime(currentDevice.lastActiveAt) }}</span>
+        </p>
+        <div class="logout-confirm__actions">
+          <button type="button" class="danger-button danger-button--solid" :disabled="logoutBusy" data-testid="logout-confirm-accept" @click="confirmLogout">
+            <span class="mdi mdi-logout" aria-hidden="true" />
+            <span>{{ logoutBusy ? 'در حال خروج…' : 'خروج' }}</span>
+          </button>
+          <button type="button" class="ghost-button" data-testid="logout-confirm-cancel" @click="logoutConfirmOpen = false">انصراف</button>
+        </div>
+        <p class="logout-confirm__warning">پس از خروج، برای ارسال SOS باید دوباره وارد شوید.</p>
+      </section>
+    </div>
     <button type="button" class="danger-button danger-button--wide" data-testid="logout-button" :disabled="logoutBusy" @click="logout">
       <span class="mdi mdi-logout" aria-hidden="true" />
-      <span>{{ logoutBusy ? 'در حال خروج…' : 'خروج از حساب' }}</span>
+      <span>خروج از حساب</span>
     </button>
   </div>
 </template>
+
+<style scoped>
+.logout-confirm { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; }
+.logout-confirm__scrim { position: absolute; inset: 0; background: rgba(6, 14, 15, .55); }
+.logout-confirm__panel {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  inline-size: min(360px, 100%);
+  padding: 22px 20px 18px;
+  border-radius: var(--r20);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.logout-confirm__icon { inline-size: 56px; block-size: 56px; display: grid; place-items: center; border-radius: 50%; background: rgba(175,52,56,.12); color: var(--danger); font-size: 26px; }
+.logout-confirm__title { font-size: 18px; font-weight: 800; color: var(--text); }
+.logout-confirm__body { margin: 0; font-size: 12.5px; color: var(--muted); }
+.logout-confirm__device { display: flex; gap: 8px; align-items: center; margin: 0; padding: 8px 14px; border-radius: var(--r12); background: var(--surface-2); font-size: 11.5px; color: var(--muted); }
+.logout-confirm__device .mdi { color: var(--info); }
+.logout-confirm__actions { display: flex; gap: 10px; justify-content: center; margin-block-start: 4px; }
+.logout-confirm__warning { margin: 2px 0 0; font-size: 11px; color: var(--warning); }
+@media (prefers-reduced-motion: reduce) { .logout-confirm { transition: none; } }
+</style>

@@ -546,3 +546,98 @@ was opened and inspected, not just computed.
 - Map tiles dark filter (`brightness/saturate/hue-rotate`) unchanged — visual acceptance item.
 - Consent prompt still has no preview-fixture trigger; unchanged (`--surface`/`--muted` fixed earlier).
 - DESIGN_MATRIX untouched; PR #6 open; no merge/tag/release; visual approval = human.
+
+## §17 — Ninth pass (2026-11-13, continued): full re-review against the 141 references — logout confirmation, admin palette trigger, light-theme `--on-accent`, preview pill, checkboxes
+
+A fresh review pass over every reference family, comparing pages, components and materials
+against the build. No DESIGN_MATRIX flips; PR #6 stays open; visual approval remains the owner's.
+
+### Fixed (with evidence)
+
+1. **Profile logout had no confirmation (design: profile/06-logout-confirm.png).** One tap on
+   «خروج از حساب» ended the session instantly — disastrous for an SOS responder mid-shift and a
+   direct contradiction of the reference dialog («از حساب خارج می‌شوید؟», current device, SOS
+   re-login warning). ProfileView now opens a proper `role="dialog"` aria-modal confirmation:
+   heading, body, current-device row (name + last activity from the sessions payload), amber SOS
+   warning, solid-danger «خروج» + «انصراف», scrim-click and Escape to dismiss
+   (`logout-confirm*` testids). The wide button keeps the ref's soft danger fill; the dialog CTA
+   now uses the filled style from the ref. Dialog closes immediately on confirm so a hanging
+   navigation can never leave it as a dead overlay. 5 new tests pin the behaviour; the acceptance
+   is visually verified in both themes
+   (`/home/user/visual-acceptance/profile-{light,dark}-logout.png`).
+2. **Admin topbar «جست‌وجوی فرمان» button did nothing.** It toggled a private, entry-less palette
+   instance owned by the admin layout while the global `<CommandPalette />` (which holds the real
+   command registry and the Ctrl+K binding) rendered nothing. The trigger now flips the new shared
+   `commandPaletteOpen` flag (`composables/useCommandPalette.ts`), which the global palette binds
+   via an optional `openRef` parameter; the phantom instance and the layout's dead Ctrl+K handler
+   are gone (the composable's own `useMagicKeys` already handled Ctrl/Cmd+K). Admin test now
+   asserts the flag flips; palette test files reset the shared ref per test so state cannot leak
+   between tests (module-level ref outlives each mount).
+3. **Light theme never defined `--on-accent`** (only dark did). Every `var(--on-accent)` color in
+   light mode was an invalid var() substitution → initial value (canvastext), so light primary
+   buttons/tab pills rendered dark-on-teal by accident: ~3.5:1, off-design (the reference login
+   shows white text on the teal CTA). `:root` now defines `--on-accent: #FFFFFF` (white on deep
+   teal in light; the dark override keeps `#082222`, near-black on mint, ~10:1). Verified on the
+   regenerated light captures (login CTA, top-pill active tab, mission «پذیرش مأموریت»,
+   sos «ادامه»/«ارسال», history chips).
+4. **«پیش‌نمایش با دادگان ساختگی» pill overlapped the bottom CTA** on every map-mode screen
+   (fixed position, bottom: 14px). Moved to the top-center status-bar dead zone
+   (`left: 50%; transform: translateX(-50%); top: 8px`), pointer-events none, still unmistakable.
+   Verified on map/sos/profile (mobile) and admin overview + login (desktop): no control is
+   covered on any of them.
+5. **Native checkboxes were near-invisible in dark mode** (reported on TripsView
+   «فقط ذخیره‌شده‌ها»; all app checkboxes were unstyled except two scoped rules). Global
+   `input[type="checkbox"]` is now custom-drawn: 18px box, `--muted` border, primary fill +
+   `--on-accent` check on `:checked`, visible focus ring; a `.share-field input[type="checkbox"]`
+   override beats the generic 100%-width form-field rule that was stretching it. Verified in the
+   dark trips capture.
+6. **Logout dialog danger fill in dark mode.** The solid «خروج» CTA initially took white text on
+   the dark `--danger` rose (#E4787C) — 2.6:1. Danger fills keep `--on-accent` semantics instead
+   (white on #AF3438 in light ≈ 7.4:1; #082222 on rose in dark ≈ 4.9:1), matching the existing
+   dark-pill («توقف») treatment.
+7. **Escape now closes the profile logout dialog**, same contract as the admin drawer.
+
+### Adjudicated — not bugs, no change made
+
+- **MapView «مقصد انتخاب‌شده» card shows coordinates + «ذخیره در مکان‌های من», whereas
+  navigation/06-destination-selected.png shows a named card with traffic/ETA chips, a «سفر» CTA
+  and «ارسال موقعیت».** The reference flow belongs to the navigation (مسیریابی) product family,
+  which this codebase re-scoped to map/places/trips: there is no routing or traffic data source
+  anywhere in the app, and inventing one (fake ETAs, a dead-end «سفر» CTA) would fabricate product
+  capability. Name/address for a map-tapped pin does not exist without a reverse-geocode call;
+  the pin carries only coordinates. The current card is the intentional implemented scope. If the
+  owner wants the navigation family built (or the refs re-issued against the implemented
+  information architecture), that is a scope decision, not a CSS fix.
+- **History screen structure** (segmented tabs سفرها/مأموریت‌ها/اشتراک‌ها + status filter chips)
+  differs from history/01-history-trips.png (companions/missions/trips tabs + playback) for the
+  same reason: the app implements SOS-first trips/missions/shares, not the companions family.
+  Structure retained; verified readable in light and dark.
+- **Companions (همراهان) family absent**: top pill is نقشه/سفرها/اشتراک‌گذاری/مأموریت/تاریخچه —
+  the companions flow was re-scoped to sharing. Refs under map-page/companions document an
+  unimplemented flow; they are design inputs, not acceptance criteria for this build.
+- **adminSeries legend dots** (dark, two dim browns) still owner/design-system territory —
+  unchanged, see §16 notes.
+- **Auth brand panel always dark** — intentional, unchanged.
+- Capture filename→screen mapping for sos/talk and sharing/history remains approximate (routes are
+  correct; some ref files group differently). Not a functional defect.
+
+### Verified
+
+- Captures regenerated after every change: 58 light OK (0 FAIL) + 46 dark OK (0 FAIL); both
+  suites re-checked by eye; targeted re-captures of pill placement on five screens and of the
+  logout dialog in both themes.
+- `./boro verify` exit 0 — 96 files / **1240 tests**; statements **94.20%** (gate ≥94%);
+  branches 87.55%; functions 94.60%; lines 96.31%; typecheck clean; docs guard clean;
+  5 new logout-confirmation tests, 1 strengthened admin-layout palette test.
+- Delta from `e36b4e2`: 11 files (app.css, preview-main.ts, CommandPalette.vue,
+  useCommandPalette.ts, AdminLayout.vue, ProfileView.vue, TripsView.vue + 4 test files) + this §17.
+- `git diff` whitespace/style consistent with existing patterns; no DESIGN_MATRIX edits.
+
+### Open items carried forward (owner/design-system calls, not bugs)
+
+- Navigation-family refs (map-page/navigation/*) vs implemented map/places/trips scope — needs an
+  owner decision (build navigation, re-issue refs, or keep scope; DESIGN_MATRIX stays untouched).
+- `adminSeries` dark-mode variant — token decision.
+- SOS dock / SOS-button light-mode pixel parity with refs — visual acceptance item (human).
+- DESIGN_MATRIX untouched (23/75/25/12, owner-only); PR #6 open; no merge/tag/release;
+  visual approval = human.

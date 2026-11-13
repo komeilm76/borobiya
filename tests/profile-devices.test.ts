@@ -337,6 +337,75 @@ describe('username editing', () => {
   });
 });
 
+describe('logout confirmation', () => {
+  it('opens the dialog on the logout button without ending the session yet', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="logout-button"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="logout-confirm"]').exists()).toBe(true);
+    expect(wrapper.find('[role="dialog"]').attributes('aria-modal')).toBe('true');
+    // Tapping logout must never strand an SOS responder on a mis-tap: nothing has been sent yet.
+    expect(calls.some((call) => call.path === '/_auth/logout')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('names the current device in the dialog', async () => {
+    stubApi();
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="logout-button"]').trigger('click');
+    await flushPromises();
+
+    expect(wrapper.find('.logout-confirm__device').text()).toContain('این مرورگر');
+    wrapper.unmount();
+  });
+
+  it('cancel and Escape both close without signing out', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="logout-button"]').trigger('click');
+
+    await wrapper.find('[data-testid="logout-confirm-cancel"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="logout-confirm"]').exists()).toBe(false);
+
+    await wrapper.find('[data-testid="logout-button"]').trigger('click');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(wrapper.find('[data-testid="logout-confirm"]').exists()).toBe(false);
+
+    expect(calls.some((call) => call.path === '/_auth/logout')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('scrim click closes without signing out', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="logout-button"]').trigger('click');
+    await wrapper.find('.logout-confirm__scrim').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="logout-confirm"]').exists()).toBe(false);
+    expect(calls.some((call) => call.path === '/_auth/logout')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('confirm calls the logout endpoint and navigates to the sign-in screen', async () => {
+    const calls = stubApi();
+    const { wrapper, router } = await render();
+    const navigations = vi.spyOn(router, 'push');
+    await wrapper.find('[data-testid="logout-button"]').trigger('click');
+    await wrapper.find('[data-testid="logout-confirm-accept"]').trigger('click');
+    await flushPromises();
+
+    expect(calls.some((call) => call.path === '/_auth/logout')).toBe(true);
+    expect(navigations).toHaveBeenCalledWith({ name: ROUTE_NAMES.login });
+    // The dialog closes in the `finally` after the push settles — that chain takes more than one tick.
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="logout-confirm"]').exists()).toBe(false));
+    wrapper.unmount();
+  });
+});
+
 describe('login history', () => {
   it('renders recent login attempts with success and failure state', async () => {
     const calls: Array<{ method: string; path: string }> = [];

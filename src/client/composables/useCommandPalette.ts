@@ -1,5 +1,12 @@
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, type Ref } from 'vue';
 import { useMagicKeys, whenever, useEventListener } from '@vueuse/core';
+
+/**
+ * Shared open-state for the global palette. Toolbar triggers outside the palette component
+ * (e.g. the admin topbar search button) set this flag; the global CommandPalette renders it.
+ * A module-level ref is deliberate: the palette is a singleton owned by App.vue.
+ */
+export const commandPaletteOpen = ref(false);
 
 /** One entry in the command palette. */
 export interface CommandEntry {
@@ -16,10 +23,12 @@ export interface CommandEntry {
  * with a single keydown listener rather than ad-hoc DOM queries.
  *
  * @param entries Commands available to the current role.
+ * @param openRef Optional shared open ref (defaults to a private one). Pass `commandPaletteOpen`
+ *                to let external triggers open the same palette.
  * @returns Reactive open state, filtered list and keyboard handlers.
  */
-export function useCommandPalette(entries: () => CommandEntry[]) {
-  const open = ref(false);
+export function useCommandPalette(entries: () => CommandEntry[], openRef?: Ref<boolean>) {
+  const open = openRef ?? ref(false);
   const query = ref('');
   const activeIndex = ref(0);
   const keys = useMagicKeys({ passive: false });

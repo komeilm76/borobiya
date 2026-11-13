@@ -9,6 +9,7 @@ import { useAuthStore } from '../src/client/stores/auth.ts';
 import { useRealtimeStore } from '../src/client/stores/realtime.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 import { HTTP_EVENTS } from '../src/shared/protocol.ts';
+import { commandPaletteOpen } from '../src/client/composables/useCommandPalette.ts';
 
 /**
  * The administrator shell is the only place that keeps the console live. It subscribes to realtime
@@ -287,10 +288,13 @@ describe('connection state', () => {
 describe('shortcuts and logout', () => {
   it('opens the command palette from the search button', async () => {
     const { wrapper } = await render();
+    commandPaletteOpen.value = false;
     await wrapper.find('.admin-search').trigger('click');
     await flushPromises();
-    // The palette renders itself; assert the trigger is wired rather than its internals.
-    expect(wrapper.find('.admin-search').attributes('aria-label')).toBe('جست‌وجوی فرمان');
+    // The trigger flips the shared open flag the global palette renders from — earlier it
+    // toggled a private empty instance, so the button visibly did nothing.
+    expect(commandPaletteOpen.value).toBe(true);
+    commandPaletteOpen.value = false;
     wrapper.unmount();
   });
 

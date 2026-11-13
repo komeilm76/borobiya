@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/auth.ts';
 import { useAdminStore } from '@/stores/admin.ts';
 import { useRealtimeStore } from '@/stores/realtime.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
-import { useCommandPalette } from '@/composables/useCommandPalette.ts';
+import { commandPaletteOpen } from '@/composables/useCommandPalette.ts';
 import AdminNav from '@/components/AdminNav.vue';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { HTTP_EVENTS } from '@shared/protocol.ts';
@@ -21,7 +21,6 @@ const auth = useAuthStore();
 const admin = useAdminStore();
 const realtime = useRealtimeStore();
 const motion = useMotionPreferences();
-const palette = useCommandPalette(() => []);
 /** Off-canvas navigation for small screens; the fixed sidebar is hidden below 1100px. */
 const navOpen = ref(false);
 
@@ -50,10 +49,6 @@ onUnmounted(() => {
 watch(() => route.name, () => { navOpen.value = false; });
 
 useEventListener(window, 'keydown', (event: KeyboardEvent) => {
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-    event.preventDefault();
-    palette.toggle();
-  }
   if (event.key === 'Escape') navOpen.value = false;
 });
 
@@ -75,7 +70,7 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
           <button type="button" class="admin-menu-button" :aria-expanded="navOpen" aria-controls="admin-drawer" aria-label="باز کردن منو" @click="navOpen = !navOpen">
             <span :class="['mdi', navOpen ? 'mdi-close' : 'mdi-menu']" aria-hidden="true" />
           </button>
-          <button type="button" class="admin-search" aria-label="جست‌وجوی فرمان" @click="palette.show()">
+          <button type="button" class="admin-search" aria-label="جست‌وجوی فرمان" @click="commandPaletteOpen = true">
             <span class="mdi mdi-magnify" aria-hidden="true" />
             <span>جستجوی کاربر، مأموریت یا حادثه…</span>
             <kbd>Ctrl K</kbd>

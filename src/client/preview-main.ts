@@ -38,10 +38,15 @@ const pill = document.createElement('div');
 pill.setAttribute('data-testid', 'preview-pill');
 pill.textContent = 'پیش‌نمایش با دادگان ساختگی';
 Object.assign(pill.style, {
-  position: 'fixed', bottom: '14px', insetInlineStart: '14px', zIndex: '10000',
+  // Bottom-left sat on top of the full-width bottom CTA in map mode (every map screen).
+  // The status-bar row is free in its middle, so pin the pill there — visible without
+  // covering any control. RTL-agnostic: physical `left: 50%` + translate.
+  position: 'fixed', top: '8px', left: '50%', zIndex: '10000',
+  transform: 'translateX(-50%)',
   background: '#AF3438', color: '#fff', fontSize: '11px', fontWeight: '700',
-  padding: '6px 10px', borderRadius: '999px', opacity: '0.92',
+  padding: '5px 10px', borderRadius: '999px', opacity: '0.9',
   fontFamily: 'Vazirmatn, system-ui, sans-serif', pointerEvents: 'none',
+  whiteSpace: 'nowrap',
   boxShadow: '0 2px 10px rgba(0,0,0,0.25)'
 } satisfies Partial<CSSStyleDeclaration>);
 document.body.appendChild(pill);

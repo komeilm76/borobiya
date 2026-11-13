@@ -199,7 +199,7 @@ const savedPlaces = computed<SavedPlaceView[]>(() => map.places);
     <h3 class="sheet__subtitle">سفرهای من</h3>
     <label class="share-field" style="display:flex;align-items:center;gap:8px">
       <input v-model="trips.savedOnly" type="checkbox" data-testid="trips-saved-filter" @change="() => trips.load()" />
-      <span>فقط ذخیره‌شده‌ها</span>
+      <span style="white-space:nowrap">فقط ذخیره‌شده‌ها</span>
     </label>
 
     <!-- Create -->

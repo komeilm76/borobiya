@@ -2,7 +2,7 @@
 import { computed, watch, nextTick, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useEventListener } from '@vueuse/core';
-import { useCommandPalette } from '@/composables/useCommandPalette.ts';
+import { useCommandPalette, commandPaletteOpen } from '@/composables/useCommandPalette.ts';
 import { useAuthStore } from '@/stores/auth.ts';
 import { useSosStore } from '@/stores/sos.ts';
 import { useSettingsStore } from '@/stores/settings.ts';
@@ -37,7 +37,7 @@ const palette = useCommandPalette(() => [
   { id: 'profile', label: 'نمایه و دستگاه‌ها', icon: 'account', group: 'حساب', run: () => router.push({ name: ROUTE_NAMES.profile }) },
   { id: 'theme', label: 'تغییر پوسته', icon: 'theme-light-dark', group: 'تنظیمات', run: () => settings.cycle() },
   { id: 'refresh', label: 'به‌روزرسانی داده‌ها', icon: 'sync', group: 'تنظیمات', run: () => void sos.load() }
-]);
+], commandPaletteOpen);
 
 const searchInput = ref<HTMLInputElement | null>(null);
 
