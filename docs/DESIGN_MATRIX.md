@@ -314,3 +314,38 @@ username), so the auth error path is not previewable; wrong-password rejection i
 server tests. Console/page/request sweeps of all 23 routes and the interactive flows (register
 validation, SOS wizard steps, history chips + reset, share search, job-type validation, device
 revoke toggle, toast dismissal, admin dispatch open, profile rename, talk press-hold) are clean.
+
+## Stage F third pass (2026-11-13) — defects found by inspection, no approvals
+
+A further bug hunt re-checked the completed pages (register/onboarding against the references,
+the admin users list against `users/01-list.png`, the SOS composer against the `sos/19` validation
+sheet, dark-mode rendering) and wired down what it found. No row flips status; visual approval
+remains a human call.
+
+Defects fixed:
+
+- **Register/onboarding security-question selects rendered dirty-but-blank** (`a752276`): the
+  model was seeded with empty strings, which Vuetify treats as a present-but-unknown selection,
+  so the placeholder and combobox affordance vanished. Slots are now `null`, mapped to `''` only
+  at the payload boundary so the server still sees five positions.
+- **Dark-mode map tiles rendered light** (`da43856`): `MapCanvas` rendered bare `<img>` tiles
+  while `app.css` scoped the dark filter (and sizing/`user-select`) to `.map-tile`, so the rule
+  never matched. The class is now applied; dark tiles verified by screenshot.
+- **Dead legacy design system in `app.css`** (`45d1d05`): ~400 lines of unreachable rules from a
+  superseded iteration removed (admin KPI/card/modal/stepper set, auth chrome, POI/overlay marker
+  classes, skeleton/shimmer, unused toast variants and keyframes). Verified: rebuild + all 46
+  captures re-taken and pixel-diffed against the pre-purge set — identical except the live
+  status-bar clock on map-shell pages. `v-*` runtime classes and the dynamically constructed
+  `toast--${tone}` variants are kept.
+
+Evaluated and deliberately not changed:
+
+- **SOS short description gates only at submit** (`sos/19` shows a disabled send button and a
+  blocker list). The disabled-submit direction is contradicted by `tests/sos-view.test.ts`, which
+  pins click-then-explain behavior (inline `VAlert` naming the 10-character minimum). Any change
+  here is a product decision, not a bug fix.
+- **`users/01-list.png` parity** (avatars, phone, last-login, bulk select, pagination, KPI
+  cards): remains recorded at `partial` rows 230–232; no code change implied.
+
+The demo-auth limitation stands: any credential logs in (persona follows the username), so the
+auth error path stays server-side-tested only.
