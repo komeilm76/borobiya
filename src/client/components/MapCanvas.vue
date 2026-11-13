@@ -223,7 +223,7 @@ const scaleLabel = computed(() => {
   block-size: 30px;
   border-radius: 50%;
   translate: -50% -50%;
-  color: #fff;
+  color: var(--on-accent);
   font-size: 16px;
   box-shadow: var(--shadow-sm);
 }
@@ -248,7 +248,7 @@ const scaleLabel = computed(() => {
   block-size: 22px;
   border-radius: 50%;
   background: var(--primary);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85);
 }
 .map-scale {

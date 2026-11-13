@@ -339,8 +339,8 @@ const savedPlaces = computed<SavedPlaceView[]>(() => map.places);
   font: inherit;
   padding: 8px 10px;
   border-radius: var(--r12, 12px);
-  border: 1px solid var(--border, #d8dedd);
-  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  background: var(--surface);
 }
 .trip-stop-list {
   display: grid;
@@ -349,10 +349,10 @@ const savedPlaces = computed<SavedPlaceView[]>(() => map.places);
   margin: 8px 0 12px;
 }
 .trip-stop-list small {
-  color: var(--muted, #66706f);
+  color: var(--muted);
   display: block;
 }
 .mdi-star.is-active {
-  color: var(--warning, #c78b1e);
+  color: var(--warning);
 }
 </style>

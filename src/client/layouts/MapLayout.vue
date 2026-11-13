@@ -418,7 +418,7 @@ async function logout(): Promise<void> {
   padding: 10px 14px;
   border-radius: var(--r16);
   background: var(--warning);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
 }
 @media (prefers-reduced-motion: reduce) {

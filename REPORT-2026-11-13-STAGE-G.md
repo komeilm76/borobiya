@@ -485,3 +485,64 @@ new features; DESIGN_MATRIX unchanged; PR stays open; visual approval remains th
 - Token conflict (`--success`/`--warning` map-vs-admin) remains the owner's decision (§4/d5d78a5).
 - DESIGN_MATRIX untouched; PR #6 open and unmerged; no tag/release; visual approval = human.
 - Other admin screens at ≤620px not re-inspected (only SupportRequests verified) — flagged, not claimed done.
+
+## §16 — Eighth pass (2026-11-13, continued): dark-theme contrast sweep
+
+Scope: user-reported "texts inside tabs or buttons in dark mode is not visible" and
+"titles & fields and content in dark mode have wrong color". Full token audit plus a fresh
+46-capture dark suite (all 23 pages × desktop/mobile, prefers-color-scheme: dark); every capture
+was opened and inspected, not just computed.
+
+### Root causes fixed
+
+1. **Vuetify's dark theme was never activated.** `borobiyaDark` existed in `plugins/vuetify.ts`
+   but nothing ever assigned it, so every Vuetify control in the admin console (tables, text
+   fields, buttons, chips, dialogs) stayed light while the custom shell around it went dark —
+   the "titles & fields & content have the wrong color" report. `App.vue` now follows
+   `settings.resolvedTheme` and calls `vuetifyTheme.change('borobiyaDark' | 'borobiyaLight')`
+   (watch, `immediate: true`). Verified: admin Users table, Settings form, Groups form,
+   SupportRequests filters/cards, palette and drawer all render dark with readable on-surface
+   ink; light mode unchanged. (First implementation used the deprecated
+   `theme.global.name.value =` setter — warning seen in tests — replaced with `change()`.)
+2. **White text on dark-mode accent fills.** Dark accents are light pastels (`--primary`
+   #71C7BE, `--danger` #E4787C, `--warning` #D7A44D, `--info` #73B1C8), so `color: #fff`
+   failed contrast on exactly the "tabs and buttons". New `--on-accent` token
+   (light `#FFFFFF` / dark `#082222`); all accent-fill text switched to it:
+   `.primary-button`, `.primary-button--danger`, `.top-pill__item.is-active`, `.user-marker__dot`
+   (app.css and MapCanvas), `.sos-button`, `.rail__step.is-done i`, `.skip-link`,
+   `.history-chip.is-active`, `.history-tab.is-active`, `.talk-button`, `.offline-banner`,
+   `.track-rec__stop`, `.admin-nav__badge`, `.map-marker*`. Three redundant per-component dark
+   overrides deleted (now covered by the token). `.sos-button__progress` now `currentColor`.
+3. **`--primary-deep` used as foreground text.** In dark it is `#0A3D3D`, i.e. dark-on-dark.
+   Rendered «درخواست‌های من ۴» (History subtab) and the active «در انتظار بررسی» filter in the
+   support-request review queue effectively invisible — the exact reported bug. All five uses
+   (`.history-subtab.is-active`, `.admin-filter.is-active`, `.team-requirement.is-filled`,
+   `.support-item__approved`, `.support-review__selected.is-ok`) now use `var(--primary)`.
+4. **Hex fallbacks carrying light-only values.** `var(--muted-ink, #4C5F60)` (trips/share rows,
+   dispatch labels), `var(--warning, #c78b1e)`, `var(--border, #d8dedd)`, `var(--surface, #fff)`,
+   `var(--muted, #66706f)`, `var(--primary-soft, #eef4f3)` — all now reference the tokens alone,
+   which flip correctly in dark.
+5. **Sparkline stroke** on the overview trend chart hard-coded `#0E6666` (seriesColors[0]) —
+   invisible on the dark panel. Now `stroke="var(--primary)"` (identical #0E6666 in light).
+   The canonical `adminSeries` legend dots keep the frozen design-system hexes (labels/numbers
+   carry the data; see notes).
+
+### Verified
+
+- Captures regenerated: 58 light OK (0 FAIL) + 46 dark OK (0 FAIL); both suites re-checked by eye.
+  Light regressions spot-checked (sos/history/mission/adminOverview — all unchanged).
+- Dark palette (Ctrl+K) and dark mobile admin drawer rendered and inspected: fully readable.
+- `./boro verify` exit 0 — 96 files / 1235 tests; statements 94.03% (gate ≥94%); typecheck clean;
+  docs guard clean. (Statement coverage moved 94.09% → 94.03% with the App.vue theme watch, still
+  above the gate.)
+- Commits: this section lands with the eighth pass commit; PR #6 stays open, CI re-checked after push.
+
+### Notes / not changed
+
+- `DESIGN_TOKENS.adminSeries` (chart legend dots) is the frozen design-system series; two of the
+  five dark-brown dots are dim on the dark panel but sit next to labels and values. If the owner
+  wants a dark-mode series variant, that is a design-system decision (token change), not a CSS patch.
+- Auth brand panel is intentionally always-dark (constant teal) in both themes — unchanged.
+- Map tiles dark filter (`brightness/saturate/hue-rotate`) unchanged — visual acceptance item.
+- Consent prompt still has no preview-fixture trigger; unchanged (`--surface`/`--muted` fixed earlier).
+- DESIGN_MATRIX untouched; PR #6 open; no merge/tag/release; visual approval = human.

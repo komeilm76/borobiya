@@ -65,7 +65,7 @@ onMounted(async () => {
         <svg class="sparkline" viewBox="0 0 220 60" preserveAspectRatio="none" role="img" aria-label="روند درخواست‌ها">
           <line x1="0" y1="14" x2="220" y2="14" />
           <line x1="0" y1="36" x2="220" y2="36" />
-          <polyline :points="sparklinePoints(trend.map((item) => item.value))" fill="none" :stroke="seriesColors[0]" stroke-width="2.5" stroke-linecap="round" />
+          <polyline :points="sparklinePoints(trend.map((item) => item.value))" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" />
         </svg>
         <ul class="legend">
           <li v-for="(item, index) in trend" :key="item.label">

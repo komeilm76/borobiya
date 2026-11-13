@@ -127,7 +127,7 @@ async function logout(): Promise<void> {
 }
 .admin-nav__item:hover { background: var(--surface-3); }
 .admin-nav__item.is-active { background: var(--primary-soft); color: var(--primary); font-weight: 600; }
-.admin-nav__badge { margin-inline-start: auto; background: var(--danger); color: #fff; border-radius: 999px; padding: 0 7px; font-size: 11px; }
+.admin-nav__badge { margin-inline-start: auto; background: var(--danger); color: var(--on-accent); border-radius: 999px; padding: 0 7px; font-size: 11px; }
 .admin-sidebar__footer { margin-block-start: auto; display: grid; gap: 4px; }
 .admin-link-button {
   display: flex;

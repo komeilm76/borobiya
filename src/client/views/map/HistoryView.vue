@@ -541,7 +541,7 @@ function starRow(rating: number): number[] {
 .history-chip.is-active {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-accent);
 }
 .history-summary {
   margin: 0;
@@ -571,7 +571,7 @@ function starRow(rating: number): number[] {
 }
 .history-tab.is-active {
   background: var(--primary);
-  color: #fff;
+  color: var(--on-accent);
 }
 .history-subtabs {
   display: grid;
@@ -581,7 +581,7 @@ function starRow(rating: number): number[] {
 }
 .history-subtab {
   padding: 8px 4px;
-  border: 1px solid var(--border, #d8dedd);
+  border: 1px solid var(--border);
   border-radius: var(--r12, 12px);
   background: transparent;
   color: var(--muted);
@@ -592,8 +592,8 @@ function starRow(rating: number): number[] {
 }
 .history-subtab.is-active {
   border-color: var(--primary);
-  color: var(--primary-deep, var(--primary));
-  background: var(--primary-soft, #eef4f3);
+  color: var(--primary);
+  background: var(--primary-soft);
 }
 .history-row--column {
   flex-direction: column;
@@ -662,7 +662,7 @@ function starRow(rating: number): number[] {
   display: flex;
   align-items: center;
   gap: 2px;
-  color: var(--warning, #c78b1e);
+  color: var(--warning);
 }
 .history-rating span:last-child {
   color: var(--muted);
@@ -670,6 +670,6 @@ function starRow(rating: number): number[] {
   margin-inline-start: 6px;
 }
 .mdi-star.is-active {
-  color: var(--warning, #c78b1e);
+  color: var(--warning);
 }
 </style>

@@ -70,7 +70,7 @@ async function stop(): Promise<void> {
 .track-rec__stop {
   border: 0;
   background: var(--danger);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: 999px;
   padding: 2px 10px;
   font-size: 11px;

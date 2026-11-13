@@ -126,7 +126,7 @@ onUnmounted(() => {
   border: 0;
   border-radius: var(--r20);
   background: var(--primary);
-  color: #fff;
+  color: var(--on-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

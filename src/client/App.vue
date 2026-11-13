@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { useTheme } from 'vuetify';
 import { useSettingsStore } from '@/stores/settings.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 import AppToastHost from '@/components/AppToastHost.vue';
@@ -16,6 +17,9 @@ import AdminLayout from '@/layouts/AdminLayout.vue';
 const route = useRoute();
 const settings = useSettingsStore();
 const motion = useMotionPreferences();
+/** Vuetify keeps its own theme object; it must follow the app's resolved theme or every
+ * Vuetify control (admin tables, fields, buttons, dialogs) stays light while the shell is dark. */
+const vuetifyTheme = useTheme();
 
 const layout = computed(() => String(route.meta.layout ?? 'auth'));
 
@@ -31,6 +35,7 @@ watch(
   () => settings.resolvedTheme,
   (value) => {
     document.documentElement.setAttribute('data-theme', value);
+    vuetifyTheme.change(value === 'dark' ? 'borobiyaDark' : 'borobiyaLight');
   },
   { immediate: true }
 );
