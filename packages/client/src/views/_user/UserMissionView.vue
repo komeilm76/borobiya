@@ -249,7 +249,7 @@
         <div v-else-if="navigation.active.value" class="mission-desk__guidance mission-desk__guidance--active" role="status">
           <span class="mission-desk__guidance-symbol" aria-hidden="true"><v-icon icon="mdi-navigation-variant" /></span>
           <div class="mission-desk__guidance-copy">
-            <strong>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'در مسیر محل حادثه' : 'دنبال‌کردن GPS متوقف است' }}</strong>
+            <strong>{{ !navigation.fix.value ? 'راهبری فعال · در انتظار GPS' : followingGps ? 'راهبری GPS فعال است' : 'دنبال‌کردن نقشه متوقف است' }}</strong>
             <small v-if="routing.selectedRoute.value">{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }} مسیر برنامه‌ریزی‌شده · زمان رسیدن زنده در دسترس نیست</small>
           </div>
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
@@ -970,7 +970,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__stage-track .mission-desk__stage--reached { background: rgb(var(--v-theme-primary)); }
 .mission-desk__map-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 .mission-desk__guidance {
-  position: absolute; z-index: 7; top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  position: absolute; z-index: 7; top: calc(5.75rem + env(safe-area-inset-top, 0px));
   left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .5rem;
   width: max-content; max-width: calc(100vw - 1.5rem); padding: .35rem .6rem;
   border-radius: var(--bb-radius-nested, 16px); color: rgb(var(--v-theme-on-surface));
@@ -1046,9 +1046,17 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
   .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
-  .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
-  .mission-desk__guidance--warning { flex-wrap: wrap; }
-  .mission-desk__guidance--warning span { flex: 1 1 100%; }
+  /* Keep warning actions visible even when a long error needs scrolling. The
+     message scrolls independently; Stop never disappears inside that scroll. */
+  .mission-desk__guidance--warning {
+    max-height: max(3.5rem, min(12rem, calc(100dvh - 25.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    overflow: hidden;
+  }
+  .mission-desk__guidance--warning span {
+    flex: 1 1 0; max-height: max(1.5rem, min(10rem, calc(100dvh - 27.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  .mission-desk__guidance--warning :deep(.v-btn) { min-height: 44px; height: auto; }
   /* Same right-hand 48px slots as the phone map, including side cutouts. */
   .mission-desk :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
@@ -1073,17 +1081,32 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     flex-direction: row;
   }
 }
-@media (max-width: 599px) and (max-height: 360px) {
-  /* On very short phones a tall rail meets the heading/guidance. Spread the
-     controls across the right edge instead; the open-sheet row stays lower. */
+@media (max-width: 599px) and (max-height: 560px) {
+  /* A 560px phone cannot fit the taller mission heading, guidance and a
+     vertical rail. Put its controls in the open band above the dock/SOS. */
   .mission-desk:not(.mission-desk--tool-open) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(7.75rem + env(safe-area-inset-right, 0px));
-    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
   .mission-desk:not(.mission-desk--tool-open) .mission-desk__map-focus {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
-    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
+  }
+  .mission-desk__guidance--warning {
+    top: calc(5.25rem + env(safe-area-inset-top, 0px));
+    max-height: max(3.5rem, min(12rem, calc(100dvh - 14.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk__guidance--warning span {
+    max-height: max(1.5rem, min(10rem, calc(100dvh - 16.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk__guidance--active { top: calc(5.25rem + env(safe-area-inset-top, 0px)); }
+  .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
+  /* Keep the complete safety copy available to assistive tech, while the
+     visible short-phone banner shows its state and real Stop action. */
+  .mission-desk__guidance--active .mission-desk__guidance-copy small {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
 }
 @media (max-width: 599px) {

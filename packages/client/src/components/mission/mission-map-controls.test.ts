@@ -76,8 +76,8 @@ describe("mission map controls", () => {
     expect(phone).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('.mission-desk--tool-open .mission-desk__map-focus');
     expect(phone).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
-    expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 360px)');
-    expect(viewStyle).toContain('bottom: calc(9rem + env(safe-area-inset-bottom, 0px));');
+    expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 560px)');
+    expect(viewStyle).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
   });
@@ -91,7 +91,7 @@ describe("mission map controls", () => {
     expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
     expect(network).toContain('width: 44px; height: 44px;');
     const idle = css.lastIndexOf('.mission-desk:not(.mission-desk--active) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {');
-    expect(idle).toBeGreaterThan(css.indexOf('@media (max-width: 599px) and (max-height: 360px)'));
+    expect(idle).toBeGreaterThan(css.indexOf('@media (max-width: 599px) and (max-height: 560px)'));
     const rule = css.slice(idle, css.indexOf('}', idle));
     expect(rule).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
     expect(rule).toContain('right: calc(4rem + env(safe-area-inset-right, 0px));');
