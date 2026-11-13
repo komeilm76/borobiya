@@ -78,22 +78,60 @@
               </v-alert>
               <template v-if="routing.target.value">
                 <div v-if="routeSection === 'plan'" class="mission-route__endpoints" aria-label="مبدأ و مقصد">
-                  <div><small>مبدأ</small><span>{{ routing.from.value ? 'موقعیت ثبت‌شده برای مسیریابی' : 'پس از دریافت موقعیت مشخص می‌شود' }}</span></div>
-                  <div><small>مقصد</small><span>محل حادثه <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi></span></div>
+                  <div class="mission-route__endpoint">
+                    <span class="mission-route__endpoint-mark" aria-hidden="true">۱</span>
+                    <div><small>مبدأ مسیر</small><strong>{{ routing.from.value ? 'موقعیت ثبت‌شده برای مسیریابی' : 'پس از دریافت موقعیت مشخص می‌شود' }}</strong>
+                      <bdi v-if="routing.from.value" dir="ltr">{{ routing.from.value.lat.toFixed(5) }}, {{ routing.from.value.lon.toFixed(5) }}</bdi>
+                    </div>
+                  </div>
+                  <div class="mission-route__endpoint">
+                    <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">۲</span>
+                    <div><small>مقصد نهایی</small><strong>محل حادثه</strong>
+                      <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
+                    </div>
+                  </div>
+                </div>
+                <section v-if="routeSection === 'plan'" class="mission-route__decision" aria-label="گام بعدی مسیر">
+                  <template v-if="routing.selectedRoute.value">
+                    <div class="mission-route__decision-heading">
+                      <v-icon icon="mdi-map-check-outline" size="22" aria-hidden="true" />
+                      <div><strong>مسیر آماده است</strong><small>{{ transportProfiles.find(item => item.value === routing.profile.value)?.title }} · مسیر {{ (routing.selectedIndex.value + 1).toLocaleString('fa-IR') }} از {{ routing.routes.value.length.toLocaleString('fa-IR') }}</small></div>
+                    </div>
+                    <div class="mission-route__metrics" aria-label="برآورد سفر">
+                      <div><span>مسافت</span><strong>{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }}</strong></div>
+                      <div><span>زمان تقریبی سفر</span><strong>{{ formatRouteDuration(routing.selectedRoute.value.duration_s) }}</strong></div>
+                    </div>
+                    <div class="mission-route__navigation">
+                      <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
+                        prepend-icon="mdi-navigation" :disabled="!mapReady" @click="startGuidance">شروع راهبری</v-btn>
+                      <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
+                        @click="stopGuidance">توقف راهبری</v-btn>
+                      <p v-if="navigation.active.value" role="status" class="text-caption mb-0">
+                        {{ !navigation.fix.value ? 'در انتظار موقعیت تازهٔ GPS…' : followingGps ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'دوربین روی نمای انتخابی شماست؛ برای دنبال‌کردن دوبارهٔ GPS، دکمهٔ موقعیت را بزنید.' }}
+                      </p>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="mission-route__decision-heading">
+                      <v-icon icon="mdi-map-marker-path" size="22" aria-hidden="true" />
+                      <div><strong>گام بعدی: دریافت مسیر</strong><small>مبدأ فقط پس از درخواست شما از GPS گرفته می‌شود.</small></div>
+                    </div>
+                    <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value" :disabled="navigation.active.value"
+                      @click="routing.findRoutes()">{{ routing.from.value ? 'محاسبهٔ دوبارهٔ مسیر' : 'دریافت موقعیت و مسیر' }}</v-btn>
+                  </template>
+                </section>
+                <v-alert v-if="routeSection === 'plan' && navigation.error.value" type="warning" variant="tonal" role="alert" class="my-3">
+                  {{ navigation.error.value }}
+                </v-alert>
+                <div v-if="routeSection === 'plan' && routing.from.value && !navigation.active.value" class="mission-route__route-actions d-flex flex-wrap ga-2">
+                  <v-btn v-if="routing.selectedRoute.value" color="primary" variant="tonal" rounded="lg"
+                    :disabled="routing.loading.value" @click="routing.findRoutes()">محاسبهٔ دوبارهٔ مسیر</v-btn>
+                  <v-btn color="primary" variant="tonal" rounded="lg"
+                    :disabled="routing.loading.value" @click="routing.findRoutes(true)">به‌روزرسانی مبدأ</v-btn>
                 </div>
                 <div v-if="routeSection === 'plan'" class="mission-route__section-links" role="group" aria-label="تنظیمات مسیر">
                   <button type="button" :disabled="navigation.active.value" @click="openTransportSection"><v-icon icon="mdi-car-multiple" /><span><strong>انتخاب وسیلهٔ دیگر</strong><small>{{ transportProfiles.find(item => item.value === routing.profile.value)?.title }}</small></span><v-icon icon="mdi-chevron-left" /></button>
                   <button type="button" :disabled="!routing.routes.value.length || navigation.active.value" @click="openAlternativesSection"><v-icon icon="mdi-routes" /><span><strong>انتخاب مسیر دیگر</strong><small>{{ routing.routes.value.length ? `مسیر ${(routing.selectedIndex.value + 1).toLocaleString('fa-IR')} از ${routing.routes.value.length.toLocaleString('fa-IR')}` : 'پس از دریافت مسیر' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
-                </div>
-                <div v-if="routeSection === 'plan'" class="mission-route__route-actions d-flex flex-wrap ga-2">
-                  <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value" :disabled="navigation.active.value"
-                    @click="routing.findRoutes()">{{ routing.from.value ? 'محاسبهٔ دوبارهٔ مسیر' : 'دریافت موقعیت و مسیر' }}</v-btn>
-                  <v-btn v-if="routing.from.value" color="primary" variant="tonal" rounded="lg"
-                    :disabled="routing.loading.value || navigation.active.value" @click="routing.findRoutes(true)">به‌روزرسانی مبدأ</v-btn>
-                </div>
-                <div v-if="routeSection === 'plan' && routing.selectedRoute.value" class="mission-route__metrics" aria-label="برآورد سفر">
-                  <div><span>مسافت</span><strong>{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }}</strong></div>
-                  <div><span>زمان تقریبی سفر</span><strong>{{ formatRouteDuration(routing.selectedRoute.value.duration_s) }}</strong></div>
                 </div>
                 <details v-if="routeSection === 'plan'" class="mission-route__stops" @toggle="onWaypointDisclosureToggle">
                   <summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)
@@ -141,6 +179,9 @@
                     @update:model-value="focusRouteStep(Number($event))" />
                   <p role="status">{{ currentStopLabel }}</p>
                 </div>
+                <p v-if="routeSection === 'alternatives'" class="mission-route__preview-note" role="status">
+                  لمس هر مسیر فقط پیش‌نمایش آن را روی نقشه نشان می‌دهد؛ برای نگه‌داشتن آن، «تأیید این مسیر» را بزنید. بازگشت، مسیر قبلی را نگه می‌دارد.
+                </p>
                 <div v-if="routeSection === 'alternatives' && routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
                   <button v-for="(choice, index) in routing.routes.value" :key="index" type="button"
                     class="mission-route__choice" :class="{ 'mission-route__choice--selected': routing.selectedIndex.value === index }"
@@ -167,18 +208,6 @@
                   <v-btn color="primary" variant="flat" rounded="lg" @click="acceptAlternative">تأیید این مسیر</v-btn>
                   <v-btn color="primary" variant="text" rounded="lg" @click="closeRouteSection()">بازگشت بدون تغییر</v-btn>
                 </div>
-                <div v-if="routeSection === 'plan' && routing.selectedRoute.value" class="mission-route__navigation">
-                  <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
-                    prepend-icon="mdi-navigation" :disabled="!mapReady" @click="startGuidance">شروع راهبری</v-btn>
-                  <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
-                    @click="stopGuidance">توقف راهبری</v-btn>
-                  <p v-if="navigation.active.value" role="status" class="text-caption mb-0">
-                    {{ !navigation.fix.value ? 'در انتظار موقعیت تازهٔ GPS…' : followingGps ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'دوربین روی نمای انتخابی شماست؛ برای دنبال‌کردن دوبارهٔ GPS، دکمهٔ موقعیت را بزنید.' }}
-                  </p>
-                </div>
-                <v-alert v-if="navigation.error.value" type="warning" variant="tonal" role="alert" class="mt-3">
-                  {{ navigation.error.value }}
-                </v-alert>
                 <p v-if="routeSection === 'plan' && routing.routes.value.length === 1" class="text-caption mt-2" role="status">
                   برای این وسیله فقط یک مسیر در شبکهٔ راه‌های محلی پیدا شد؛ وجود چند مسیر تضمین نمی‌شود.
                 </p>
@@ -756,10 +785,31 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-route__emblem { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-primary), .15); color: rgb(var(--v-theme-primary)); }
 .mission-route__header :deep(.v-btn) { flex: none; min-width: 40px; }
 .mission-route__header h2 { margin: 0; font-size: 1.08rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mission-route__endpoints { display: grid; gap: .65rem; margin-bottom: 1rem; padding-inline-start: .75rem; border-inline-start: 2px solid rgb(var(--v-theme-primary)); }
-.mission-route__endpoints > div { display: grid; grid-template-columns: 3.7rem minmax(0, 1fr); align-items: baseline; gap: .5rem; font-size: .85rem; }
-.mission-route__endpoints small { color: rgb(var(--v-theme-primary)); font-weight: 800; }
-.mission-route__endpoints span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-route__endpoints { display: grid; gap: .45rem; margin-bottom: .85rem; }
+.mission-route__endpoint { display: flex; align-items: center; gap: .7rem; min-width: 0; padding: .55rem .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.mission-route__endpoint-mark { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); font-size: .9rem; font-weight: 800; }
+.mission-route__endpoint-mark--incident { border-radius: 10px; background: rgb(var(--v-theme-error)); color: rgb(var(--v-theme-on-error)); }
+.mission-route__endpoint > div { display: grid; gap: 1px; min-width: 0; font-size: .85rem; line-height: 1.45; }
+.mission-route__endpoints small { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
+.mission-route__endpoints strong { font-weight: 700; }
+.mission-route__endpoints bdi { overflow-wrap: anywhere; }
+.mission-route__decision {
+  display: grid; gap: .65rem; margin: .8rem 0; padding: .85rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  background: var(--bb-color-inset);
+}
+.mission-route__decision-heading { display: flex; align-items: flex-start; gap: .6rem; min-width: 0; }
+.mission-route__decision-heading > :deep(.v-icon) { flex: none; color: rgb(var(--v-theme-primary)); }
+.mission-route__decision-heading > div { display: grid; gap: 2px; min-width: 0; }
+.mission-route__decision-heading strong { font-size: .94rem; }
+.mission-route__decision-heading small { font-size: .8rem; line-height: 1.5; }
+.mission-route__decision :deep(.v-btn) { width: 100%; max-width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; text-align: center; }
+.mission-route__decision :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.mission-route__decision .mission-route__metrics { margin: 0; }
+.mission-route__decision .mission-route__metrics > div { background: rgb(var(--v-theme-surface)); }
+.mission-route__decision .mission-route__navigation { display: grid; gap: .4rem; margin: 0; }
+.mission-route__decision .mission-route__navigation p { margin: 0; }
+.mission-route__preview-note { margin: .85rem 0 0; padding: .75rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); font-size: .82rem; line-height: 1.6; }
 .mission-route__section-links { display: grid; gap: .5rem; margin: 1rem 0; }
 .mission-route__section-links button { display: flex; align-items: center; gap: .65rem; width: 100%; min-height: 54px; padding: .55rem .7rem; text-align: start; font: inherit; cursor: pointer; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); }
 .mission-route__section-links button > span { flex: 1; display: grid; min-width: 0; }
