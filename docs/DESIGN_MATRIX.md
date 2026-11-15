@@ -18,7 +18,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | 01-login.png | partial | P2/M | Functional (Vuetify card, typed server errors, role redirect). Missing designed top bar, back-to-home, heading/icon lockup, floating labels, social/quick sign-in variants; demo-account panel is a code-only extra. |
-| 02-login-empty.png | missing | P2/L | No dedicated empty-state composition; form renders plainly. |
+| 02-login-empty.png | missing | P2/L | The empty-state contract ships on the login screen (submit disabled with an explicit note until both fields carry a value); the designed empty-state composition is not built. See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | 03-register.png | partial | P2/M | Five catalog-backed security questions implemented and re-validated server-side; simpler styling than the design (strength hints, show-password row, numbered question cards with dropdowns exist in code but differ visually). |
 | 04-register-error.png | partial | P2/L | Inline `VAlert` covers the error; no designed inline-field error presentation. |
 | 05-recovery-account.png | partial | P2/M | Three-step recovery (account, questions, password) exists client+server; simpler visual treatment. |
@@ -28,7 +28,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | 09-recovery-password.png | partial | P2/L | Implemented; simplified UI. |
 | 10-recovery-done.png | partial | P2/L | Completion screen is minimal vs design. |
 | 11-onboarding.png | partial | P2/L | Security-question onboarding implemented (`auth/09…`, `/_auth/onboarding`); simplified UI. |
-| 12-onboarding-loading.png | missing | P2/L | No dedicated loading state. |
+| 12-onboarding-loading.png | missing | P2/L | The forced onboarding screen now shows its loading composition (informational banner, five skeleton rows, disabled CTA) and an inline error with retry on catalog failure. See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | 13-anatomy.png | reference | — | Layout anatomy sheet for the auth family. |
 | 14-states.png | reference | — | Auth states overview sheet. |
 | 15-dark.png | partial | P2/L | Dark theme exists via system preference + cycle; auth surface not verified against the dark reference. |
@@ -94,7 +94,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/04-sos-location-picker.png | partial | P2/H | Step 2 now supports tap-to-place manual incident pin (arm button, crosshair cursor, tap on canvas drops the pin, dashed alarm marker, review shows "manual", recovery button re-adopts GPS fix and clears the flag). `isManual` and a zero accuracy flow to the server and render on the offer/review surfaces. Not designed: drag-to-adjust, reverse-geocoded address of the pin. |
 | sos/05-sos-photo.png | done | P1/C | Browser pipeline: validate (jpeg/png/webp, 15 MB ceiling), decode, downscale to ≤1280px, re-encode JPEG along a quality ladder, subject to the server's 160000-char wire cap (~119,981 B effective — the designed 128 KB target is not reachable under that cap). Retryable error state with Persian copy; submit-time size guard; picker resets for re-pick. |
 | sos/06-sos-review.png | done | P2/M | Review step submits to the API; disabled state + inline error surface. |
-| sos/07-sos-sending.png | missing | P2/M | No sending progress surface (only a disabled button while submitting). |
+| sos/07-sos-sending.png | missing | P2/M | A full-screen sending dialog renders while the SOS is mid-submit (heading, staged request steps, photo/note lines only when staged, no fake progress). See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | sos/08-sos-pending.png | missing | P2/M | No dedicated pending surface; the mission rail approximates it. |
 | sos/09-sos-dispatched.png | missing | P2/M | No dedicated dispatched surface. |
 | sos/10-sos-rescuer-en-route.png | missing | P2/M | No en-route surface/ETA (ETA needs routing data — superseded area; a status-only surface remains possible). |
@@ -103,7 +103,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/13-sos-cancel-reason.png | done | P1/C | Mission view offers the requester an inline cancel panel: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. |
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
 | sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with a remove-photo button or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
-| sos/16-sos-offline.png | missing | P2/M | Only a generic offline banner; no SOS-specific offline guidance/queueing stance. |
+| sos/16-sos-offline.png | missing | P2/M | The SOS composer now carries its offline stance: an explicit no-SOS-reaches-the-center card (no offline queue exists, last catalog sync shown where known) and a disabled, relabelled send button on review while the link is down. See Stage H review log. Status stays `missing`. |
 | sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, day-grouped date, tracked-code, Persian status label); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | partial | P2/M | Expandable per-request detail in HistoryView: description, tracking code, manual-fix flag, severity, and the server-held status timeline from `GET /_user/sos/:id`; not the designed full-screen detail. |
 | sos/19-sos-validation.png | partial | P2/L | Inline validation exists (10–500 description, Persian messages); designed field-level presentation absent. |
@@ -125,13 +125,13 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | mission/10-mission-in-progress.png | partial | P2/L | Start/complete implemented. |
 | mission/11-support-request.png | partial | P2/M | Support requests exist end to end (leader composer, pending list, administrator review with full/partial/reject decisions and a staffing picker); the designed sheet presentation is absent. |
 | mission/12-support-pending.png | partial | P2/M | Pending requests render in the leader's support panel with a two-step withdrawal; the designed pending surface is absent. |
-| mission/13-support-accepted-notification.png | missing | P2/M | Depends on the above. |
+| mission/13-support-accepted-notification.png | missing | P2/M | The mission page's support panel renders the review outcome as an explicit notice (approved / partially approved / rejected with the server's reason codes). See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | mission/14-team-leader-dashboard.png | partial | P2/M | Team leadership is a mission-scoped designation (roles unchanged: user, responder, admin); the leader sees the team panel with roster, composition progress and the support-request composer. The designed dashboard is absent. |
 | mission/15-mission-cancel.png | done | P1/H | Assigned responder (or admin) gets an inline mission-cancel panel on the mission card: optional note for the requester, confirmation step, `progress('cancel')` through the state machine, conflict surfaced, authoritative reload afterwards. |
 | mission/16-mission-report.png | partial | P2/M | Rating accepts an optional report note (≤200 chars) via a textarea on the rating block; stored in `missions.rating_note`, served on the mission projection and embedded mission, shown on the mission card after rating. Designed full report form absent. |
 | mission/17-mission-completed.png | partial | P2/M | Completed missions reachable; card shows Persian status label, recorded rating and the saved rating note. No designed completion/report surface. |
 | mission/18-mission-no-offer.png | done | P2/M | Empty-offer state for responders with no offers/mission/request: explanation + refresh button (re-fetches catalogs, lists and offers). No radius control (server has no radius concept). |
-| mission/19-mission-offline.png | missing | P2/M | Generic offline banner only. |
+| mission/19-mission-offline.png | missing | P2/M | The mission page now shows an offline card in place of the offers list (wifi-off glyph, wall-clock of the last successful catalog/list sync where known, retry that re-pulls). See Stage H review log. Status stays `missing`. |
 
 ## Mobile map — history (11)
 
@@ -175,7 +175,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | profile/03-login-history.png | partial | P2/M | Last-8/last-50 login events (device, IP, success/fail, time) render on the profile screen from `GET /_user/logins`; designed full-screen history page not built. |
 | profile/04-active-devices.png | done | P2/L | List + revoke implemented with current-session protection. |
 | profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |
-| profile/06-logout-confirm.png | missing | P2/L | Logout is one control elsewhere; no confirmation sheet. |
+| profile/06-logout-confirm.png | missing | P2/L | A confirmation dialog replaced the one-tap logout on the profile flow (title, account-safety body, current-device rows where known, danger accept, scrim/Escape). Status stays `missing` pending human visual acceptance. |
 | profile/07-map-entry.png | partial | P2/L | Role-aware landing works; designed entry composition absent. |
 | profile/08-bookmarks.png | partial | P2/H | Stage C review found the saved-places UI shipped: the profile screen lists saved places with per-place inline edit (name, label, address, icon) and delete; server CRUD + store are used. The designed dedicated bookmarks screen (search, reorder, groups) is absent; reorder remains API-only. |
 | profile/09-bookmark-edit.png | partial | P2/M | Inline edit panel per saved place on the profile screen (name, label, address, icon; full PATCH with preserved rank). The designed dedicated edit screen is absent. |
@@ -200,7 +200,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| admin-panel/states/01-loading.png | missing | P3/M | No skeletons anywhere in the console. |
+| admin-panel/states/01-loading.png | missing | P3/M | Console-wide first-load skeletons now ship (users, overview, reports, alerts, groups, audit, dispatch, job types, incident types, support requests, settings and the system-health panel); the skeleton geometry is a generic row batch, not screen-specific layouts. See Stage H review log. Status stays `missing`. |
 | admin-panel/states/02-empty.png | partial | P3/L | Plain empty texts per view. |
 | admin-panel/states/03-error.png | partial | P3/M | Inline error only on overview; no retry pattern elsewhere. |
 | admin-panel/states/04-offline.png | missing | P3/M | The admin shell now shows a dark offline banner (wifi-off glyph, last clean `loadAll` wall-clock where known, retry that re-pulls every admin projection). Per-panel staleness was not invented (no per-panel freshness model). See Stage H review log. Status stays `missing`. |
