@@ -760,7 +760,7 @@ those branches). Docs guard clean; build, `tsc`, `vue-tsc` and all packaging ste
   server's actual reason codes, surfaced in the mission page's support panel. Event-honest subset only.
 
 **Verification:** `./boro verify` exit **0** — 1345 tests passed (was 1297 at the start of this continuation),
-coverage statements **94.56%** / branches **87.69%** / functions **95.32%** / lines **96.64%** (no gate lowered;
+coverage roughly statement **94.5%** / branch **87.6%** / function **95.3%** / line **96.6%** (v8 figures jitter by tenths between runs; no gate lowered;
 the weakest suites — support-request composer and team panel, dispatch team builder, mission-team store — gained
 real behavioral tests after PR #6's quality gate failed on frozen-install variance, and the gate now passes).
 Docs delta recorded in `docs/DESIGN_MATRIX.md`; no matrix row flipped.

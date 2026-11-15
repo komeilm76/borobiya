@@ -10,7 +10,7 @@ Designed state compositions shipped across the console and the responder flow, r
 - Authentication and account: the login submit stays disabled with an explicit note until both fields are filled; the forced onboarding screen shows a loading composition and a retry-on-failure instead of a silent empty form; logout goes through a confirmation dialog.
 - Trips: leader-only stop reordering (up/down rank controls, wholesale `PATCH` of the stop list); drag handles and ETA recomputation were not invented (no routing engine).
 - Administrator: incident types can now be created and inline-edited (label/icon/color, shipped-glyph allowlist, `#RRGGBB` colors, server-assigned rank); account detail panel on the users screen (sessions, login history, membership, two-step deactivation); the dispatch board flags hand-dropped incident pins in the queue row and in the expanded panel (`isManual`).
-- The visual preview catalog gained the `/_forbidden` page (ready for human review, never auto-approved). CI's coverage step failed on frozen-install variance and was closed by adding behavioral tests, with no gate lowered. `./boro verify` exits 0: 1345 tests across 104 files; coverage statements 94.56% / branches 87.69% / functions 95.32% / lines 96.64%.
+- The visual preview catalog gained the `/_forbidden` page (ready for human review, never auto-approved). CI's coverage step failed on frozen-install variance and was closed by adding behavioral tests, with no gate lowered. `./boro verify` exits 0: 1345 tests across 104 files; coverage roughly statement 94.5% / branch 87.6% / function 95.3% / line 96.6% (v8 figures jitter by tenths between runs; thresholds unchanged).
 
 ## Unreleased — Stage D: consented track recording (2026-11-12)
 
