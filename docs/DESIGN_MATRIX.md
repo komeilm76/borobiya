@@ -79,7 +79,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | navigation/14-navigation-full-route.png | superseded | — | See above. |
 | navigation/15-navigation-off-route.png | superseded | — | See above. |
 | navigation/16-multi-destination.png | partial | P2/M | Stage 5 implements the ordered multi-destination trip as the Trips screen (top-pill trips tab, `/_user/trips`): create with ranked stops (label + coordinates, saved-place and map-center insertion), save/unsave, start/complete/cancel, explicit-leader group rides with invitation acceptance. Not built: route computation, per-stop ETAs/distances, traffic chips, quick-add-from-map, fastest-order suggestion, trip polyline. |
-| navigation/17-destination-reordering.png | missing | P2/M | Stop reordering UI not built (design shows drag handles/up-down arrows). The server supports wholesale stop-list replacement via `PATCH /_user/trips/:tripId`, so reordering is possible through the API only. Saved-place reordering API also exists; wiring tracked under bookmarks. |
+| navigation/17-destination-reordering.png | missing | P2/M | Leader-only up/down rank reordering with wholesale stop-list `PATCH` now ships on the Trips screen (Stage 5). The design's drag handles, auto-optimize and distance/ETA recomputation were not ported (no routing engine). See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | navigation/18-sos-confirmation.png | missing | P1/M | SOS review step covers confirmation generally; no designed confirmation sheet from trip context (trip context superseded). |
 | navigation/19-trip-cancel.png | superseded | — | Trip superseded; the underlying SOS cancel gap is tracked under sos/13. |
 | navigation/20-trip-completed.png | superseded | — | Trip superseded. |
@@ -186,7 +186,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 |---|---|---|---|
 | admin-panel/dashboard/01-overview.png | partial | P3/H | KPIs + 7-day trend sparkline + recent requests render. Missing: deltas, delta icons, live operations map with markers, readiness/group availability panel, alerts panel, export/refresh controls, designed grouped sidebar and user footer card. |
 | admin-panel/dashboard/02-dispatch-board.png | partial | P1/H | Done in P1: per-request explicit panel — nearest responders with name/rating/distance/readiness (`GET /_admin/sos/:id/nearest`, now called client-side, loading/empty/error+retry states), picker restricted to active staffed groups, selection restricted to the chosen group's members, dispatch only after explicit group + member choice, panel survives server refusals. Still missing vs design: 3-column board, incident detail panel, map, cancel. |
-| admin-panel/dashboard/03-reports.png | missing | P3/H | No KPI deltas, no period selector, no donut, no 30-day trend, no incidents-by-type, no group-performance table; only status distribution list + two CSV links. |
+| admin-panel/dashboard/03-reports.png | missing | P3/H | KPI cards with deltas, period chips, an SVG trend, a group-share donut, incidents-by-type bars and a group-performance table now ship backed by `GET /_admin/reports?days=7|30|90` computed from the database; deltas are `null` on empty previous windows. See Stage H review log. Status stays `missing` pending human visual acceptance. |
 
 ## Administrator console — design system (3)
 
@@ -203,16 +203,16 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | admin-panel/states/01-loading.png | missing | P3/M | No skeletons anywhere in the console. |
 | admin-panel/states/02-empty.png | partial | P3/L | Plain empty texts per view. |
 | admin-panel/states/03-error.png | partial | P3/M | Inline error only on overview; no retry pattern elsewhere. |
-| admin-panel/states/04-offline.png | missing | P3/M | No cached-data offline banner + retry; only the tiny realtime status pill. |
+| admin-panel/states/04-offline.png | missing | P3/M | The admin shell now shows a dark offline banner (wifi-off glyph, last clean `loadAll` wall-clock where known, retry that re-pulls every admin projection). Per-panel staleness was not invented (no per-panel freshness model). See Stage H review log. Status stays `missing`. |
 | admin-panel/states/05-forbidden.png | partial | P3/L | Router guard redirects non-admins; no designed 403 surface. |
 
 ## Administrator console — services/groups (4)
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| admin-panel/services/01-groups.png | partial | P3/H | List + create (client-side rule hints) works; no edit. |
-| admin-panel/services/02-group-edit.png | missing | P3/H | No edit UI (name/color/capacity/status/coverage). |
-| admin-panel/services/03-members.png | missing | P3/H | No member add/remove UI (`memberIds` used by dispatch but unmanageable in UI). |
+| admin-panel/services/01-groups.png | partial | P3/H | List + create (client-side rule hints) works; an inline per-group edit panel now ships (name/color/capacity/status/coverage chips) backed by `PATCH /_admin/groups/:id`. See Stage H review log. Status stays `partial`. |
+| admin-panel/services/02-group-edit.png | missing | P3/H | Inline per-group edit panel ships (name/color/capacity/status/coverage chips) backed by `PATCH /_admin/groups/:id` with client-side pre-validation. See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| admin-panel/services/03-members.png | missing | P3/H | A per-group roster panel now ships (leader pinned first, presence dot, job type, rating, two-step remove + add) backed by `GET|POST|DELETE /_admin/groups/:id/members[/:userId]`. See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | admin-panel/services/04-incident-types.png | partial | P3/M | Create + inline edit (label/icon/color) now ship: `POST/PATCH /_admin/incident-types`, service-layer validation (icon limited to the shipped glyph subset, `#RRGGBB` color, rank assigned server-side), audit rows, card-grid presentation with per-type group coverage derived client-side. Not pixel-matched to the reference (no per-type request counter — needs the reports aggregate, not the catalog payload); stays `partial` pending human visual acceptance. |
 
 ## Administrator console — system (3)
@@ -227,8 +227,8 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| admin-panel/users/01-list.png | partial | P3/H | Search/role filter/toggle/create implemented; missing avatars, phone, last-seen, detail links, designed empty state. |
-| admin-panel/users/02-account.png | missing | P3/M | No account detail/edit panel. |
+| admin-panel/users/01-list.png | partial | P3/H | Search/role filter/toggle/create implemented, avatars present and an account detail entry point exists (see Stage H review log); the designed filter-empty state with a clear-filters action ships (Stage G). Not implemented: phone/last-seen columns, bulk select, pagination, KPI cards. Status stays `partial`. |
+| admin-panel/users/02-account.png | missing | P3/M | A per-account detail panel now ships on the users screen (identity, role/activation pills, group memberships, job type, membership date, last login, SOS count, live sessions, login history, inline role/job-type editor, two-step deactivate via session revocation) backed by `GET /_admin/users/:id`. See Stage H review log. Status stays `missing` pending human visual acceptance. |
 | admin-panel/users/03-roles.png | missing | P3/M | No roles/permissions view. |
 
 ## Excluded artifacts
@@ -253,7 +253,7 @@ Code-vs-matrix audit of all 141 canonical rows; the matrix was confirmed as the 
 
 - Integrity check: the 141 canonical PNGs on disk (154 files minus the 13 `_generator/_preview-*.png` artifacts) map 1:1 onto the 141 matrix rows; no missing, extra or duplicated references.
 - Stale rows corrected: `mission/01-mission-ready-on`, `mission/02-mission-ready-off`, `profile/08-bookmarks`, `profile/09-bookmark-edit` — all four described shipped functionality as absent (readiness switch and saved-places UI are wired); now `partial` with accurate notes.
-- Spot checks confirmed accurate as written (Stage C, 2026-11-08): `navigation/17` (no reorder UI), `sos/07`–`sos/11` and `sos/16` (no sending/pending/dispatched/en-route/arrived/offline surfaces), `admin-panel/services/*` (no edit/member-management UI), `admin-panel/dashboard/03-reports` (no deltas/period/donut), `admin-panel/states/01|04`, `history/07|08` (playback/per-companion absent; `history/05` changed by Stage E — see the Stage E review log), `mission/13|19`, `companions/02|05|10`, `profile/06`, `auth/02|12`.
+- Spot checks confirmed accurate as written (Stage C, 2026-11-08): `navigation/17` (no reorder UI at the time), `sos/07`–`sos/11` and `sos/16` (no sending/pending/dispatched/en-route/arrived/offline surfaces at the time), `admin-panel/services/*` (no edit/member-management UI at the time), `admin-panel/dashboard/03-reports` (no deltas/period/donut at the time), `admin-panel/states/01|04` (at the time), `history/07|08` (playback/per-companion absent; `history/05` changed by Stage E — see the Stage E review log), `mission/13|19`, `companions/02|05|10`, `profile/06`, `auth/02|12`. The listed feature gaps have since shipped on this branch — rows and notes re-read accordingly; every status above stands unchanged pending human visual acceptance.
 - The 23 `done` rows were not re-verified visually; they remain "implemented and wired, pixel fidelity unverified".
 - Remaining `missing` work is enumerated by the matrix; several rows are product/architecture decisions rather than buildable screens (e.g. `history/07` playback: the trip-track recording decision is approved and implemented — see `docs/TRIP_TRACK_PROPOSAL.md` (2026-11-12) — and the row stays `missing` until a human accepts the recorded preview in the visual preview).
 
@@ -267,7 +267,7 @@ Consented trip/mission track recording landed (see `docs/IMPLEMENTATION_PLAN.md`
 
 - `history/01` and `history/06` stay `partial`: recorded distance/duration now render for recorded trips; the designed statistics/modal are still absent.
 - `history/07` stays `missing`: the designed map-animated playback surface does not exist; a schematic, authorization-aware replay panel shipped instead. Status flips only after a human accepts the recorded preview (`docs/VISUAL_PREVIEW.md`), never from this log.
-- No other rows change; DF-04 is annotated as addressed in the register above. The tally remains `done` 23, `partial` 70, `missing` 31, `superseded` 11, `reference` 5, `deviation` 1.
+- No other rows change; DF-04 is annotated as addressed in the register above. The tally at that point was `done` 23, `partial` 70, `missing` 31, `superseded` 11, `reference` 5, `deviation` 1; Stage E then moved `history/05` `missing` → `partial`, giving the canonical tally in the summary section (`done` 23, `partial` 71, `missing` 30).
 
 ## Stage H review log (2026-11-13)
 
