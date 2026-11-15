@@ -752,9 +752,11 @@ those branches). Docs guard clean; build, `tsc`, `vue-tsc` and all packaging ste
 - Support-accepted notification (`mission/13`): approved / partially-approved / rejected titles with the
   server's actual reason codes, surfaced in the mission page's support panel. Event-honest subset only.
 
-**Verification:** `./boro verify` exit **0** — 1330 tests passed (was 1297 at the start of this continuation),
-coverage statements **94.06%** / branches **87.51%** / lines **96.21%** (no gate lowered). Docs delta recorded in
-`docs/DESIGN_MATRIX.md`; no matrix row flipped.
+**Verification:** `./boro verify` exit **0** — 1343 tests passed (was 1297 at the start of this continuation),
+coverage statements **94.62%** / branches **87.67%** / functions **95.24%** / lines **96.66%** (no gate lowered;
+the weakest suites — support-request composer and team panel, dispatch team builder, mission-team store — gained
+real behavioral tests after PR #6's quality gate failed on frozen-install variance, and the gate now passes).
+Docs delta recorded in `docs/DESIGN_MATRIX.md`; no matrix row flipped.
 
 **Visual verification (inspection only, not approval):** light/dark desktop and light mobile captures of
 both screens were opened and inspected (1280×900, 390×844): RTL layout holds, sidebar active state correct,
