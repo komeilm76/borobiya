@@ -380,6 +380,30 @@ accepts the recorded preview):
   query), and a distinct honest generic case when the roster is simply empty. Reports panels keep
   their honest per-section empty copy (with skeletons while loading); other screens still render
   their plain empty texts. Status stays `partial`.
+- `sos/08`–`sos/11` — precise inventory of what already exists, to support the adjudication of these
+  four rows: the mission screen renders the five-step lifecycle rail (registered / dispatched / accepted /
+  in-progress / completed, labels in Persian as designed) with per-step wall-clock times taken from the
+  server's mission timeline (a step with nothing recorded stays undated), a "step n of 5" stage counter,
+  the incident card, the requester/responder action buttons, the cancel flow with its reason catalog and
+  the rating form. The dispatch board and the mission screen are the only two status surfaces that exist;
+  each of the four design compositions (the pending bottom sheet with its "what to do until the
+  responder arrives" guidance list, the dispatched sheet, the arrived sheet, and any ETA-bearing
+  en-route treatment — ETA requires a routing engine that does not exist) was NOT ported. Building a
+  second full-screen surface duplicating the rail was judged out of scope without a product decision;
+  these notes record the facts only. Status of all four stays `missing`.
+- `admin-panel/states/03-error.png` — the console's inline load-error surface now exists everywhere: a
+  shared `AdminInlineError` panel renders the admin store's shared load error with a retry that
+  re-issues the screen's own primary pull (disabled and labelled retrying while in flight) on ten
+  screens: overview, users, groups, alerts, audit, incident types, job types, dispatch, settings and
+  reports. The retry re-pulls lists, not any mutation; the message is the store's shared ref, so a
+  panel may display a failure that originated elsewhere in the console. The reference's full-screen
+  error composition was not ported. Status stays `partial`.
+- `admin-panel/states/01-loading.png` and the DF register — the loading family is now console-complete
+  (users, overview, reports, alerts, groups, audit, dispatch, job types, incident types, support
+  requests, settings + system health), and DF-03, DF-05 and DF-07 were marked ADDRESSED in the
+  register (honest per-tab summary lines; manual-location markers on both the offer screen and the
+  dispatch board, the latter added now with tests; the shipped-icon guard already scans every client
+  source). No matrix row was flipped.
 - Counts remain: `done` 23, `partial` 71, `missing` 30, `superseded` 11, `reference` 5, `deviation` 1.
 
 ## Design flaws found in the reference material (to fix or consciously keep)
@@ -388,11 +412,11 @@ accepts the recorded preview):
 |---|---|---|---|
 | DF-01 | auth/06-recovery-account-error.png | Explicit unknown-username error = user enumeration oracle. | Keep implementation (decoys); do not port the screen. |
 | DF-02 | mission/03-mission-offer.png | A 52-second countdown and "3 offers active" imply a server-enforced offer TTL; offers now have a status lifecycle and an endpoint, but there is no offer-expiry/TTL job. | Drop the countdown, or add offer TTL to the backend as a product decision. Do not fake it client-side. |
-| DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/sharing metrics in P2; document the swap. |
+| DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/sharing metrics. ADDRESSED: the history screen renders honest per-tab summary lines (finished trips plus a recorded-track count, mission count with the rated-average and its own count, live-share count) computed only from loaded records — no kilometres, no vehicle/month aggregates, no invented figures; the profile home carries no trip counters. Kept until the designed surfaces are accepted. |
 | DF-04 | history/07-history-playback.png | Playback UI does not communicate authorization scope/expiry although the API is share-gated. | Add an authorization note; never show playback without an active authorized share. ADDRESSED in Stage D (2026-11-12): the replay panel states share-scoped authorization and the grant expiry (`authorizedUntil`) whenever access is via a share; participants are authorized by membership. Kept until the designed surface is accepted. |
-| DF-05 | sos/04-sos-location-picker.png | Dropping an incident pin far from GPS is a fraud/abuse vector with no responder-facing "manual location" marker. | Surface `isManual` (already recorded server-side) on the offer/dispatch screens. |
+| DF-05 | sos/04-sos-location-picker.png | Dropping an incident pin far from GPS is a fraud/abuse vector with no responder-facing "manual location" marker. | Surface `isManual` (already recorded server-side) on the offer/dispatch screens. ADDRESSED: the mission offer screen already carried the manual-placement note; the dispatch board now flags hand-dropped pins in the queue row (inline marker) and in the expanded dispatch panel (full note), both asserted by tests. Kept until the designed surfaces are accepted. |
 | DF-06 | navigation/* (except 16-17) | The navigation family contradicts the offline/deterministic-tile architecture and the documented product scope; keeping it as silent reference invites accidental scope creep. | Keep files as visual identity reference; exclude from acceptance scope. Explicit product decision (Stage 5) brought 16-multi-destination (partial) and 17-destination-reordering (missing) back into scope as the Trips screen; the rest stays excluded. |
-| DF-07 | design/icons vs client | Client consumes generated subset; canonical set allows aliases. Verify in P5 that no ad-hoc icon appears outside the inventory. | Guard via existing asset test; extend if needed. |
+| DF-07 | design/icons vs client | Client consumes generated subset; canonical set allows aliases. Verify in P5 that no ad-hoc icon appears outside the inventory. | ADDRESSED: `tests/assets.test.ts` ("every icon used by the Vue client exists in the shipped MDI subset and canonical inventory") already scans all client `.vue`/`.ts` sources plus the server catalog for `mdi-*` references and fails on any ad-hoc icon or missing shipped glyph. Kept until the icon subset is regenerated. |
 | DF-08 | map-page/navigation/02 | The 350-metre scale bar appears only in the press-hold reference, not in idle. | Treat the scale bar as a permanent map affordance if confirmed with the design owner; otherwise drop. |
 
 ## Stage F second pass (2026-11-13) — agent comparison sweep, no approvals

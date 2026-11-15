@@ -27,6 +27,7 @@ const PENDING = {
   latitude: 35.7219,
   longitude: 51.3347,
   incidentTypeId: 'inc_fire',
+  isManual: false,
   createdAt: 1794136403220
 };
 
@@ -192,6 +193,28 @@ describe('dispatch queue', () => {
     // The description is the only free-form information the dispatcher gets.
     expect(item.text()).toContain('دود از طبقه سوم');
     wrapper.unmount();
+  });
+
+  it('flags manual (hand-dropped) incident pins in the queue row and the dispatch panel', async () => {
+    const manual = { ...PENDING, id: 'sos_manual', isManual: true };
+    stubApi({ queue: [manual] });
+    const { wrapper } = await render();
+    const row = wrapper.find('.admin-list li');
+    expect(row.text()).toContain('موقعیت دستی');
+    expect(row.find('.offer-facts__manual').exists()).toBe(true);
+    // The expanded panel must carry the same warning, worded as what it is.
+    await wrapper.find('[data-testid="open-dispatch"]').trigger('click');
+    await flushPromises();
+    const panelNote = wrapper.find('.dispatch-panel .offer-manual-note');
+    expect(panelNote.exists()).toBe(true);
+    expect(panelNote.text()).toContain('دستی ثبت شده است');
+    wrapper.unmount();
+    // A GPS-derived request must not carry the flag anywhere.
+    stubApi({ queue: [PENDING] });
+    const second = await render();
+    expect(second.wrapper.find('.offer-facts__manual').exists()).toBe(false);
+    wrapper.unmount();
+    second.wrapper.unmount();
   });
 
   it('shows the queue size', async () => {

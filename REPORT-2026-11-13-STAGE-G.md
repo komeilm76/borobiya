@@ -717,6 +717,13 @@ those branches). Docs guard clean; build, `tsc`, `vue-tsc` and all packaging ste
   settings screen plus its system-health panel (`settings-loading` / `health-loading`; the health list
   no longer prints zeroed counters while its figures are unknown). Tests that hang the network assert
   the skeletons render and the either-empty copy does not.
+- Manual-location markers (`DF-05`): the dispatch board now flags hand-dropped incident pins in the
+  queue row (inline pencil marker) and in the expanded dispatch panel (full note), matching the marker
+  the mission offer screen already carried; asserted by a test covering both surfaces and the
+  GPS-derived absence case. The dispatch queue is the one place a hand-placed (possibly fraudulent)
+  pin decides where responders drive.
+- PR description refreshed to the branch as it stands (Stage G/H continuation added to the stage list,
+  validation figures updated to the final verified numbers).
 - Console inline load errors (`states/03-error`): a shared `AdminInlineError` panel replaces the
   silence that followed a failed first load on ten administrator screens (overview, users, groups,
   alerts, audit, incident types, job types, dispatch, settings and reports). It prints the admin
@@ -752,8 +759,8 @@ those branches). Docs guard clean; build, `tsc`, `vue-tsc` and all packaging ste
 - Support-accepted notification (`mission/13`): approved / partially-approved / rejected titles with the
   server's actual reason codes, surfaced in the mission page's support panel. Event-honest subset only.
 
-**Verification:** `./boro verify` exit **0** — 1343 tests passed (was 1297 at the start of this continuation),
-coverage statements **94.62%** / branches **87.67%** / functions **95.24%** / lines **96.66%** (no gate lowered;
+**Verification:** `./boro verify` exit **0** — 1344 tests passed (was 1297 at the start of this continuation),
+coverage statements **94.56%** / branches **87.69%** / functions **95.32%** / lines **96.64%** (no gate lowered;
 the weakest suites — support-request composer and team panel, dispatch team builder, mission-team store — gained
 real behavioral tests after PR #6's quality gate failed on frozen-install variance, and the gate now passes).
 Docs delta recorded in `docs/DESIGN_MATRIX.md`; no matrix row flipped.

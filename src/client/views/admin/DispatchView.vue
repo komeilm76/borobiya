@@ -223,11 +223,13 @@ onMounted(() => void admin.loadDispatch());
           <div>
             <strong>{{ item.incidentLabel }} · {{ severityLabel(item.severity) }}</strong>
             <small>{{ item.description }}</small>
+            <span v-if="item.isManual" class="offer-facts__manual"><span class="mdi mdi-pencil-outline" aria-hidden="true" /> موقعیت دستی</span>
           </div>
           <button type="button" class="admin-action" data-testid="open-dispatch" @click="openPanel(item)">{{ openId === item.id ? 'بستن' : 'اعزام' }}</button>
         </li>
         <li v-if="openItem?.id === item.id" class="dispatch-panel" data-testid="dispatch-panel">
           <strong class="dispatch-panel__title">اعزام درخواست</strong>
+          <p v-if="openItem?.isManual" class="offer-facts__manual offer-manual-note"><span class="mdi mdi-pencil-outline" aria-hidden="true" /> موقعیت توسط درخواست‌کننده دستی ثبت شده است</p>
 
           <fieldset class="dispatch-mode" data-testid="dispatch-mode">
             <legend>نحوه اعزام</legend>
