@@ -21,6 +21,7 @@ const MARKERS: Record<string, string> = {
   register: 'ساخت حساب',
   recovery: 'دریافت پرسش‌ها',
   onboarding: 'تکمیل حساب',
+  forbidden: 'forbidden-back',
   map: 'بیمارستان امید',
   sos: 'شدت حادثه',
   mission: 'mission-offer',

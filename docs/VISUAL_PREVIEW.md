@@ -56,6 +56,7 @@ No credentials are real. Any password works; typing `admin` on the login screen 
 | *(none)* | `saeed.k` — responder, ready for mission | All map-layout pages |
 | `?persona=admin` | `admin` — administrator | All admin-console pages |
 | `?persona=onboarding` | `leila.n` — security questions pending | The onboarding screen |
+| `?persona=user` on a URL of an administrator section after aiming at one as a non-admin | `saeed.k` — responder | The `/_forbidden` screen (a signed-in non-admin who opened an admin URL) |
 | `?anon=1` | *(no session)* | Login, register, recovery |
 
 In-app navigation preserves the chosen persona for the lifetime of the tab; a full reload of an admin URL without `?persona=admin` falls back to the user persona.
@@ -68,6 +69,7 @@ In-app navigation preserves the chosen persona for the lifetime of the tab; a fu
 - Sharing Center: one live outbound share, one inbound history share, plus expired and revoked examples
 - Admin console: overview KPIs and trend, a dispatch queue with nearest responders and groups, two pending support requests with candidates and ineligibility reasons, alerts, audit log, settings, system health, and CSV exports — both CSVs are generated in the browser from the demo world (no server download happens)
 - Talk (`/_user/talk`) is listed as **Partially implemented**: the screen renders, but the real-time audio path needs a live server peer and microphone; it cannot be exercised meaningfully against fixtures
+- A designed 403 (`/_forbidden`): a signed-in responder (saeed.k) who opens an administrator URL. The in-memory demo fetch answers no admin endpoint for this persona, which mirrors production; the screen itself renders from auth state only and shows the role label and the 403 code
 - History replays the recorded demo trip and the completed responder mission through the Stage D replay panel (schematic path plus per-member summary; the other completed trip shows the honest `expired` state). The designed map-animated playback surface does not exist and stays `missing` in the design matrix until a human accepts it; the preview is the review harness for that decision
 
 ## Keeping the preview honest

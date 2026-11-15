@@ -1,5 +1,17 @@
 # Release notes
 
+## Unreleased — Stage G/H: design-parity continuation (2026-11-15)
+
+Designed state compositions shipped across the console and the responder flow, recorded honestly in `REPORT-2026-11-13-STAGE-G.md`; no `docs/DESIGN_MATRIX.md` row was flipped — human visual acceptance remains the gate.
+
+- Administrator console: first-load skeletons on every screen (users, overview, reports, alerts, groups, audit, dispatch, job types, incident types, support requests, settings and the system-health panel); a designed filter-empty state on the users screen with a clear-filters action; a shared `AdminInlineError` panel so a swallowed loader failure renders inline with a retry that re-issues the screen's own primary pull (wired on ten screens — the admin store's `guard()` never throws, so failures used to surface nothing); a dark offline banner in the admin shell with the last clean sync wall-clock and a retry that re-pulls every admin projection.
+- Designed 403 surface: a signed-in non-admin reaching an administrator URL lands on a composed panel (title, the actual rule — administrator-role accounts only, no finer permission scope exists — and a back CTA) instead of a silent redirect.
+- Responder flow: the SOS composer states its offline stance plainly (no SOS reaches the center while the link is down, no offline queue exists) and shows a full-screen sending card while mid-submit; the mission screen shows an offline card with the last successful catalog sync where known, and an explicit notice when an administrator reviews a support request (approved / partially approved / rejected with the server's reason codes).
+- Authentication and account: the login submit stays disabled with an explicit note until both fields are filled; the forced onboarding screen shows a loading composition and a retry-on-failure instead of a silent empty form; logout goes through a confirmation dialog.
+- Trips: leader-only stop reordering (up/down rank controls, wholesale `PATCH` of the stop list); drag handles and ETA recomputation were not invented (no routing engine).
+- Administrator: incident types can now be created and inline-edited (label/icon/color, shipped-glyph allowlist, `#RRGGBB` colors, server-assigned rank); account detail panel on the users screen (sessions, login history, membership, two-step deactivation); the dispatch board flags hand-dropped incident pins in the queue row and in the expanded panel (`isManual`).
+- The visual preview catalog gained the `/_forbidden` page (ready for human review, never auto-approved). CI's coverage step failed on frozen-install variance and was closed by adding behavioral tests, with no gate lowered. `./boro verify` exits 0: 1345 tests across 104 files; coverage statements 94.56% / branches 87.69% / functions 95.32% / lines 96.64%.
+
 ## Unreleased — Stage D: consented track recording (2026-11-12)
 
 Consented GPS track recording for trips and responder missions, per the approved proposal in `docs/TRIP_TRACK_PROPOSAL.md` (the Stage D change set on this branch).
