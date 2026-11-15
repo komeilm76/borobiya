@@ -400,6 +400,29 @@ describe('dispatching', () => {
 });
 
 describe('team dispatch', () => {
+  it('adds and removes composition lines, taking the next unused job type each time', async () => {
+    stubApi();
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-mode-team"]').setValue(true);
+    await flushPromises();
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await flushPromises();
+    // One seeded line (fire). Add another — it must take the next unused type (medical).
+    await wrapper.find('.dispatch-team__add').trigger('click');
+    await flushPromises();
+    const lines = wrapper.findAll('.team-editor__line');
+    expect(lines).toHaveLength(2);
+    const selects = wrapper.findAll('.team-editor__line select');
+    expect((selects[1].element as HTMLSelectElement).value).toBe('job_medical');
+    // Remove the seeded fire line; only the medical line remains.
+    await wrapper.find('[aria-label="حذف خط 1"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('.team-editor__line')).toHaveLength(1);
+    expect((wrapper.find('.team-editor__line select').element as HTMLSelectElement).value).toBe('job_medical');
+    wrapper.unmount();
+  });
+
   it('requires an explicit leader before the team mission can be built', async () => {
     stubApi();
     const { wrapper } = await render();

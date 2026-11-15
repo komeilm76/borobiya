@@ -179,6 +179,44 @@ describe('administrator roster management', () => {
     wrapper.unmount();
   });
 
+  it('adds and removes composition lines and saves the result', async () => {
+    const { wrapper, calls } = await render();
+    await wrapper.find('[data-testid="open-requirements-editor"]').trigger('click');
+    await flushPromises();
+    // One seeded line (job_medical). Add a second line — it takes the next unused job type.
+    const addButton = wrapper.findAll('.team-editor .ghost-button').find((button) => button.text().includes('خط تازه'));
+    expect(addButton).toBeDefined();
+    await addButton!.trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('.team-editor__line')).toHaveLength(2);
+    // Remove the seeded first line; only the fresh line remains.
+    await wrapper.findAll('[aria-label="حذف خط 1"]')[0].trigger('click');
+    await flushPromises();
+    expect(wrapper.findAll('.team-editor__line')).toHaveLength(1);
+    await wrapper.find('[data-testid="save-requirements"]').trigger('click');
+    await flushPromises();
+    const save = calls.find((call) => call.path === '/_admin/missions/mis_1/requirements' && call.method === 'PUT');
+    expect(save?.body).toEqual({ requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] });
+    wrapper.unmount();
+  });
+
+  it('blocks saving while two lines target the same job type', async () => {
+    const { wrapper, calls } = await render();
+    await wrapper.find('[data-testid="open-requirements-editor"]').trigger('click');
+    await flushPromises();
+    const addButton = wrapper.findAll('.team-editor .ghost-button').find((button) => button.text().includes('خط تازه'));
+    await addButton!.trigger('click');
+    await flushPromises();
+    // Point both lines at the same job type; the save must refuse and say why.
+    const selects = wrapper.findAll('.team-editor select');
+    await selects[1].setValue('job_medical');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="save-requirements"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('نوع شغل یکتا');
+    expect(calls.some((call) => call.path === '/_admin/missions/mis_1/requirements' && call.method === 'PUT')).toBe(false);
+    wrapper.unmount();
+  });
+
   it('edits the required composition through the requirements editor', async () => {
     const { wrapper, calls } = await render();
     await wrapper.find('[data-testid="open-requirements-editor"]').trigger('click');

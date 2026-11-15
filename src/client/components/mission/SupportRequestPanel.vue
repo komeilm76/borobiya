@@ -116,7 +116,10 @@ async function loadCatalog(): Promise<void> {
 async function openComposer(): Promise<void> {
   await loadCatalog();
   composerOpen.value = true;
-  formError.value = null;
+  // Only clear a previous error when the catalog actually loaded; otherwise the failure
+  // message set by loadCatalog must stay visible (the form's submit stays disabled too,
+  // because every line requires a real job type).
+  if (jobTypes.value.length) formError.value = null;
 }
 
 function resetComposer(): void {
