@@ -23,6 +23,19 @@ export const INCIDENT_TYPES: CatalogItem[] = [
   { id: 'inc_other', label: 'سایر موارد', icon: 'lifebuoy', color: '#0E6666' }
 ];
 
+/**
+ * Icons an administrator may attach to an incident type. Every name ships in the generated
+ * `public/assets/icons.css` subset (tests/assets.test.ts fails the build otherwise), so the
+ * catalog may never reference a glyph the client cannot render.
+ */
+export const INCIDENT_TYPE_ICONS = [
+  'alert-octagon', 'alert-outline', 'alert-rhombus-outline', 'alarm-light', 'ambulance',
+  'car', 'car-emergency', 'car-wrench', 'fire', 'hand-heart-outline', 'heart-pulse',
+  'home-flood', 'home-outline', 'lifebuoy', 'medical-bag', 'road-variant', 'traffic-light',
+  'waves', 'wrench-outline'
+] as const;
+export type IncidentTypeIcon = (typeof INCIDENT_TYPE_ICONS)[number];
+
 export const CANCELLATION_REASONS: CatalogItem[] = [
   { id: 'cancel_resolved', label: 'مشکل خودبهخود حل شد' },
   { id: 'cancel_mistake', label: 'درخواست اشتباهی ثبت شد' },

@@ -251,3 +251,30 @@ export function adminReportsFor(daysInput: number): Record<string, unknown> {
     serverTime: T0
   };
 }
+/* ----------------------------------------- admin user detail (singular) - */
+
+/** Deterministic detail payload for the account side panel (fiction only). */
+export function adminUserDetailFor(userId: string): Record<string, unknown> | null {
+  const base = adminUsers.find((user) => user.id === userId);
+  if (!base) return null;
+  const sessions = userId === 'usr_hadi' ? [] : [
+    { sessionId: `ses_${userId}_1`, deviceName: 'iPhone 15 · Safari', ip: '188.47.62.18', createdAt: T0 - 2 * HOUR, lastActiveAt: T0 - 5 * MIN, expiresAt: T0 + 7 * DAY },
+    ...(userId === 'usr_samira' ? [{ sessionId: `ses_${userId}_2`, deviceName: 'Pixel 8 · Chrome', ip: '79.127.14.203', createdAt: T0 - 3 * DAY, lastActiveAt: T0 - 90 * MIN, expiresAt: T0 + 4 * DAY }] : [])
+  ];
+  const logins = [
+    { ip: '188.47.62.18', deviceName: 'iPhone 15 · Safari', success: true, loginAt: T0 - 2 * HOUR },
+    { ip: '188.47.62.18', deviceName: 'iPhone 15 · Safari', success: true, loginAt: T0 - 2 * DAY },
+    { ip: base.id === 'usr_leila' ? '5.232.118.77' : '188.47.62.18', deviceName: 'Chrome · Windows', success: base.id !== 'usr_leila', loginAt: T0 - 4 * DAY }
+  ];
+  return {
+    user: {
+      id: base.id, username: base.username, role: base.role, isActive: base.active,
+      securityReady: base.securityReady, mustCompleteSecurityQuestions: base.mustCompleteSecurityQuestions,
+      readyForMission: base.readyForMission, recordTrack: base.id === 'usr_demo',
+      averageRating: base.averageRating, createdAt: base.createdAt
+    },
+    sessions,
+    logins,
+    sosCount: base.role === 'responder' ? 3 : base.id === 'usr_samira' ? 12 : 6
+  };
+}

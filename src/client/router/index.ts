@@ -44,7 +44,8 @@ export const ROUTE_NAMES = Object.freeze({
   adminJobTypes: 'admin-job-types',
   adminAudit: 'admin-audit',
   adminAlerts: 'admin-alerts',
-  adminSettings: 'admin-settings'
+  adminSettings: 'admin-settings',
+  forbidden: 'forbidden'
 } as const);
 
 type RouteName = (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES];
@@ -81,6 +82,12 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.onboarding,
     component: () => import('@/views/auth/OnboardingView.vue'),
     meta: { layout: 'auth', access: 'user', label: 'تکمیل پرسش‌های امنیتی', brand: { badge: 'یک مرحله ضروری', headlineA: 'از حسابتان', headlineB: 'بهتر محافظت کنید.', sub: 'پنج پرسشی که فقط شما جوابشان را می‌دانید؛ اگر گذرواژه را فراموش کنید، همین‌ها حسابتان را باز می‌کنند.' } }
+  },
+  {
+    path: '/_forbidden',
+    name: ROUTE_NAMES.forbidden,
+    component: () => import('@/views/ForbiddenView.vue'),
+    meta: { layout: 'auth', access: 'public', label: 'دسترسی مجاز نیست', brand: { badge: 'خطای ۴۰۳', headlineA: 'این صفحه برای', headlineB: 'نقش شما بسته است.', sub: 'پنل مدیریت فقط برای حساب‌های مدیر سامانه باز است؛ اگر فکر می‌کنید به آن نیاز دارید، با یک مدیر هماهنگ کنید.' } }
   },
   {
     path: '/_user/map',
@@ -248,7 +255,8 @@ export async function authGuard(
   }
   if (access === 'admin') {
     if (!user) return { name: ROUTE_NAMES.login };
-    if (user.role !== ROLES.ADMIN) return { name: ROUTE_NAMES.map };
+    // The designed 403 surface; the reference's finer "manager" scope does not exist in the model.
+    if (user.role !== ROLES.ADMIN) return { name: ROUTE_NAMES.forbidden };
   }
   return true;
 }

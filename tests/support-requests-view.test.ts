@@ -99,6 +99,22 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+describe('support requests first load', () => {
+  it('renders skeleton rows instead of an empty-filter hint while the queue is in flight', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.adminSupportRequests });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(SupportRequestsView, { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="support-loading"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('درخواستی در این فیلتر نیست');
+    wrapper.unmount();
+  });
+});
+
 describe('support-request queue', () => {
   it('lists the pending request with its composition and opens the review drawer', async () => {
     const { wrapper } = await render();

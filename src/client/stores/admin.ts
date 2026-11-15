@@ -1,9 +1,10 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 import { del, errorMessage, get, patch, post, put } from '@/api/client.ts';
 import type {
   AdminJobTypeView,
   AdminMissionOfferView,
+  AdminUserDetail,
   AdminUserView,
   AlertView,
   AuditEntryView,
@@ -45,6 +46,8 @@ export const useAdminStore = defineStore('admin', () => {
   const dispatchQueue = ref<ListView<SosView> | null>(null);
   const users = ref<ListView<AdminUserView> | null>(null);
   const groups = ref<GroupView[]>([]);
+  /** Detail for the account currently open in the side panel, if any. */
+  const userDetail = ref<AdminUserDetail | null>(null);
   /** Per-group roster, loaded lazily when the members panel opens. */
   const groupMembers = ref<Record<string, GroupMemberView[]>>({});
   /** The /_admin/reports payload for the selected window. */
@@ -56,13 +59,17 @@ export const useAdminStore = defineStore('admin', () => {
   /** Support requests awaiting an administrator decision (nav badge). */
   const pendingSupportRequests = ref(0);
   const health = ref<Record<string, unknown> | null>(null);
-  const loading = ref(false);
+  /** In-flight count across every loader; `loading` stays true until the slowest one settles. */
+  const pending = ref(0);
+  const loading = computed(() => pending.value > 0);
   const error = ref<string | null>(null);
+  /** Wall-clock of the last `loadAll` that settled without an error — the console's offline banner reports it. */
+  const lastSyncedAt = ref<number | null>(null);
   const userFilters = ref<UserFilters>({ page: 1, limit: 20 });
   const auditFilters = ref<AuditFilters>({ limit: 100 });
 
   async function guard<T>(task: () => Promise<T>): Promise<T | null> {
-    loading.value = true;
+    pending.value += 1;
     error.value = null;
     try {
       return await task();
@@ -70,7 +77,7 @@ export const useAdminStore = defineStore('admin', () => {
       error.value = errorMessage(caught);
       return null;
     } finally {
-      loading.value = false;
+      pending.value -= 1;
     }
   }
 
@@ -167,6 +174,18 @@ export const useAdminStore = defineStore('admin', () => {
     await loadGroups();
   }
 
+  /** Loads one account's detail panel payload; null while loading or after clearUserDetail. */
+  async function loadUserDetail(userId: string): Promise<AdminUserDetail | null> {
+    const result = await guard(() => get<AdminUserDetail>(`/_admin/users/${userId}`));
+    userDetail.value = result ?? null;
+    return userDetail.value;
+  }
+
+  /** Closes the account detail panel and drops its payload. */
+  function clearUserDetail(): void {
+    userDetail.value = null;
+  }
+
   /** Loads open (and optionally resolved) alerts. */
   async function loadAlerts(includeResolved = false): Promise<void> {
     const result = await guard(() => get<{ items: AlertView[] }>('/_admin/alerts', { includeResolved }));
@@ -202,6 +221,16 @@ export const useAdminStore = defineStore('admin', () => {
   async function loadIncidentTypes(): Promise<void> {
     const result = await guard(() => get<{ items: IncidentTypeView[] }>('/_admin/incident-types'));
     if (result) incidentTypes.value = result.items ?? [];
+  }
+
+  /** Creates an incident type; the caller refreshes the catalog afterwards. */
+  async function createIncidentType(input: { label: string; icon: string; color: string }): Promise<void> {
+    await post('/_admin/incident-types', input);
+  }
+
+  /** Updates label/icon/color of an incident type; the caller refreshes the catalog afterwards. */
+  async function updateIncidentType(incidentTypeId: string, input: { label?: string; icon?: string; color?: string }): Promise<void> {
+    await patch(`/_admin/incident-types/${incidentTypeId}`, input);
   }
 
   /** Loads the system health snapshot. */
@@ -263,13 +292,17 @@ export const useAdminStore = defineStore('admin', () => {
 
   /** Loads every dataset an administrator screen may need. */
   async function loadAll(): Promise<void> {
+    error.value = null;
     await Promise.all([loadOverview(), loadDispatch(), loadGroups(), loadAlerts(), loadSettings(), loadPendingSupportRequests()]);
+    // Individual loaders swallow their own failures into `error`; only a clean settle counts as a sync.
+    if (!error.value) lastSyncedAt.value = Date.now();
   }
 
   return {
     overview,
     dispatchQueue,
     users,
+    userDetail,
     groups,
     groupMembers,
     reports,
@@ -280,11 +313,14 @@ export const useAdminStore = defineStore('admin', () => {
     health,
     loading,
     error,
+    lastSyncedAt,
     userFilters,
     auditFilters,
     loadOverview,
     loadDispatch,
     loadUsers,
+    loadUserDetail,
+    clearUserDetail,
     createUser,
     updateUser,
     loadGroups,
@@ -309,6 +345,8 @@ export const useAdminStore = defineStore('admin', () => {
     loadJobTypes,
     createJobType,
     updateJobType,
+    createIncidentType,
+    updateIncidentType,
     loadAll
   };
 });

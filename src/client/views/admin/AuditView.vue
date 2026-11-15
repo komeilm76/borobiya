@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { VBtn, VTextField } from 'vuetify/components';
 import { useAdminStore } from '@/stores/admin.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { tryDownloadPreviewCsv } from '@/preview/demo-downloads.ts';
 
@@ -84,7 +85,14 @@ onMounted(() => void admin.loadAudit());
           </tr>
         </tbody>
       </table>
-      <p v-if="!entries.length" class="panel__empty">رویدادی ثبت نشده است.</p>
+      <div v-if="admin.loading && !entries.length" class="skeleton-stack" role="status" data-testid="audit-loading" aria-label="در حال بارگذاری رویدادها">
+        <div v-for="row in 5" :key="row" class="skeleton-stack__row">
+          <span class="skeleton skeleton--bar skeleton--bar-sm" />
+          <span class="skeleton skeleton--bar skeleton--bar-wide" />
+        </div>
+      </div>
+      <p v-else-if="!entries.length" class="panel__empty">رویدادی ثبت نشده است.</p>
     </article>
+    <AdminInlineError testid="audit" :retry="() => admin.loadAudit({ q: query || undefined, limit: 100 })" />
   </section>
 </template>

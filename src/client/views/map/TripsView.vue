@@ -86,6 +86,44 @@ function parsedStop(stop: DraftStop): TripStopInput | null {
   if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
   return { label, latitude, longitude, placeId: stop.placeId };
 }
+/* ---------- leader: reorder stops (wholesale PATCH of the stop list) ---------- */
+const reordering = ref(false);
+const reorderedStops = ref<TripStopInput[]>([]);
+const savingOrder = ref(false);
+const canReorder = computed(() =>
+  Boolean(current.value && current.value.role === 'leader' && ['planned', 'active'].includes(current.value.status) && current.value.stops.length > 1)
+);
+function startReorder(): void {
+  if (!current.value) return;
+  reorderedStops.value = current.value.stops.map((stop) => ({
+    label: stop.label,
+    latitude: stop.latitude,
+    longitude: stop.longitude,
+    placeId: stop.placeId ?? null
+  }));
+  reordering.value = true;
+}
+function moveStop(index: number, delta: -1 | 1): void {
+  const target = index + delta;
+  if (target < 0 || target >= reorderedStops.value.length) return;
+  const next = [...reorderedStops.value];
+  [next[index], next[target]] = [next[target], next[index]];
+  reorderedStops.value = next;
+}
+async function saveOrder(): Promise<void> {
+  if (!current.value || savingOrder.value) return;
+  savingOrder.value = true;
+  try {
+    await trips.update(current.value.id, { stops: reorderedStops.value });
+    toast.push('ترتیب توقف‌ها ذخیره شد.', 'success', 2400);
+    reordering.value = false;
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    savingOrder.value = false;
+  }
+}
+
 const parsedStops = computed(() => draftStops.value.map(parsedStop));
 const canSubmit = computed(() => newName.value.trim().length > 0 && parsedStops.value.length > 0 && parsedStops.value.every((stop) => stop !== null));
 
@@ -261,12 +299,40 @@ const savedPlaces = computed<SavedPlaceView[]>(() => map.places);
     <!-- Detail -->
     <template v-if="current">
       <h3 class="sheet__subtitle">جزئیات سفر: {{ current.name }}</h3>
-      <ol class="trip-stop-list" data-testid="trips-detail-stops">
+      <ol v-if="!reordering" class="trip-stop-list" data-testid="trips-detail-stops">
         <li v-for="stop in current.stops" :key="stop.id">
           <strong>{{ format.number(stop.rank) }}. {{ stop.label }}</strong>
           <small>{{ format.number(stop.latitude.toFixed(4)) }} ، {{ format.number(stop.longitude.toFixed(4)) }}</small>
         </li>
       </ol>
+      <button v-if="canReorder && !reordering" type="button" class="ghost-button" data-testid="trips-reorder-open" @click="startReorder">
+        <span class="mdi mdi-sort-variant" aria-hidden="true" />
+        <span>مرتب‌سازی توقف‌ها</span>
+      </button>
+      <ol v-else-if="reordering" class="trip-stop-list trip-stop-list--reorder" data-testid="trips-reorder-list">
+        <li v-for="(stop, index) in reorderedStops" :key="`${stop.label}-${index}`" class="trip-reorder-row">
+          <span class="trip-reorder-row__rank">{{ format.number(index + 1) }}</span>
+          <span class="trip-reorder-row__meta">
+            <strong>{{ stop.label }}</strong>
+            <small>{{ format.number(stop.latitude.toFixed(4)) }} ، {{ format.number(stop.longitude.toFixed(4)) }}</small>
+          </span>
+          <span class="trip-reorder-row__controls">
+            <button type="button" class="rank-button" :disabled="index === 0" :aria-label="`بالاتر بردن ${stop.label}`" :data-testid="`reorder-up-${index}`" @click="moveStop(index, -1)">
+              <span class="mdi mdi-arrow-up" aria-hidden="true" />
+            </button>
+            <button type="button" class="rank-button" :disabled="index === reorderedStops.length - 1" :aria-label="`پایین‌تر بردن ${stop.label}`" :data-testid="`reorder-down-${index}`" @click="moveStop(index, 1)">
+              <span class="mdi mdi-arrow-down" aria-hidden="true" />
+            </button>
+          </span>
+        </li>
+      </ol>
+      <div v-if="reordering" class="action-row" data-testid="trips-reorder-actions">
+        <button type="button" class="primary-button" :disabled="savingOrder" data-testid="trips-reorder-save" @click="saveOrder">
+          <span class="mdi mdi-check" aria-hidden="true" />
+          <span>{{ savingOrder ? 'در حال ذخیره…' : 'ذخیره ترتیب' }}</span>
+        </button>
+        <button type="button" class="ghost-button" data-testid="trips-reorder-cancel" @click="reordering = false">انصراف</button>
+      </div>
       <ul class="share-list" data-testid="trips-detail-members">
         <li v-for="member in current.members ?? []" :key="member.userId" class="share-row">
           <span class="mdi mdi-account" aria-hidden="true" />

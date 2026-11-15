@@ -100,6 +100,58 @@ afterEach(() => {
 });
 
 describe('administrator reports', () => {
+  it('shows skeletons instead of zeroes and empty copy while the first payload is in flight', async () => {
+    let release: (() => void) | null = null;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      if (path === '/_admin/reports') {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return jsonLike(REPORTS);
+      }
+      return jsonLike({});
+    }));
+    const jsonLike = (data: unknown) => new Response(JSON.stringify({ ok: true, requestId: 'r', data }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const wrapper = await render(ReportsView, ROUTE_NAMES.adminReports);
+    // In flight: the screen must not print zeroes or "nothing recorded" copy.
+    expect(wrapper.find('[data-testid="reports-kpis-skeleton"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="reports-trend-skeleton"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('در این بازه درخواستی به گروهی اعزام نشده است');
+    release!();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="reports-kpis-skeleton"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="reports-kpis"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+
+  it('shows skeletons for the KPI cards and panels while the overview is in flight', async () => {
+    let release: (() => void) | null = null;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      if (path === '/_admin/overview') {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return jsonLike(OVERVIEW);
+      }
+      return jsonLike({});
+    }));
+    const jsonLike = (data: unknown) => new Response(JSON.stringify({ ok: true, requestId: 'r', data }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const wrapper = await render(OverviewView, ROUTE_NAMES.adminOverview);
+    // While the payload is pending the console must not print reassuring zeroes.
+    expect(wrapper.find('[data-testid="overview-trend-skeleton"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="overview-recent-skeleton"]').exists()).toBe(true);
+    expect(wrapper.findAll('.metric-card--skeleton')).toHaveLength(4);
+    expect(wrapper.findAll('.metric-card:not(.metric-card--skeleton)')).toHaveLength(0);
+    // KPI values are not printed while unknown.
+    expect(wrapper.find('[data-testid="overview-cards"]').text()).not.toContain('۰');
+    release!();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="overview-trend-skeleton"]').exists()).toBe(false);
+    expect(wrapper.findAll('.metric-card')).not.toHaveLength(0);
+    wrapper.unmount();
+  });
+
   it('renders the real KPI figures and group rows, not an empty state', async () => {
     stubOverview();
     const wrapper = await render(ReportsView, ROUTE_NAMES.adminReports);
@@ -134,6 +186,39 @@ describe('administrator reports', () => {
 });
 
 describe('administrator overview', () => {
+  it('surfaces a load failure with a retry that re-pulls the overview', async () => {
+    let calls = 0;
+    const errorEnvelope = () =>
+      new Response(JSON.stringify({ ok: false, requestId: 'r', error: { code: 'INTERNAL', message: 'خطای سرور' } }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+        const path = url.split('?')[0];
+        if (path === '/_admin/overview') {
+          calls += 1;
+          if (calls === 1) return errorEnvelope();
+          return new Response(JSON.stringify({ ok: true, requestId: 'r', data: OVERVIEW }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        return jsonLike({});
+      })
+    );
+    const jsonLike = (data: unknown) => new Response(JSON.stringify({ ok: true, requestId: 'r', data }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const wrapper = await render(OverviewView, ROUTE_NAMES.adminOverview);
+
+    const banner = wrapper.find('[data-testid="overview-error"]');
+    expect(banner.exists()).toBe(true);
+    await wrapper.find('[data-testid="overview-retry"]').trigger('click');
+    await flushPromises();
+    expect(calls).toBe(2);
+    expect(wrapper.find('[data-testid="overview-error"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+
   it('shows the real KPI values including the open-alert count', async () => {
     stubOverview();
     const wrapper = await render(OverviewView, ROUTE_NAMES.adminOverview);

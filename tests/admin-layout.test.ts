@@ -285,6 +285,32 @@ describe('connection state', () => {
   });
 });
 
+describe('offline console', () => {
+  it('shows the banner with the last sync and a retry that re-pulls the projections', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const { wrapper, calls } = await render();
+
+    const banner = wrapper.find('[data-testid="admin-offline-banner"]');
+    expect(banner.exists()).toBe(true);
+    expect(banner.text()).toContain('اتصال به سرور قطع است');
+    expect(banner.text()).toContain('آخرین همگام‌سازی');
+
+    const before = calls.length;
+    await wrapper.find('[data-testid="admin-offline-retry"]').trigger('click');
+    await flushPromises();
+    expect(calls.length).toBeGreaterThan(before);
+    wrapper.unmount();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('hides the banner while online', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    const { wrapper } = await render();
+    expect(wrapper.find('[data-testid="admin-offline-banner"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
 describe('shortcuts and logout', () => {
   it('opens the command palette from the search button', async () => {
     const { wrapper } = await render();

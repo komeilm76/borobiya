@@ -67,7 +67,7 @@ describe('auth guard with a resolved session', () => {
     await expect(authGuard(to(ROUTE_NAMES.adminUsers, 'admin', 'admin'))).resolves.toBe(true);
 
     auth.user = { id: 'usr_6', username: 'plain', role: ROLES.USER, mustCompleteSecurityQuestions: false } as never;
-    await expect(authGuard(to(ROUTE_NAMES.adminUsers, 'admin', 'admin'))).resolves.toEqual({ name: ROUTE_NAMES.map });
+    await expect(authGuard(to(ROUTE_NAMES.adminUsers, 'admin', 'admin'))).resolves.toEqual({ name: ROUTE_NAMES.forbidden });
   });
 });
 

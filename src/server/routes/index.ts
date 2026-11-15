@@ -6,6 +6,7 @@ import {
   number, oneOf, optional, password, shape, text, username, type Validator
 } from '../core/validate.ts';
 import { APP_VERSION, ROLES, SOS_STATUS } from '../../shared/protocol.ts';
+import { INCIDENT_TYPE_ICONS } from '../domain/catalog.ts';
 import type { AppContext } from '../services/context.ts';
 
 const SOS_STATUSES = Object.values(SOS_STATUS) as string[];
@@ -15,6 +16,8 @@ const SHARE_KINDS = ['live', 'history'] as const;
 const MISSION_ACTIONS = ['arrive', 'start', 'complete', 'cancel'] as const;
 const GROUP_STATUSES = ['active', 'paused'] as const;
 const SETTINGS_BOOLEAN = ['0', '1'] as const;
+const INCIDENT_ICONS = INCIDENT_TYPE_ICONS;
+const hexColor = text({ min: 7, max: 7, pattern: /^#[0-9A-Fa-f]{6}$/ });
 
 const RATE = {
   auth: { name: 'auth', capacity: 8, refillPerSecond: 0.15, windowMs: 60_000 },
@@ -412,6 +415,10 @@ export function registerRoutes(router: Router<AppContext>): void {
   router.add({ method: 'DELETE', path: '/_admin/groups/:id/members/:userId', auth: 'admin', rate: RATE.mutation, tags: ['admin'], summary: 'Remove group member', handler: (ctx) =>
     ok(ctx.app.services.admin.removeGroupMember(actor(ctx), ctx.params.id, ctx.params.userId)) });
   router.add({ method: 'GET', path: '/_admin/incident-types', auth: 'admin', tags: ['admin'], summary: 'Incident types', handler: (ctx) => ok(ctx.app.services.admin.incidentTypes()) });
+  router.add({ method: 'POST', path: '/_admin/incident-types', auth: 'admin', body: shape({ label: displayText(1, 80), icon: oneOf(INCIDENT_ICONS), color: hexColor }), rate: RATE.mutation, tags: ['admin'], summary: 'Create incident type', handler: (ctx) =>
+    created(ctx.app.services.admin.createIncidentType(actor(ctx), body<any>(ctx))) });
+  router.add({ method: 'PATCH', path: '/_admin/incident-types/:id', auth: 'admin', body: shape({ label: optional(displayText(1, 80)), icon: optional(oneOf(INCIDENT_ICONS)), color: optional(hexColor) }), rate: RATE.mutation, tags: ['admin'], summary: 'Update incident type', handler: (ctx) =>
+    ok(ctx.app.services.admin.updateIncidentType(actor(ctx), ctx.params.id, body<any>(ctx))) });
   router.add({ method: 'GET', path: '/_admin/audit', auth: 'admin', query: auditQuery, tags: ['admin'], summary: 'Audit log', handler: (ctx) =>
     ok(ctx.app.services.admin.auditLog(auditFilters(ctx))) });
   router.add({ method: 'GET', path: '/_admin/audit.csv', auth: 'admin', query: auditQuery, tags: ['admin'], summary: 'Audit CSV', handler: (ctx) =>

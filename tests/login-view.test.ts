@@ -205,6 +205,24 @@ describe('sign-in form', () => {
     wrapper.unmount();
   });
 
+  it('keeps the submit disabled until both fields are filled, exactly as the screen promises', async () => {
+    stubApi(() => json({}));
+    const { wrapper } = await render();
+    const submit = wrapper.find('[data-testid="login-submit"]');
+    // The reference empty-state composition promises the CTA stays inactive with empty fields.
+    expect(submit.attributes('disabled')).toBeDefined();
+    expect(wrapper.find('[data-testid="login-empty-note"]').exists()).toBe(true);
+
+    await wrapper.find('#login-username').setValue('saeed.k');
+    await flushPromises();
+    expect(submit.attributes('disabled')).toBeDefined();
+
+    await wrapper.find('#login-password').setValue('DemoPass!2026');
+    await flushPromises();
+    expect(submit.attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+
   it('keeps the password masked until the user asks to see it', async () => {
     stubApi(() => json({}));
     const { wrapper } = await render();

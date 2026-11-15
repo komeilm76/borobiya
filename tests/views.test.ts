@@ -178,8 +178,9 @@ describe('routed views render', () => {
 
   it('the route table covers every view file exactly once', async () => {
     const declared = ROUTES.map((route) => route.component).filter(Boolean).length;
-    const total = VIEWS.auth.length + VIEWS.map.length + VIEWS.admin.length;
-    expect(total).toBe(23);
+    // Plus the designed 403 surface, which lives outside the three shells.
+    const total = VIEWS.auth.length + VIEWS.map.length + VIEWS.admin.length + 1;
+    expect(total).toBe(24);
     expect(declared).toBe(total);
     const names = ROUTES.map((route) => route.name).filter(Boolean);
     expect(new Set(names).size).toBe(names.length);
@@ -240,9 +241,37 @@ describe('route guards', () => {
     auth.loading = false;
     vi.spyOn(auth, 'refresh').mockResolvedValue(auth.user);
     await appRouter.push('/_admin/settings');
-    expect(appRouter.currentRoute.value.name).toBe(ROUTE_NAMES.map);
+    expect(appRouter.currentRoute.value.name).toBe(ROUTE_NAMES.forbidden);
     await appRouter.push('/_user/profile');
     expect(appRouter.currentRoute.value.name).toBe(ROUTE_NAMES.profile);
+  });
+
+  it('renders the designed 403 surface for a non-admin who lands there directly', async () => {
+    const { router: appRouter } = await import('../src/client/router/index.ts');
+    const auth = useAuthStore();
+    auth.user = {
+      id: 'usr_user2', username: 'saeed.k', role: ROLES.USER, mustCompleteSecurityQuestions: false
+    } as never;
+    auth.loading = false;
+    vi.spyOn(auth, 'refresh').mockResolvedValue(auth.user);
+    // Anonymous-public route: a plain user may land on it directly.
+    const ForbiddenView = (await import('../src/client/views/ForbiddenView.vue')).default;
+    const { mount } = await import('@vue/test-utils');
+    const { createPinia } = await import('pinia');
+    const { vuetify } = await import('../src/client/plugins/vuetify.ts');
+    const pinia = createPinia();
+    const { setActivePinia } = await import('pinia');
+    setActivePinia(pinia);
+    const auth2 = useAuthStore();
+    auth2.user = { id: 'usr_user2', username: 'saeed.k', role: ROLES.USER, mustCompleteSecurityQuestions: false } as never;
+    const wrapper = mount(ForbiddenView, { attachTo: document.body, global: { plugins: [pinia, vuetify, appRouter] } });
+    expect(wrapper.text()).toContain('دسترسی به این بخش برای نقش شما مجاز نیست');
+    expect(wrapper.text()).toContain('کد خطا');
+    expect(wrapper.text()).toContain('کاربر');
+    await wrapper.find('[data-testid="forbidden-back"]').trigger('click');
+    await flushPromises();
+    expect(appRouter.currentRoute.value.name).toBe(ROUTE_NAMES.map);
+    wrapper.unmount();
   });
 
   it('holds an account that still needs onboarding on the onboarding route', async () => {

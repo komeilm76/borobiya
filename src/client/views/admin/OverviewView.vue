@@ -6,6 +6,7 @@ import { DESIGN_TOKENS } from '@/stores/settings.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 import { revealTimeline } from '@/motion/index.ts';
 import { statusLabel, statusTone } from '@/utils/status.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 
 /** Administrator overview: KPI cards, the status trend chart and recent requests. */
 const admin = useAdminStore();
@@ -47,14 +48,25 @@ onMounted(async () => {
 
 <template>
   <section class="admin-page" data-testid="admin-overview">
-    <div class="admin-cards">
-      <article v-for="item in kpis" :key="item.key" class="metric-card">
-        <span :class="['mdi', `mdi-${item.icon}`]" aria-hidden="true" />
-        <div>
-          <small>{{ item.label }}</small>
-          <strong>{{ format.number(item.value) }}</strong>
-        </div>
-      </article>
+    <div class="admin-cards" data-testid="overview-cards">
+      <template v-if="admin.loading && !admin.overview">
+        <article v-for="row in 4" :key="row" class="metric-card metric-card--skeleton" aria-hidden="true">
+          <span class="skeleton skeleton--avatar" />
+          <div>
+            <span class="skeleton skeleton--bar" />
+            <span class="skeleton skeleton--bar skeleton--bar-sm" />
+          </div>
+        </article>
+      </template>
+      <template v-else>
+        <article v-for="item in kpis" :key="item.key" class="metric-card">
+          <span :class="['mdi', `mdi-${item.icon}`]" aria-hidden="true" />
+          <div>
+            <small>{{ item.label }}</small>
+            <strong>{{ format.number(item.value) }}</strong>
+          </div>
+        </article>
+      </template>
     </div>
     <div class="admin-grid">
       <article class="panel" ref="chart">
@@ -62,18 +74,21 @@ onMounted(async () => {
           <h2>روند درخواست‌ها</h2>
           <span class="panel__hint">۷ روز گذشته</span>
         </header>
-        <svg class="sparkline" viewBox="0 0 220 60" preserveAspectRatio="none" role="img" aria-label="روند درخواست‌ها">
-          <line x1="0" y1="14" x2="220" y2="14" />
-          <line x1="0" y1="36" x2="220" y2="36" />
-          <polyline :points="sparklinePoints(trend.map((item) => item.value))" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" />
-        </svg>
-        <ul class="legend">
-          <li v-for="(item, index) in trend" :key="item.label">
-            <i :style="{ background: seriesColors[index % seriesColors.length] }" />
-            <span>{{ item.label }}</span>
-            <strong>{{ format.number(item.value) }}</strong>
-          </li>
-        </ul>
+        <div v-if="admin.loading && !admin.overview" class="skeleton skeleton--chart" role="status" data-testid="overview-trend-skeleton" aria-label="در حال بارگذاری روند درخواست‌ها" />
+        <template v-else>
+          <svg class="sparkline" viewBox="0 0 220 60" preserveAspectRatio="none" role="img" aria-label="روند درخواست‌ها">
+            <line x1="0" y1="14" x2="220" y2="14" />
+            <line x1="0" y1="36" x2="220" y2="36" />
+            <polyline :points="sparklinePoints(trend.map((item) => item.value))" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" />
+          </svg>
+          <ul class="legend">
+            <li v-for="(item, index) in trend" :key="item.label">
+              <i :style="{ background: seriesColors[index % seriesColors.length] }" />
+              <span>{{ item.label }}</span>
+              <strong>{{ format.number(item.value) }}</strong>
+            </li>
+          </ul>
+        </template>
       </article>
       <article class="panel">
         <header class="panel__head"><h2>درخواست‌های اخیر</h2></header>
@@ -87,9 +102,15 @@ onMounted(async () => {
             <span :class="statusTone(item.status)">{{ statusLabel(item.status) }}</span>
           </li>
         </ul>
-        <p v-if="!recent.length" class="panel__empty">درخواستی ثبت نشده است.</p>
+        <div v-if="admin.loading && !admin.overview" class="skeleton-stack" role="status" data-testid="overview-recent-skeleton" aria-label="در حال بارگذاری درخواست‌های اخیر">
+          <div v-for="row in 3" :key="row" class="skeleton-stack__row">
+            <span class="skeleton skeleton--avatar" />
+            <span class="skeleton skeleton--bar skeleton--bar-wide" />
+          </div>
+        </div>
+        <p v-else-if="!recent.length" class="panel__empty">درخواستی ثبت نشده است.</p>
       </article>
     </div>
-    <p v-if="admin.error" class="panel__error">{{ admin.error }}</p>
+    <AdminInlineError testid="overview" :retry="() => admin.loadOverview()" />
   </section>
 </template>

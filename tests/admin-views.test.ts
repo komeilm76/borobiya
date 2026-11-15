@@ -6,6 +6,7 @@ import { vuetify } from '../src/client/plugins/vuetify.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 import AuditView from '../src/client/views/admin/AuditView.vue';
 import AlertsView from '../src/client/views/admin/AlertsView.vue';
+import GroupsView from '../src/client/views/admin/GroupsView.vue';
 import ReportsView from '../src/client/views/admin/ReportsView.vue';
 import HistoryView from '../src/client/views/map/HistoryView.vue';
 import { useAdminStore } from '../src/client/stores/admin.ts';
@@ -186,6 +187,76 @@ describe('operational alerts', () => {
       admin.alerts = [] as never;
     });
     expect(wrapper.text()).toContain('هشدار بازی وجود ندارد.');
+    wrapper.unmount();
+  });
+});
+
+describe('console skeletons during first load', () => {
+  it('renders skeleton rows instead of a calm empty alerts panel while the first load pends', async () => {
+    const { wrapper } = await render(AlertsView, ROUTE_NAMES.adminAlerts, () => {
+      // Hang every request so the in-flight counter stays above zero.
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    });
+    expect(wrapper.find('[data-testid="alerts-loading"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('هشدار بازی وجود ندارد');
+    wrapper.unmount();
+  });
+
+  it('renders skeleton rows instead of an empty audit trail while the first load pends', async () => {
+    const { wrapper } = await render(AuditView, ROUTE_NAMES.adminAudit, () => {
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    });
+    expect(wrapper.find('[data-testid="audit-loading"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('رویدادی ثبت نشده است');
+    wrapper.unmount();
+  });
+
+  it('renders skeleton rows instead of an empty group list while the first load pends', async () => {
+    const { wrapper } = await render(GroupsView, ROUTE_NAMES.adminGroups, () => {
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    });
+    expect(wrapper.find('[data-testid="groups-loading"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('گروهی تعریف نشده است');
+    wrapper.unmount();
+  });
+});
+
+describe('console inline load errors', () => {
+  it('alerts shows the load failure inline with a retry that re-pulls the alerts feed', async () => {
+    const { wrapper, admin } = await render(AlertsView, ROUTE_NAMES.adminAlerts);
+    const panel = wrapper.find('[data-testid="alerts-error"]');
+    expect(panel.exists()).toBe(true);
+    expect(panel.text()).toContain('offline');
+    expect(wrapper.find('[data-testid="alerts-retry"]').exists()).toBe(true);
+    // The retry re-issues the loader; with the fetch stub still failing, the error remains on screen.
+    const loadsBefore = vi.mocked(fetch).mock.calls.length;
+    await wrapper.find('[data-testid="alerts-retry"]').trigger('click');
+    await flushPromises();
+    expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(loadsBefore);
+    expect(wrapper.find('[data-testid="alerts-error"]').exists()).toBe(true);
+    expect(admin.error).toBeTruthy();
+    wrapper.unmount();
+  });
+
+  it('audit shows the load failure inline with a retry that re-pulls the trail', async () => {
+    const { wrapper } = await render(AuditView, ROUTE_NAMES.adminAudit);
+    expect(wrapper.find('[data-testid="audit-error"]').exists()).toBe(true);
+    const loadsBefore = vi.mocked(fetch).mock.calls.length;
+    await wrapper.find('[data-testid="audit-retry"]').trigger('click');
+    await flushPromises();
+    expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(loadsBefore);
+    expect(wrapper.find('[data-testid="audit-error"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('groups shows the load failure inline with a retry that re-pulls groups and incident types', async () => {
+    const { wrapper } = await render(GroupsView, ROUTE_NAMES.adminGroups);
+    expect(wrapper.find('[data-testid="groups-error"]').exists()).toBe(true);
+    const loadsBefore = vi.mocked(fetch).mock.calls.length;
+    await wrapper.find('[data-testid="groups-retry"]').trigger('click');
+    await flushPromises();
+    expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(loadsBefore);
+    expect(wrapper.find('[data-testid="groups-error"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });

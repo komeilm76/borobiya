@@ -52,6 +52,23 @@ export const SEVERITY_TONES: Record<string, string> = {
   high: 'status-pill status-pill--danger'
 };
 
+/** Persian labels for mission-timeline event keys — raw server keys must never reach the UI. */
+export const TIMELINE_ACTION_LABELS: Record<string, string> = {
+  created: 'درخواست ثبت شد',
+  dispatch: 'اعزام شد',
+  assign: 'اعزام شد',
+  accept: 'پذیرفته شد',
+  arrive: 'به محل رسید',
+  start: 'رسیدگی آغاز شد',
+  complete: 'پایان یافت',
+  cancel: 'لغو شد'
+};
+
+/** Timeline action label, falling back to a neutral phrase for unknown keys. */
+export function timelineActionLabel(action: string): string {
+  return TIMELINE_ACTION_LABELS[action] ?? 'به‌روزرسانی مأموریت';
+}
+
 /** Persian label for a responder group lifecycle status. */
 export const GROUP_STATUS_LABELS: Record<string, string> = { active: 'فعال', paused: 'متوقف', inactive: 'غیرفعال' };
 

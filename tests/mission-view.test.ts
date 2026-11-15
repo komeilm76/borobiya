@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
@@ -55,6 +55,14 @@ const CANCELLATION_REASONS = [
   { id: 'cancel_mistake', label: 'اشتباه بود', requiresText: false },
   { id: 'cancel_other', label: 'سایر', requiresText: true }
 ];
+
+/** Selects a reason radio by value; mirrors what a tap on the row does. */
+async function pickReason(wrapper: VueWrapper, value: string) {
+  const radios = wrapper.findAll('[data-testid="cancel-reason"]');
+  const target = radios.find((radio) => (radio.element as HTMLInputElement).value === value);
+  expect(target, `reason ${value} is rendered`).toBeDefined();
+  await target!.setValue(true);
+}
 
 function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string; acceptFails?: boolean; cancelFails?: boolean; progressFails?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
@@ -179,8 +187,11 @@ describe('mission screen', () => {
     expect(calls.some((call) => call.path === '/_user/sos/sos_1')).toBe(true);
     const entries = wrapper.findAll('.timeline li');
     expect(entries).toHaveLength(2);
-    expect(entries[0].text()).toContain('created');
-    expect(entries[1].text()).toContain('dispatch');
+    expect(entries[0].text()).toContain('درخواست ثبت شد');
+    expect(entries[1].text()).toContain('اعزام شد');
+    // Raw server keys must never reach the UI.
+    expect(wrapper.text()).not.toContain('created');
+    expect(wrapper.text()).not.toContain('dispatch');
     wrapper.unmount();
   });
 
@@ -203,6 +214,38 @@ describe('mission screen', () => {
     expect(text).toContain('آتش‌سوزی');
     expect(text).toContain('۳۲۳۵');
     expect(text).not.toContain('—');
+    wrapper.unmount();
+  });
+
+  it('shows mission offline guidance with a retry that re-syncs', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const calls = stubApi();
+    const { wrapper } = await render();
+
+    const panel = wrapper.find('[data-testid="mission-offline"]');
+    expect(panel.exists()).toBe(true);
+    expect(panel.text()).toContain('ارتباط با سرور امداد قطع است');
+    // The last sync wall-clock is the one honest datum we have while offline.
+    expect(panel.text()).toContain('آخرین همگام‌سازی');
+
+    const before = calls.length;
+    await wrapper.find('[data-testid="mission-offline-retry"]').trigger('click');
+    await flushPromises();
+    expect(calls.length).toBeGreaterThan(before);
+    wrapper.unmount();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('shows the completion summary once the mission is closed', async () => {
+    stubApi({ mission: { id: 'mis_1', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+
+    const done = wrapper.find('[data-testid="mission-completed"]');
+    expect(done.exists()).toBe(true);
+    expect(done.text()).toContain('مأموریت با موفقیت بسته شد');
+    // The state machine is exhausted: no action buttons may be offered.
+    expect(wrapper.findAll('[data-testid="mission-next-actions"] button')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="mission-done-history"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -366,6 +409,9 @@ describe('responder offer', () => {
     const calls = stubApi({ mission: null });
     const { wrapper } = await render({ role: 'responder' });
     await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
+    // Two steps by design: the card opens the confirmation; the POST stands behind it.
+    expect(calls.some((entry) => entry.path === '/_user/sos/sos_1/accept')).toBe(false);
+    await wrapper.find('[data-testid="accept-confirm-accept"]').trigger('click');
     await flushPromises();
 
     const accept = calls.find((entry) => entry.path === '/_user/sos/sos_1/accept');
@@ -376,10 +422,27 @@ describe('responder offer', () => {
     wrapper.unmount();
   });
 
+  it('holds the accept behind a confirmation until the user commits', async () => {
+    const calls = stubApi({ mission: null });
+    const { wrapper } = await render({ role: 'responder' });
+
+    await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
+    const dialog = wrapper.find('[data-testid="accept-confirm"]');
+    expect(dialog.exists()).toBe(true);
+    // The dialog must not advertise a POST that has not happened yet.
+    expect(calls.some((entry) => entry.path === '/_user/sos/sos_1/accept')).toBe(false);
+
+    await wrapper.find('[data-testid="accept-confirm-cancel"]').trigger('click');
+    expect(wrapper.find('[data-testid="accept-confirm"]').exists()).toBe(false);
+    expect(calls.some((entry) => entry.path === '/_user/sos/sos_1/accept')).toBe(false);
+    wrapper.unmount();
+  });
+
   it('reports a lost race instead of pretending acceptance worked', async () => {
     const calls = stubApi({ acceptFails: true, mission: null });
     const { wrapper } = await render({ role: 'responder' });
     await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
+    await wrapper.find('[data-testid="accept-confirm-accept"]').trigger('click');
     await flushPromises();
 
     expect(useToast().messages.value.some((message) => message.message.includes('درخواست از قبل مأمور'))).toBe(true);
@@ -402,7 +465,7 @@ describe('cancellation', () => {
     const calls = stubApi();
     const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
     await wrapper.find('[data-testid="cancel-request"]').trigger('click');
-    await wrapper.find('[data-testid="cancel-reason"]').setValue('cancel_mistake');
+    await pickReason(wrapper, 'cancel_mistake');
     // No detail required for this reason; the confirm button must arm on the reason alone.
     const confirm = wrapper.find('[data-testid="confirm-cancel-request"]');
     expect(confirm.attributes('disabled')).toBeUndefined();
@@ -419,7 +482,7 @@ describe('cancellation', () => {
     const calls = stubApi();
     const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
     await wrapper.find('[data-testid="cancel-request"]').trigger('click');
-    await wrapper.find('[data-testid="cancel-reason"]').setValue('cancel_other');
+    await pickReason(wrapper, 'cancel_other');
     // Nine characters are not enough — the server would refuse with 400.
     await wrapper.find('[data-testid="cancel-detail"]').setValue('فقط نه');
     const confirm = wrapper.find('[data-testid="confirm-cancel-request"]');
@@ -439,7 +502,7 @@ describe('cancellation', () => {
     stubApi({ cancelFails: true });
     const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
     await wrapper.find('[data-testid="cancel-request"]').trigger('click');
-    await wrapper.find('[data-testid="cancel-reason"]').setValue('cancel_mistake');
+    await pickReason(wrapper, 'cancel_mistake');
     await wrapper.find('[data-testid="confirm-cancel-request"]').trigger('click');
     await flushPromises();
 

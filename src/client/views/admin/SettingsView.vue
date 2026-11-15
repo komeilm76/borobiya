@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { VAlert, VBtn, VTextField } from 'vuetify/components';
 import { useAdminStore } from '@/stores/admin.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
@@ -71,9 +72,11 @@ async function save(): Promise<void> {
   }
 }
 
-onMounted(async () => {
+async function reload(): Promise<void> {
   await Promise.all([admin.loadSettings(), admin.loadHealth()]);
-});
+}
+
+onMounted(() => void reload());
 </script>
 
 <template>
@@ -81,26 +84,41 @@ onMounted(async () => {
     <article class="panel">
       <header class="panel__head"><h2>تنظیمات سامانه</h2></header>
       <form class="stack-form" @submit.prevent="save">
-        <label v-for="row in settings" :key="row.key" class="settings-row">
-          <span>{{ LABELS[row.key] ?? row.key }}</span>
-          <VTextField
-            v-model="values[row.key]"
-            density="compact"
-            hide-details
-            :placeholder="BOOLEAN_KEYS.includes(row.key) ? '۰ یا ۱' : 'مثال: ۵۰۰۰'"
-          />
-        </label>
+        <div v-if="admin.loading && !settings.length" class="skeleton-stack" role="status" data-testid="settings-loading" aria-label="در حال بارگذاری تنظیمات">
+          <div v-for="row in 4" :key="row" class="skeleton-stack__row">
+            <span class="skeleton skeleton--bar skeleton--bar-sm" />
+            <span class="skeleton skeleton--bar skeleton--bar-wide" />
+          </div>
+        </div>
+        <template v-if="!(admin.loading && !settings.length)">
+          <label v-for="row in settings" :key="row.key" class="settings-row">
+            <span>{{ LABELS[row.key] ?? row.key }}</span>
+            <VTextField
+              v-model="values[row.key]"
+              density="compact"
+              hide-details
+              :placeholder="BOOLEAN_KEYS.includes(row.key) ? '۰ یا ۱' : 'مثال: ۵۰۰۰'"
+            />
+          </label>
+        </template>
         <VAlert v-if="formError" type="error" variant="tonal" density="compact">{{ formError }}</VAlert>
-        <VBtn type="submit" color="primary">ذخیره</VBtn>
+        <VBtn type="submit" color="primary" :disabled="admin.loading && !settings.length">ذخیره</VBtn>
       </form>
     </article>
     <article class="panel">
       <header class="panel__head"><h2>سلامت سیستم</h2></header>
-      <ul class="admin-list">
+      <div v-if="admin.loading && !admin.health" class="skeleton-stack" role="status" data-testid="health-loading" aria-label="در حال بارگذاری سلامت سیستم">
+        <div v-for="row in 3" :key="row" class="skeleton-stack__row">
+          <span class="skeleton skeleton--avatar" />
+          <span class="skeleton skeleton--bar skeleton--bar-wide" />
+        </div>
+      </div>
+      <ul v-else class="admin-list">
         <li><span class="mdi mdi-database" aria-hidden="true" /><div><strong>کاربران</strong><small>{{ format.number(Number((health.database as any)?.users ?? 0)) }}</small></div></li>
         <li><span class="mdi mdi-lan-connect" aria-hidden="true" /><div><strong>اتصال‌های زنده</strong><small>{{ format.number(Number((health.realtime as any)?.connections ?? 0)) }}</small></div></li>
         <li><span class="mdi mdi-clock-outline" aria-hidden="true" /><div><strong>زمان سرور</strong><small>{{ health.serverTime ? format.dateTime(Number(health.serverTime)) : '—' }}</small></div></li>
       </ul>
     </article>
+    <AdminInlineError testid="settings" :retry="reload" />
   </section>
 </template>

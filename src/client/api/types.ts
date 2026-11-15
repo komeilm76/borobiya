@@ -292,6 +292,27 @@ export interface AlertView {
   resolvedBy: string | null;
 }
 
+/** The administrator's read of one account: profile, live sessions, login history and request volume. */
+export interface AdminUserDetail {
+  user: {
+    id: string;
+    username: string;
+    role: Role;
+    isActive: boolean;
+    securityReady: boolean;
+    mustCompleteSecurityQuestions: boolean;
+    readyForMission: boolean;
+    recordTrack: boolean;
+    averageRating: number;
+    createdAt: number;
+  };
+  /** Live sessions for the account (device/network context, most recently active first). */
+  sessions: Array<{ sessionId: string; deviceName: string; ip: string; createdAt: number; lastActiveAt: number; expiresAt: number }>;
+  /** Recent authentication attempts, most recent first (both successes and failures). */
+  logins: Array<{ ip: string; deviceName: string; success: boolean; loginAt: number }>;
+  sosCount: number;
+}
+
 /** A paged administrator user record. */
 export interface AdminUserView {
   id: string;

@@ -673,10 +673,88 @@ Branch `arena/250278b6-borobiya`, same open PR #6. Scope: the not-yet-built admi
 - View fixtures in `tests/views.test.ts` updated to the real reports payload shape;
   `tests/admin-overview-view.test.ts` rewritten for the new screen contract.
 
-**Verification:** `./boro verify` exit **0** — 1263 tests passed (was 1240), coverage statements **94.11%**
+- Account detail panel on the users screen (`user-account-panel`): identity, activation/role pills,
+  group memberships derived client-side from each group's `memberIds`, job type, membership date, last
+  login, SOS request count, live sessions and login history (all from `GET /_admin/users/:id`), an inline
+  role/job-type editor and a two-step deactivate; the server's `admin.updateUser({active:false})` revokes
+  every session of the account, which is exactly what the panel's footer promises. Escape/backdrop close,
+  skeleton while loading. Preview fixture + catalog entry updated; existing toggle tests retargeted at
+  `user-toggle-<id>` testids, eight new tests added (panel open/close, deactivation, reactivation, role
+  edit, refused edit/deactivation, job-type change, group roster resolution, skeleton swap).
+
+- Incident types are now manageable end to end (`04-incident-types`): `POST /_admin/incident-types`
+  (rank assigned server-side as MAX+1, audit row, `SETTINGS_UPDATED` event), `PATCH /_admin/incident-types/:id`
+  (label/icon/color, hex colors normalized uppercase), service-layer guards (icon allowlist limited to glyphs
+  that ship in the generated client subset; `#RRGGBB` validation) mirrored at the route boundary. The admin
+  screen now presents a card grid (tinted icon chip, identifier, group coverage derived client-side from each
+  group's `incidentIds`, rank) with create form and inline editor; no per-type request counter (that fact lives
+  in the reports aggregate, not the catalog payload) and no active/inactive pill (the catalog has no such column) —
+  both deliberately omitted rather than invented. Preview fixtures/catalog updated; HTTP + service-guard + view tests added.
+
+**Verification:** `./boro verify` exit **0** — 1297 tests passed (was 1240), coverage statements **94.12%**
 / branches 87.19% / lines 96.24% (no gate lowered; margin over the 94% statement gate is ~0.11pp — flagged
 for the owner; the new attribution test in `tests/admin-reports-members.test.ts` exists partly to cover
 those branches). Docs guard clean; build, `tsc`, `vue-tsc` and all packaging steps green.
+
+### Stage G continued — map-client and console states (2026-11-13, later)
+
+- Auth and emergency-path empty/loading/offline compositions (`auth/02`, `auth/12`, `sos/16`): the login
+  submit stays disabled with an explicit note until both fields are filled; the forced onboarding gate
+  shows an informational loading banner, five skeleton rows and a disabled CTA while the question catalog
+  is in flight (a load failure surfaces an inline error with a retry, rather than the old silent empty
+  form); the SOS composer now states its offline stance plainly - no SOS reaches the center while the link
+  is down, no offline queue exists - and disables the send button on the review step until connectivity
+  returns. The login demo credentials keep working as before.
+- Console loading skeletons beyond the users table: the overview screen swaps in skeleton KPI cards,
+  a skeleton trend panel and a skeleton recent-requests list until the first payload lands (no more
+  reassuring zeroes); the reports screen does the same for its KPI cards, trend chart, group-share
+  donut, incident-type bars and group-performance table; the users panel shows the designed filter-empty
+  composition (mark, hint, clear-filters action) when a search/role filter matches nothing and a distinct
+  honest generic case when the roster is empty; the alerts, groups and audit panels swap in skeleton
+  row batches while their first load pends (verified by tests that hang the network). The remaining
+  console screens now do the same: the dispatch queue, the job-types catalog, the incident-type list,
+  the support-request queue (`support-loading`, replacing the misleading spinner hint with rows) and the
+  settings screen plus its system-health panel (`settings-loading` / `health-loading`; the health list
+  no longer prints zeroed counters while its figures are unknown). Tests that hang the network assert
+  the skeletons render and the either-empty copy does not.
+- Console inline load errors (`states/03-error`): a shared `AdminInlineError` panel replaces the
+  silence that followed a failed first load on ten administrator screens (overview, users, groups,
+  alerts, audit, incident types, job types, dispatch, settings and reports). It prints the admin
+  store's shared load-error message with a retry that re-issues the screen's own primary pull
+  (disabled and relabelled while in flight). The retry re-pulls lists; per-panel error isolation
+  and the design's full-screen error composition were not built. Tests that stub a failing
+  envelope assert the panel renders and the retry re-calls the loader.
+- A designed 403 surface (`states/05-forbidden`) replaces the silent redirect: a signed-in non-admin
+  reaching an administrator URL now sees the composed panel ("access not permitted", the actual rule
+  stated honestly - administrator-role accounts only, no finer scope in the model, no audit claim - a back
+  CTA and a code/role footer) riding the auth shell. The reference's manager-scope framing was not ported.
+- Overview load failures now render inline with a retry button (re-pull of the overview projection,
+  disabled and relabelled while in flight) — the previously bare `panel__error` copy on the one
+  administrator screen that reported its own load failures at all.
+
+- Mission page offline surface (`mission/19`): when the browser reports the link down, the offers panel
+  is replaced by an explicit offline card — wifi-off glyph, offline-connection message, the wall-clock
+  of the last successful catalog/list sync where known, and a retry button that re-pulls via the SOS store
+  (disabled/retrying while in flight). Leaving the offers live-looking while fetches fail was the
+  old, dishonest behavior. Honest subset only; the design's responder-side details not applicable.
+- SOS sending overlay (`sos/07`): while the composer is mid-submit (`sos.submitting`), the screen shows a
+  full-screen sending card — target title sending-to-center heading, the staged steps (including the
+  photo line only when a photo is staged and a note row when a note is typed), role dialog for AT. No fake
+  progress fill; the overlay releases exactly when the server answers.
+- Trips leader reorder (`navigation/17`): reorder mode with up/down rank controls; save PATCHes the
+  wholesale stop list through the existing leader-only `PATCH /_user/trips/:tripId`; members see nothing.
+  Drag handles, auto-optimize and ETA recomputation were not invented (no routing engine).
+- Console states (`states/01-loading`, `states/04-offline`): the admin store's `guard()` now counts
+  in-flight loaders instead of racing one boolean, the users table renders shimmer skeleton rows with a
+  status strip until the payload lands, and the admin shell shows a dark offline banner («اتصال به سرور
+  قطع است» + last clean sync + retry re-pull). Full-console skeleton coverage and per-widget
+  staleness markers were not built (no per-panel freshness model exists server-side).
+- Support-accepted notification (`mission/13`): approved / partially-approved / rejected titles with the
+  server's actual reason codes, surfaced in the mission page's support panel. Event-honest subset only.
+
+**Verification:** `./boro verify` exit **0** — 1330 tests passed (was 1297 at the start of this continuation),
+coverage statements **94.06%** / branches **87.51%** / lines **96.21%** (no gate lowered). Docs delta recorded in
+`docs/DESIGN_MATRIX.md`; no matrix row flipped.
 
 **Visual verification (inspection only, not approval):** light/dark desktop and light mobile captures of
 both screens were opened and inspected (1280×900, 390×844): RTL layout holds, sidebar active state correct,

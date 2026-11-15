@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { TransitionGroup } from 'vue';
 import { useAdminStore } from '@/stores/admin.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 
@@ -49,7 +50,14 @@ onMounted(reload);
           <span v-else class="status-pill status-pill--neutral">بسته شده</span>
         </li>
       </TransitionGroup>
-      <p v-if="!alerts.length" class="panel__empty">هشدار بازی وجود ندارد.</p>
+      <div v-if="admin.loading && !alerts.length" class="skeleton-stack" role="status" data-testid="alerts-loading" aria-label="در حال بارگذاری هشدارها">
+        <div v-for="row in 3" :key="row" class="skeleton-stack__row">
+          <span class="skeleton skeleton--avatar" />
+          <span class="skeleton skeleton--bar skeleton--bar-wide" />
+        </div>
+      </div>
+      <p v-else-if="!alerts.length" class="panel__empty">هشدار بازی وجود ندارد.</p>
     </article>
+    <AdminInlineError testid="alerts" :retry="() => admin.loadAlerts(includeResolved)" />
   </section>
 </template>

@@ -274,10 +274,22 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
   }],
   ['POST', /^\/_admin\/users$/, () => envelope({ ok: true })],
   ['PATCH', /^\/_admin\/users\/[^/]+$/, () => envelope({ ok: true })],
+  ['GET', /^\/_admin\/users\/([^/]+)$/, ({ args }) => {
+    const detail = A.adminUserDetailFor(args[0]);
+    return detail ? envelope(detail) : failure(404, 'NOT_FOUND', 'کاربری با این شناسه وجود ندارد.');
+  }],
   ['GET', /^\/_admin\/groups$/, () => items(A.adminGroups.map((g) => ({ ...g })))],
   ['POST', /^\/_admin\/groups$/, () => envelope({ ok: true })],
   ['PATCH', /^\/_admin\/groups\/[^/]+$/, () => envelope({ ok: true })],
   ['GET', /^\/_admin\/incident-types$/, () => items([...A.adminIncidentTypes])],
+  ['POST', /^\/_admin\/incident-types$/, ({ body }) =>
+    envelope({ ok: true, incidentType: { id: 'inc_preview', label: String(body.label ?? 'نوع تازه'), icon: String(body.icon ?? 'alert-outline'), color: String(body.color ?? '#0E6666').toUpperCase(), rank: 9 } })],
+  ['PATCH', /^\/_admin\/incident-types\/([^/]+)$/, ({ args, body }) => {
+    const id = String(args[0]);
+    const source = A.adminIncidentTypes.find((j) => j.id === id) as Record<string, unknown> | undefined;
+    if (!source) return failure(404, 'NOT_FOUND', 'نوع حادثه‌ای با این شناسه وجود ندارد.');
+    return envelope({ ok: true, incidentType: { ...source, ...body } });
+  }],
   ['GET', /^\/_admin\/job-types$/, () => items(A.adminJobTypes.map((j) => ({ ...j })))],
   ['POST', /^\/_admin\/job-types$/, () => envelope({ ok: true })],
   ['PATCH', /^\/_admin\/job-types\/[^/]+$/, () => envelope({ ok: true })],

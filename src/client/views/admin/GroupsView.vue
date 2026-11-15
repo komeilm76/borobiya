@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { VAlert, VBtn, VTextField, VSelect } from 'vuetify/components';
 import { useAdminStore } from '@/stores/admin.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
@@ -196,9 +197,11 @@ async function removeMember(userId: string): Promise<void> {
   }
 }
 
-onMounted(async () => {
+async function reload(): Promise<void> {
   await Promise.all([admin.loadGroups(), admin.loadIncidentTypes()]);
-});
+}
+
+onMounted(() => void reload());
 </script>
 
 <template>
@@ -274,7 +277,13 @@ onMounted(async () => {
           </div>
         </li>
       </ul>
-      <p v-if="!groups.length" class="panel__empty">گروهی تعریف نشده است.</p>
+      <div v-if="admin.loading && !groups.length" class="skeleton-stack" role="status" data-testid="groups-loading" aria-label="در حال بارگذاری گروه‌ها">
+        <div v-for="row in 4" :key="row" class="skeleton-stack__row">
+          <span class="skeleton skeleton--avatar" />
+          <span class="skeleton skeleton--bar skeleton--bar-wide" />
+        </div>
+      </div>
+      <p v-else-if="!groups.length" class="panel__empty">گروهی تعریف نشده است.</p>
     </article>
     <article class="panel">
       <header class="panel__head"><h2>گروه تازه</h2></header>
@@ -286,6 +295,7 @@ onMounted(async () => {
         <VBtn type="submit" color="primary" block>ساخت گروه</VBtn>
       </form>
     </article>
+    <AdminInlineError testid="groups" :retry="reload" />
   </section>
 </template>
 

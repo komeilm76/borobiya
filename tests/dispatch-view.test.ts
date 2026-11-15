@@ -167,7 +167,22 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('queue', () => {
+describe('dispatch queue', () => {
+  it('renders skeleton rows while the dispatch projections are in flight', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.adminDispatch });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(DispatchView, { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="dispatch-loading"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('صف اعزام خالی است');
+    wrapper.unmount();
+  });
+
+
   it('lists each pending request with what a dispatcher needs to judge it', async () => {
     stubApi();
     const { wrapper } = await render();

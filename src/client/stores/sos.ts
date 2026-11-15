@@ -35,6 +35,8 @@ export const useSosStore = defineStore('sos', () => {
   /** True while the next map tap should drop the incident pin for a manual location. */
   const placementArmed = ref(false);
   const loading = ref(false);
+  /** Wall-clock of the last fully successful load — the offline surface reports it, nothing else. */
+  const lastSyncedAt = ref<number | null>(null);
   const submitting = ref(false);
   const error = ref<string | null>(null);
   const activeMissionId = ref<string | null>(null);
@@ -78,6 +80,7 @@ export const useSosStore = defineStore('sos', () => {
       requests.value = sosList.items ?? [];
       missions.value = missionList.items ?? [];
       offers.value = offerList.items ?? [];
+      lastSyncedAt.value = Date.now();
       if (!draft.value.incidentTypeId && incidentTypes.value.length) draft.value.incidentTypeId = incidentTypes.value[0].id;
     } catch (caught) {
       error.value = errorMessage(caught);
@@ -211,6 +214,7 @@ export const useSosStore = defineStore('sos', () => {
     cancellationReasons,
     requests,
     missions,
+    lastSyncedAt,
     draft,
     loading,
     submitting,

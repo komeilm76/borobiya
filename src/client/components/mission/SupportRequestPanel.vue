@@ -18,6 +18,24 @@ import type { SupportRequestView } from '@/api/types.ts';
  */
 const props = defineProps<{ missionId: string }>();
 
+/**
+ * Set when a realtime `support.request.reviewed` event arrives for this mission: the design
+ * (13-support-accepted-notification) wants the requesting leader to see an in-sheet notice.
+ * The event payload carries `decision` only — names/counts are never fabricated from it.
+ */
+const reviewNotice = ref<{ decision: 'approved' | 'partially_approved' | 'rejected'; at: number } | null>(null);
+const NOTICE_TITLES: Record<string, string> = {
+  approved: 'درخواست نیروی کمکی شما تأیید شد',
+  partially_approved: 'نیروی کمکی به‌صورت جزئی تأیید شد',
+  rejected: 'درخواست نیروی کمکی شما رد شد'
+};
+const noticeTitle = computed(() => (reviewNotice.value ? NOTICE_TITLES[reviewNotice.value.decision] ?? 'درخواست نیروی کمکی بررسی شد' : ''));
+const noticeTone = computed(() => {
+  if (!reviewNotice.value) return '';
+  if (reviewNotice.value.decision === 'rejected') return 'support-notice support-notice--danger';
+  return 'support-notice support-notice--success';
+});
+
 const team = useMissionTeamStore();
 const format = useFormatters();
 const toast = useToast();
@@ -25,8 +43,12 @@ const toast = useToast();
 /* Live refresh: re-pull the projection whenever this mission's team or requests change. */
 const realtime = useRealtimeStore();
 const unsubscribers: Array<() => void> = [];
-const handleTeamEvent = (payload: { missionId?: string }): void => {
-  if (!payload?.missionId || payload.missionId === props.missionId) void reload();
+const handleTeamEvent = (payload: { missionId?: string; decision?: 'approved' | 'partially_approved' | 'rejected' }): void => {
+  if (!payload?.missionId || payload.missionId !== props.missionId) return;
+  if (isLeader.value && payload.decision && (payload.decision in NOTICE_TITLES)) {
+    reviewNotice.value = { decision: payload.decision, at: Date.now() };
+  }
+  void reload();
 };
 
 onMounted(() => {
@@ -151,6 +173,16 @@ onMounted(() => void reload());
 
 <template>
   <div class="support-requests" data-testid="support-request-panel">
+    <div v-if="reviewNotice" :class="noticeTone" role="status" data-testid="support-review-notice">
+      <span class="mdi" :class="reviewNotice.decision === 'rejected' ? 'mdi-close-circle-outline' : 'mdi-check-circle-outline'" aria-hidden="true" />
+      <div>
+        <strong>{{ noticeTitle }}</strong>
+        <small>{{ format.clock(reviewNotice.at) }} · لیست نیروها تازه شد</small>
+      </div>
+      <button type="button" class="support-notice__close" aria-label="بستن اعلان" data-testid="support-review-notice-close" @click="reviewNotice = null">
+        <span class="mdi mdi-close" aria-hidden="true" />
+      </button>
+    </div>
     <div class="support-requests__head">
       <strong>درخواست نیروی کمکی</strong>
       <button v-if="isLeader && !composerOpen" type="button" class="ghost-button" data-testid="open-support-composer" @click="openComposer">

@@ -85,6 +85,22 @@ afterEach(() => {
 });
 
 describe('job types', () => {
+  it('renders skeleton rows while the catalog is in flight', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.adminJobTypes });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(JobTypesView, { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="job-types-loading"]').exists()).toBe(true);
+    expect(wrapper.text()).not.toContain('هنوز نوع شغلی تعریف نشده است');
+    wrapper.unmount();
+  });
+});
+
+describe('job types', () => {
   it('lists the catalog with policy and member count', async () => {
     stubApi();
     const { wrapper } = await render();

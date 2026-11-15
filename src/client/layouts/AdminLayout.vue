@@ -5,6 +5,8 @@ import { useEventListener } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth.ts';
 import { useAdminStore } from '@/stores/admin.ts';
 import { useRealtimeStore } from '@/stores/realtime.ts';
+import { useOfflineStore } from '@/stores/offline.ts';
+import { useFormatters } from '@/composables/useFormatters.ts';
 import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 import { commandPaletteOpen } from '@/composables/useCommandPalette.ts';
 import AdminNav from '@/components/AdminNav.vue';
@@ -20,6 +22,8 @@ const route = useRoute();
 const auth = useAuthStore();
 const admin = useAdminStore();
 const realtime = useRealtimeStore();
+const offline = useOfflineStore();
+const format = useFormatters();
 const motion = useMotionPreferences();
 /** Off-canvas navigation for small screens; the fixed sidebar is hidden below 1100px. */
 const navOpen = ref(false);
@@ -47,6 +51,9 @@ onUnmounted(() => {
 });
 
 watch(() => route.name, () => { navOpen.value = false; });
+
+/** The console's honest offline stance: say so plainly, name the data age, offer a reload of the projections. */
+const retrySync = (): void => { void admin.loadAll(); };
 
 useEventListener(window, 'keydown', (event: KeyboardEvent) => {
   if (event.key === 'Escape') navOpen.value = false;
@@ -84,6 +91,16 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
         </div>
       </header>
       <section class="admin-content bb-admin-pad">
+        <div v-if="offline.offline" class="admin-offline" role="status" data-testid="admin-offline-banner">
+          <span class="admin-offline__text">
+            <span class="mdi mdi-wifi-off" aria-hidden="true" />
+            <span>اتصال به سرور قطع است — در حال نمایش آخرین داده‌های ذخیره‌شده.<template v-if="admin.lastSyncedAt"> آخرین همگام‌سازی {{ format.dateTime(admin.lastSyncedAt) }}.</template> به‌روزرسانی زنده متوقف است.</span>
+          </span>
+          <button type="button" class="admin-offline__retry" :disabled="admin.loading" data-testid="admin-offline-retry" @click="retrySync">
+            <span :class="['mdi', admin.loading ? 'mdi-loading is-spinning' : 'mdi-refresh']" aria-hidden="true" />
+            <span>{{ admin.loading ? 'در حال تلاش…' : 'تلاش دوباره' }}</span>
+          </button>
+        </div>
         <Transition name="bb-admin-panel" mode="out-in" :duration="motion.fast.value">
           <RouterView :key="String(route.name)" />
         </Transition>
@@ -118,6 +135,11 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
 .admin-bell { position: relative; display: grid; place-items: center; inline-size: 40px; block-size: 40px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); text-decoration: none; }
 .admin-bell:hover { background: var(--surface-3); }
 .admin-bell__dot { position: absolute; inset-block-start: 9px; inset-inline-end: 10px; inline-size: 9px; block-size: 9px; border-radius: 50%; background: var(--danger); border: 2px solid var(--surface-2); }
+.admin-offline { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; border-radius: var(--r16); background: #3c3226; color: #f0e4c8; font-size: 12.5px; margin-block-end: 14px; }
+.admin-offline__text { display: flex; align-items: center; gap: 10px; min-inline-size: 0; line-height: 1.9; }
+.admin-offline__text .mdi { flex-shrink: 0; font-size: 20px; }
+.admin-offline__retry { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 8px 16px; border-radius: var(--r12); background: rgba(255,255,255,.12); color: inherit; font-weight: 700; border: 1px solid rgba(255,255,255,.22); }
+.admin-offline__retry:hover:not(:disabled) { background: rgba(255,255,255,.18); }
 .admin-main { display: flex; flex-direction: column; min-inline-size: 0; }
 .admin-topbar {
   display: flex;

@@ -102,6 +102,24 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+describe('settings first load', () => {
+  it('renders skeleton rows and no zeroed health figures while the payload pends', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.adminSettings });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(SettingsView, { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="settings-loading"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="health-loading"]').exists()).toBe(true);
+    // The health panel must not print zeroed counters while unknown.
+    expect(wrapper.text()).not.toContain('اتصال‌های زنده');
+    wrapper.unmount();
+  });
+});
+
 describe('settings form', () => {
   it('shows a readable label per setting instead of the raw key', async () => {
     const { wrapper } = await render();

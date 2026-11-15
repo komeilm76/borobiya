@@ -227,9 +227,12 @@ onUnmounted(() => {
       </div>
 
       <p v-if="team.error" class="team-panel__error" role="alert">{{ team.error }}</p>
-      <p v-else-if="team.loading && !team.adminRequests.length" class="team-panel__hint">
-        <span class="mdi mdi-loading is-spinning" aria-hidden="true" /> بارگذاری درخواست‌ها…
-      </p>
+      <div v-else-if="team.loading && !team.adminRequests.length" class="skeleton-stack" role="status" data-testid="support-loading" aria-label="در حال بارگذاری درخواست‌ها">
+        <div v-for="row in 3" :key="row" class="skeleton-stack__row">
+          <span class="skeleton skeleton--avatar" />
+          <span class="skeleton skeleton--bar skeleton--bar-wide" />
+        </div>
+      </div>
 
       <ul class="admin-list">
         <template v-for="request in team.adminRequests" :key="request.id">

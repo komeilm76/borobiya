@@ -128,6 +128,68 @@ describe('question catalog', () => {
     wrapper.unmount();
   });
 
+  it('shows a loading banner and skeleton rows while the catalog is in flight', async () => {
+    let release: (() => void) | null = null;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      if (path === '/_public/security-questions') {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return json({ items: QUESTIONS });
+      }
+      const method = init?.method ?? 'GET';
+      if (path === '/_user/me' && method === 'GET') return json({ id: 'usr_new', username: 'new.person', role: ROLES.USER, mustCompleteSecurityQuestions: false });
+      return json({});
+    }));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.onboarding });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(OnboardingView, { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } });
+
+    // While the catalog is pending the screen says so and the submit is disabled; the five
+    // slots are not shown yet because "loading" and "your five questions" are different states.
+    expect(wrapper.find('[data-testid="onboarding-loading"]').exists()).toBe(true);
+    expect(wrapper.findAll('.onboarding-skeleton-row')).toHaveLength(5);
+    expect((wrapper.find('button[type="submit"]').element as HTMLButtonElement).disabled).toBe(true);
+
+    release!();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="onboarding-loading"]').exists()).toBe(false);
+    expect(wrapper.findAll('.auth-card__question')).toHaveLength(5);
+    wrapper.unmount();
+  });
+
+  it('shows the load failure with a retry that re-fetches the catalog', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      if (path === '/_public/security-questions') {
+        calls += 1;
+        if (calls === 1) return failure(500, 'INTERNAL', 'internal error');
+        return json({ items: QUESTIONS });
+      }
+      return json({ id: 'usr_new', username: 'new.person', role: ROLES.USER, mustCompleteSecurityQuestions: false });
+    }));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.onboarding });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const wrapper = mount(OnboardingView, { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } });
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="onboarding-load-error"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="onboarding-load-retry"]').trigger('click');
+    await flushPromises();
+    expect(calls).toBe(2);
+    expect(wrapper.find('[data-testid="onboarding-load-error"]').exists()).toBe(false);
+    expect(wrapper.findAll('.auth-card__question')).toHaveLength(5);
+    wrapper.unmount();
+  });
+
   it('renders five answer fields even before the catalog arrives', async () => {
     stubApi({ questions: [] });
     const { wrapper } = await render();

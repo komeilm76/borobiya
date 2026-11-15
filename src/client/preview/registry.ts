@@ -142,8 +142,8 @@ export const PREVIEW_PAGES: PreviewPage[] = [
   },
   {
     id: 'adminUsers', name: 'کاربران', section: 'admin', route: '/_admin/users', persona: 'admin', status: 'ready',
-    summary: 'فهرست کاربران با جست‌وجو، فیلتر نقش/وضعیت، فعال‌سازی و تغییر نقش.',
-    testHints: ['جست‌وجوی نام کاربری', 'فیلتر نقش responder', 'تغییر وضعیت یک حساب (نمایشی)']
+    summary: 'فهرست کاربران با جست‌وجو، فیلتر نقش/وضعیت، فعال‌سازی و تغییر نقش؛ پنل جزئیات حساب (پروفایل، گروه‌ها، نشست‌های فعال، تاریخچهٔ ورود).',
+    testHints: ['جست‌وجوی نام کاربری', 'فیلتر نقش responder', 'تغییر وضعیت یک حساب (نمایشی)', 'باز کردن پنل «جزئیات» یک حساب']
   },
   {
     id: 'adminGroups', name: 'گروه‌های خدمت', section: 'admin', route: '/_admin/groups', persona: 'admin', status: 'ready',
@@ -152,8 +152,8 @@ export const PREVIEW_PAGES: PreviewPage[] = [
   },
   {
     id: 'adminIncidents', name: 'انواع حادثه', section: 'admin', route: '/_admin/incidents', persona: 'admin', status: 'ready',
-    summary: 'کاتالوگ رنگ‌های استاندارد حادثه (فقط خواندنی).',
-    testHints: ['رنگ‌ها و آیکون‌ها', 'ترتیب رتبه‌بندی']
+    summary: 'کاتالوگ نوع‌های حادثه: ساخت و ویرایش درون‌خطی برچسب، آیکون و رنگ؛ رتبه ترتیب نمایش را تعیین می‌کند.',
+    testHints: ['رنگ‌ها و آیکون‌ها', 'ترتیب رتبه‌بندی', 'ساخت نوع حادثهٔ تازه (نمایشی)', 'ویرایش درون‌خطی برچسب، آیکون و رنگ']
   },
   {
     id: 'adminJobTypes', name: 'انواع شغل', section: 'admin', route: '/_admin/job-types', persona: 'admin', status: 'ready',

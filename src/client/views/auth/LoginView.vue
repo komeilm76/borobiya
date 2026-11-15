@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { VAlert, VBtn, VCard, VForm, VTextField } from 'vuetify/components';
 import { useAuthStore } from '@/stores/auth.ts';
@@ -18,6 +18,8 @@ const password = ref('');
 const showPassword = ref(false);
 const error = ref<string | null>(null);
 const busy = ref(false);
+/** The submit stays disabled until both fields carry something — the reference empty state says so right under the button. */
+const canSubmit = computed(() => username.value.trim().length > 0 && password.value.length > 0 && !busy.value);
 
 async function onSubmit(): Promise<void> {
   if (busy.value) return;
@@ -69,7 +71,8 @@ const demo = async (name: string): Promise<void> => {
         <RouterLink :to="{ name: ROUTE_NAMES.recovery }">گذرواژه را فراموش کرده‌اید؟</RouterLink>
       </div>
       <VAlert v-if="error" type="error" variant="tonal" density="compact">{{ error }}</VAlert>
-      <VBtn type="submit" block color="primary" class="auth-submit" :loading="busy" data-testid="login-submit">
+      <p class="auth-submit-note" data-testid="login-empty-note">تا وقتی هر دو فیلد پر نشده، دکمه غیرفعال می‌ماند.</p>
+      <VBtn type="submit" block color="primary" class="auth-submit" :loading="busy" :disabled="!canSubmit" data-testid="login-submit">
         <span>ورود به حساب</span>
         <span class="mdi mdi-arrow-left" aria-hidden="true" />
       </VBtn>
@@ -94,6 +97,7 @@ const demo = async (name: string): Promise<void> => {
 .auth-form__row { display: flex; justify-content: flex-start; margin-block-start: -6px; font-size: 12.5px; }
 .auth-form__row a { color: var(--primary); text-decoration: none; }
 .auth-submit { height: 52px; font-size: 15px; border-radius: var(--r14); gap: 10px; letter-spacing: 0; }
+.auth-submit-note { margin: 0; font-size: 11.5px; color: var(--muted); text-align: center; }
 .auth-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
 .auth-divider::before,
 .auth-divider::after { content: ''; flex: 1; block-size: 1px; background: var(--border); }

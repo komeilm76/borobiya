@@ -307,6 +307,44 @@ describe('SOS composer submission', () => {
     wrapper.unmount();
   });
 
+  it('covers the screen with the sending surface while the POST is in flight', async () => {
+    // Hold the create request open so the submitting state is observable mid-flight.
+    let release: (() => void) | null = null;
+    const calls: Array<{ method: string; path: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+        const path = url.split('?')[0];
+        const method = init?.method ?? 'GET';
+        calls.push({ method, path });
+        if (path === '/_user/sos' && method === 'POST') {
+          await new Promise<void>((resolve) => { release = resolve; });
+          return new Response(JSON.stringify({ ok: true, requestId: 'r', data: { id: 'sos_new' } }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        const data = path === '/_public/incident-types' ? { items: INCIDENT_TYPES } : { items: [] };
+        return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      })
+    );
+    const { wrapper } = await render();
+    await writeDescription(wrapper, 'دود غلیظ از پنجره طبقه سوم');
+    for (let index = 0; index < 4; index += 1) await advance(wrapper);
+
+    expect(wrapper.find('[data-testid="sos-sending"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="sos-sending"]').text()).toContain('در حال ارسال به مرکز امداد');
+
+    release!();
+    await flushPromises();
+    expect(wrapper.find('[data-testid="sos-sending"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('reports a failed submit and keeps the draft so it can be retried', async () => {
     stubApi();
     const { wrapper } = await render();
@@ -334,6 +372,37 @@ describe('SOS composer submission', () => {
 });
 
 describe('SOS composer photo', () => {
+  it('says the SOS cannot reach the center while offline and disables the submit', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    stubApi();
+    const { wrapper } = await render();
+
+    const card = wrapper.find('[data-testid="sos-offline"]');
+    expect(card.exists()).toBe(true);
+    expect(card.text()).toContain('درخواست امداد فعلاً به مرکز نمی‌رسد');
+    expect(card.text()).toContain('صف آفلاین');
+
+    // Walk the composer to the review step and pin the disabled submit.
+    await writeDescription(wrapper, 'در راه خانه با ماشین تصادف کردم و فردی مصدوم است');
+    await advance(wrapper); // 2: location
+    await advance(wrapper); // 3: photo
+    await advance(wrapper); // 4: review
+    const submit = wrapper.find('[data-testid="sos-submit"]');
+    expect(submit.exists()).toBe(true);
+    expect(submit.attributes('disabled')).toBeDefined();
+    expect(submit.text()).toContain('در انتظار اتصال');
+    wrapper.unmount();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+  });
+
+  it('keeps the offline card hidden and the submit enabled while online', async () => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    stubApi();
+    const { wrapper } = await render();
+    expect(wrapper.find('[data-testid="sos-offline"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it('shows the compression pipeline error instead of attaching an unreadable image', async () => {
     stubApi();
     const { wrapper } = await render();

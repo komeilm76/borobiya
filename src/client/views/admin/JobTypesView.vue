@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { VAlert, VBtn, VSelect, VTextField } from 'vuetify/components';
 import { useAdminStore } from '@/stores/admin.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
@@ -95,7 +96,13 @@ onMounted(() => void reload());
           </button>
         </li>
       </ul>
-      <p v-if="!items.length" class="panel__empty">هنوز نوع شغلی تعریف نشده است.</p>
+      <div v-if="admin.loading && !items.length" class="skeleton-stack" role="status" data-testid="job-types-loading" aria-label="در حال بارگذاری انواع شغل">
+        <div v-for="row in 4" :key="row" class="skeleton-stack__row">
+          <span class="skeleton skeleton--avatar" />
+          <span class="skeleton skeleton--bar skeleton--bar-wide" />
+        </div>
+      </div>
+      <p v-else-if="!items.length" class="panel__empty">هنوز نوع شغلی تعریف نشده است.</p>
     </article>
     <article class="panel">
       <header class="panel__head"><h2>نوع شغل تازه</h2></header>
@@ -106,5 +113,6 @@ onMounted(() => void reload());
         <VBtn type="submit" color="primary" block>ساخت نوع شغل</VBtn>
       </form>
     </article>
+    <AdminInlineError testid="job-types" :retry="() => reload()" />
   </section>
 </template>

@@ -4,6 +4,7 @@ import { hashPassword, newId } from '../core/crypto.ts';
 import type { SqlValue } from '../db/repository.ts';
 import type { Repository } from '../db/repository.ts';
 import { HTTP_EVENTS, MISSION_STATUS, ROLES } from '../../shared/protocol.ts';
+import { INCIDENT_TYPE_ICONS } from '../domain/catalog.ts';
 import type { AppContext } from './context.ts';
 
 export interface UserFilters { q?: string; role?: string; active?: boolean; page: number; limit: number }
@@ -345,7 +346,41 @@ export class AdminService {
 
   incidentTypes(): Record<string, unknown> {
     const rows = this.ctx.repo.all<Record<string, any>>('SELECT * FROM incident_types ORDER BY rank');
-    return { items: rows.map((row) => ({ id: String(row.id), label: String(row.label), icon: String(row.icon), color: String(row.color) })), total: rows.length };
+    return { items: rows.map((row) => this.publicIncidentType(row)), total: rows.length };
+  }
+
+  createIncidentType(identity: AuthIdentity, input: { label: string; icon: string; color: string }): Record<string, unknown> {
+    const label = input.label.trim();
+    if (!label) throw badRequest('Incident type label is required.', { field: 'label' });
+    this.assertIncidentIcon(input.icon);
+    const color = input.color.trim();
+    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) throw badRequest('Incident type color must be a #RRGGBB hex value.', { field: 'color' });
+    const rank = Number(this.ctx.repo.one<{ value: number }>('SELECT COALESCE(MAX(rank),0) AS value FROM incident_types')?.value ?? 0) + 1;
+    const id = newId('inc');
+    return this.ctx.uow.commit((tx) => {
+      tx.repo.run('INSERT INTO incident_types(id,label,icon,color,rank) VALUES(?,?,?,?,?)', id, label, input.icon, color.toUpperCase(), rank);
+      this.audit(tx.repo, identity, 'incident-type.create', id, { label, icon: input.icon, color });
+      tx.event(HTTP_EVENTS.SETTINGS_UPDATED, { kind: 'incident-type', incidentTypeId: id }, ['role:admin']);
+      return { ok: true, incidentType: this.publicIncidentType({ id, label, icon: input.icon, color: color.toUpperCase(), rank }) };
+    });
+  }
+
+  updateIncidentType(identity: AuthIdentity, incidentTypeId: string, input: { label?: string; icon?: string; color?: string }): Record<string, unknown> {
+    const existing = this.ctx.repo.one<Record<string, any>>('SELECT * FROM incident_types WHERE id=?', incidentTypeId);
+    if (!existing) throw notFound('Incident type not found.');
+    if (input.icon !== undefined) this.assertIncidentIcon(input.icon);
+    const label = input.label === undefined ? String(existing.label) : input.label.trim();
+    if (!label) throw badRequest('Incident type label is required.', { field: 'label' });
+    const color = input.color === undefined ? String(existing.color) : input.color.trim();
+    if (!/^#[0-9A-Fa-f]{6}$/.test(color)) throw badRequest('Incident type color must be a #RRGGBB hex value.', { field: 'color' });
+    const icon = input.icon ?? String(existing.icon);
+    return this.ctx.uow.commit((tx) => {
+      tx.repo.run('UPDATE incident_types SET label=?, icon=?, color=? WHERE id=?', label, icon, color.toUpperCase(), incidentTypeId);
+      this.audit(tx.repo, identity, 'incident-type.update', incidentTypeId, { label, icon, color: color.toUpperCase() });
+      tx.event(HTTP_EVENTS.SETTINGS_UPDATED, { kind: 'incident-type', incidentTypeId }, ['role:admin']);
+      const row = tx.repo.one<Record<string, any>>('SELECT * FROM incident_types WHERE id=?', incidentTypeId)!;
+      return { ok: true, incidentType: this.publicIncidentType(row) };
+    });
   }
 
   createGroup(identity: AuthIdentity, input: GroupInput): Record<string, unknown> {
@@ -485,6 +520,16 @@ export class AdminService {
 
   private assertGroup(groupId: string): void {
     if (!this.ctx.repo.one('SELECT id FROM service_groups WHERE id=?', groupId)) throw notFound('Service group not found.');
+  }
+
+  private assertIncidentIcon(icon: string): void {
+    if (!(INCIDENT_TYPE_ICONS as readonly string[]).includes(icon)) {
+      throw badRequest('Unknown incident type icon.', { field: 'icon' });
+    }
+  }
+
+  private publicIncidentType(row: Record<string, any>): Record<string, unknown> {
+    return { id: String(row.id), label: String(row.label), icon: String(row.icon), color: String(row.color), rank: Number(row.rank) };
   }
 
   private assertIncidentIds(ids: string[]): void {

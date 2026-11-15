@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import { VAlert, VBtn, VTextarea } from 'vuetify/components';
 import { useSosStore } from '@/stores/sos.ts';
 import { useMapStore } from '@/stores/map.ts';
+import { useOfflineStore } from '@/stores/offline.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
 import { errorMessage } from '@/api/client.ts';
@@ -18,6 +19,7 @@ import { compressImageFile, ImageProcessingError, SERVER_DATA_URL_LIMIT, type Im
 const router = useRouter();
 const sos = useSosStore();
 const map = useMapStore();
+const offline = useOfflineStore();
 const format = useFormatters();
 const toast = useToast();
 
@@ -140,6 +142,14 @@ async function submit(): Promise<void> {
     <span class="siren-badge"><span class="mdi mdi-alarm-light" aria-hidden="true" /></span>
   </div>
   <div class="sheet__body sheet__body--sos">
+    <div v-if="offline.offline" class="sos-offline" role="status" data-testid="sos-offline">
+      <span class="mdi mdi-wifi-off sos-offline__icon" aria-hidden="true" />
+      <div class="sos-offline__body">
+        <strong>درخواست امداد فعلاً به مرکز نمی‌رسد</strong>
+        <p>تا بازگشت اتصال اینترنت، ارسال درخواست از این دستگاه ممکن نیست و هیچ امدادی مطلع نمی‌شود. این برنامه درخواست را در صف آفلاین نگه نمی‌دارد؛ تا پیدا کردن اتصال اینترنت، ارسال ممکن نخواهد شد.</p>
+        <p v-if="sos.lastSyncedAt" class="sos-offline__sync">آخرین همگام‌سازی فهرست‌ها: {{ format.dateTime(sos.lastSyncedAt) }}</p>
+      </div>
+    </div>
     <div class="sos-progress">
       <span v-for="(label, index) in steps" :key="label" :class="{ 'is-done': index < draft.step }" />
     </div>
@@ -245,6 +255,19 @@ async function submit(): Promise<void> {
 
     <VAlert v-if="sos.error" type="error" variant="tonal" density="compact" class="mt-2">{{ sos.error }}</VAlert>
   </div>
+  <div v-if="sos.submitting" class="sos-sending" role="dialog" aria-modal="true" aria-labelledby="sos-sending-title" data-testid="sos-sending">
+    <div class="sos-sending__panel">
+      <span class="sos-sending__ring" aria-hidden="true" />
+      <strong id="sos-sending-title" class="sos-sending__title">در حال ارسال به مرکز امداد</strong>
+      <p class="sos-sending__sub">این پنجره را نبندید؛ چند ثانیه بیشتر طول نمی‌کشد.</p>
+      <ul class="sos-sending__steps">
+        <li class="is-active"><span class="mdi mdi-loading is-spinning" aria-hidden="true" /><span>ثبت درخواست در مرکز امداد</span></li>
+        <li v-if="draft.photoDataUrl" class="is-active"><span class="mdi mdi-loading is-spinning" aria-hidden="true" /><span>تصویر صحنه همراه درخواست ارسال می‌شود</span></li>
+        <li><span class="mdi mdi-circle-outline" aria-hidden="true" /><span>پس از تأیید ثبت، به امدادگران نزدیک اعلام می‌شود</span></li>
+      </ul>
+      <p class="sos-sending__note"><span class="mdi mdi-information-outline" aria-hidden="true" /><span>تا پایان ارسال، درخواست «در حال ثبت» است.</span></p>
+    </div>
+  </div>
   <div class="sheet__footer sheet__footer--sos">
     <button v-if="draft.step > 1" type="button" class="ghost-button" @click="sos.previousStep()">بازگشت</button>
     <button
@@ -255,8 +278,29 @@ async function submit(): Promise<void> {
     >
       <span>ادامه</span><span class="mdi mdi-arrow-left" aria-hidden="true" />
     </button>
-    <button v-else type="button" class="primary-button primary-button--danger" :disabled="sos.submitting" @click="submit">
-      <span>ارسال درخواست امداد</span><span class="mdi mdi-send" aria-hidden="true" />
+    <button v-else type="button" class="primary-button primary-button--danger" :disabled="sos.submitting || offline.offline" data-testid="sos-submit" @click="submit">
+      <span>{{ offline.offline ? 'در انتظار اتصال…' : 'ارسال درخواست امداد' }}</span><span class="mdi mdi-send" aria-hidden="true" />
     </button>
   </div>
 </template>
+
+<style scoped>
+.sos-sending { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(6, 14, 15, .55); border-radius: inherit; }
+.sos-sending__panel { display: grid; gap: 10px; justify-items: center; inline-size: min(340px, 100%); padding: 22px 18px 16px; border-radius: var(--r20); background: var(--surface); box-shadow: var(--shadow-lg); text-align: center; }
+.sos-sending__ring { inline-size: 52px; block-size: 52px; border-radius: 50%; border: 4px solid color-mix(in srgb, var(--danger) 22%, transparent); border-top-color: var(--danger); animation: sos-ring 900ms linear infinite; }
+.sos-sending__title { font-size: 17px; font-weight: 800; }
+.sos-sending__sub { margin: 0; font-size: 12px; color: var(--muted); }
+.sos-sending__steps { display: grid; gap: 6px; list-style: none; margin: 2px 0 0; padding: 0; inline-size: 100%; text-align: right; }
+.sos-sending__steps li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); padding: 6px 10px; border-radius: var(--r10); }
+.sos-sending__steps li.is-active { color: var(--text); font-weight: 700; }
+.sos-sending__steps .mdi { color: var(--danger); }
+.sos-sending__steps li:last-child .mdi { color: var(--muted); }
+.sos-sending__note { display: flex; align-items: center; gap: 6px; margin: 0; padding: 8px 12px; border-radius: var(--r12); background: var(--surface-2); font-size: 11px; color: var(--muted); }
+.sos-sending__note .mdi { flex-shrink: 0; }
+.sos-offline { display: flex; gap: 12px; padding: 12px 14px; border-radius: var(--r16); background: #3c3226; color: #f0e4c8; font-size: 12px; line-height: 1.9; margin-block-end: 12px; }
+.sos-offline__icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.sos-offline__body { display: grid; gap: 4px; }
+.sos-offline__sync { margin: 0; font-size: 11px; opacity: .85; }
+@keyframes sos-ring { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sos-sending__ring { animation: none; } }
+</style>

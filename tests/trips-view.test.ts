@@ -262,6 +262,74 @@ describe('trip detail interactions', () => {
     wrapper.unmount();
   });
 
+  it('lets the leader reorder the stops and PATCHes the wholesale stop list', async () => {
+    const REORDERED = {
+      ...DETAIL,
+      stops: [
+        { id: 'tstp_2', rank: 1, label: 'بیمارستان امید', latitude: 35.7231, longitude: 51.4122, placeId: null },
+        { id: 'tstp_1', rank: 2, label: 'خانه', latitude: 35.7192, longitude: 51.3314, placeId: null }
+      ]
+    };
+    const { calls } = stubFetch((path, method, body) => {
+      if (path === '/_user/trips') return { items: [TRIP], total: 1 };
+      if (path === '/_user/trips/invitations') return { items: [], total: 0 };
+      if (path === '/_public/map/config') return { pois: [] };
+      if (path === '/_user/places') return { items: [] };
+      if (path === '/_user/trips/trp_1' && method === 'GET') return DETAIL;
+      if (path === '/_user/trips/trp_1' && method === 'PATCH') return REORDERED;
+      return { items: [] };
+    });
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-row-trp_1"]').trigger('click');
+    await flushPromises();
+
+    await wrapper.find('[data-testid="trips-reorder-open"]').trigger('click');
+    // Move the second stop (بیمارستان امید) up one position.
+    await wrapper.find('[data-testid="reorder-up-1"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="trips-reorder-list"]').text()).toContain('بیمارستان امید');
+
+    await wrapper.find('[data-testid="trips-reorder-save"]').trigger('click');
+    await flushPromises();
+
+    const patch = calls.find((call) => call.method === 'PATCH' && call.path === '/_user/trips/trp_1');
+    expect(patch?.body?.stops?.map((stop: any) => stop.label)).toEqual(['بیمارستان امید', 'خانه']);
+    wrapper.unmount();
+  });
+
+  it('does not offer the reorder controls to a plain member', async () => {
+    stubFetch((path, method) => {
+      if (path === '/_user/trips') return { items: [{ ...TRIP, role: 'member' }], total: 1 };
+      if (path === '/_user/trips/invitations') return { items: [], total: 0 };
+      if (path === '/_public/map/config') return { pois: [] };
+      if (path === '/_user/places') return { items: [] };
+      if (path === '/_user/trips/trp_1' && method === 'GET') return MEMBER_DETAIL;
+      return { items: [] };
+    });
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-row-trp_1"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="trips-reorder-open"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('disables upward movement on the first row', async () => {
+    stubFetch((path, method) => {
+      if (path === '/_user/trips') return { items: [TRIP], total: 1 };
+      if (path === '/_user/trips/invitations') return { items: [], total: 0 };
+      if (path === '/_public/map/config') return { pois: [] };
+      if (path === '/_user/places') return { items: [] };
+      if (path === '/_user/trips/trp_1' && method === 'GET') return DETAIL;
+      return { items: [] };
+    });
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-row-trp_1"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="trips-reorder-open"]').trigger('click');
+    expect(wrapper.find('[data-testid="reorder-up-0"]').attributes('disabled')).toBeDefined();
+    wrapper.unmount();
+  });
+
   it('completes an active trip as the leader', async () => {
     const { calls } = stubFetch((path, method) => {
       if (path === '/_user/trips') return { items: [{ ...TRIP, status: 'active' }], total: 1 };

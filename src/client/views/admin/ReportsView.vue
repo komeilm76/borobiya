@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { useAdminStore } from '@/stores/admin.ts';
+import AdminInlineError from '@/components/AdminInlineError.vue';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
 import { tryDownloadPreviewCsv } from '@/preview/demo-downloads.ts';
@@ -21,6 +22,8 @@ const PERIODS = [
 ] as const;
 
 const reports = computed(() => admin.reports);
+/** True only while the first reports payload is pending — the panels swap in skeletons instead of zeroes and reassuring empty copy. */
+const showSkeletons = computed(() => admin.loading && !admin.reports);
 const kpis = computed(() => reports.value?.kpis ?? null);
 const trend = computed(() => reports.value?.trend ?? []);
 const incidentTypes = computed(() => reports.value?.incidentTypes ?? []);
@@ -122,7 +125,14 @@ onMounted(() => void admin.loadReports(days.value));
       </div>
     </header>
 
-    <div class="reports-kpis" data-testid="reports-kpis">
+    <div v-if="showSkeletons" class="reports-kpis" data-testid="reports-kpis-skeleton" aria-hidden="true">
+      <article v-for="row in 4" :key="row" class="panel report-kpi report-kpi--skeleton">
+        <div class="report-kpi__head"><span class="skeleton skeleton--avatar" /><span class="skeleton skeleton--bar skeleton--bar-sm" /></div>
+        <span class="skeleton skeleton--bar" style="block-size: 26px; inline-size: 96px;" />
+        <span class="skeleton skeleton--bar skeleton--bar-sm" />
+      </article>
+    </div>
+    <div v-else class="reports-kpis" data-testid="reports-kpis">
       <article class="panel report-kpi">
         <div class="report-kpi__head"><span class="report-kpi__icon mdi mdi-chart-bar" aria-hidden="true" /><span>کل درخواست‌ها</span></div>
         <strong>{{ format.number(kpis?.totalRequests ?? 0) }}</strong>
@@ -160,7 +170,8 @@ onMounted(() => void admin.loadReports(days.value));
     <div class="reports-grid">
       <article class="panel reports-trend" data-testid="reports-trend">
         <header class="panel__head"><h2>روند درخواست و مأموریت <small class="is-muted">{{ format.number(days) }} روز آخر</small></h2></header>
-        <svg v-if="trend.length" viewBox="0 0 560 140" role="img" aria-label="نمودار روند درخواست‌ها و مأموریت‌ها" preserveAspectRatio="none">
+        <div v-if="showSkeletons" class="skeleton skeleton--chart" role="status" data-testid="reports-trend-skeleton" aria-label="در حال بارگذاری روند" />
+        <svg v-else-if="trend.length" viewBox="0 0 560 140" role="img" aria-label="نمودار روند درخواست‌ها و مأموریت‌ها" preserveAspectRatio="none">
           <line v-for="gy in [20, 52, 84, 116]" :key="gy" :x1="0" :x2="560" :y1="gy" :y2="gy" class="reports-trend__grid" />
           <polyline :points="seriesPoints('requests')" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
           <polyline :points="seriesPoints('missions')" fill="none" stroke="var(--amber)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="0" />
@@ -174,7 +185,8 @@ onMounted(() => void admin.loadReports(days.value));
 
       <article class="panel reports-donut" data-testid="reports-donut">
         <header class="panel__head"><h2>سهم گروه‌ها</h2></header>
-        <div v-if="groupRequestTotal" class="reports-donut__body">
+        <div v-if="showSkeletons" class="skeleton skeleton--chart" role="status" aria-label="در حال بارگذاری سهم گروه‌ها" />
+        <div v-else-if="groupRequestTotal" class="reports-donut__body">
           <div class="reports-donut__chart" :style="{ background: `conic-gradient(${donutStops})` }" role="img" :aria-label="`سهم گروه‌ها از ${format.number(groupRequestTotal)} درخواست اعزام‌شده`">
             <div><strong>{{ format.number(groupRequestTotal) }}</strong><span>درخواست</span></div>
           </div>
@@ -191,7 +203,8 @@ onMounted(() => void admin.loadReports(days.value));
 
       <article class="panel reports-incidents" data-testid="reports-incidents">
         <header class="panel__head"><h2>بر اساس نوع حادثه</h2></header>
-        <div v-if="incidentTypes.length" class="reports-bars">
+        <div v-if="showSkeletons" class="skeleton skeleton--chart" role="status" aria-label="در حال بارگذاری انواع حادثه" />
+        <div v-else-if="incidentTypes.length" class="reports-bars">
           <div v-for="item in incidentTypes" :key="item.label" class="reports-bar">
             <span class="reports-bar__count">{{ format.number(item.count) }}</span>
             <div class="reports-bar__track"><i :style="{ height: `${(item.count / incidentMax) * 100}%`, background: item.color }" /></div>
@@ -203,7 +216,8 @@ onMounted(() => void admin.loadReports(days.value));
 
       <article class="panel reports-groups" data-testid="reports-groups">
         <header class="panel__head"><h2>عملکرد گروه‌ها</h2></header>
-        <div v-if="reports?.groups?.length" class="reports-table-wrap">
+        <div v-if="showSkeletons" class="skeleton skeleton--chart" role="status" aria-label="در حال بارگذاری عملکرد گروه‌ها" />
+        <div v-else-if="reports?.groups?.length" class="reports-table-wrap">
           <table class="reports-table">
             <thead>
               <tr><th>گروه</th><th>درخواست</th><th>میانگین پاسخ</th><th>پذیرش</th><th>رضایت</th><th>وضعیت</th></tr>
@@ -235,6 +249,7 @@ onMounted(() => void admin.loadReports(days.value));
         </div>
       </article>
     </div>
+    <AdminInlineError testid="reports" :retry="() => admin.loadReports(days)" />
   </section>
 </template>
 

@@ -213,7 +213,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | admin-panel/services/01-groups.png | partial | P3/H | List + create (client-side rule hints) works; no edit. |
 | admin-panel/services/02-group-edit.png | missing | P3/H | No edit UI (name/color/capacity/status/coverage). |
 | admin-panel/services/03-members.png | missing | P3/H | No member add/remove UI (`memberIds` used by dispatch but unmanageable in UI). |
-| admin-panel/services/04-incident-types.png | partial | P3/M | Read-only list; no create/edit. |
+| admin-panel/services/04-incident-types.png | partial | P3/M | Create + inline edit (label/icon/color) now ship: `POST/PATCH /_admin/incident-types`, service-layer validation (icon limited to the shipped glyph subset, `#RRGGBB` color, rank assigned server-side), audit rows, card-grid presentation with per-type group coverage derived client-side. Not pixel-matched to the reference (no per-type request counter — needs the reports aggregate, not the catalog payload); stays `partial` pending human visual acceptance. |
 
 ## Administrator console — system (3)
 
@@ -294,6 +294,92 @@ accepts the recorded preview):
   current members. Status stays `missing`.
 - `admin-panel/services/01-groups.png` — unchanged status `partial`; its note (list + create, no
   edit) is now stale — edit exists; the row should be re-read when the owner adjudicates.
+- `admin-panel/services/04-incident-types.png` — create + inline edit now ship (service guards,
+  audit rows, shipped-glyph allowlist); the reference's per-type request counter is not in the
+  catalog payload and was not invented; status stays `partial` pending human visual acceptance.
+- `admin-panel/users/02-account.png` — a per-account detail panel now ships in the users screen:
+  identity, role/activation pills, group memberships (computed client-side from each group's
+  `memberIds`), job type, membership date, last login, SOS request count, live sessions, login
+  history, an inline role/job-type editor and a two-step deactivate (which the server backs by
+  revoking every session). Every figure comes from `GET /_admin/users/:id`; nothing is invented.
+  Status stays `missing` until human visual acceptance. The `01-list` row's stale note (no avatars,
+  no detail links) — avatars and now a detail entry point exist; row stays `partial`.
+  `03-roles` remains absent on purpose: the schema has exactly three roles (user, responder, admin)
+  with no permissions model behind them; drawing the designed dispatch-manager matrix would invent a
+  capability that does not exist. Owner decision needed: either formalize roles/permissions in the
+  data model, or record the matrix as in-scope-never.
+- `navigation/17-destination-reordering.png` — the Trips screen (Stage 5 scope) now carries leader-only
+  stop reordering: up/down rank controls on a reordered list, a save action that PATCHes the wholesale
+  stop list via `PATCH /_user/trips/:tripId`, a first-row up-disable, and no reorder affordance for plain
+  members. The design's drag handles, auto-optimize-route button and distance/ETA recomputation note
+  were not ported (no routing engine; “nearest” ordering would invent distances). Status stays `missing`
+  pending human visual acceptance.
+- `admin-panel/states/01-loading.png` — the console now counts in-flight loaders (`guard` in the admin
+  store increments/decrements a pending counter instead of a boolean racing), and the built screens swap
+  in shimmer skeletons instead of misleading zeroes or reassuring empty copy while their first payload is
+  in flight: the users table (row batch plus an informational status strip), the overview screen (KPI
+  cards, trend panel and recent-requests list), the reports screen (KPI cards, trend chart, group-share
+  donut, incident-type bars and the group-performance table), and the alerts, groups and audit panels
+  (skeleton row batches). Dispatch (`dispatch-loading`), job types (`job-types-loading`), incident types
+  (`incidents-loading`), support requests (`support-loading`) and the settings screen (`settings-loading`
+  plus `health-loading` for the system-health snapshot) now skeletonize the same way. Remaining gaps in
+  this family: the skeleton geometry is a generic row batch rather than screen-specific layouts, and no
+  route under the console shows a full-screen skeleton scrim. Status stays `missing`.
+- `admin-panel/states/04-offline.png` — the admin shell now shows a dark offline banner whenever the
+  browser reports the link down: wifi-off glyph, server connection lost, the wall-clock of the last
+  clean `loadAll` (where the last sync is known), and a retry retry that re-pulls every admin
+  projection and is labelled "retrying" while in flight. The banner deliberately does not claim
+  staleness per widget (the console has no per-panel freshness model) and the KPI-pill stored data
+  marker and the offline map empty state were not ported. Status stays `missing`.
+- `mission/13-support-accepted-notification.png` — the mission page's support panel now renders the
+  review outcome as an explicit notice with the title family (approved / partially-approved / rejected)
+  and the server's actual reason codes, driven entirely by `supportRequestNotice` state. No push/permission
+  flow was invented. Status stays `missing` pending human visual acceptance.
+- `mission/19-mission-offline.png` — the mission page now shows an offline card in place of the offers
+  list when the browser reports the link down: wifi-off glyph, the connection-lost title, the wall-clock
+  of the last successful catalog/list sync where known, and a retry that re-pulls through the SOS store
+  (disabled and labelled retrying while in flight). The design's full-screen responder-side treatment was
+  not ported. Status stays `missing`.
+- `admin-panel/states/03-error.png` — the console's inline load-error surface now exists everywhere
+  instead of only on the overview: a shared `AdminInlineError` panel renders the admin store's shared
+  load-error message with a retry that re-issues the screen's own primary pull (disabled and labelled
+  retrying while in flight), and it ships on the overview, users, groups, alerts, audit, incident types,
+  job types, dispatch, settings and reports screens. The retry re-pulls lists, not any mutation that
+  failed; the message is the store's shared error ref (the same one the overview shows), so one panel
+  per screen may display a failure that originated elsewhere in the console. Statuses are unchanged;
+  the design's full-screen error composition and per-panel isolation of load failures are not built.
+  Status stays `partial`.
+- `sos/07-sos-sending.png` — while the SOS composer is mid-submit the screen shows a full-screen sending
+  card as a dialog: the sending-to-center heading, the staged request steps (photo line only when a photo
+  is staged, note row only when a note was typed). No fake progress fill and no counters the server cannot
+  truthfully drive; the overlay releases exactly when the server answers. Status stays `missing`.
+- `profile/06-logout-confirm.png` — the map sheet's one-tap logout was replaced by a confirmation
+  dialog (title, account-safety body, current-device rows when sessions are known, solid-danger accept
+  and cancel, scrim and Escape to dismiss). Status stays `missing` pending human visual acceptance.
+- `auth/02-login-empty.png` — the login screen now renders its empty-state contract: the submit CTA is
+  disabled until both the username and the password carry a value, with an explicit note under the button
+  saying so. Status stays `missing` pending human visual acceptance.
+- `auth/12-onboarding-loading.png` — the forced onboarding screen now shows its loading composition while
+  the question catalog is in flight: an informational banner, five skeleton rows and a disabled submit; a
+  load failure surfaces an inline error with a retry that re-fetches the catalog, instead of the silent
+  empty form the screen used to show. Status stays `missing` pending human visual acceptance.
+- `admin-panel/states/05-forbidden.png` — a designed 403 surface now exists and the router guard
+  points at it: a signed-in non-admin who reaches an administrator URL lands on the composed panel
+  (lock-shield mark, the "access not permitted for this role" title, an honest body naming the actual
+  rule - console open to administrator-role accounts only, no finer permission scope exists in the model,
+  no audit claim is invented - plus a back CTA and a footer printing the numeric code and the caller's
+  current role). The reference's manager-scope framing was not ported (no such permission exists).
+  Status stays `partial` pending human visual acceptance.
+- `sos/16-sos-offline.png` — the SOS composer now carries its offline stance: whenever the browser reports
+  the link down, the composer body shows an explicit no-reach card (no SOS reaches the rescue center, no
+  offline queueing happens, last catalog sync shown where known) and the send button on the review step is
+  disabled and relabelled until connectivity returns. Status stays `missing`.
+- `admin-panel/states/02-empty.png` — the users console panel now renders its designed empty
+  composition when a search/role filter matches nothing (centered mark, "no user matches these
+  filters" title, the shorten-or-reset hint and a clear-filters action that re-issues the unfiltered
+  query), and a distinct honest generic case when the roster is simply empty. Reports panels keep
+  their honest per-section empty copy (with skeletons while loading); other screens still render
+  their plain empty texts. Status stays `partial`.
 - Counts remain: `done` 23, `partial` 71, `missing` 30, `superseded` 11, `reference` 5, `deviation` 1.
 
 ## Design flaws found in the reference material (to fix or consciously keep)
