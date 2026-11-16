@@ -298,23 +298,20 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
     width: min(30rem, calc(100vw - 7.5rem)); }
 }
 @media (max-width: 599px) {
-  section.point-route-shell { left: calc(.75rem + env(safe-area-inset-left, 0px));
-    right: calc(.75rem + env(safe-area-inset-right, 0px));
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
-  /* The two-row SOS/Search rail needs 17rem above the sheet: 9.5rem SOS
-     offset, 3rem hit area and 4.5rem for the workspace tabs. Scroll the card
-     instead of pushing emergency actions behind the tabs on short phones. */
-  .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important;
-    max-height: min(52dvh, 27rem, max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+  section.point-route-shell { left: 0; right: 0; bottom: 0; width: auto; }
+  /* Match active guidance: the dock reaches the bottom edge, while two 48px
+     action rows and the workspace tabs remain above its measured top. */
+  .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+    max-height: min(52dvh, 27rem, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   .point-route-shell--expanded .point-route.bb-map-navigation-card {
-    max-height: min(40rem, max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    max-height: min(40rem, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
   }
   .point-route__header, .point-route__endpoints, .point-route__choices, .point-route__metrics, .point-route__actions {
     padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
   .point-route.bb-map-navigation-card {
-    max-height: max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto; /* One scroll surface when the header and footer alone fill the card. */
   }
   .point-route__content { flex: none; overflow: visible; }

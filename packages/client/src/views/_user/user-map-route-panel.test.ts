@@ -48,8 +48,8 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('@search="openRouteSearch" @choose-route="openRouteChoices"');
     const styles = css(sheet, "PointRouteSheet.vue");
     expect(styles).toContain('section.point-route-shell[data-v-route-panel] { position: fixed; z-index: 7');
-    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto');
-    expect(styles).toContain('max-height: min(52dvh, 27rem, max(7rem, calc(100dvh - 17rem');
+    expect(styles).toContain('left: 0; right: 0; bottom: 0; width: auto;');
+    expect(styles).toContain('max-height: min(52dvh, 27rem, max(7rem, calc(100dvh - 12.25rem');
     expect(styles).toContain('overflow-y: auto');
     expect(styles).toContain('min-height: 44px');
   });
@@ -175,13 +175,14 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain("'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value");
     expect(map).toContain('function measurePointSheet(): void {');
     expect(map).toContain('function pointSheetId(): string {');
+    expect(shell).toContain(':root { --bb-map-point-sheet-height: min(48dvh, max(7rem, calc(100dvh - 12.25rem');
     expect(map).toContain('new ResizeObserver(measurePointSheet)');
     expect(map).toContain('document.documentElement.style.removeProperty("--bb-map-point-sheet-height")');
     expect(map).toContain('function onPointRouteLayoutChange(): void {\n  measurePointSheet();');
     expect(map).toContain('watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });');
     const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
     const rule = '.app-shell--map:has(.user-map-view--route-preview)';
-    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem + env(safe-area-inset-bottom, 0px))';
+    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem)';
     for (const selector of ['.sos-fab.sos-fab', '.user-map-view__route-choices-toggle.user-map-view__route-choices-toggle']) {
       const start = phone.indexOf(`${rule} ${selector} {`);
       expect(start).toBeGreaterThan(0);
@@ -189,11 +190,12 @@ describe("progressive trip planning and editing", () => {
     }
     const rail = css(map, "UserMapView.vue");
     expect(rail).toContain('.user-map-view--route-preview');
-    expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px)');
-    expect(rail).toContain('13rem + env(safe-area-inset-right, 0px)');
-    // Five 48px actions with >=4px gaps fit a 320px phone with 20px insets.
-    const lastActionLeft = 320 - (12 + 13 * 16 + 20) - 48;
-    expect(lastActionLeft).toBeGreaterThanOrEqual(20);
+    expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + .5rem');
+    expect(rail).toContain('11.25rem + env(safe-area-inset-right, 0px)');
+    // Four 48px actions with 8px gaps fit a 320px phone; SOS and route
+    // choice occupy a separate row, never extending beyond the left edge.
+    const lastActionLeft = 320 - (11.25 * 16 + 12) - 48;
+    expect(lastActionLeft).toBeGreaterThanOrEqual(12);
     expect(sheet).toContain('role="region"'); // No overlay focus trap: the map and actions remain reachable.
   });
 
@@ -205,39 +207,41 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('modelValue: activeTool.value === "live"');
     expect(map).toContain('@create-share="shareOpen = true"');
     expect(map).toContain('<ShareDialog v-model="shareOpen" :fullscreen="isPhone"');
-    for (const panel of [css(sheet, "PointRouteSheet.vue"), css(choices, "PointRouteChoicesSheet.vue"),
-      css(transport, "PointTransportChoicesSheet.vue")]) {
-      expect(panel).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto;');
+    for (const panel of [css(sheet, "PointRouteSheet.vue"), css(choices, "PointRouteChoicesSheet.vue")]) {
+      expect(panel).toContain('left: 0; right: 0; bottom: 0; width: auto;');
       expect(panel).toContain('pointer-events: auto');
     }
+    const transportStyle = css(transport, "PointTransportChoicesSheet.vue");
+    expect(transportStyle).toContain('section.point-transport-choices-shell[data-v-route-panel]:not(.point-transport-choices-shell--mission)');
+    expect(transportStyle).toContain('left: 0; right: 0; bottom: 0;');
+    expect(transport).toContain("'point-transport-choices-shell--mission': !!missionId");
     const search = css(map, "UserMapView.vue");
     expect(search).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(search).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px))');
+    expect(search).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem)');
     expect(search).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem)');
     // A 48px Search target sits below SOS with an 8px gap in all three states.
     expect(4.25 - (.75 + 3)).toBe(.5);
-    expect(9.5 - (6 + 3)).toBe(.5);
     expect(4 - (.5 + 3)).toBe(.5);
     expect(sheet).toContain('overflow-y: auto'); // Landscape keeps full-size buttons scrollable.
   });
 
   it("caps all phone trip and guidance cards before they push SOS into the workspace tabs", () => {
-    const clearance = 'max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))';
+    const clearance = 'max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))';
     for (const [component, filename] of [[sheet, "PointRouteSheet.vue"],
       [choices, "PointRouteChoicesSheet.vue"], [transport, "PointTransportChoicesSheet.vue"]] as const) {
       expect(css(component, filename)).toContain(clearance);
     }
     expect(css(sheet, "PointRouteSheet.vue")).toContain('max-height: min(40rem, ' + clearance);
     expect(css(map, "UserMapView.vue")).toContain('max-height: min(72dvh, 36rem, max(7rem, calc(100dvh - 12.25rem');
-    expect(shell).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem');
+    expect(shell).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem');
     expect(shell).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem');
     // At 430px even the old 52dvh/62dvh caps would put SOS offscreen. The
     // new cap leaves the 48px target below the 4.5rem top-tab corridor.
     for (const height of [430, 568, 667]) {
-      const available = Math.max(7 * 16, height - 17 * 16);
+      const available = Math.max(7 * 16, height - 12.25 * 16);
       for (const card of [Math.min(.52 * height, 27 * 16, available),
         Math.min(62 / 100 * height, 32 * 16, available), Math.min(40 * 16, available)]) {
-        expect(height - card - 9.5 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
+        expect(height - card - 4 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
       }
       const guidance = Math.min(.72 * height, 36 * 16, Math.max(7 * 16, height - 12.25 * 16));
       // The dock reaches the screen edge; its measured height keeps the
@@ -286,8 +290,7 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain('role="region" aria-label="انتخاب مسیر"');
     expect(choices).not.toContain('VBottomSheet');
     const choiceStyles = css(choices, "PointRouteChoicesSheet.vue");
-    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: calc(.75rem + env(safe-area-inset-left, 0px));');
-    expect(choiceStyles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));\n    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto;');
+    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: 0; right: 0; bottom: 0; width: auto;');
     expect(choiceStyles).toContain('width: min(30rem, calc(100vw - 7.5rem))');
     expect(choices).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
     expect(choices).toContain('v-for="(route, index) in api.routes.value"');
@@ -336,8 +339,9 @@ describe("progressive trip planning and editing", () => {
     const styles = css(transport, "PointTransportChoicesSheet.vue");
     expect(styles).toContain('section.point-transport-choices-shell[data-v-route-panel] { left: calc(.75rem + env(safe-area-inset-left, 0px));');
     expect(styles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
-    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto');
-    expect(styles).toContain('max-height: min(62dvh, 32rem, max(7rem, calc(100dvh - 17rem');
+    expect(styles).toContain('section.point-transport-choices-shell[data-v-route-panel]:not(.point-transport-choices-shell--mission)');
+    expect(styles).toContain('left: 0; right: 0; bottom: 0;');
+    expect(styles).toContain('max-height: min(62dvh, 32rem, max(7rem, calc(100dvh - 12.25rem');
     expect(styles).toContain('overflow-y: auto'); // Full-size footer is reachable on short phones.
   });
 

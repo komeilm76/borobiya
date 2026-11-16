@@ -2850,7 +2850,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view__search-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
   .user-map-view--route-preview .user-map-view__search-action {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem);
   }
   .user-map-view--navigating .user-map-view__search-action {
     inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
@@ -2906,21 +2906,22 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 @media (max-width: 599px) {
-  /* The nonmodal planner covers the lower map. Put the full control row above
-   * its measured top edge; keep the 48px hit areas on 320px RTL phones. */
+  /* Every Trips sheet shares guidance's measured two-row action layout.
+   * Four map controls sit 8px above the dock, SOS and route choice one row
+   * higher, without hiding a sheet action or covering the workspace tabs. */
   .user-map-view--route-preview .user-map-view__share,
   .user-map-view--route-preview .user-map-view__recenter,
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: auto; bottom: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px));
+    top: auto; bottom: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem);
   }
   .user-map-view--route-preview .user-map-view__share {
-    right: calc(.75rem + 6.5rem + env(safe-area-inset-right, 0px)); left: auto;
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--route-preview .user-map-view__recenter {
-    right: calc(.75rem + 9.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(.75rem + 13rem + env(safe-area-inset-right, 0px)); left: auto;
+    right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--navigating .user-map-view__recenter,
   .user-map-view--navigating .user-map-view__share,

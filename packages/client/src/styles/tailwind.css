@@ -558,6 +558,10 @@ a {
 }
 
 @media (max-width: 599px) {
+  /* Until ResizeObserver measures the current Trips card, cap the fallback to
+     the same clearance as the card. The measured root inline value takes over
+     immediately; a short phone never briefly loses SOS behind the top tabs. */
+  :root { --bb-map-point-sheet-height: min(48dvh, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   .app-shell--map { height: 100dvh; overflow: hidden; }
   .app-shell--map .app-main { min-height: 0; }
   /* Keep the 48px SOS one row above the shared Search action. */
@@ -569,14 +573,15 @@ a {
     inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
     inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
   }
-  /* The planner and route-choice sheets cover the lower map. Keep both App-level
-   * actions visible and adjacent above the currently measured sheet. */
+  /* Point/route/vehicle sheets now meet the viewport edge. Their measured
+   * height already includes safe-area padding: keep SOS and route choice in
+   * the second row above the dock, without adding that inset twice. */
   .app-shell--map:has(.user-map-view--route-preview) .sos-fab.sos-fab {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem);
   }
   .app-shell--map:has(.user-map-view--route-preview) .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem + env(safe-area-inset-bottom, 0px));
-    inset-inline-start: calc(0.75rem + 3.25rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem);
+    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
   }
   /* During guidance Search joins the action row above the measured sheet;
    * SOS and route choice sit one row higher, never behind the card. */

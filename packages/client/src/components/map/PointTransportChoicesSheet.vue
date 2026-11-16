@@ -1,6 +1,7 @@
 <template>
   <!-- Match the route chooser: a nonmodal, bounded sheet over the visible map. -->
   <section v-if="open && (api?.point.value || missionId)" class="point-transport-choices-shell"
+    :class="{ 'point-transport-choices-shell--mission': !!missionId }"
     role="region" aria-label="انتخاب وسیلهٔ حرکت" @keydown.esc.stop.prevent="emit('close')">
     <v-card id="map-point-transport-choices-sheet" class="point-transport-choices bb-floating-card bb-map-navigation-card" elevation="3" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-transport-choices__header">
@@ -89,13 +90,24 @@ section.point-transport-choices-shell { position: fixed; z-index: 7; pointer-eve
   section.point-transport-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px));
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
+  /* The mission picker keeps its own floating placement above the mission dock. */
+  section.point-transport-choices-shell:not(.point-transport-choices-shell--mission) {
+    left: 0; right: 0; bottom: 0;
+  }
   .point-transport-choices.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important;
     width: 100%; max-height: min(62dvh, 32rem, max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+  .point-transport-choices-shell:not(.point-transport-choices-shell--mission) .point-transport-choices.bb-map-navigation-card {
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+    max-height: min(62dvh, 32rem, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
   .point-transport-choices__list { padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
   .point-transport-choices.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto; }
+  .point-transport-choices-shell:not(.point-transport-choices-shell--mission) .point-transport-choices.bb-map-navigation-card {
+    max-height: max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
   .point-transport-choices__header, .point-transport-choices__hint, .point-transport-choices__footer { flex-shrink: 0; }
   .point-transport-choices__list { flex: none; overflow-y: visible; }
 }

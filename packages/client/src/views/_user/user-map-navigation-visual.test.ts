@@ -30,18 +30,20 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(common).toContain('.v-card.bb-floating-card {'); // Existing desktop/phone depth tiers.
   });
 
-  it("docks phone guidance flush with the bottom while preview and choice cards stay floating", () => {
+  it("docks all phone trip panels flush with the bottom while keeping safe-area padding inside", () => {
     for (const [source, name, root] of [[point, "PointRouteSheet.vue", ".point-route"],
       [routes, "PointRouteChoicesSheet.vue", ".point-route-choices"],
       [transport, "PointTransportChoicesSheet.vue", ".point-transport-choices"]] as const) {
       const styles = css(source, name);
       expect(styles).toContain(`${root}.bb-map-navigation-card[data-v-navigation]`);
-      expect(styles).toContain('border-radius: var(--bb-radius-card, 24px) !important');
-      expect(styles).not.toContain('var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0');
+      expect(styles).toContain('border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important');
       expect(styles).toContain('safe-area-inset-bottom');
-      expect(styles).toContain('left: calc(.75rem + env(safe-area-inset-left, 0px))');
-      expect(styles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px))');
+      expect(styles).toContain('left: 0; right: 0; bottom: 0;');
+      expect(styles).toContain('max-height: max(7rem, calc(100dvh - 12.25rem');
     }
+    // The shared transport component retains the older floating mission picker.
+    expect(transport).toContain("'point-transport-choices-shell--mission': !!missionId");
+    expect(transport).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto;');
     const guidance = css(map, "UserMapView.vue");
     expect(guidance).toContain('.user-map-view__journey-stack[data-v-navigation]');
     expect(guidance).toContain('transform: none; bottom: 0; width: auto;');
