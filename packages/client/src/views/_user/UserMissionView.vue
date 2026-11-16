@@ -4,7 +4,7 @@
     'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
     <!-- The map workspace owns the persistent public canvas even while idle. -->
     <div class="mission-desk__shell">
-      <header v-if="!desk.activeMission.value" class="mission-hero">
+      <header v-if="!desk.activeMission.value && (!embedded || desk.error.value)" class="mission-hero">
         <span class="mission-hero__eyebrow"><v-icon icon="mdi-lifebuoy" size="18" /> میز مأموریت امدادگر</span>
         <h1>{{ missionHeadline }}</h1>
         <p>{{ missionIntro }}</p>
@@ -998,13 +998,28 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   background: transparent !important; pointer-events: none; }
 .mission-desk--embedded .mission-desk__shell,
 .mission-desk--embedded .mission-desk__workspace { pointer-events: none; }
+/* The idle offer surface, not the whole map shell or an inner offer list, is
+   the one scroll container. Keep a clear strip of map/SOS visible below it. */
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__shell {
+  overflow: hidden; padding-bottom: 0;
+}
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
-  width: min(42rem, calc(100vw - 1.5rem)); padding: .75rem;
-  max-height: min(62dvh, 38rem); overflow-y: auto; overscroll-behavior: contain;
+  width: min(42rem, calc(100vw - 1.5rem));
+  margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;
+  padding: .9rem; max-height: min(68dvh, calc(100dvh - 10rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
   background: rgb(var(--v-theme-surface));
 }
-.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) { padding: .5rem; }
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) {
+  padding: 0; background: transparent;
+}
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__hero) { padding: .75rem; }
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__items) {
+  max-height: none; overflow: visible; padding: 0;
+}
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__empty) {
+  margin-top: .75rem; padding: 1rem;
+}
 .mission-desk--embedded .mission-desk__map-heading { top: calc(4.65rem + env(safe-area-inset-top, 0px));
   left: auto; right: 1rem; transform: none; }
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }

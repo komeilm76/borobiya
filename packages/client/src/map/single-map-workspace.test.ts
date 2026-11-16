@@ -3,12 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import { createMemoryHistory } from "vue-router";
 import { compileTemplate, parse } from "vue/compiler-sfc";
 import { createAppRouter } from "@/router";
+import { proposalEntryIntent, workspaceTabQuery } from "./workspace-tab-query";
 
 vi.mock("@client/views/_user/UserMapView.vue", () => ({ default: {} }));
 const map = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
 const mission = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
 const room = readFileSync(new URL("../components/mission/MissionLivePanel.vue", import.meta.url), "utf8");
 const offers = readFileSync(new URL("../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8");
+const proposalDrawer = readFileSync(new URL("../components/shell/MapProposalSidebar.vue", import.meta.url), "utf8");
 
 // Source and compiled-template tests: never mount .vue components in unit tests.
 describe("one persistent user map workspace", () => {
@@ -20,6 +22,22 @@ describe("one persistent user map workspace", () => {
     await router.push("/_user/mission?offer=example");
     expect(router.currentRoute.value.path).toBe("/_user/map");
     expect(router.currentRoute.value.query).toMatchObject({ tab: "missions", offer: "example" });
+  });
+  it("opens bookmarked proposals once, then keeps them closed across every map tab", async () => {
+    const router = createAppRouter(createMemoryHistory(), {
+      isAuthenticated: true, mustCompleteSecurityQuestions: false,
+      user: { role: "user" }, ensureSession: async () => {}
+    });
+    for (const link of ["/_user/map?inbox=1", "/_user/map?offer=example"]) {
+      await router.push(link);
+      expect(proposalEntryIntent(router.currentRoute.value.path, router.currentRoute.value.query)).not.toBeNull();
+      for (const tab of ["missions", "sharing", "history", "trips"] as const) {
+        const current = router.currentRoute.value;
+        await router.push({ path: "/_user/map", query: workspaceTabQuery(current.query, tab) });
+        expect(router.currentRoute.value.query.tab).toBe(tab);
+        expect(proposalEntryIntent(router.currentRoute.value.path, router.currentRoute.value.query)).toBeNull();
+      }
+    }
   });
   it("uses one canvas for idle/active mission, search and trip, never a second offer/room map", () => {
     expect(map.match(/<MapCanvas\b/g)).toHaveLength(1);
@@ -49,6 +67,21 @@ describe("one persistent user map workspace", () => {
     expect(mission).toContain('const added = routing.addWaypoint({ lat, lon });');
     expect(mission).toContain('if (!props.visible || !pickingWaypoint.value || navigation.active.value) return;');
     expect(mission).toContain('if (!visible && pickingWaypoint.value) {');
+  });
+  it("does not reopen proposal drawers on tab changes or scroll the entire map when an offer is selected", () => {
+    expect(map).toContain('workspaceTabQuery(route.query, next)');
+    expect(map).toContain('workspaceTabQuery(route.query, "history")');
+    expect(map).toContain('workspaceTabQuery(route.query, "sharing")');
+    expect(map).toContain('workspaceTabQuery(route.query, "missions")');
+    expect(proposalDrawer).toContain('if (intent === lastEntryIntent) return;');
+    expect(proposalDrawer).toContain('const intent = proposalEntryIntent(route.path, route.query);');
+    expect(proposalDrawer).toContain('returnFocusOnClose.value = false;');
+    expect(offers).toContain('detail.closest<HTMLElement>(".mission-desk__empty, .map-proposal__details-scroll")');
+    expect(offers).not.toContain('detailRef.value?.scrollIntoView(');
+    expect(mission).toContain('.mission-desk__empty :deep(.offers__items) {');
+    expect(mission).toContain('max-height: none; overflow: visible; padding: 0;');
+    expect(proposalDrawer).toContain('.map-proposal__details-scroll .offers .offers__items');
+    expect(map).toContain('max-width: calc(100% - 8.5rem); overflow: hidden;');
   });
   it("leaves offers accessible while trip navigation locks Missions/History", () => {
     expect(map).toContain(':disabled="!modeAvailability[item.id]');

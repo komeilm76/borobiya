@@ -96,7 +96,7 @@
           </div>
         </section>
 
-        <section v-if="selected" ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده">
+        <section v-if="selected" ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده" tabindex="-1">
           <div class="offer-detail__top">
             <span class="offer-detail__kicker">پروندهٔ امداد · {{ proposalTime(selected.createdAt) }}</span>
             <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
@@ -198,7 +198,17 @@ const detailRef = ref<HTMLElement | null>(null);
 async function selectOffer(id: string): Promise<void> {
   selectedId.value = id;
   await nextTick();
-  detailRef.value?.scrollIntoView({ block: "start" });
+  if (selectedId.value !== id || !detailRef.value) return;
+  const detail = detailRef.value;
+  // Scroll only the offer surface, not the map, app shell and nested list.
+  // scrollIntoView() scrolls every ancestor and made the workspace jump.
+  const panel = detail.closest<HTMLElement>(".mission-desk__empty, .map-proposal__details-scroll");
+  if (panel) {
+    const top = detail.getBoundingClientRect().top - panel.getBoundingClientRect().top;
+    if (top < 0 || top > panel.clientHeight - 64)
+      panel.scrollTo({ top: panel.scrollTop + top - 12, behavior: "auto" });
+  }
+  detail.focus({ preventScroll: true });
 }
 const confirmAction = ref<"accept" | "decline" | null>(null);
 const tripEndError = ref<string | null>(null);

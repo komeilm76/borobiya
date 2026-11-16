@@ -346,6 +346,7 @@ import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import UserMissionView from "./UserMissionView.vue";
 import { mapModeAvailability, type MapMode } from "@/map/map-mode-policy";
+import { workspaceTabQuery } from "@/map/workspace-tab-query";
 import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
@@ -447,7 +448,7 @@ function chooseMode(next: MapMode): void {
     else if (next === "sharing") void selectTool("live");
     return;
   }
-  void router.push({ path: "/_user/map", query: { ...route.query, tab: next } });
+  void router.push({ path: "/_user/map", query: workspaceTabQuery(route.query, next) });
 }
 watch(mode, (next) => {
   if (next === "missions") {
@@ -544,9 +545,9 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
   if (selected === "history" && !modeAvailability.value.history) return;
   if (selected === "history" && mode.value !== "history")
-    void router.push({ path: "/_user/map", query: { ...route.query, tab: "history" } });
+    void router.push({ path: "/_user/map", query: workspaceTabQuery(route.query, "history") });
   if (selected === "live" && mode.value !== "sharing")
-    void router.push({ path: "/_user/map", query: { ...route.query, tab: "sharing" } });
+    void router.push({ path: "/_user/map", query: workspaceTabQuery(route.query, "sharing") });
   const previous = activeTool.value;
   if (selected === previous) return;
   if (selected) closeNearbyResults();
@@ -638,7 +639,7 @@ async function addMissionStop(): Promise<void> {
   if (!place || !assignmentId) return;
   // Make the route editor visible before mutating it, even when the result was
   // selected in Sharing. A changed/ended assignment invalidates this consent.
-  if (mode.value !== "missions") await router.push({ path: "/_user/map", query: { ...route.query, tab: "missions" } });
+  if (mode.value !== "missions") await router.push({ path: "/_user/map", query: workspaceTabQuery(route.query, "missions") });
   if (pendingMissionStop.value !== place || mode.value !== "missions" || assignmentId !== missionShare.mission?.id) return;
   if (!missionWorkspace.value?.addSearchWaypoint(place.lat, place.lon)) {
     missionStopError.value = "ایستگاه افزوده نشد؛ مأموریت یا محل حادثه را دوباره بررسی کنید. مقصد حادثه تغییر نکرده است.";
@@ -2196,7 +2197,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   left: 50%; transform: translateX(-50%); display: flex; gap: .2rem;
   padding: .25rem; border: 1px solid var(--bb-color-outline); border-radius: 1.1rem;
   background: rgba(var(--v-theme-surface), .97); box-shadow: var(--bb-shadow-overlay);
-  max-width: calc(100% - 8.5rem); overflow-x: auto;
+  max-width: calc(100% - 8.5rem); overflow: hidden;
 }
 .user-map-view__modes button { display: flex; align-items: center; justify-content: center; gap: .35rem;
   min-height: 44px; min-width: 44px; padding: .35rem .65rem; border: 0; border-radius: .85rem;
@@ -2208,7 +2209,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__mission-search { position: absolute; z-index: 8; top: calc(4.85rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px)); width: 48px; height: 48px; }
 @media (max-width: 700px) {
-  .user-map-view__modes { max-width: calc(100% - 7.8rem); }
+  .user-map-view__modes { max-width: calc(100% - 7.8rem); gap: 0; padding: .15rem; }
   .user-map-view__modes button { padding: 0; }
   .user-map-view__modes button span { position: absolute; width: 1px; height: 1px; padding: 0;
     margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

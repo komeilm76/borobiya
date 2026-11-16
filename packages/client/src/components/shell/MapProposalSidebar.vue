@@ -107,8 +107,9 @@
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="detailsOpen" class="map-proposal__details" fullscreen
+  <v-dialog :model-value="detailsOpen" class="map-proposal__details" fullscreen
     :persistent="Boolean(inbox.decidingId)" aria-labelledby="map-proposal-details-title"
+    @update:model-value="(visible: boolean) => { if (!visible) closeDetails(); }"
     @after-leave="restoreBellFocus">
     <v-card class="map-proposal__details-panel" rounded="xl" elevation="0">
       <v-card-title class="map-proposal__details-header">
@@ -127,6 +128,7 @@
 import { computed, defineAsyncComponent, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { proposalSeverity, proposalTime } from "@/sos/proposal-presentation";
+import { proposalEntryIntent } from "@/map/workspace-tab-query";
 import type { useProposalInboxStore } from "@/stores/proposal-inbox";
 
 const props = defineProps<{ inbox: ReturnType<typeof useProposalInboxStore>; userId: string }>();
@@ -134,19 +136,24 @@ const ProposalInboxContent = defineAsyncComponent(() => import("./ProposalInboxC
 const open = ref(false);
 const detailsOpen = ref(false);
 const selectedOfferId = ref<string | null>(null);
+const returnFocusOnClose = ref(false);
 const route = useRoute();
 
 function openOffer(id: string | null): void {
   selectedOfferId.value = id;
+  returnFocusOnClose.value = false;
   open.value = false;
   detailsOpen.value = true;
 }
 function closeDetails(): void {
   if (props.inbox.decidingId) return;
+  returnFocusOnClose.value = true;
   detailsOpen.value = false;
 }
 function restoreBellFocus(): void {
-  if (!detailsOpen.value) document.querySelector<HTMLButtonElement>(".map-proposal__bell")?.focus({ preventScroll: true });
+  if (returnFocusOnClose.value && !detailsOpen.value)
+    document.querySelector<HTMLButtonElement>(".map-proposal__bell")?.focus({ preventScroll: true });
+  returnFocusOnClose.value = false;
 }
 const bellLabel = computed(() => props.inbox.failed
   ? "پیشنهادهای مأموریت؛ به‌روزرسانی ناموفق"
@@ -156,13 +163,22 @@ const bellLabel = computed(() => props.inbox.failed
 
 // The store fences late reads on account changes. Hide both overlays immediately
 // so no previous-account details linger while a new session is restoring.
-watch(() => props.userId, () => { open.value = false; detailsOpen.value = false; selectedOfferId.value = null; });
+watch(() => props.userId, () => {
+  open.value = false; detailsOpen.value = false; selectedOfferId.value = null;
+  returnFocusOnClose.value = false;
+});
+let lastEntryIntent: string | null = null;
 watch(() => route.fullPath, () => {
+  // A tab change closes an open drawer; it must not replay an earlier offer
+  // deep link just because the URL changed. Only a NEW entry intent opens it.
   open.value = false;
   detailsOpen.value = false;
-  if (route.path !== "/_user/map") return;
-  if (typeof route.query.offer === "string") openOffer(route.query.offer);
-  else if (route.query.inbox === "1") { open.value = true; void props.inbox.refresh(); }
+  returnFocusOnClose.value = false;
+  const intent = proposalEntryIntent(route.path, route.query);
+  if (intent === lastEntryIntent) return;
+  lastEntryIntent = intent;
+  if (intent?.startsWith("offer:")) openOffer(intent.slice(6));
+  else if (intent === "inbox") { open.value = true; void props.inbox.refresh(); }
 }, { immediate: true });
 </script>
 
@@ -287,6 +303,11 @@ watch(() => route.fullPath, () => {
 :global(.map-proposal__details.v-dialog > .v-overlay__content > .map-proposal__details-panel > .map-proposal__details-scroll) {
   flex: 1 1 auto; min-height: 0; padding: 0 !important;
   overflow-y: auto; overscroll-behavior: contain;
+}
+/* The fullscreen review has one scrollbar. The inline mobile offer list must
+   not trap swipes inside a second, 45vh-tall scroller. */
+:global(.map-proposal__details-scroll .offers .offers__items) {
+  max-height: none; overflow: visible; padding: 0;
 }
 :global(:root.dark .map-proposal__severity--urgent) { color: #ffadad; }
 :global(:root.dark .map-proposal__severity--important) { color: #f9ca76; }
