@@ -89,7 +89,8 @@ async function shoot(page, file) {
 let failures = 0;
 for (const scenario of scenarios) {
   if (only && scenario.ref !== only && !scenario.ref.startsWith(only)) continue;
-  const personaParam = scenario.anon ? '?anon=1' : scenario.persona ? `?persona=${scenario.persona}` : '';
+  const glue = scenario.route.includes('?') ? '&' : '?';
+  const personaParam = scenario.anon ? `${glue}anon=1` : scenario.persona ? `${glue}persona=${scenario.persona}` : '';
   const url = `http://127.0.0.1:4173/app${scenario.route}${personaParam}`;
   const width = scenario.width ?? 393, height = scenario.height ?? 852, dsf = scenario.dsf ?? 2;
   const browser = await puppeteer.launch({

@@ -11,16 +11,23 @@ import App from './App.vue';
 import { router } from './router/index.ts';
 import { vuetify } from './plugins/vuetify.ts';
 import { useSettingsStore } from './stores/settings.ts';
-import { installDemoFetch, setPreviewPersona, setPreviewSections, setPreviewSession } from './preview/demo-fetch.ts';
+import { installDemoFetch, setPreviewFailures, setPreviewPersona, setPreviewSections, setPreviewSession } from './preview/demo-fetch.ts';
 import './styles/tailwind.css';
 
 const params = new URLSearchParams(window.location.search);
 const persona = params.get('persona');
 if (persona === 'admin' || persona === 'onboarding' || persona === 'user') setPreviewPersona(persona);
 if (params.get('anon') === '1') setPreviewSession(false);
-if (params.get('missions') === 'empty' || params.get('offers') === 'empty') {
-  setPreviewSections({ missions: params.get('missions') === 'empty', offers: params.get('offers') === 'empty' });
+if (params.get('missions') === 'empty' || params.get('offers') === 'empty' || params.get('history') === 'empty' || params.get('shares') === 'empty') {
+  setPreviewSections({
+    missions: params.get('missions') === 'empty',
+    offers: params.get('offers') === 'empty',
+    history: params.get('history') === 'empty',
+    shares: params.get('shares') === 'empty'
+  });
 }
+const fail = params.get('fail');
+if (fail === 'history' || fail === 'admin') setPreviewFailures({ history: fail === 'history', admin: fail === 'admin' });
 installDemoFetch();
 
 const app = createApp(App);

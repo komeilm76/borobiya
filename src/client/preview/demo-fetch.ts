@@ -25,7 +25,14 @@ const state = {
   // Preview harness knobs so a capture can render the requester-only view of the mission
   // screen (own cancellable request, no responder mission shadowing it) and the empty inbox.
   emptyMissions: false,
-  emptyOffers: false
+  emptyOffers: false,
+  // Additional capture knobs: empty history lists (and empty share inbox), and deliberate
+  // server failure for the history and admin-console loads so the designed error surfaces
+  // can be reproduced in the preview.
+  emptyHistory: false,
+  emptyShares: false,
+  failHistory: false,
+  failAdmin: false
 };
 
 /** Selects which demo account `/_user/me` resolves to. */
@@ -39,9 +46,17 @@ export function setPreviewSession(active: boolean): void {
 }
 
 /** Empties selected collections; used by capture scenarios that need the requester view. */
-export function setPreviewSections(sections: { missions?: boolean; offers?: boolean }): void {
+export function setPreviewSections(sections: { missions?: boolean; offers?: boolean; history?: boolean; shares?: boolean }): void {
   if (sections.missions !== undefined) state.emptyMissions = sections.missions;
   if (sections.offers !== undefined) state.emptyOffers = sections.offers;
+  if (sections.history !== undefined) state.emptyHistory = sections.history;
+  if (sections.shares !== undefined) state.emptyShares = sections.shares;
+}
+
+/** Makes selected loads fail on purpose; used by capture scenarios for the error surfaces. */
+export function setPreviewFailures(failures: { history?: boolean; admin?: boolean }): void {
+  if (failures.history !== undefined) state.failHistory = failures.history;
+  if (failures.admin !== undefined) state.failAdmin = failures.admin;
 }
 
 /** Restores the pristine demo state; used by the smoke test between pages. */
@@ -51,6 +66,10 @@ export function resetPreviewState(): void {
   state.onboarded = false;
   state.emptyMissions = false;
   state.emptyOffers = false;
+  state.emptyHistory = false;
+  state.emptyShares = false;
+  state.failHistory = false;
+  state.failAdmin = false;
 }
 
 const envelope = (data: unknown, init?: ResponseInit): Response =>
@@ -179,8 +198,9 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
     return items(matched.slice(0, limit));
   }],
   ['GET', /^\/_user\/location\/shares$/, ({ query }) => {
+    if (state.failHistory) return failure(500, 'PREVIEW_FAIL', 'پیش‌نمایش: خطای عمدی برای بازتولید سطح خطای فهرست‌ها.');
     const includeAll = query.get('include') === 'all';
-    const list = D.demoShares.filter((s) => includeAll || s.state === 'active');
+    const list = state.emptyShares || state.emptyHistory ? [] : D.demoShares.filter((s) => includeAll || s.state === 'active');
     return items(list);
   }],
   ['POST', /^\/_user\/location\/shares$/, ({ body }) =>
@@ -199,7 +219,7 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
   ['DELETE', /^\/_user\/location\/shares\/[^/]+$/, () => envelope({})],
 
   /* -------------------------------------- user: SOS and missions feed */
-  ['GET', /^\/_user\/sos$/, () => items([...D.userRequests])],
+  ['GET', /^\/_user\/sos$/, () => (state.failHistory ? failure(500, 'PREVIEW_FAIL', 'پیش‌نمایش: خطای عمدی برای بازتولید سطح خطای فهرست‌ها.') : items(state.emptyHistory ? [] : [...D.userRequests]))],
   ['GET', /^\/_user\/sos\/([^/]+)$/, ({ args }) => {
     const id = args[0];
     const all: Record<string, { sos: Record<string, unknown>; timeline: unknown }> = {
@@ -222,7 +242,7 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
   ['POST', /^\/_user\/sos\/[^/]+\/accept$/, () => envelope({ missionId: 'mis_single', missionStatus: 'accepted' })],
   ['POST', /^\/_user\/sos\/[^/]+\/decline$/, () => envelope({ ok: true })],
 
-  ['GET', /^\/_user\/missions$/, () => items(state.emptyMissions ? [] : previewMissions.map((mission) => ({ ...mission })))],
+  ['GET', /^\/_user\/missions$/, () => (state.failHistory ? failure(500, 'PREVIEW_FAIL', 'پیش‌نمایش: خطای عمدی برای بازتولید سطح خطای فهرست‌ها.') : items(state.emptyMissions || state.emptyHistory ? [] : previewMissions.map((mission) => ({ ...mission }))))],
   ['GET', /^\/_user\/mission-offers$/, () => items(state.emptyOffers ? [] : [D.pendingOfferSos])],
   ['POST', /^\/_user\/missions\/([^/]+)\/progress$/, ({ args, body }) => {
     const target = previewMissions.find((mission) => mission.id === args[0]);
@@ -261,8 +281,9 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
 
   /* ------------------------------------------------------ user: trips */
   ['GET', /^\/_user\/trips$/, ({ query }) => {
+    if (state.failHistory) return failure(500, 'PREVIEW_FAIL', 'پیش‌نمایش: خطای عمدی برای بازتولید سطح خطای فهرست‌ها.');
     const savedOnly = query.get('saved') === 'true';
-    return items(D.demoTrips.filter((t) => !savedOnly || t.saved).map(({ ...t }) => t));
+    return items(state.emptyHistory ? [] : D.demoTrips.filter((t) => !savedOnly || t.saved).map(({ ...t }) => t));
   }],
   ['POST', /^\/_user\/trips$/, ({ body }) =>
     envelope({ id: `trp_demo_${Date.now()}`, name: String(body.name ?? 'سفر جدید'), status: 'planned', saved: false, role: 'leader', ownerId: D.DEMO_USER_ID, ownerUsername: D.DEMO_USERNAME, stopCount: Array.isArray(body.stops) ? body.stops.length : 0, memberCount: 1, createdAt: Date.now(), updatedAt: Date.now(), startedAt: null, completedAt: null, stops: (Array.isArray(body.stops) ? body.stops : []).map((s, i) => ({ id: `stp_demo_${i}`, rank: i + 1, label: String((s as { label?: string }).label ?? `توقف ${i + 1}`), latitude: Number((s as { latitude?: number }).latitude ?? D.LAT), longitude: Number((s as { longitude?: number }).longitude ?? D.LNG), placeId: (s as { placeId?: string | null }).placeId ?? null })) })],
@@ -422,6 +443,9 @@ export function installDemoFetch(): void {
       } catch {
         body = {};
       }
+    }
+    if (state.failAdmin && method === 'GET' && parsed.pathname.startsWith('/_admin')) {
+      return failure(500, 'PREVIEW_FAIL', 'پیش‌نمایش: خطای عمدی برای بازتولید سطح خطای پنل مدیریت.');
     }
     for (const [routeMethod, pattern, handler] of routes) {
       if (routeMethod !== method) continue;
