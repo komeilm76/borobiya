@@ -502,6 +502,7 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
   return added;
 }
 defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
+  hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
   hasMapLegend: computed(() => !!routing.target.value && !activeTool.value && !desk.terminalHold.value) });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
@@ -1248,6 +1249,13 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 @media (max-width: 599px) {
   .mission-desk--active { padding: 0; }
+  /* The idle offer list must not cover the shared map-action rail. Keep its
+     single scroll surface usable on short screens without blocking SOS. */
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
+    width: calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    margin: calc(8.5rem + env(safe-area-inset-top, 0px)) 0 0 calc(.75rem + env(safe-area-inset-left, 0px));
+    max-height: max(7rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
   .mission-desk--active .mission-desk__card,
   .mission-desk--active .mission-route {
     inset-inline: .75rem; width: auto;

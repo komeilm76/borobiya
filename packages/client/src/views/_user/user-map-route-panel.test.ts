@@ -138,7 +138,8 @@ describe("progressive trip planning and editing", () => {
     expect(app.indexOf('id="map-route-choices-action-anchor"')).toBeLessThan(app.indexOf('<v-main class="app-main'));
     expect(app).toContain('<SosTriggerButton v-if="showSosButton"');
     expect(map).toContain('<Teleport defer to="#map-route-choices-action-anchor">');
-    expect(map).toContain('<v-btn v-show="!!journey.point.value && mode !== \'missions\' && !missionActive" id="map-route-choices-toggle"');
+    // Sharing keeps guidance visible but not the trip-only route editor.
+    expect(map).toContain('<v-btn v-show="!!journey.point.value && mode === \'trips\' && !missionActive" id="map-route-choices-toggle"');
     expect(map).not.toContain('<v-btn v-if="journey.point.value" id="map-route-choices-toggle"');
     const { descriptor } = parse(map, { filename: "UserMapView.vue" });
     const rendered = compileTemplate({
@@ -147,7 +148,7 @@ describe("progressive trip planning and editing", () => {
     expect(rendered.errors).toEqual([]);
     const teleport = rendered.code.slice(rendered.code.indexOf('_createBlock(_Teleport'), rendered.code.indexOf('Keep location a map feature'));
     expect(teleport).toContain('_withDirectives(_createVNode(_component_v_btn');
-    expect(teleport).toContain("[_vShow, !!_ctx.journey.point.value && _ctx.mode !== 'missions' && !_ctx.missionActive]");
+    expect(teleport).toContain("[_vShow, !!_ctx.journey.point.value && _ctx.mode === 'trips' && !_ctx.missionActive]");
     expect(teleport).not.toContain('_ctx.journey.point.value)\n        ?'); // No conditional component vnode in the Teleport block.
     const routeSelector = '.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle';
     const base = shell.slice(shell.indexOf(`${routeSelector} {`), shell.indexOf('}', shell.indexOf(`${routeSelector} {`)));

@@ -1,8 +1,10 @@
 <template>
   <section class="user-map-view" :class="{ 'user-map-view--mission': mode === 'missions',
     'user-map-view--mission-legend': mode === 'missions' && !!missionWorkspace?.hasMapLegend,
+    'user-map-view--mission-active': mode === 'missions' && !!missionWorkspace?.hasActiveMission,
+    'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
-    'user-map-view--navigating': mode === 'trips' && isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
+    'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
@@ -88,7 +90,7 @@
       <!-- Keep the teleported button vnode stable while point selection and
            reverse geocoding trigger consecutive updates; its target is kept
            mounted in App.vue to prevent patching an unmounted vnode. -->
-      <v-btn v-show="!!journey.point.value && mode !== 'missions' && !missionActive" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
+      <v-btn v-show="!!journey.point.value && mode === 'trips' && !missionActive" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
         icon="mdi-routes" variant="flat" color="primary" :disabled="!journey.point.value" :aria-expanded="routeChoicesOpen"
         aria-controls="map-point-route-choices-sheet"
         :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
@@ -2768,6 +2770,16 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
   }
+  /* The mission overlay is a sibling of MapCanvas: its scoped compass rules
+   * cannot reach this shared canvas. Match its focus-button rail here. */
+  .user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    left: auto; top: auto;
+    bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
+  }
+  .user-map-view--mission-tool-open .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  }
   /* Preserve MapLibre's attribution above the lower map edge and below the menu
    * launcher, never buried beneath an open tool or the SOS pill. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
@@ -2832,6 +2844,16 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__panel:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
   .user-map-view__search, .user-map-view__playback, .user-map-view__live {
     pointer-events: auto;
+  }
+}
+
+/* Short mission phones use the same horizontal control row as the mission
+ * focus buttons, including when the planner is open. */
+@media (max-width: 599px) and (max-height: 560px) {
+  .user-map-view--mission-active:not(.user-map-view--mission-tool-open)
+    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(7.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
