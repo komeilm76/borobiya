@@ -72,7 +72,8 @@ describe("map place search handoff", () => {
   it("routes a current search hit to one navigation sheet without a duplicate POI modal", () => {
     const selection = body("selectPlace");
     expect(selection).toContain('bounds.contains([place.lon, place.lat])');
-    expect(selection).toContain('current !== place || !placeSearch.select(place)');
+    expect(selection).toContain('if (current !== place) return;');
+    expect(selection).toContain('if (!placeSearch.select(place)) return;');
     expect(selection).toContain('instance.flyTo(');
     expect(selection).toContain('offset: [0, offsetY]');
     expect(selection).toContain('{ placeSearchSelection: true }');

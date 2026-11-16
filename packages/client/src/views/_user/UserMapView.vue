@@ -292,6 +292,14 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <v-dialog :model-value="!!blockedSearchReason" max-width="28rem"
+      aria-labelledby="map-search-blocked-title" @update:model-value="(open: boolean) => { if (!open) blockedSearchReason = null; }">
+      <v-card dir="rtl" rounded="xl">
+        <v-card-title id="map-search-blocked-title">امکان تغییر مقصد نیست</v-card-title>
+        <v-card-text role="alert">{{ blockedSearchReason }}</v-card-text>
+        <v-card-actions><v-btn color="primary" variant="flat" @click="blockedSearchReason = null">متوجه شدم</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
     <ShareDialog v-model="shareOpen" :fullscreen="isPhone" @shared="onShareCreated" />
   </section>
 </template>
@@ -617,6 +625,7 @@ const workspaceMarker = shallowRef<typeof Marker | null>(null);
 const missionWorkspace = ref<InstanceType<typeof UserMissionView> | null>(null);
 const pendingMissionStop = shallowRef<GeocodeResult | null>(null);
 const missionStopError = ref<string | null>(null);
+const blockedSearchReason = ref<string | null>(null);
 async function addMissionStop(): Promise<void> {
   const place = pendingMissionStop.value;
   const assignmentId = missionShare.mission?.id;
@@ -634,7 +643,7 @@ async function addMissionStop(): Promise<void> {
   chooseMode("missions");
 }
 watch([() => auth.user?.id, () => missionShare.mission?.id], () => {
-  pendingMissionStop.value = null; missionStopError.value = null;
+  pendingMissionStop.value = null; missionStopError.value = null; blockedSearchReason.value = null;
 }, { flush: "sync" });
 const own = useOwnMapPosition(computed(() => auth.user?.id ?? null));
 let ownMarker: Marker | null = null;
@@ -1348,7 +1357,6 @@ function syncSelectedPlaceMarker(): void {
     const element = selectedPlaceMarker.getElement();
     element.setAttribute("role", "button");
     element.setAttribute("tabindex", "0");
-    element.setAttribute("aria-controls", "map-point-route-sheet");
     element.classList.add("user-map-view__selected-place");
     const label = document.createElement("bdi");
     label.className = "user-map-view__selected-place-label";
@@ -1361,15 +1369,26 @@ function syncSelectedPlaceMarker(): void {
     });
   } else selectedPlaceMarker.setLngLat([place.lon, place.lat]);
   const element = selectedPlaceMarker.getElement();
-  const station = mode.value === "missions" || missionActive.value;
-  element.setAttribute("aria-controls", station ? "mission-search-stop-title" : "map-point-route-sheet");
-  element.setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}؛ ${station ? "پیشنهاد ایستگاه میانی" : "نمایش مسیر"}`);
+  const station = !!missionShare.mission;
+  const awaitingMission = missionActive.value && !station;
+  const exploring = mode.value === "missions" && !missionActive.value;
+  const blockedTrip = !station && !awaitingMission && !exploring &&
+    (journey.navigating.value || journey.navigationPending.value || (auth.user?.role === "user" && !missionShare.verified));
+  const controls = station || awaitingMission ? "mission-search-stop-title" :
+    exploring || blockedTrip ? null : "map-point-route-sheet";
+  if (controls) element.setAttribute("aria-controls", controls);
+  else element.removeAttribute("aria-controls");
+  element.setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}؛ ${station ? "پیشنهاد ایستگاه میانی" :
+    awaitingMission ? "در انتظار تأیید مأموریت" : exploring ? "نمایش مکان روی نقشه" :
+      blockedTrip ? "تغییر مقصد فعلاً ممکن نیست" : "نمایش مسیر"}`);
   // DOM text, never HTML or a hover-only/native tooltip.
   const label = selectedPlaceMarker.getElement().querySelector<HTMLElement>(".user-map-view__selected-place-label");
   if (label) label.textContent = place.name;
   positionSelectedPlaceLabel(selectedPlaceMarker, instance);
 }
 watch(() => isSelectedSearchDestination.value, () => { syncSelectedPlaceMarker(); syncDestinationMarker(); });
+watch([() => missionShare.verified, () => journey.navigating.value, () => journey.navigationPending.value],
+  syncSelectedPlaceMarker, { flush: "sync" });
 watch(() => placeSearch.selectedPlaceId.value, () => {
   syncSelectedPlaceMarker();
   syncDestinationMarker();
@@ -1390,7 +1409,19 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   // A prior result with the same ID is not proof that this captured card is current.
   const current = placeSearch.results.value.find(hit => hit.placeId === place.placeId) ??
     (showAllResultsOnMap.value ? placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId) : null);
-  if (current !== place || !placeSearch.select(place)) return;
+  if (current !== place) return;
+  // Search must not clear an active/pending trip (select() calls clear()), or
+  // create a personal trip before the assignment read has verified its state.
+  // Keep the current route and camera unchanged; the dialog explains recovery.
+  if (!missionActive.value && mode.value !== "missions" && auth.user?.role === "user" && !missionShare.verified) {
+    blockedSearchReason.value = "وضعیت مأموریت هنوز از سرور تأیید نشده است. پس از تأیید، مکان را دوباره انتخاب کنید؛ سفر یا مسیر فعلی تغییر نکرده است.";
+    return;
+  }
+  if (!missionActive.value && mode.value !== "missions" && (journey.navigating.value || journey.navigationPending.value)) {
+    blockedSearchReason.value = "سفر فعلی فعال است. برای تغییر مقصد، ابتدا از بخش سفرها «پایان سفر» را انتخاب کنید؛ مسیر فعلی حفظ شده است.";
+    return;
+  }
+  if (!placeSearch.select(place)) return;
   closeNearbyResults();
   userControlledCamera.value = true;
   // MapLibre forwards eventData to moveend. This camera flight must keep the other search
@@ -1877,7 +1908,11 @@ function attachHold(instance: MapLibreMap): () => void {
   let suppressContextUntil = 0;
   const hold = createHoldToSelect((x, y, type) => {
     if (type === "touch") suppressContextUntil = Date.now() + 900; // Native contextmenu can follow the timer.
-    if (!auth.user?.id || missionActive.value || mode.value === "missions" || journey.navigating.value || map.value !== instance) return;
+    // A long press edits the Trips planner only. In Sharing/History it would
+    // create an invisible personal route under the current workspace.
+    if (!auth.user?.id || missionActive.value || mode.value !== "trips" ||
+      (auth.user.role === "user" && !missionShare.verified) ||
+      journey.navigating.value || journey.navigationPending.value || map.value !== instance) return;
     const rect = canvas.getBoundingClientRect();
     const location = instance.unproject([x - rect.left, y - rect.top]);
     const bounds = instance.getMaxBounds();

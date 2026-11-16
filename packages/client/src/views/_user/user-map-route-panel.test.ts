@@ -240,7 +240,9 @@ describe("progressive trip planning and editing", () => {
 
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
     const hold = map.slice(map.indexOf('function attachHold('), map.indexOf('const pointer = (event: PointerEvent)', map.indexOf('function attachHold(')));
-    expect(hold).toContain('if (!auth.user?.id || missionActive.value || mode.value === "missions" || journey.navigating.value || map.value !== instance) return;');
+    expect(hold).toContain('if (!auth.user?.id || missionActive.value || mode.value !== "trips" ||');
+    expect(hold).toContain('(auth.user.role === "user" && !missionShare.verified) ||');
+    expect(hold).toContain('journey.navigating.value || journey.navigationPending.value || map.value !== instance) return;');
     expect(hold).toContain('if (bounds && !bounds.contains(location)) return;');
     expect(hold.indexOf('journey.select({ lat: location.lat, lon: location.lng })'))
       .toBeLessThan(hold.indexOf('instance.easeTo({ center: [location.lng, location.lat], duration: 450 }'));
