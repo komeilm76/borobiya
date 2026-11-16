@@ -38,9 +38,7 @@
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
-      <MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === 'status'"
-        :desk="desk" :visible="visible && activeTool === 'status'" @close="closeTool('status')" />
-      <section v-else-if="!desk.error.value" class="mission-desk__empty">
+      <section v-else-if="!desk.activeMission.value && !desk.error.value" class="mission-desk__empty">
         <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
           class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
         <v-alert v-else-if="embedded && desk.completedMissionId.value" type="success" variant="tonal" rounded="lg"
@@ -261,9 +259,10 @@
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
-        <div v-if="!activeTool && !desk.terminalHold.value" class="mission-desk__bottom-panel">
-          <section v-if="routing.target.value"
-            class="mission-desk__map-legend" aria-labelledby="mission-map-legend-title" dir="rtl">
+        <div v-if="!desk.terminalHold.value && (!activeTool || activeTool === 'status')"
+          class="mission-desk__bottom-stack" :class="{ 'mission-desk__bottom-stack--information': activeTool === 'status' }">
+          <section v-if="routing.target.value || activeTool === 'status'" class="mission-desk__map-legend bb-floating-card"
+            aria-labelledby="mission-map-legend-title" dir="rtl">
             <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
             <ul class="mission-desk__map-legend-body" aria-label="راهنمای نشانگرها">
               <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> حادثه</li>
@@ -275,15 +274,19 @@
             </ul>
             <small>مبدأ مسیر زنده نیست؛ تازگی موقعیت‌های اشتراکی را بررسی کنید.</small>
           </section>
-          <div class="mission-desk__map-cards">
-            <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep" :team-sharing="teamSharing"
-              :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel">
-              <template #team>
-                <v-btn id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline" variant="tonal" size="small"
-                  aria-label="نمایش اعضای مأموریت" title="نمایش اعضای مأموریت"
-                  aria-controls="mission-team-panel" :aria-expanded="false" @click="toggleTool('team')" />
-              </template>
-            </MissionMapCards>
+          <MissionStatusPanel v-if="activeTool === 'status'" :desk="desk" :visible="visible"
+            @close="closeTool('status')" />
+          <div v-else class="mission-desk__bottom-panel">
+            <div class="mission-desk__map-cards">
+              <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep" :team-sharing="teamSharing"
+                :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel">
+                <template #team>
+                  <v-btn id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline" variant="tonal" size="small"
+                    aria-label="نمایش اعضای مأموریت" title="نمایش اعضای مأموریت"
+                    aria-controls="mission-team-panel" :aria-expanded="false" @click="toggleTool('team')" />
+                </template>
+              </MissionMapCards>
+            </div>
           </div>
         </div>
         <v-btn id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"
@@ -496,7 +499,8 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 }
 defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
-  hasMapLegend: computed(() => !!routing.target.value && !activeTool.value && !desk.terminalHold.value) });
+  hasMapLegend: computed(() => !desk.terminalHold.value &&
+    (activeTool.value === 'status' || (!activeTool.value && !!routing.target.value))) });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
   const lon = Number(waypointLon.value);
@@ -1068,7 +1072,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded :deep(.live-panel__members),
 .mission-desk--embedded :deep(.live-panel__map-actions),
 .mission-desk--embedded .mission-desk__map-focus,
-.mission-desk--embedded .mission-desk__bottom-panel,
+.mission-desk--embedded .mission-desk__bottom-stack,
 .mission-desk--embedded .mission-desk__info-action,
 .mission-desk--embedded .mission-desk__map-hint,
 .mission-desk--embedded .mission-desk__dock,
@@ -1094,13 +1098,19 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
-/* Information is a full-width bottom sheet, like the route planner, but the
-   essential map/SOS/dock controls remain accessible in the clear strip below. */
-.mission-desk--active #mission-status-panel {
-  left: 0; right: 0; width: 100%;
+/* The key is a separate, full-width surface directly above either the
+   progress sheet or Mission Information. Flex sizing keeps it above the real
+   height of the information card, even after its address/photo loads. */
+.mission-desk__bottom-stack { position: absolute; z-index: 9;
+  left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  width: 100%; max-height: min(65dvh, 32rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  display: flex; flex-direction: column; gap: .5rem; min-height: 0; pointer-events: auto; }
+.mission-desk__bottom-stack--information { max-height: min(75dvh, 40rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+.mission-desk--active .mission-desk__bottom-stack #mission-status-panel {
+  position: relative; inset: auto; flex: 1 1 auto; min-height: 0;
+  width: 100%; max-height: none; margin: 0;
   padding-left: max(1rem, env(safe-area-inset-left, 0px));
   padding-right: max(1rem, env(safe-area-inset-right, 0px));
-  max-height: min(60dvh, 33rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
 }
 .mission-desk--active .mission-desk__load-alert {
   position: absolute; z-index: 12; top: calc(3.5rem + env(safe-area-inset-top, 0px));
@@ -1156,18 +1166,20 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
 .mission-desk__direct-distance { color: rgb(var(--v-theme-primary)); font-weight: 800; }
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
-/* One full-width bottom surface for the legend and the only step list. The
-   key stays visible while the stages/action scroll; it never sits behind them. */
-.mission-desk__bottom-panel { position: absolute; z-index: 8;
-  left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  width: 100%; max-height: min(55dvh, 26rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-  display: flex; flex-direction: column; min-height: 0; overflow: hidden; pointer-events: auto;
+/* The key uses Mission Information's card treatment, not an inset strip in
+   the steps widget. The two surfaces stay in normal flex flow, never overlap. */
+.mission-desk__map-legend { flex: none; min-width: 0; max-height: min(8rem, 25dvh);
+  padding: .55rem max(.75rem, env(safe-area-inset-right, 0px)) .55rem max(.75rem, env(safe-area-inset-left, 0px));
+  overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+.mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;
+  display: flex; flex-direction: column; overflow: hidden;
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
   background: rgba(var(--v-theme-surface), .97); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
-.mission-desk__map-legend { flex: none; min-width: 0; padding: .45rem .75rem;
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: .85rem; font-weight: 800; }
 .mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .2rem .35rem;
   margin: 0; padding: 0; list-style: none; font-size: .8rem; line-height: 1.3; }
@@ -1255,9 +1267,10 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   /* Bottom sheet fills the map width; the essential camera, route, info and
      SOS controls retain the same clear row below it as the route planner. */
   .mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
-  .mission-desk__bottom-panel { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: min(52dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
-  .mission-desk--active #mission-status-panel { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); }
+  .mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: min(60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk__bottom-stack--information {
+    max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
@@ -1293,8 +1306,9 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 @media (max-width: 599px) and (max-height: 560px) {
   /* Short phones keep the one bottom-docked progress surface scrollable. No
      duplicate heading competes with guidance or the top tab controls. */
-  .mission-desk__bottom-panel { max-height: min(48dvh, calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
-  .mission-desk__map-legend { padding: .2rem .6rem; }
+  .mission-desk__bottom-stack { max-height: min(48dvh, calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk__bottom-stack--information { max-height: calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  .mission-desk__map-legend { padding: .2rem .6rem; max-height: 4rem; }
   .mission-desk__map-legend h2 { position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0, 0, 0, 0); white-space: nowrap; }
   .mission-desk__map-legend small { position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -1345,7 +1359,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: none;
   }
-  .mission-desk--active #mission-status-panel { max-height: none; }
   /* The tool's own close header replaces the stage sheet on short screens;
      the map, SOS and camera actions remain available beneath the sheet. */
   .mission-desk--route-open .mission-route {

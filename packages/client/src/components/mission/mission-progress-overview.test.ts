@@ -64,7 +64,7 @@ describe("at-a-glance mission progress and information", () => {
     expect(template).not.toContain('نمایش تصویر ایمن');
     expect(info).toContain('controller?.abort(); controller = null;');
     expect(info).toContain('photoSrc.value = null; photoLoading.value = false; photoError.value = null;');
-    expect(page).toContain(':visible="visible && activeTool === \'status\'"');
+    expect(page).toContain('<MissionStatusPanel v-if="activeTool === \'status\'" :desk="desk" :visible="visible"');
     expect(compileTemplate({ filename: "MissionBriefDetails.vue", id: "mission-brief-info", source: template }).errors).toEqual([]);
   });
 
@@ -76,12 +76,13 @@ describe("at-a-glance mission progress and information", () => {
     for (const [filename, css] of [["UserMissionView.vue", viewStyle], ["MissionStatusPanel.vue", panelStyle],
       ["MissionMapCards.vue", cardStyle], ["MissionBriefDetails.vue", infoStyle]] as const)
       expect(compileStyle({ filename, id: "data-v-mission-brief", scoped: true, source: css }).errors).toEqual([]);
-    expect(viewStyle).toContain('.mission-desk__bottom-panel { position: absolute; z-index: 8;');
+    expect(viewStyle).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
     expect(viewStyle).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(viewStyle).toContain('.mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
-    expect(viewStyle).toContain('.mission-desk--active #mission-status-panel {');
-    expect(viewStyle).toContain('left: 0; right: 0; width: 100%;');
+    expect(viewStyle).toContain('.mission-desk--active .mission-desk__bottom-stack #mission-status-panel {');
+    expect(viewStyle).toContain('width: 100%; max-height: none; margin: 0;');
     expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 560px) {');
     expect(cardStyle).toContain('.mission-desk__phase-steps');
     expect(cardStyle).toContain('.mission-desk__phase-step--current');

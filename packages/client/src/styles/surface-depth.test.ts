@@ -58,7 +58,7 @@ describe("surface depth across light and dark UI", () => {
     expect(mission).toContain('class="mission-route bb-map-navigation-card bb-floating-card"');
     // Open mission information, route, legend and stages all use the same floating widget tier.
     expect(mission).toContain('.mission-desk__card, .mission-desk__empty { border-radius: var(--bb-radius-card, 24px); background: rgba(var(--v-theme-surface), .95); border: 1px solid rgba(var(--v-theme-on-surface), .1); box-shadow: var(--bb-shadow-overlay);');
-    expect(mission).toContain('class="mission-desk__map-legend"');
+    expect(mission).toContain('class="mission-desk__map-legend bb-floating-card"');
     expect(mission).toContain('box-shadow: var(--bb-shadow-overlay);');
     expect(proposals).toContain(".offer-card--selected { border-color: #319581; box-shadow: 0 0 0 2px");
     expect(history).toContain(".history__item--selected { border-color: #269b7c; box-shadow: 0 0 0 2px");

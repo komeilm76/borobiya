@@ -100,7 +100,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).not.toContain('watch(() => [routing.error.value, navigation.error.value]');
     expect(view).toContain('activeTool !== \'route\' && (routing.error.value || navigation.error.value)');
     expect(view).toContain('aria-label="بستن هشدار راهبری"');
-    expect(view).toContain('<MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === \'status\'"');
+    expect(view).toContain('<MissionStatusPanel v-if="activeTool === \'status\'" :desk="desk" :visible="visible"');
     expect(status).toContain('id="mission-status-panel"');
     expect(view).toContain('@close="closeTool(\'status\')" />');
     expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\' && routeSection !== \'transport\'" id="mission-route-panel"');

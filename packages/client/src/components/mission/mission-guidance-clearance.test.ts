@@ -11,7 +11,7 @@ describe("mission guidance over the full-screen map", () => {
     const compiled = compileStyle({ source: css, filename: "UserMissionView.vue", id: "data-v-guidance", scoped: true });
     expect(compiled.errors).toEqual([]);
     expect(css).toContain('.mission-desk__guidance {\n  position: absolute; z-index: 10; top: calc(5.75rem + env(safe-area-inset-top, 0px));');
-    expect(css).toContain('.mission-desk__bottom-panel { position: absolute; z-index: 8;');
+    expect(css).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
     expect(page).not.toContain('mission-desk__map-heading');
     expect(compiled.code).toContain('.mission-desk__guidance[data-v-guidance]');
   });
