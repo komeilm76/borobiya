@@ -69,7 +69,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | navigation/04-bookmark-saved.png | partial | P2/M | Profile screen lists saved places with inline edit (full PATCH payload incl. preserved rank) and delete; reorder UI remains API-only. |
 | navigation/05-search-open.png | done | P1/H | Real offline search: saved places + road POIs from the map configuration (projection-converted), Persian/Arabic-insensitive normalization, keyboard navigation (combobox semantics), loading/empty/error+retry states, result selection moves and zooms the map with a dedicated pin. |
 | navigation/06-destination-selected.png | partial | P2/H | Tapping the canvas selects a destination (pin + sheet panel: coordinates, distance from own fix, save-to-places inline form, clear). Designed name/address header, ETA and traffic chips, and the send/navigate actions need routing and share plumbing — not built. |
-| navigation/07-destination-details.png | partial | P2/M | The destination panel doubles as the detail surface (coords, distance, save/clear); share-my-location-to-this-point and saved-place detail editing screens not built. |
+| navigation/07-destination-details.png | partial | P2/M | The destination panel doubles as the detail surface (coords, distance, save/clear); share-my-location-to-this-point and saved-place detail editing screens not built. Capture for the panel: `screens/navigation-02-map-press-hold-impl.png` and `screens/navigation-06-destination-selected-impl.png` (2026-11-16). |
 | navigation/08-trip-transport-selection.png | superseded | — | Turn-by-turn trip planning superseded (docs/ACCEPTANCE.md). |
 | navigation/09-manual-origin-selection.png | superseded | — | See above. |
 | navigation/10-route-options.png | superseded | — | See above. |
@@ -99,7 +99,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/09-sos-dispatched.png | missing | P2/M | No dedicated dispatched surface. |
 | sos/10-sos-rescuer-en-route.png | missing | P2/M | No en-route surface/ETA (ETA needs routing data — superseded area; a status-only surface remains possible). |
 | sos/11-sos-rescuer-arrived.png | missing | P2/L | Rail covers it only. |
-| sos/12-sos-completed.png | partial | P2/M | Rail + one-time rating implemented; no designed completion card. |
+| sos/12-sos-completed.png | partial | P2/M | Rail + one-time rating implemented; no designed completion card. Adjacent evidence: `screens/mission-17-mission-completed-impl.png` (2026-11-16). |
 | sos/13-sos-cancel-reason.png | partial | P1/C | Mission view offers the requester an inline cancel panel below the rail: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. Materially different from the reference (inline panel, four server-catalog reasons, no 200-character counter). Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-13-sos-cancel-reason-impl.png`, requester-only rail via `?missions=empty&offers=empty`). |
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
 | sos/15-sos-photo-retry.png | partial | P1/H | The photo rides `POST /_user/sos`; there is no post-submit photo-upload step and therefore no designed retry surface. The retryable error exists inline in composer step 3 (size, type), the preview resets for re-pick and a submit-time size guard rejects oversized sources; the designed full-screen surface does not exist. Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-15-sos-photo-retry-impl.png`). |
@@ -107,7 +107,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, day-grouped date, tracked-code, Persian status label); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | partial | P2/M | Expandable per-request detail in HistoryView: description, tracking code, manual-fix flag, severity, and the server-held status timeline from `GET /_user/sos/:id`; not the designed full-screen detail. |
 | sos/19-sos-validation.png | partial | P2/L | Inline validation exists (10–500 description, Persian messages); designed field-level presentation absent. |
-| sos/20-sos-history-empty.png | partial | P2/L | Plain empty text in HistoryView (missions and trips tabs). |
+| sos/20-sos-history-empty.png | partial | P2/L | Plain empty text in HistoryView (missions and trips tabs). Capture: `screens/history-10-history-empty-impl.png` (2026-11-16, requests sub-tab). |
 
 ## Mobile map — mission (19)
 
@@ -145,9 +145,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/06-history-details.png | partial | P2/M | Stage 6: inline detail for every history record — trips show the ranked stop list, members and start/end times, plus repeat-as-new-trip and save; requests show the server timeline; missions show rating/note; every record can spawn a scoped history-window share. Stage D (2026-11-12): recorded tracks render an explicit availability state, a schematic path and a per-member distance/duration summary (missions and trips); deviation statistics remain absent and this is not the designed modal. |
 | history/07-history-playback.png | missing | P2/H | Stage D records consented tracks and ships an authorization-aware replay panel (participants by default; window-covering history-share recipients scope-projected with the grant expiry shown; `available`/`expired`/`none` stated explicitly). The designed map-animated playback surface does not exist and this row stays `missing` until a human accepts the recorded preview — visual acceptance is never automated. DF-04 was addressed in the replay panel and is retained in the register for the designed surface. |
 | history/08-history-companion.png | missing | P2/M | No per-companion history; would additionally need companion-level aggregation the APIs do not expose today. |
-| history/09-history-loading.png | partial | P2/L | An inline loading line on detail expansion; no designed skeleton list, no designed pagination indicator. |
-| history/10-history-empty.png | partial | P2/L | Plain empty text on every history tab. The designed route illustration, headline CTA and empty-state map card are absent. |
-| history/11-history-error.png | partial | P2/M | Stage 6: per-tab error messages with a working retry button (trips, missions, shares). The designed offline framing (cached-snapshot section, last-saved timestamp) is absent. |
+| history/09-history-loading.png | partial | P2/L | An inline loading line on detail expansion; no designed skeleton list, no designed pagination indicator. Not capturable as designed (no skeleton exists in the implementation to screenshot). |
+| history/10-history-empty.png | partial | P2/L | Plain empty text on every history tab. The designed route illustration, headline CTA and empty-state map card are absent. Capture: `screens/history-10-history-empty-impl.png` (2026-11-16, `?history=empty`, requests sub-tab). |
+| history/11-history-error.png | partial | P2/M | Stage 6: per-tab error messages with a working retry button (trips, missions, shares). The designed offline framing (cached-snapshot section, last-saved timestamp) is absent. Capture: `screens/history-11-history-error-impl.png` (2026-11-16, `?fail=history`; the mock's error copy stands in for the server's). |
 
 ## Mobile map — sharing (`design/map-page/companions/`, 10)
 
@@ -163,7 +163,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | companions/06-share-location.png | partial | P2/H | New-share panel on the Sharing Center screen: username search (`GET /_user/users/search`) with online/role/rating rows, single-select recipient, live kind with 15 min/1/4/24 h durations plus an indefinite option (`durationSeconds: 0`, no expiry, revoke any time). Server endpoint tested. Designed dedicated share sheet / multi-recipient / accuracy toggle absent. |
 | companions/07-share-history.png | partial | P2/H | Same panel, history kind: from/to `datetime-local` inputs with client-side checks mirroring the server (chronological, not future, at most 30 days); explicit scope selection — route points always included, optional motion (heading/speed) and accuracy details. The server stores the selection (migration v7 `location_shares.scope`), rejects unknown details and projects history points per the granted scope; both parties see the granted scope. Designed dedicated history-share sheet / intensity preview absent. |
 | companions/08-shared-with-me.png | partial | P2/M | `listShares` returns owned + received shares with outgoing/incoming counts and usernames; the screen filters by direction (all/outgoing/incoming) and each row carries direction text. Revoked grants drop off the active list but remain visible via `include=all` (state: active/expired/revoked). Grouped live/history tabs not built. |
-| companions/09-companions-empty.png | partial | P2/L | Plain empty texts exist. |
+| companions/09-companions-empty.png | partial | P2/L | Plain empty texts exist. Capture: `screens/companions-09-companions-empty-impl.png` (2026-11-16, `?shares=empty`). |
 | companions/10-companions-offline.png | missing | P2/L | No offline-specific sharing state. |
 
 ## Mobile map — profile (9)
@@ -176,7 +176,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | profile/04-active-devices.png | done | P2/L | List + revoke implemented with current-session protection. |
 | profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |
 | profile/06-logout-confirm.png | missing | P2/L | A confirmation dialog replaced the one-tap logout on the profile flow (title, account-safety body, current-device rows where known, danger accept, scrim/Escape). Status stays `missing` pending human visual acceptance. |
-| profile/07-map-entry.png | partial | P2/L | Role-aware landing works; designed entry composition absent. |
+| profile/07-map-entry.png | partial | P2/L | Role-aware landing works; designed entry composition absent. The map-entry surface is the profile sheet (`screens/profile-01-profile-home-impl.png`). |
 | profile/08-bookmarks.png | partial | P2/H | Stage C review found the saved-places UI shipped: the profile screen lists saved places with per-place inline edit (name, label, address, icon) and delete; server CRUD + store are used. The designed dedicated bookmarks screen (search, reorder, groups) is absent; reorder remains API-only. |
 | profile/09-bookmark-edit.png | partial | P2/M | Inline edit panel per saved place on the profile screen (name, label, address, icon; full PATCH with preserved rank). The designed dedicated edit screen is absent. |
 
@@ -202,7 +202,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 |---|---|---|---|
 | admin-panel/states/01-loading.png | missing | P3/M | Console-wide first-load skeletons now ship (users, overview, reports, alerts, groups, audit, dispatch, job types, incident types, support requests, settings and the system-health panel); the skeleton geometry is a generic row batch, not screen-specific layouts. See Stage H review log. Status stays `missing`. |
 | admin-panel/states/02-empty.png | partial | P3/L | Plain empty texts per view. |
-| admin-panel/states/03-error.png | partial | P3/M | Inline error only on overview; no retry pattern elsewhere. |
+| admin-panel/states/03-error.png | partial | P3/M | A shared inline error panel with retry ships on the overview, users, groups, alerts, audit, incident types, job types, dispatch, settings and reports (Stage H); the designed offline framing (stale snapshot with last-saved timestamp) is absent. Capture: `screens/admin-states-03-error-impl.png` (2026-11-16, `?fail=admin`, users screen; mock copy stands in for the server's). |
 | admin-panel/states/04-offline.png | missing | P3/M | The admin shell now shows a dark offline banner (wifi-off glyph, last clean `loadAll` wall-clock where known, retry that re-pulls every admin projection). Per-panel staleness was not invented (no per-panel freshness model). See Stage H review log. Status stays `missing`. |
 | admin-panel/states/05-forbidden.png | partial | P3/L | Router guard redirects non-admins; no designed 403 surface. |
 
@@ -245,7 +245,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 ## Summary tally (canonical 141)
 
-Counts over the 141 canonical rows above: `done` 21, `partial` 74, `missing` 29, `superseded` 11, `reference` 5, intentional `deviation` 1.
+Counts over the 141 canonical rows above: `done` 21, `partial` 78, `missing` 24, `superseded` 12, `reference` 5, intentional `deviation` 1. Reconciled 2026-11-16 against the table itself (the printed tallies in earlier stage logs had drifted from the rows; the table is authoritative).
 
 ## Stage C review log (2026-11-08)
 
@@ -498,9 +498,8 @@ Defects fixed:
   it sat flush against the bottom/inline-end edges where the button's `overflow: hidden` and
   999px radius clipped it entirely, and a competing `.is-holding` rule forced `width: 100%`
   regardless of the inline-size binding. The bar is now a bottom-inset (8px) pill inset 14px
-  from the inline start, 5px tall, painted in the on-accent color; hold captures at ~50 percent
-  fill (`navigation/02`, `sos/02`, viewport clips — full-page screenshots do not paint the hold
-  indicator in headless Chromium) confirm it renders mid-hold.
+  from the inline start, 5px tall, painted in the on-accent color; hold captures show the fill (`navigation/02`, `sos/02`, viewport clips — full-page screenshots do not paint the hold
+  indicator in headless Chromium); the exact fill fraction at capture time is not measured and no mid-hold percentage is claimed.
 - **The SOS dock painted under the route sheet** (`z-index` 16) and was effectively unreachable
   at every detent: now `z-index: 18`, and the quick-jump saved-place chips moved out of the
   sheet (they were clipped by its rounded top edge) into a detent-aware sibling that paints
@@ -512,11 +511,26 @@ Defects fixed:
   `sos/13`; `clickAt` joined the harness step set for canvas point taps.
 
 Rows moved on code/capture evidence: `sos/07` missing → `partial`, `sos/13` done → `partial`,
-`sos/15` done → `partial`. Tally: `done` 21, `partial` 74, `missing` 29, `superseded` 11,
-`reference` 5, intentional `deviation` 1.
+`sos/15` done → `partial`. Tally after those moves, as counted from the table: `done` 21,
+`partial` 78, `missing` 24, `superseded` 12, `reference` 5, intentional `deviation` 1.
 
-Evidence: 88 implementation captures (393 × 852, DPR 2) under `docs/visual-acceptance/screens/`,
-generated with the harness committed at `scripts/visual-acceptance/` and documented in
-`docs/VISUAL_ACCEPTANCE.md`. They are byte-stable and reproducible from the demo bundle; their
-`node_modules/` stays gitignored. Pixel-level fidelity against the references remains unverified
-for every row; the human P5 review is the approval gate.
+Tally reconciliation (2026-11-16): the printed tallies in the Stage C/D/E/H logs and in the
+summary section (e.g. `done` 23, `partial` 71/74, `missing` 29/30/31, `superseded` 11) drifted
+from the rows they describe and never matched the table as committed. The per-row table is the
+single authority; counting its 141 data rows on 2026-11-16 gives `done` 21, `partial` 78,
+`missing` 24, `superseded` 12, `reference` 5, `deviation` 1 — unchanged by this evidence pass
+(no row changed status). Earlier logs are kept as the historical record of what was claimed at
+the time; this note is the correction.
+
+Evidence: 92 implementation captures under `docs/visual-acceptance/screens/` (mobile 393 × 852,
+DPR 2; admin captures at desktop widths — the pre-existing set at 1440 × 900, the new `admin-states/03-error` at 1280 × 900), generated with the harness committed at
+`scripts/visual-acceptance/` and documented in `docs/VISUAL_ACCEPTANCE.md`. They are byte-stable
+and reproducible from the demo bundle; the tool's `node_modules/` stays gitignored. The five
+references newly exercised in the pass are the empty/error states (`history/10`, `history/11`,
+`companions/09`, `admin-states/03-error`, `sos/20` via the history capture); `navigation/07`,
+`sos/12` and `profile/07` reuse existing captures as named in their rows. The 2026-11-16
+empty/error captures were produced with four preview-only failure/empty knobs added to the demo
+bundle (`?history=empty`, `?shares=empty`, `?fail=history`, `?fail=admin` — deterministic 500
+envelopes and empty lists served by the fake-data layer), the same way the earlier
+`?missions=empty&offers=empty` knobs work. Pixel-level fidelity
+against the references remains unverified for every row; the human P5 review is the approval gate.

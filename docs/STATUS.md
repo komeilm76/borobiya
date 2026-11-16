@@ -27,6 +27,8 @@ The Vitest suite covers every routed view and the role guard, the mobile shell's
 
 Professional visual acceptance against the canonical PNG references remains a separately deferred human review. The automated suite verifies structural, behavioral and asset invariants — including Vuetify component mounting and preview-header behavior — but it does not perform browser-driven navigation, screenshot comparison or real-device testing.
 
+The 2026-11-16 evidence pass (documented in `docs/VISUAL_ACCEPTANCE.md` and the Stage F log in `docs/DESIGN_MATRIX.md`) produced 92 implementation captures under `docs/visual-acceptance/screens/` for 141 canonical references, reconciled the matrix tallies to the per-row table (done 21 · partial 78 · missing 24 · superseded 12 · reference 5 · deviation 1), added preview-only empty/error-state knobs to the demo bundle (`?history=empty`, `?shares=empty`, `?fail=history`, `?fail=admin`) and corrected stale claims (no measured hold-pill fill percentage; no unverified pixel-comparison claim). No row was flipped to `done`; the human P5 review remains the gate. As of this pass `./boro verify` exits 0: 1346/1346 tests (104 files), coverage statements 94.38% / branches 87.28% / functions 95.21% / lines 96.51%.
+
 ## Operational readiness
 
 For production, install Bun 1.4.4, set a unique administrator password, disable demo seeding, enable secure cookies, configure exact allowed origins, terminate HTTPS at a trusted proxy and place the SQLite data directory on persistent storage. Use `/_public/health`, `/_public/openapi.json`, `/_admin/system/health`, a protected route, a tile request and a WebSocket upgrade as smoke checks. Back up the database and WAL together. Audio remains ephemeral and is never stored.

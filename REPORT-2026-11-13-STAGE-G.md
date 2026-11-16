@@ -7,7 +7,7 @@ Branch `arena/250278b6-borobiya`, PR [#6](https://github.com/komeilm76/borobiya/
 | Stage | Commit | Status | Summary |
 |---|---|---|---|
 | B — visual preview server | (earlier) | Done | `build/preview-app` (git-ignored) served by `bun scripts/preview.ts` on port **4173**; homepage lists every genuinely completed page; every page reachable directly at `/app/<route>?persona=<admin\|user\|onboarding>`; realistic fake data; red demo badge when built with `VITE_PREVIEW_DEMO=true`. |
-| C — design reference review | (earlier) | Done | 141 canonical references under `design/` cross-referenced and kept honest in `docs/DESIGN_MATRIX.md`. Counts **now**: 23 done, 75 partial, 25 missing, 12 superseded, 5 reference, 1 deviation (plus per-row notes). No row flips to `done` without human visual acceptance. |
+| C — design reference review | (earlier) | Done | 141 canonical references under `design/` cross-referenced and kept honest in `docs/DESIGN_MATRIX.md`. Counts as printed at the time: 23 done, 75 partial, 25 missing, 12 superseded, 5 reference, 1 deviation. **Superseded** — see the 2026-11-16 addendum (§19): the printed tallies had drifted from the per-row table; the table is authoritative (canonical tally: 21 / 78 / 24 / 12 / 5 / 1). No row flips to `done` without human visual acceptance. |
 | D — consented track recording | `b0b3328` | Done & verified | Trips and responder missions; see §5. |
 | E — history discovery (minimal) | `5d24aa4` | Done & verified | Date-range chips, status/lifecycle chips, resettable empty states, per-tab summary lines, unfiltered badge totals. Vehicle/companions/toggles deliberately omitted (no backing data); `history/05` stays `partial` until human acceptance. |
 | F — visual & functional acceptance | `80d93fd`, `faa2cf5` | Done (human sign-off pending) | 46 captures (23 pages × desktop 1280×900 / mobile 390×844) regenerated from the final build into `/home/user/visual-acceptance/`. Material defects found by inspecting the running app were fixed; see §3 and §4. |
@@ -66,7 +66,7 @@ Interactive spot-checks: Ctrl/Cmd+K command palette (was effectively unstyled �
 
 ## 4. Design-reference coverage and discrepancies
 
-- 141 canonical references (154 PNGs minus 13 `_generator/_preview-*.png`): **23 done · 75 partial · 25 missing · 12 superseded · 5 reference · 1 deviation** (registry in `docs/DESIGN_MATRIX.md`).
+- 141 canonical references (154 PNGs minus 13 `_generator/_preview-*.png`): the figures printed here (**23 · 75 · 25 · 12 · 5 · 1**) are stale — reconciled 2026-11-16 (§19) to the table-derived **21 done · 78 partial · 24 missing · 12 superseded · 5 reference · 1 deviation** (registry in `docs/DESIGN_MATRIX.md`).
 - Deliberate, documented deviations: recovery-unknown-account enumeration resistance (matrix row 06); turn-by-turn trip planning superseded by the simplified SOS→mission workflow; Stage E history filter omits vehicle/companions/toggles (no data — will not flip to `done` until human acceptance).
 - Known unfixed divergences (recorded, partial): login (top bar/heading lockup/social variants missing), talk screen, adminGroups density, bottom-sheet 28/52/76 detents never pixel-validated against `bottom-sheet.png`, dark-theme surfaces not re-validated this cycle.
 - Superseded stage: the legacy multi-service roadmap (PostGIS/OSRM/Android/Docker) is superseded, not skipped — see `docs/ACCEPTANCE.md` "Legacy feature scope reconciliation".
@@ -116,7 +116,7 @@ Data is deterministic fake data (SVG tiles, seeded demo users/missions/trips). C
 
 ## 9. PR / release state
 
-PR #6 "Migrate runtime to Bun 1.4.4 and client to Vue 3 (2.0.0)" — **OPEN**, `MERGEABLE`, not draft, base `main`, head `arena/250278b6-borobiya`, latest quality-gate run **pass**. No merge, no tag, no GitHub release created. Commits on the branch: `b0b3328` (Stage D), `5d24aa4` (Stage E), `80d93fd` (Stage F visual acceptance pass), `faa2cf5` (docs-guard + parent-tab contract fix), `6c319dc` (second pass: dark-theme chrome, toast dismissal, dead utilities), `e67b180` (design-matrix second-pass log). CI green on the latest commit.
+PR #6 "Migrate runtime to Bun 1.4.4 and client to Vue 3 (2.0.0)" — **OPEN**, `MERGEABLE`, not draft, base `main`, head `arena/250278b6-borobiya`, latest quality-gate run **pass**. No merge, no tag, no GitHub release created. Commits on the branch: `b0b3328` (Stage D), `5d24aa4` (Stage E), `80d93fd` (Stage F visual acceptance pass), `faa2cf5` (docs-guard + parent-tab contract fix), `6c319dc` (second pass: dark-theme chrome, toast dismissal, dead utilities), `e67b180` (design-matrix second-pass log). CI green on the latest commit. (Post-report state — commits `389ffb1` and the 2026-11-16 evidence pass — is covered by the addendum, §19.)
 
 
 ## 10. Second pass (2026-11-13, continued) — reference comparison and bug hunt
@@ -777,3 +777,42 @@ rows changed). Remaining matrix items (e.g. `admin-panel/states/04-offline`, `ad
 owner decisions or human-gated. The reference PNG `design/admin-panel/dashboard/03-reports.png` also shows
 completed-missions and satisfaction deltas with values the database cannot yet distinguish; what ships is
 one honest delta per KPI, documented in the Stage H matrix log.
+
+## §19 — Addendum (2026-11-16) — Stage F evidence pass and tally reconciliation
+
+This addendum supersedes the stale figures and state printed in the report body; the body is left as the
+record of what was believed on 2026-11-13. All claims below were verified on 2026-11-16.
+
+**Verification (2026-11-16, `./boro verify` exit 0):** 1346/1346 tests (104 files); coverage statements
+94.38% / branches 87.28% / functions 95.21% / lines 96.51% — thresholds unchanged, nothing lowered.
+`bun scripts/check-docs.ts` clean (25 required documents, English-only).
+
+**Matrix tally reconciled.** The tallies printed above (23/75/25/12 and 23/71/30/11 in the stage logs)
+had drifted from the per-row table. Counting the 141 canonical rows in `docs/DESIGN_MATRIX.md` on
+2026-11-16 yields **done 21 · partial 78 · missing 24 · superseded 12 · reference 5 · deviation 1**; a
+reconciliation note now lives in the matrix's Stage F log and its summary section. No row changed
+status in this evidence pass, and no row was ever flipped to `done` — visual acceptance remains the
+human P5 gate. Row corrections that did land: `navigation/07`, `sos/12`, `sos/20`, `history/09`,
+`history/10`, `history/11`, `companions/09`, `profile/07`, `admin-panel/states/03-error` rows now name
+their capture evidence or the reason none exists (`history/09` — no skeleton exists to screenshot).
+
+**Captures.** The evidence set under `docs/visual-acceptance/screens/` grew from 88 to **92** captures:
+`history-10-history-empty-impl.png` (`?history=empty`), `history-11-history-error-impl.png`
+(`?fail=history`, inline error + retry), `companions-09-companions-empty-impl.png` (`?shares=empty`)
+and `admin-states-03-error-impl.png` (`?fail=admin`, users screen: shared inline error panel with
+retry). These four captures required new preview-only demo-bundle knobs (`?history=empty`,
+`?shares=empty`, `?fail=history`, `?fail=admin`) and a harness fix (`scripts/visual-acceptance/
+capture.mjs`: the `persona` query parameter now lands correctly when the route already carries query
+parameters — the first admin error capture showed the designed 403 role-gate instead of the users
+screen and was re-shot). The empty captures are honest evidence of the plain empty texts that ship;
+the designed empty/error compositions (illustration, cached-snapshot framing, full-screen admin error)
+are still absent and the rows stay `partial`. `docs/VISUAL_ACCEPTANCE.md` documents the knobs and the
+four captures.
+
+**Claims corrected in this pass.** `docs/VISUAL_ACCEPTANCE.md` and the matrix's Stage F log no longer
+state a measured "~50 percent" hold-pill fill (the fill fraction at capture time is not measured) and no
+longer claim pixel-level capture/reference comparison; observed-difference notes remain.
+
+**Branch and PR state (2026-11-16).** Branch `arena/250278b6-borobiya`; PR [#6](https://github.com/komeilm76/borobiya/pull/6)
+**OPEN and unmerged** (MERGEABLE), CI green at `389ffb1`, no release, no tag. This addendum and the
+reconciliation it describes land with the 2026-11-16 evidence-pass commit(s).

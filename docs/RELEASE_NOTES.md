@@ -1,5 +1,14 @@
 # Release notes
 
+## Unreleased — Stage F evidence pass (2026-11-16)
+
+Visual-acceptance evidence and documentation reconciliation for this branch; PR [#6](https://github.com/komeilm76/borobiya/pull/6) remains open and unmerged — no release, no tag.
+
+- The visual-acceptance evidence set grew from 88 to **92 implementation captures** under `docs/visual-acceptance/screens/`: `history/10` (empty), `history/11` (error with retry), `companions/09` (empty Sharing Center) and `admin-states/03-error` (users console, inline error panel with retry). They were produced against the demo bundle with new preview-only knobs in the fake-data layer (`?history=empty`, `?shares=empty`, `?fail=history`, `?fail=admin` — deterministic 500 envelopes and empty lists) and a capture-harness fix (the `persona` query parameter now lands correctly when the route already carries query parameters).
+- The canonical matrix tallies were reconciled against the per-row table in `docs/DESIGN_MATRIX.md`, which is the single authority: **done 21 · partial 78 · missing 24 · superseded 12 · reference 5 · deviation 1** (printed tallies in earlier stage logs had drifted; a reconciliation note now records this). No row was flipped to `done`; visual acceptance remains the deferred human P5 review.
+- Stale claims corrected: no measured hold-pill fill percentage and no unverified pixel-level capture/reference comparison are claimed anywhere; `docs/VISUAL_ACCEPTANCE.md`, `docs/DESIGN_MATRIX.md`, `docs/STATUS.md`, `docs/IMPLEMENTATION_PLAN.md` (Stage F log) and the delivery report (§19 addendum) now state what was verified on 2026-11-16.
+- `./boro verify` exits 0: 1346/1346 tests (104 files); coverage statements 94.38% / branches 87.28% / functions 95.21% / lines 96.51% — thresholds unchanged, nothing lowered.
+
 ## Unreleased — Stage G/H: design-parity continuation (2026-11-15)
 
 Designed state compositions shipped across the console and the responder flow, recorded honestly in `REPORT-2026-11-13-STAGE-G.md`; no `docs/DESIGN_MATRIX.md` row was flipped — human visual acceptance remains the gate.

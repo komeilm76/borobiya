@@ -10,7 +10,7 @@ Pixel-diff gates would either block every intentional redesign or rubber-stamp r
 
 The captures and the harness are generated review aids. They are committed so a reviewer can compare implementation against reference without running anything (mirroring how `design/` carries the references); their dependency tree is not:
 
-- `docs/visual-acceptance/screens/` — one `<reference-id>-impl.png` per canonical reference exercised in a capture run (88 captures).
+- `docs/visual-acceptance/screens/` — one `<reference-id>-impl.png` per canonical reference exercised in a capture run (92 captures).
 - `scripts/visual-acceptance/` — the capture harness (Node, `puppeteer-core` over `@sparticuz/chromium`), pinned by `package.json`. `scenarios.json` is the machine-readable capture plan keyed by reference id: route, persona, viewport and DPR, an ordered list of input steps (click, clickAt, clickText, type, upload, hold, hover, offline, dark, network latency, wait, clip), and optional per-scenario or per-shot viewport clips for transient states. `node_modules/` inside it is gitignored; nothing under it ships to production.
 
 Regenerating the evidence requires no credentials — the demo bundle is the only requirement.
@@ -35,16 +35,28 @@ Full-page screenshots are not sufficient for every state. Known cases and how th
 
 - The SOS hold progress indicator does not paint in headless full-page captures (deterministic, independent of screenshot flags). Hold references are captured with a viewport clip sized to the button instead (`clip`, and `shots[].clip` for per-shot clips).
 - The submitting card is a transient state; the demo answers `POST /_user/sos` after an artificial 1500 ms delay so the state is screenshottable. Production latency does the real work.
+- History/sharing empty states and the list/admin error states are reached through four preview-only knobs in the demo fake-data layer: `?history=empty` (empty history lists), `?shares=empty` (empty Sharing Center), `?fail=history` (history endpoints answer 500 with a Persian preview-failure envelope) and `?fail=admin` (admin GET endpoints answer the same). They are screenshot-only determinism aids, never wired to production behaviour.
 - The requester-only mission rail (the signed-in account's own cancellable request) is shadowed by the responder missions in the stock demo world. The capture uses `?missions=empty&offers=empty`, two preview-only query knobs added for the harness, which serve an empty missions list and an empty offers inbox.
 - The map has no long-press gesture; destination selection is tap-to-select. `navigation-02` is captured as tap-to-select and differs materially from the reference.
 - The map-canvas point click needs an explicit `clickAt` step; clicking the canvas element center would hit the search bar.
 
 ## What the 2026-11-16 pass verified
 
-- The SOS hold progress indicator end to end. The bar is now a bottom-inset pill bound to inline size only; a competing rule that forced it full-width during a hold was removed. The button also paints above the route sheet and rides its top edge at every detent (it was unreachable), and the hold state is visible in the clipped hold captures (~50 percent fill mid-hold).
+- The SOS hold progress indicator end to end. The bar is now a bottom-inset pill bound to inline size only; a competing rule that forced it full-width during a hold was removed. The button also paints above the route sheet and rides its top edge at every detent (it was unreachable), and the hold state is visible in the clipped hold captures (the exact fill fraction at capture time is not measured and no mid-hold percentage is claimed).
 - The map route's saved-place quick chips moved out of the sheet into a detent-aware sibling, so they are no longer clipped by the sheet's rounded top edge; the map-route search bar and chips paint above the sheet there only.
-- The submitting dialog (`sos/07`), the inline photo error path (`sos/15`), the cancel-request panel (`sos/13`), tap-to-select destination (`navigation/02`) and the hold pill (`sos/02`) were captured and compared against their references by the agent pass. Rows `sos/07` (`missing` to `partial`), `sos/13` (`done` to `partial`) and `sos/15` (`done` to `partial`) moved on that evidence — see the Stage F fourth-pass log in `docs/DESIGN_MATRIX.md`. No row was flipped to `done`.
+- The submitting dialog (`sos/07`), the inline photo error path (`sos/15`), the cancel-request panel (`sos/13`), tap-to-select destination (`navigation/02`) and the hold pill (`sos/02`) were captured by the agent pass; the fidelity notes below record observed differences, and no pixel-level comparison was performed. Rows `sos/07` (`missing` to `partial`), `sos/13` (`done` to `partial`) and `sos/15` (`done` to `partial`) moved on that evidence — see the Stage F fourth-pass log in `docs/DESIGN_MATRIX.md`. No row was flipped to `done`.
 - Fidelity notes worth carrying into P5 adjudication: `sos/13` renders the cancel panel inline below the rail with four server-catalog reasons and a required-detail rule enforced client- and server-side (the reference shows a full-screen sheet, five reasons and a 200-character counter); `sos/07` renders the ring, staged rows and the informational note but without per-row done timestamps and with the dim confined to the sheet; `sos/15` has no designed equivalent — the photo rides `POST /_user/sos`, so the retryable error surfaces inline in composer step three; `navigation/02` differs in gesture model (tap, not press-and-hold) and ships no callout.
+
+## The 2026-11-16 empty/error evidence pass
+
+Four more captures were added on 2026-11-16, produced against the demo bundle with the knobs above (ad-hoc scenario; not part of `scenarios.json`). The harness itself was fixed so the `persona` query lands correctly when the route already carries query parameters.:
+
+- `history/10-history-empty` — the history screen with `?history=empty` (requests sub-tab shows the plain empty copy; all tab counters read zero). Not the designed illustrated empty composition.
+- `history/11-history-error` — the history screen with `?fail=history` (inline red preview-failure notice with a working retry on the requests list). The designed offline cached-snapshot framing is absent; the mock's failure copy stands in for the server's.
+- `companions/09-companions-empty` — the Sharing Center with `?shares=empty` (no incoming or outgoing grants). The designed dedicated companions/add-friend empty state does not exist; the rename to Sharing Center is documented in `docs/LEGACY_REVIEW.md`.
+- `admin-states/03-error` — the users console with `?fail=admin` (shared inline `AdminInlineError` panel with retry; mock copy stands in for the server's). The designed full-screen error composition is not built.
+
+All four rows remain `partial` in `docs/DESIGN_MATRIX.md`; no row was flipped to `done` and the human P5 review remains the approval gate.
 
 ## Maintenance contract
 
