@@ -340,6 +340,7 @@ import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
 import ShareDialog from "@/components/sharing/ShareDialog.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { shareSessionKey } from "@/sharing/share-submission-fence";
+import { mapTripSession } from "@/map/trip-session";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
 import { historyCameraKey, historyCameraPadding } from "@/history/camera-padding";
@@ -687,6 +688,12 @@ function followNavigationCamera(camera: NavigationCamera): void {
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
+// Proposals are App-owned; register only a revocable, synchronous stop callback.
+// A pending Start with weak GPS is still a trip and must be ended before acceptance.
+const unregisterTrip = mapTripSession.register(clearPointRoute);
+watch([() => journey.navigating.value, () => journey.navigationPending.value], ([active, pending]) => {
+  mapTripSession.update(active || pending);
+}, { flush: "sync", immediate: true });
 // Arrival is a one-time GPS event. Snapshot the destination before removing the
 // entire route; a second fix cannot replay the sound or reopen the planner.
 watch(() => journey.arrived.value, (arrived) => {
@@ -1991,6 +1998,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  unregisterTrip();
   document.documentElement.style.removeProperty("--bb-map-navigation-sheet-height");
   document.documentElement.style.removeProperty("--bb-map-point-sheet-height");
   // `map.value` is cleared first: Vue runs a parent's `beforeUnmount` before the child's, so the map is

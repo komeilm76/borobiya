@@ -168,9 +168,13 @@
 
     <v-dialog :model-value="confirmAction !== null" max-width="460" scrollable persistent @update:model-value="(open: boolean) => { if (!open) confirmAction = null; }">
       <v-card rounded="xl" class="pa-2">
-        <v-card-title>{{ confirmAction === 'accept' ? 'پذیرش مأموریت' : 'رد پیشنهاد' }}</v-card-title>
+        <v-card-title>{{ confirmAction === 'accept' ? mapTripSession.navigating.value ? 'پایان سفر فعلی و شروع مأموریت' : 'پذیرش مأموریت' : 'رد پیشنهاد' }}</v-card-title>
         <v-card-text>
-          <p v-if="confirmAction === 'accept'">با پذیرش این مأموریت، پیشنهادهای دیگر شما خودکار بسته می‌شوند. برای ادامه مطمئن هستید؟</p>
+          <p v-if="confirmAction === 'accept' && mapTripSession.navigating.value" role="alert">
+            با تأیید، سفر فعلی و مسیر شخصی آن پایان می‌یابد؛ سپس پذیرش مأموریت ثبت می‌شود. اگر ثبت ناموفق باشد، سفر قبلی خودکار بازنمی‌گردد.
+          </p>
+          <p v-else-if="confirmAction === 'accept'">با پذیرش این مأموریت، پیشنهادهای دیگر شما خودکار بسته می‌شوند. برای ادامه مطمئن هستید؟</p>
+          <p v-if="tripEndError" role="alert" class="text-error">{{ tripEndError }}</p>
           <template v-else>
             <p class="mb-4">اگر نمی‌توانید این مأموریت را انجام دهید، می‌توانید دلیل کوتاهی ثبت کنید (اختیاری).</p>
             <v-textarea v-model="declineReason" label="دلیل رد (اختیاری)" :counter="500" maxlength="500" rows="3" variant="outlined" />
@@ -195,6 +199,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { missionMapCamera } from "@/sos/mission-map";
+import { mapTripSession } from "@/map/trip-session";
 import { proposalDistance, proposalSeverity, proposalTime } from "@/sos/proposal-presentation";
 import { useAuthStore } from "@/stores/auth";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
@@ -217,6 +222,8 @@ async function selectOffer(id: string): Promise<void> {
 }
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const confirmAction = ref<"accept" | "decline" | null>(null);
+const tripEndError = ref<string | null>(null);
+watch(confirmAction, () => { tripEndError.value = null; });
 const declineReason = ref("");
 const photoSrc = ref<string | null>(null);
 const photoError = ref<string | null>(null);
@@ -308,6 +315,12 @@ async function submitDecision(): Promise<void> {
   const id = selected.value?.id;
   const action = confirmAction.value;
   if (!id || !action) return;
+  // Confirmation is explicit: a trip, including Start waiting for GPS, must
+  // release its watcher and route before the server can accept a mission.
+  if (action === "accept" && !mapTripSession.endForMission()) {
+    tripEndError.value = "پایان سفر تأیید نشد؛ مأموریت پذیرفته نشد. سفر را متوقف کنید و دوباره تلاش کنید.";
+    return;
+  }
   const success = await inbox.decide(id, action, action === "decline" ? declineReason.value.trim() || undefined : undefined);
   if (success) {
     confirmAction.value = null;

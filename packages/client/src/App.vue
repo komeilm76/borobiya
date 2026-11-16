@@ -191,7 +191,8 @@
       </header>
       <RouterView v-slot="{ Component, route }">
         <Transition mode="out-in" name="page-fade">
-          <component :is="Component" :key="route.fullPath" />
+          <!-- Map query changes (offers and future tabs) must not tear down a live trip or MapLibre. -->
+          <component :is="Component" :key="route.name === 'user-map' ? route.path : route.fullPath" />
         </Transition>
       </RouterView>
     </v-main>
