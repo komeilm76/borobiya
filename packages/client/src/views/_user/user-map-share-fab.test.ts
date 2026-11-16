@@ -26,7 +26,7 @@ describe("map sharing quick action", () => {
     expect(button).toContain("broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning'");
     expect(button).toContain("broadcast.view.isActive ? 'primary' : 'surface'");
     expect(view).toContain(":color=\"own.error.value || recenterError ? 'warning' : 'primary'\"");
-    expect(view).toContain('icon="mdi-routes" variant="flat" color="primary"');
+    expect(view).not.toContain('id="map-route-choices-toggle"');
     expect(button).toContain(":class=\"{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }\"");
     expect(button).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
     expect(button).toContain('@click="broadcast.toggle()"');
@@ -43,8 +43,22 @@ describe("map sharing quick action", () => {
     expect(base).toContain('height: 48px;');
     expect(base).toContain('border-radius: 50%;');
     expect(view).toContain('v-show="!missionActive && !(isShortPhone && activeTool)"');
-    expect(view).toContain('inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))');
-    expect(view).toContain('inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))');
+    const phone = view.split('@media (max-width: 599px) {')[1]!;
+    const normalRail = phone.slice(phone.indexOf('  /* Search → SOS → broadcast → recenter → compass:'));
+    const recenter = styleBlock(normalRail, '.user-map-view__recenter');
+    const share = styleBlock(normalRail, '.user-map-view__share');
+    const compass = styleBlock(phone.slice(phone.indexOf('/* On phones the compass')), '.user-map-view__canvas :deep(.maplibregl-ctrl-top-right)');
+    const sos = styleBlock(shell, '.app-shell--map .sos-fab.sos-fab');
+    expect(recenter).toContain('inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px))');
+    expect(share).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(compass).toContain('inset-block-end: calc(14.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(sos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
+    // Adjacent 48px targets have an 8px gap, including broadcast above SOS.
+    for (const [lower, upper] of [[4.25, 7.75], [7.75, 11.25], [11.25, 14.75]]) {
+      expect(upper - lower - 3).toBe(.5);
+    }
+    const landscape = view.split('@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {')[1]!;
+    expect(styleBlock(landscape, '.user-map-view__recenter')).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
     expect(view).toContain('class="user-map-view__history-dialog"');
     expect(view).toContain('class="user-map-view__history-body"');
     expect(view).toContain('overflow-y: auto; overscroll-behavior: contain;');

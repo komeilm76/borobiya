@@ -84,21 +84,6 @@
       title="جست‌وجوی مکان" aria-controls="map-search-panel"
       :aria-expanded="activeTool === 'search'" @click="selectTool('search')" />
 
-    <!-- SOS is an App.vue sibling, outside this map's isolated stacking context.
-         Teleport the launcher into that same viewport context so both buttons
-         share an origin, safe-area offset and guidance-sheet height. -->
-    <Teleport defer to="#map-route-choices-action-anchor">
-      <!-- Keep the teleported button vnode stable while point selection and
-           reverse geocoding trigger consecutive updates; its target is kept
-           mounted in App.vue to prevent patching an unmounted vnode. -->
-      <v-btn v-show="!!journey.point.value && mode === 'trips' && !missionActive" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
-        icon="mdi-routes" variant="flat" color="primary" :disabled="!journey.point.value" :aria-expanded="routeChoicesOpen"
-        aria-controls="map-point-route-choices-sheet"
-        :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
-        :title="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
-        @click="openRouteChoices" />
-    </Teleport>
-
     <!-- Keep location a map feature, not a fourth panel. This is a private GPS
          watcher; opening the map never starts outgoing location sharing. -->
     <v-btn
@@ -868,7 +853,7 @@ watch([isPhone, () => journey.navigating.value, () => journey.sheetOpen.value],
     window.addEventListener("resize", onResize);
   }, { flush: "post" });
 // The planner and the route/vehicle choice sheets are mutually exclusive.
-// Keep SOS and the route launcher ABOVE whichever in-map phone sheet is visible.
+// Keep SOS and the map controls ABOVE whichever in-map phone sheet is visible.
 // React to async route results and safe-area changes without guessing a height.
 function pointSheetId(): string {
   return transportChoicesOpen.value ? "map-point-transport-choices-sheet"
@@ -2431,7 +2416,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__journey-actions :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: 2px; }
 @media (min-width: 600px) and (max-width: 1023px) {
-  /* The same card, parked beside rather than over the SOS/route action rail. */
+  /* The same card, parked beside rather than over the SOS/map action rail. */
   .user-map-view__journey-stack { left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;
     width: min(30rem, calc(100vw - 7.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
 }
@@ -2538,8 +2523,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   pointer-events: none;
 }
 
-/* One 48px map-action rail: sharing is opt-in and sits above the other map
- * controls, with the same 8px gap and RTL/safe-area alignment as SOS. */
+/* One 48px map-action rail: sharing is opt-in and aligns with recenter,
+ * compass and SOS, with safe-area clearance. */
 .user-map-view__recenter, .user-map-view__share {
   position: fixed;
   z-index: 6;
@@ -2773,7 +2758,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(0.75rem + env(safe-area-inset-right, 0px));
     left: auto;
-    inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(14.75rem + env(safe-area-inset-bottom, 0px));
   }
   /* With no active mission, park the three map actions in the open band under
    * the tabs. The centered offer list starts below them, so none of its
@@ -2837,8 +2822,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__recenter, .user-map-view__share {
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
-  .user-map-view__recenter { inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px)); }
-  .user-map-view__share { inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px)); }
+  /* Search → SOS → broadcast → recenter → compass: each 48px target has
+     the same 8px gap on an ordinary phone map. Mission and trip-sheet rails
+     keep their own panel-aware positions. */
+  .user-map-view__recenter { inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px)); }
+  .user-map-view__share { inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px)); }
 
   /* One 48px Search action below SOS; keep map and tab controls unobscured. */
   .user-map-view__search-action {
@@ -2885,20 +2873,19 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (max-width: 599px) and (max-height: 360px) {
   .user-map-view__recenter {
     inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(0.75rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px));
   }
 }
 
-/* In short landscape, recenter sits beside sharing so the compass stays above it. */
+/* In short landscape, recenter sits beside sharing at the same height. */
 @media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
-  /* Put recenter beside sharing, leaving room for the compass above and SOS below. */
   .user-map-view__recenter {
     inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
@@ -2907,8 +2894,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
 @media (max-width: 599px) {
   /* Every Trips sheet shares guidance's measured two-row action layout.
-   * Four map controls sit 8px above the dock, SOS and route choice one row
-   * higher, without hiding a sheet action or covering the workspace tabs. */
+   * Search, sharing, recenter and compass sit 8px above the dock; SOS is one
+   * row higher, without hiding a sheet action or covering the workspace tabs. */
   .user-map-view--route-preview .user-map-view__share,
   .user-map-view--route-preview .user-map-view__recenter,
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {

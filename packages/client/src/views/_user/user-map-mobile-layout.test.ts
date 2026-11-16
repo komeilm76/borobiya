@@ -200,7 +200,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("safe-area-inset-bottom");
     expect(phoneMap).toContain(".maplibregl-ctrl-top-right");
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right");
-    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*right: calc\(0\.75rem[^}]*left: auto;[^}]*inset-block-end: calc\(16rem/);
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*right: calc\(0\.75rem[^}]*left: auto;[^}]*inset-block-end: calc\(14\.75rem/);
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{[^}]*top: calc\(4\.5rem[^}]*bottom: auto;/);
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib");
     expect(phoneMap).toContain("max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));"); // Real OSM/OpenMapTiles credit must not cover the action rail.
@@ -214,8 +214,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("max-height: none !important;"); // Remove the old 56dvh/26rem card cap.
     expect(view).toContain('v-show="!missionActive && !(isShortPhone && activeTool)"');
     expect(phoneMap).toContain(".user-map-view__recenter");
-    expect(phoneMap).toContain("inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))");
-    expect(phoneMap).toContain("inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))");
+    expect(phoneMap).toContain("inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px))");
+    expect(phoneMap).toContain("inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))");
     expect(phoneMap).toContain("overflow-y: auto;"); // Full-height dialog body scrolls.
     expect(phoneMap).toContain("overscroll-behavior: contain");
     expect(phoneMap).toContain("min-height: 44px");

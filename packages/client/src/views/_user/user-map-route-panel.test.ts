@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+import { compileStyle, parse } from "vue/compiler-sfc";
 import { transportOptions, transportLabel } from "../../map/transport-options";
 
 // Source and compiled CSS contracts only; never mount Vue SFCs in unit tests.
@@ -149,48 +149,20 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('if (!auth.isAuthenticated) return;');
   });
 
-  it("locates the route launcher in SOS's viewport context in idle and guidance states", () => {
-    // Keep the target and its teleported child stable while point selection and
-    // reverse geocoding trigger back-to-back render updates.
-    expect(app).toContain('<span v-show="isMapRoute" id="map-route-choices-action-anchor" />');
-    expect(app).not.toContain('<span v-if="isMapRoute" id="map-route-choices-action-anchor" />');
-    expect(app.indexOf('id="map-route-choices-action-anchor"')).toBeLessThan(app.indexOf('<v-main class="app-main'));
+  it("removes the floating route launcher without removing the planner's route chooser", () => {
+    expect(app).not.toContain('map-route-choices-action-anchor');
+    expect(map).not.toContain('map-route-choices-toggle');
+    expect(map).not.toContain('user-map-view__route-choices-toggle');
+    expect(shell).not.toContain('user-map-view__route-choices-toggle');
     expect(app).toContain('<SosTriggerButton v-if="showSosButton"');
-    expect(map).toContain('<Teleport defer to="#map-route-choices-action-anchor">');
-    // Sharing keeps guidance visible but not the trip-only route editor.
-    expect(map).toContain('<v-btn v-show="!!journey.point.value && mode === \'trips\' && !missionActive" id="map-route-choices-toggle"');
-    expect(map).not.toContain('<v-btn v-if="journey.point.value" id="map-route-choices-toggle"');
-    const { descriptor } = parse(map, { filename: "UserMapView.vue" });
-    const rendered = compileTemplate({
-      source: descriptor.template!.content, filename: "UserMapView.vue", id: "route-launcher",
-    });
-    expect(rendered.errors).toEqual([]);
-    const teleport = rendered.code.slice(rendered.code.indexOf('_createBlock(_Teleport'), rendered.code.indexOf('Keep location a map feature'));
-    expect(teleport).toContain('_withDirectives(_createVNode(_component_v_btn');
-    expect(teleport).toContain("[_vShow, !!_ctx.journey.point.value && _ctx.mode === 'trips' && !_ctx.missionActive]");
-    expect(teleport).not.toContain('_ctx.journey.point.value)\n        ?'); // No conditional component vnode in the Teleport block.
-    const routeSelector = '.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle';
-    const base = shell.slice(shell.indexOf(`${routeSelector} {`), shell.indexOf('}', shell.indexOf(`${routeSelector} {`)));
-    expect(base).toContain('position: fixed;');
-    expect(base).toContain('z-index: 950;'); // SOS is 950; map is isolated.
-    expect(base).toContain('inset-inline-start: calc(1.25rem + 3.5rem)');
-    expect(base).toContain('inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px))');
-    const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf(`${routeSelector} {`)));
-    const phoneSos = phone.slice(phone.indexOf('.app-shell--map .sos-fab.sos-fab {'), phone.indexOf('}', phone.indexOf('.app-shell--map .sos-fab.sos-fab {')));
-    const phoneRoute = phone.slice(phone.indexOf(`${routeSelector} {`), phone.indexOf('}', phone.indexOf(`${routeSelector} {`)));
-    expect(phoneSos).toContain('inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px))');
-    expect(phoneRoute).toContain('inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px))');
-    expect(phoneRoute).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
-    expect(phoneSos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
-    const navigatingSos = phone.slice(phone.indexOf('.app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {'));
-    const navigatingRoute = phone.slice(phone.indexOf(`.app-shell--map:has(.user-map-view--navigating) .user-map-view__route-choices-toggle`));
-    const offset = 'inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem)';
-    expect(navigatingSos).toContain(offset);
-    expect(navigatingRoute).toContain(offset);
-    expect(map).not.toContain('.user-map-view--navigating .user-map-view__route-choices-toggle,'); // Teleported element is not a map descendant.
+    expect(sheet).toContain('title="انتخاب مسیر دیگر" @click="emit(\'choose-route\')"');
+    expect(map).toContain('@search="openRouteSearch" @choose-route="openRouteChoices"');
+    const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Tablet panels still scroll')));
+    expect(phone).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
+    expect(phone).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem)');
   });
 
-  it("keeps SOS and route choices reachable above whichever phone route sheet is open", () => {
+  it("keeps SOS reachable above whichever phone route sheet is open", () => {
     expect(map).toContain("'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value");
     expect(map).toContain('function measurePointSheet(): void {');
     expect(map).toContain('function pointSheetId(): string {');
@@ -199,20 +171,17 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('document.documentElement.style.removeProperty("--bb-map-point-sheet-height")');
     expect(map).toContain('function onPointRouteLayoutChange(): void {\n  measurePointSheet();');
     expect(map).toContain('watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });');
-    const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
-    const rule = '.app-shell--map:has(.user-map-view--route-preview)';
-    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem)';
-    for (const selector of ['.sos-fab.sos-fab', '.user-map-view__route-choices-toggle.user-map-view__route-choices-toggle']) {
-      const start = phone.indexOf(`${rule} ${selector} {`);
-      expect(start).toBeGreaterThan(0);
-      expect(phone.slice(start, phone.indexOf('}', start))).toContain(bottom);
-    }
+    const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Tablet panels still scroll')));
+    const rule = '.app-shell--map:has(.user-map-view--route-preview) .sos-fab.sos-fab {';
+    const start = phone.indexOf(rule);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(phone.slice(start, phone.indexOf('}', start))).toContain(
+      'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem)');
     const rail = css(map, "UserMapView.vue");
     expect(rail).toContain('.user-map-view--route-preview');
     expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + .5rem');
     expect(rail).toContain('11.25rem + env(safe-area-inset-right, 0px)');
-    // Four 48px actions with 8px gaps fit a 320px phone; SOS and route
-    // choice occupy a separate row, never extending beyond the left edge.
+    // Search, share, recenter and compass each remain reachable on a 320px phone.
     const lastActionLeft = 320 - (11.25 * 16 + 12) - 48;
     expect(lastActionLeft).toBeGreaterThanOrEqual(12);
     expect(sheet).toContain('role="region"'); // No overlay focus trap: the map and actions remain reachable.
@@ -280,10 +249,9 @@ describe("progressive trip planning and editing", () => {
   });
 
   it("moves alternative selection into a separate accessible sheet and returns to the planner", () => {
-    expect(map).toContain('id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"');
-    expect(map).toContain('aria-controls="map-point-route-choices-sheet"');
-    expect(map).not.toContain('aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"');
-    expect(map).toContain('ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود');
+    expect(sheet).toContain('title="انتخاب مسیر دیگر" @click="emit(\'choose-route\')"');
+    expect(map).toContain('@choose-route="openRouteChoices"');
+    expect(map).not.toContain('map-route-choices-toggle');
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return; }');
     expect(map).toContain('if (journey.navigating.value) journey.editNavigation();');
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return false; }');
@@ -325,7 +293,6 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain('api.error.value');
     expect(choices).toContain('safe-area-inset-bottom');
     expect(css(choices, "PointRouteChoicesSheet.vue")).toContain('.point-route-choices__card[aria-pressed="true"]');
-    expect(shell).toContain('.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle');
   });
 
   it("opens a separate vehicle chooser and applies a draft only after explicit confirmation", () => {

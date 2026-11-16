@@ -538,25 +538,6 @@ a {
   .app-shell--map .app-main { overflow: visible; }
 }
 
-/* Both actions are App.vue siblings in the same viewport containing block.
- * The map itself isolates its layers, so a map-child button cannot reliably
- * align or stack beside the global SOS trigger. */
-.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-  position: fixed;
-  z-index: 950;
-  inset-inline-start: calc(1.25rem + 3.5rem);
-  inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
-  width: 48px;
-  min-width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  box-shadow: var(--bb-shadow-overlay);
-}
-.app-shell--map .user-map-view__route-choices-toggle:focus-visible {
-  outline: 3px solid rgb(var(--v-theme-primary));
-  outline-offset: 3px;
-}
-
 @media (max-width: 599px) {
   /* Until ResizeObserver measures the current Trips card, cap the fallback to
      the same clearance as the card. The measured root inline value takes over
@@ -569,26 +550,13 @@ a {
     inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
-  .app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-    inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-  }
-  /* Point/route/vehicle sheets now meet the viewport edge. Their measured
-   * height already includes safe-area padding: keep SOS and route choice in
-   * the second row above the dock, without adding that inset twice. */
+  /* The measured sheet height already includes safe-area padding. Keep SOS
+   * above the dock without adding that inset twice; Search remains reachable
+   * below it and route alternatives are available inside the trip planner. */
   .app-shell--map:has(.user-map-view--route-preview) .sos-fab.sos-fab {
     inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem);
   }
-  .app-shell--map:has(.user-map-view--route-preview) .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem);
-    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-  }
-  /* During guidance Search joins the action row above the measured sheet;
-   * SOS and route choice sit one row higher, never behind the card. */
   .app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {
-    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
-  }
-  .app-shell--map:has(.user-map-view--navigating) .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
     inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
   }
 }

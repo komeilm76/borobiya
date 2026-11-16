@@ -21,8 +21,9 @@ describe("shared map icon clearance", () => {
     expect(compass).toContain('right: 1.25rem;');
     expect(compass.slice(0, compass.indexOf('}'))).not.toContain('inset-inline-start:');
     expect(css).toContain('right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;');
-    // Editing the trip route is not a Sharing-tab action, even while guidance continues.
-    expect(map).toContain('v-show="!!journey.point.value && mode === \'trips\' && !missionActive"');
+    // Editing the trip route stays in the planner, not a floating action on Sharing.
+    expect(map).not.toContain('id="map-route-choices-toggle"');
+    expect(map).toContain('@choose-route="openRouteChoices"');
   });
 
   it("centers idle mission offers beneath a dedicated icon row, clear of SOS", () => {

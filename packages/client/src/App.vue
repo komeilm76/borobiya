@@ -143,12 +143,6 @@
       <template #actions><v-btn variant="text" @click="logoutUnconfirmed = false">متوجه شدم</v-btn></template>
     </v-snackbar>
 
-    <!-- Route choices are owned by the map but share SOS's viewport positioning
-         context; the map itself isolates its stacking context for map layers. -->
-    <!-- Keep the Teleport target mounted across auth and route transitions. A
-         disappearing target can leave an unmounted button vnode in Vue's block. -->
-    <span v-show="isMapRoute" id="map-route-choices-action-anchor" />
-
     <v-main class="app-main dark:text-slate-100">
       <header v-if="isPublicRoute" class="public-chrome">
         <RouterLink class="public-chrome__brand" to="/_public/landing" aria-label="بوروبیا؛ صفحهٔ اصلی">
