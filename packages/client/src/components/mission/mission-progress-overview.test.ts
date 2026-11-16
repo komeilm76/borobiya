@@ -34,9 +34,19 @@ describe("at-a-glance mission progress", () => {
     expect(panel).toContain('@click="desk.advanceStatus()"');
     expect(panel).toContain('desk.cancellationNeedsRefresh.value');
     expect(panel).toContain('desk.showCancellation()');
-    expect(panel).toContain("teamSharing ? 'اشتراک موقعیت مأموریت برقرار است' : 'اشتراک موقعیت مأموریت برقرار نشده'");
-    expect(panel).toContain('پس از تأیید مأموریت و اجازهٔ GPS خودکار فعال می‌شود');
-    expect(panel).toContain('class="mission-desk__sharing"');
+    expect(panel).toContain('v-if="!teamSharing" class="mission-desk__sharing" role="status"');
+    expect(panel).toContain('اشتراک موقعیت مأموریت برقرار نشده');
+    expect(panel).toContain('هشدار اتصال یا اجازهٔ GPS را بررسی کنید.');
+    for (const redundant of [
+      'تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.',
+      'اشتراک موقعیت مأموریت برقرار است',
+      'برای این مأموریت به‌صورت خودکار فعال است.',
+      'لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.'
+    ]) {
+      expect(panel).not.toContain(redundant);
+    }
+    expect(panel).toContain('aria-controls="mission-route-panel"');
+    expect(panel).toContain('title="قادر به ادامه نیستم"');
     expect(panel).toContain('grid-template-columns: minmax(0, 1fr);'); // A 28rem floating card cannot fit five text columns.
     expect(panel).toContain('class="mission-desk__tracking-id"');
   });

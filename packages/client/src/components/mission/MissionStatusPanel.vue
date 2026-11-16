@@ -33,12 +33,11 @@
           :loading="desk.progressing.value" :disabled="!desk.canAdvance.value"
           @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
       </div>
-      <p>تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.</p>
-      <div class="mission-desk__sharing" :class="{ 'mission-desk__sharing--active': teamSharing }" role="status">
-        <v-icon :icon="teamSharing ? 'mdi-map-marker-check-outline' : 'mdi-map-marker-alert-outline'" size="20" aria-hidden="true" />
+      <div v-if="!teamSharing" class="mission-desk__sharing" role="status">
+        <v-icon icon="mdi-map-marker-alert-outline" size="20" aria-hidden="true" />
         <div>
-          <strong>{{ teamSharing ? 'اشتراک موقعیت مأموریت برقرار است' : 'اشتراک موقعیت مأموریت برقرار نشده' }}</strong>
-          <small>{{ teamSharing ? 'برای این مأموریت به‌صورت خودکار فعال است.' : 'پس از تأیید مأموریت و اجازهٔ GPS خودکار فعال می‌شود؛ هشدار اتصال یا اجازهٔ GPS را بررسی کنید.' }}</small>
+          <strong>اشتراک موقعیت مأموریت برقرار نشده</strong>
+          <small>هشدار اتصال یا اجازهٔ GPS را بررسی کنید.</small>
         </div>
       </div>
       <p v-if="desk.loading.value" role="status">در حال تأیید وضعیت مأموریت از سرور؛ تغییر مرحله موقتاً متوقف است.</p>
@@ -69,7 +68,6 @@
       <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-map-marker-path"
         aria-controls="mission-route-panel" :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
         @click="emit('open-route')">باز کردن مسیر</v-btn>
-      <p><v-icon icon="mdi-shield-check-outline" size="20" /> لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.</p>
       <v-menu location="bottom end">
         <template #activator="{ props }">
           <v-btn v-bind="props" variant="text" color="error" rounded="lg" prepend-icon="mdi-dots-horizontal"
@@ -116,7 +114,6 @@ const emit = defineEmits<{ close: []; 'open-route': [] }>();
 .mission-desk__next-step > span { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
 .mission-desk__sharing { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 12px; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
 .mission-desk__sharing > :deep(.v-icon) { flex: none; color: rgb(var(--v-theme-warning)); }
-.mission-desk__sharing--active > :deep(.v-icon) { color: rgb(var(--v-theme-success)); }
 .mission-desk__sharing > div { display: grid; gap: 2px; min-width: 0; }
 .mission-desk__sharing strong { font-size: .86rem; }
 .mission-desk__sharing small { font-size: .8rem; line-height: 1.55; }
@@ -137,7 +134,6 @@ const emit = defineEmits<{ close: []; 'open-route': [] }>();
 .mission-desk__progress :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-desk__next-step :deep(.v-btn) { width: 100%; }
 .mission-desk__foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid rgba(98,146,137,.2); padding-top: 18px; }
-.mission-desk__foot p { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 0.9rem; opacity: .76; }
 @media(max-width: 480px) { .mission-desk__foot { align-items: flex-start; flex-direction: column; } }
 :global(:root.dark .mission-steps__item:not(.mission-steps__item--reached)) {
   background: var(--bb-color-inset);
