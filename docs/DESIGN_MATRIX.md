@@ -18,7 +18,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | 01-login.png | partial | P2/M | Functional (Vuetify card, typed server errors, role redirect). Missing designed top bar, back-to-home, heading/icon lockup, floating labels, social/quick sign-in variants; demo-account panel is a code-only extra. |
-| 02-login-empty.png | missing | P2/L | The empty-state contract ships on the login screen (submit disabled with an explicit note until both fields carry a value); the designed empty-state composition is not built. See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| 02-login-empty.png | partial | P2/L | The empty-state contract ships on the login screen (submit disabled with an explicit note until both fields carry a value); the designed empty-state composition is not built. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; the designed empty-state composition is not built. `done` requires human visual acceptance (P5). |
 | 03-register.png | partial | P2/M | Five catalog-backed security questions implemented and re-validated server-side; simpler styling than the design (strength hints, show-password row, numbered question cards with dropdowns exist in code but differ visually). |
 | 04-register-error.png | partial | P2/L | Inline `VAlert` covers the error; no designed inline-field error presentation. |
 | 05-recovery-account.png | partial | P2/M | Three-step recovery (account, questions, password) exists client+server; simpler visual treatment. |
@@ -28,7 +28,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | 09-recovery-password.png | partial | P2/L | Implemented; simplified UI. |
 | 10-recovery-done.png | partial | P2/L | Completion screen is minimal vs design. |
 | 11-onboarding.png | partial | P2/L | Security-question onboarding implemented (`auth/09…`, `/_auth/onboarding`); simplified UI. |
-| 12-onboarding-loading.png | missing | P2/L | The forced onboarding screen now shows its loading composition (informational banner, five skeleton rows, disabled CTA) and an inline error with retry on catalog failure. See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| 12-onboarding-loading.png | partial | P2/L | The forced onboarding screen now shows its loading composition (informational banner, five skeleton rows, disabled CTA) and an inline error with retry on catalog failure. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
 | 13-anatomy.png | reference | — | Layout anatomy sheet for the auth family. |
 | 14-states.png | reference | — | Auth states overview sheet. |
 | 15-dark.png | partial | P2/L | Dark theme exists via system preference + cycle; auth surface not verified against the dark reference. |
@@ -79,7 +79,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | navigation/14-navigation-full-route.png | superseded | — | See above. |
 | navigation/15-navigation-off-route.png | superseded | — | See above. |
 | navigation/16-multi-destination.png | partial | P2/M | Stage 5 implements the ordered multi-destination trip as the Trips screen (top-pill trips tab, `/_user/trips`): create with ranked stops (label + coordinates, saved-place and map-center insertion), save/unsave, start/complete/cancel, explicit-leader group rides with invitation acceptance. Not built: route computation, per-stop ETAs/distances, traffic chips, quick-add-from-map, fastest-order suggestion, trip polyline. |
-| navigation/17-destination-reordering.png | missing | P2/M | Leader-only up/down rank reordering with wholesale stop-list `PATCH` now ships on the Trips screen (Stage 5). The design's drag handles, auto-optimize and distance/ETA recomputation were not ported (no routing engine). See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| navigation/17-destination-reordering.png | partial | P2/M | Leader-only up/down rank reordering with wholesale stop-list `PATCH` now ships on the Trips screen (Stage 5). The design's drag handles, auto-optimize and distance/ETA recomputation were not ported (no routing engine). See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; the designed drag handles / auto-optimize / ETA are not built. `done` requires human visual acceptance (P5). |
 | navigation/18-sos-confirmation.png | missing | P1/M | SOS review step covers confirmation generally; no designed confirmation sheet from trip context (trip context superseded). |
 | navigation/19-trip-cancel.png | superseded | — | Trip superseded; the underlying SOS cancel gap is tracked under sos/13. |
 | navigation/20-trip-completed.png | superseded | — | Trip superseded. |
@@ -103,7 +103,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/13-sos-cancel-reason.png | partial | P1/C | Mission view offers the requester an inline cancel panel below the rail: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. Materially different from the reference (inline panel, four server-catalog reasons, no 200-character counter). Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-13-sos-cancel-reason-impl.png`, requester-only rail via `?missions=empty&offers=empty`). |
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
 | sos/15-sos-photo-retry.png | partial | P1/H | The photo rides `POST /_user/sos`; there is no post-submit photo-upload step and therefore no designed retry surface. The retryable error exists inline in composer step 3 (size, type), the preview resets for re-pick and a submit-time size guard rejects oversized sources; the designed full-screen surface does not exist. Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-15-sos-photo-retry-impl.png`). |
-| sos/16-sos-offline.png | missing | P2/M | The SOS composer now carries its offline stance: an explicit no-SOS-reaches-the-center card (no offline queue exists, last catalog sync shown where known) and a disabled, relabelled send button on review while the link is down. See Stage H review log. Status stays `missing`. |
+| sos/16-sos-offline.png | partial | P2/M | The SOS composer now carries its offline stance: an explicit no-SOS-reaches-the-center card (no offline queue exists, last catalog sync shown where known) and a disabled, relabelled send button on review while the link is down. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
 | sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, day-grouped date, tracked-code, Persian status label); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | partial | P2/M | Expandable per-request detail in HistoryView: description, tracking code, manual-fix flag, severity, and the server-held status timeline from `GET /_user/sos/:id`; not the designed full-screen detail. |
 | sos/19-sos-validation.png | partial | P2/L | Inline validation exists (10–500 description, Persian messages); designed field-level presentation absent. |
@@ -125,13 +125,13 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | mission/10-mission-in-progress.png | partial | P2/L | Start/complete implemented. |
 | mission/11-support-request.png | partial | P2/M | Support requests exist end to end (leader composer, pending list, administrator review with full/partial/reject decisions and a staffing picker); the designed sheet presentation is absent. |
 | mission/12-support-pending.png | partial | P2/M | Pending requests render in the leader's support panel with a two-step withdrawal; the designed pending surface is absent. |
-| mission/13-support-accepted-notification.png | missing | P2/M | The mission page's support panel renders the review outcome as an explicit notice (approved / partially approved / rejected with the server's reason codes). See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| mission/13-support-accepted-notification.png | partial | P2/M | The mission page's support panel renders the review outcome as an explicit notice (approved / partially approved / rejected with the server's reason codes). See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
 | mission/14-team-leader-dashboard.png | partial | P2/M | Team leadership is a mission-scoped designation (roles unchanged: user, responder, admin); the leader sees the team panel with roster, composition progress and the support-request composer. The designed dashboard is absent. |
 | mission/15-mission-cancel.png | done | P1/H | Assigned responder (or admin) gets an inline mission-cancel panel on the mission card: optional note for the requester, confirmation step, `progress('cancel')` through the state machine, conflict surfaced, authoritative reload afterwards. |
 | mission/16-mission-report.png | partial | P2/M | Rating accepts an optional report note (≤200 chars) via a textarea on the rating block; stored in `missions.rating_note`, served on the mission projection and embedded mission, shown on the mission card after rating. Designed full report form absent. |
 | mission/17-mission-completed.png | partial | P2/M | Completed missions reachable; card shows Persian status label, recorded rating and the saved rating note. No designed completion/report surface. |
 | mission/18-mission-no-offer.png | done | P2/M | Empty-offer state for responders with no offers/mission/request: explanation + refresh button (re-fetches catalogs, lists and offers). No radius control (server has no radius concept). |
-| mission/19-mission-offline.png | missing | P2/M | The mission page now shows an offline card in place of the offers list (wifi-off glyph, wall-clock of the last successful catalog/list sync where known, retry that re-pulls). See Stage H review log. Status stays `missing`. |
+| mission/19-mission-offline.png | partial | P2/M | The mission page now shows an offline card in place of the offers list (wifi-off glyph, wall-clock of the last successful catalog/list sync where known, retry that re-pulls). See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; the design's responder-side treatment was not ported. `done` requires human visual acceptance (P5). |
 
 ## Mobile map — history (11)
 
@@ -143,7 +143,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/04-history-companions.png | partial | P2/M | The history screen (shares tab) and the Sharing Center list every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
 | history/05-history-filter.png | partial | P2/M | Stage E (2026-11-12): date-range (today / 7 days / 30 days / all) and status chips ship on every history tab (share lifecycle chips for shares), with per-tab filtered empty states and reset, plus an honest per-tab summary line (filtered count; recorded-trip count where trackStatus is `available`; rated-mission average). The designed bottom-sheet grouping (vehicle type, companions, "recorded only" / "emergency only" toggles) is deliberately absent: the vehicle/companion dimensions have no backing data in history records today and the two toggles duplicate filters no record distinguishes. The status stays `partial` (designed sheet not pixel-matched) and flips to `done` only after a human accepts the recorded preview — visual acceptance is never automated. |
 | history/06-history-details.png | partial | P2/M | Stage 6: inline detail for every history record — trips show the ranked stop list, members and start/end times, plus repeat-as-new-trip and save; requests show the server timeline; missions show rating/note; every record can spawn a scoped history-window share. Stage D (2026-11-12): recorded tracks render an explicit availability state, a schematic path and a per-member distance/duration summary (missions and trips); deviation statistics remain absent and this is not the designed modal. |
-| history/07-history-playback.png | missing | P2/H | Stage D records consented tracks and ships an authorization-aware replay panel (participants by default; window-covering history-share recipients scope-projected with the grant expiry shown; `available`/`expired`/`none` stated explicitly). The designed map-animated playback surface does not exist and this row stays `missing` until a human accepts the recorded preview — visual acceptance is never automated. DF-04 was addressed in the replay panel and is retained in the register for the designed surface. |
+| history/07-history-playback.png | partial | P2/H | Stage D records consented tracks and ships an authorization-aware replay panel (participants by default; window-covering history-share recipients scope-projected with the grant expiry shown; `available`/`expired`/`none` stated explicitly). The designed map-animated playback surface does not exist moved `missing` → `partial` on code evidence 2026-11-16 — the designed map-animated playback surface does not exist. The row flips to `done` only when a human accepts the recorded preview — visual acceptance is never automated. DF-04 was addressed in the replay panel and is retained in the register for the designed surface. |
 | history/08-history-companion.png | missing | P2/M | No per-companion history; would additionally need companion-level aggregation the APIs do not expose today. |
 | history/09-history-loading.png | partial | P2/L | An inline loading line on detail expansion; no designed skeleton list, no designed pagination indicator. Not capturable as designed (no skeleton exists in the implementation to screenshot). |
 | history/10-history-empty.png | partial | P2/L | Plain empty text on every history tab. The designed route illustration, headline CTA and empty-state map card are absent. Capture: `screens/history-10-history-empty-impl.png` (2026-11-16, `?history=empty`, requests sub-tab). |
@@ -175,7 +175,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | profile/03-login-history.png | partial | P2/M | Last-8/last-50 login events (device, IP, success/fail, time) render on the profile screen from `GET /_user/logins`; designed full-screen history page not built. |
 | profile/04-active-devices.png | done | P2/L | List + revoke implemented with current-session protection. |
 | profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |
-| profile/06-logout-confirm.png | missing | P2/L | A confirmation dialog replaced the one-tap logout on the profile flow (title, account-safety body, current-device rows where known, danger accept, scrim/Escape). Status stays `missing` pending human visual acceptance. |
+| profile/06-logout-confirm.png | partial | P2/L | A confirmation dialog replaced the one-tap logout on the profile flow (title, account-safety body, current-device rows where known, danger accept, scrim/Escape). Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
 | profile/07-map-entry.png | partial | P2/L | Role-aware landing works; designed entry composition absent. The map-entry surface is the profile sheet (`screens/profile-01-profile-home-impl.png`). |
 | profile/08-bookmarks.png | partial | P2/H | Stage C review found the saved-places UI shipped: the profile screen lists saved places with per-place inline edit (name, label, address, icon) and delete; server CRUD + store are used. The designed dedicated bookmarks screen (search, reorder, groups) is absent; reorder remains API-only. |
 | profile/09-bookmark-edit.png | partial | P2/M | Inline edit panel per saved place on the profile screen (name, label, address, icon; full PATCH with preserved rank). The designed dedicated edit screen is absent. |
@@ -186,7 +186,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 |---|---|---|---|
 | admin-panel/dashboard/01-overview.png | partial | P3/H | KPIs + 7-day trend sparkline + recent requests render. Missing: deltas, delta icons, live operations map with markers, readiness/group availability panel, alerts panel, export/refresh controls, designed grouped sidebar and user footer card. |
 | admin-panel/dashboard/02-dispatch-board.png | partial | P1/H | Done in P1: per-request explicit panel — nearest responders with name/rating/distance/readiness (`GET /_admin/sos/:id/nearest`, now called client-side, loading/empty/error+retry states), picker restricted to active staffed groups, selection restricted to the chosen group's members, dispatch only after explicit group + member choice, panel survives server refusals. Still missing vs design: 3-column board, incident detail panel, map, cancel. |
-| admin-panel/dashboard/03-reports.png | missing | P3/H | KPI cards with deltas, period chips, an SVG trend, a group-share donut, incidents-by-type bars and a group-performance table now ship backed by `GET /_admin/reports?days=7|30|90` computed from the database; deltas are `null` on empty previous windows. See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| admin-panel/dashboard/03-reports.png | partial | P3/H | KPI cards with deltas, period chips, an SVG trend, a group-share donut, incidents-by-type bars and a group-performance table now ship backed by `GET /_admin/reports?days=7|30|90` computed from the database; deltas are `null` on empty previous windows. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; the reference's per-KPI deltas and layout are only partially matched. `done` requires human visual acceptance (P5). |
 
 ## Administrator console — design system (3)
 
@@ -200,10 +200,10 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| admin-panel/states/01-loading.png | missing | P3/M | Console-wide first-load skeletons now ship (users, overview, reports, alerts, groups, audit, dispatch, job types, incident types, support requests, settings and the system-health panel); the skeleton geometry is a generic row batch, not screen-specific layouts. See Stage H review log. Status stays `missing`. |
+| admin-panel/states/01-loading.png | partial | P3/M | Console-wide first-load skeletons now ship (users, overview, reports, alerts, groups, audit, dispatch, job types, incident types, support requests, settings and the system-health panel); the skeleton geometry is a generic row batch, not screen-specific layouts. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; the skeleton geometry is a generic row batch, not the designed compositions. `done` requires human visual acceptance (P5). |
 | admin-panel/states/02-empty.png | partial | P3/L | Plain empty texts per view. |
 | admin-panel/states/03-error.png | partial | P3/M | A shared inline error panel with retry ships on the overview, users, groups, alerts, audit, incident types, job types, dispatch, settings and reports (Stage H); the designed offline framing (stale snapshot with last-saved timestamp) is absent. Capture: `screens/admin-states-03-error-impl.png` (2026-11-16, `?fail=admin`, users screen; mock copy stands in for the server's). |
-| admin-panel/states/04-offline.png | missing | P3/M | The admin shell now shows a dark offline banner (wifi-off glyph, last clean `loadAll` wall-clock where known, retry that re-pulls every admin projection). Per-panel staleness was not invented (no per-panel freshness model). See Stage H review log. Status stays `missing`. |
+| admin-panel/states/04-offline.png | partial | P3/M | The admin shell now shows a dark offline banner (wifi-off glyph, last clean `loadAll` wall-clock where known, retry that re-pulls every admin projection). Per-panel staleness was not invented (no per-panel freshness model). See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; per-panel staleness is not modelled. `done` requires human visual acceptance (P5). |
 | admin-panel/states/05-forbidden.png | partial | P3/L | Router guard redirects non-admins; no designed 403 surface. |
 
 ## Administrator console — services/groups (4)
@@ -211,8 +211,8 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | admin-panel/services/01-groups.png | partial | P3/H | List + create (client-side rule hints) works; an inline per-group edit panel now ships (name/color/capacity/status/coverage chips) backed by `PATCH /_admin/groups/:id`. See Stage H review log. Status stays `partial`. |
-| admin-panel/services/02-group-edit.png | missing | P3/H | Inline per-group edit panel ships (name/color/capacity/status/coverage chips) backed by `PATCH /_admin/groups/:id` with client-side pre-validation. See Stage H review log. Status stays `missing` pending human visual acceptance. |
-| admin-panel/services/03-members.png | missing | P3/H | A per-group roster panel now ships (leader pinned first, presence dot, job type, rating, two-step remove + add) backed by `GET|POST|DELETE /_admin/groups/:id/members[/:userId]`. See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| admin-panel/services/02-group-edit.png | partial | P3/H | Inline per-group edit panel ships (name/color/capacity/status/coverage chips) backed by `PATCH /_admin/groups/:id` with client-side pre-validation. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
+| admin-panel/services/03-members.png | partial | P3/H | A per-group roster panel now ships (leader pinned first, presence dot, job type, rating, two-step remove + add) backed by `GET|POST|DELETE /_admin/groups/:id/members[/:userId]`. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
 | admin-panel/services/04-incident-types.png | partial | P3/M | Create + inline edit (label/icon/color) now ship: `POST/PATCH /_admin/incident-types`, service-layer validation (icon limited to the shipped glyph subset, `#RRGGBB` color, rank assigned server-side), audit rows, card-grid presentation with per-type group coverage derived client-side. Not pixel-matched to the reference (no per-type request counter — needs the reports aggregate, not the catalog payload); stays `partial` pending human visual acceptance. |
 
 ## Administrator console — system (3)
@@ -228,7 +228,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | admin-panel/users/01-list.png | partial | P3/H | Search/role filter/toggle/create implemented, avatars present and an account detail entry point exists (see Stage H review log); the designed filter-empty state with a clear-filters action ships (Stage G). Not implemented: phone/last-seen columns, bulk select, pagination, KPI cards. Status stays `partial`. |
-| admin-panel/users/02-account.png | missing | P3/M | A per-account detail panel now ships on the users screen (identity, role/activation pills, group memberships, job type, membership date, last login, SOS count, live sessions, login history, inline role/job-type editor, two-step deactivate via session revocation) backed by `GET /_admin/users/:id`. See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| admin-panel/users/02-account.png | partial | P3/M | A per-account detail panel now ships on the users screen (identity, role/activation pills, group memberships, job type, membership date, last login, SOS count, live sessions, login history, inline role/job-type editor, two-step deactivate via session revocation) backed by `GET /_admin/users/:id`. See Stage H review log. Moved `missing` → `partial` on code evidence 2026-11-16 — the implementation ships; pixel fidelity is unverified. `done` requires human visual acceptance (P5). |
 | admin-panel/users/03-roles.png | missing | P3/M | No roles/permissions view. |
 
 ## Excluded artifacts
@@ -245,7 +245,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 ## Summary tally (canonical 141)
 
-Counts over the 141 canonical rows above: `done` 21, `partial` 78, `missing` 24, `superseded` 12, `reference` 5, intentional `deviation` 1. Reconciled 2026-11-16 against the table itself (the printed tallies in earlier stage logs had drifted from the rows; the table is authoritative).
+Counts over the 141 canonical rows above: `done` 21, `partial` 92, `missing` 10, `superseded` 12, `reference` 5, intentional `deviation` 1. Reconciled twice on 2026-11-16: first against the table itself (the printed tallies in earlier stage logs had drifted from the rows; the table is authoritative), then after the code-evidence sweep that moved every row whose note documented a shipped implementation from `missing` to `partial` (see the Stage F fifth-pass log). The table is authoritative.
 
 ## Stage C review log (2026-11-08)
 
@@ -514,13 +514,15 @@ Rows moved on code/capture evidence: `sos/07` missing → `partial`, `sos/13` do
 `sos/15` done → `partial`. Tally after those moves, as counted from the table: `done` 21,
 `partial` 78, `missing` 24, `superseded` 12, `reference` 5, intentional `deviation` 1.
 
-Tally reconciliation (2026-11-16): the printed tallies in the Stage C/D/E/H logs and in the
-summary section (e.g. `done` 23, `partial` 71/74, `missing` 29/30/31, `superseded` 11) drifted
-from the rows they describe and never matched the table as committed. The per-row table is the
-single authority; counting its 141 data rows on 2026-11-16 gives `done` 21, `partial` 78,
-`missing` 24, `superseded` 12, `reference` 5, `deviation` 1 — unchanged by this evidence pass
-(no row changed status). Earlier logs are kept as the historical record of what was claimed at
-the time; this note is the correction.
+Tally reconciliation (2026-11-16, two steps): the printed tallies in the Stage C/D/E/H logs and
+in the summary section (e.g. `done` 23, `partial` 71/74, `missing` 29/30/31, `superseded` 11)
+drifted from the rows they describe and never matched the table as committed. Step one: counting
+the 141 data rows on 2026-11-16 gave `done` 21, `partial` 78, `missing` 24, `superseded` 12,
+`reference` 5, `deviation` 1. Step two (same day, see the Stage F fifth-pass log): a sweep moved
+the 14 rows whose notes documented shipped implementations from `missing` to `partial`, giving
+`done` 21, `partial` 92, `missing` 10, `superseded` 12, `reference` 5, `deviation` 1. No row
+moved to `done`; visual acceptance remains the deferred human P5 gate. Earlier logs are kept as
+the historical record of what was claimed at the time; this note is the correction.
 
 Evidence: 92 implementation captures under `docs/visual-acceptance/screens/` (mobile 393 × 852,
 DPR 2; admin captures at desktop widths — the pre-existing set at 1440 × 900, the new `admin-states/03-error` at 1280 × 900), generated with the harness committed at
@@ -534,3 +536,29 @@ bundle (`?history=empty`, `?shares=empty`, `?fail=history`, `?fail=admin` — de
 envelopes and empty lists served by the fake-data layer), the same way the earlier
 `?missions=empty&offers=empty` knobs work. Pixel-level fidelity
 against the references remains unverified for every row; the human P5 review is the approval gate.
+
+## Stage F fifth pass (2026-11-16) — code-evidence status sweep, no approvals
+
+The status legend defines `missing` as "no implementation exists". Fourteen rows marked `missing`
+carried notes documenting a shipped, wired implementation; that contradicted the legend and the
+documented rule that code evidence may move `missing` → `partial` (only a human moves `partial` →
+`done`). Each was re-read against the code (views, stores, routes, tests) and moved `missing` →
+`partial` on 2026-11-16, with the note rewritten to say so and to keep the P5 gate explicit:
+
+`auth/02-login-empty`, `auth/12-onboarding-loading`, `navigation/17-destination-reordering`,
+`sos/16-sos-offline`, `mission/13-support-accepted-notification`, `mission/19-mission-offline`,
+`history/07-history-playback` (ships an authorization-aware replay panel; the designed
+map-animated surface is absent — the flip does not pre-empt human acceptance of the recorded
+preview), `profile/06-logout-confirm`, `admin-panel/dashboard/03-reports`,
+`admin-panel/states/01-loading`, `admin-panel/states/04-offline`,
+`admin-panel/services/02-group-edit`, `admin-panel/services/03-members`,
+`admin-panel/users/02-account`.
+
+Rows verified to ship nothing and therefore left `missing`: `navigation/18-sos-confirmation` (the
+SOS composer review step is a general confirmation; the designed over-turn-by-turn-guidance hold-to-send
+context is superseded — no trip guidance exists), `sos/08-sos-pending`, `sos/09-sos-dispatched`,
+`sos/10-sos-rescuer-en-route`, `sos/11-sos-rescuer-arrived`, `history/08-history-companion`,
+`companions/02-companion-add`, `companions/05-companion-status`, `companions/10-companions-offline`,
+`admin-panel/users/03-roles`. Canonical tally now: `done` 21 · `partial` 92 · `missing` 10 ·
+`superseded` 12 · `reference` 5 · `deviation` 1. No row was flipped to `done`; the human P5 review
+remains the approval gate for every row.
