@@ -763,8 +763,8 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   margin: 0.6rem 0 0;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: var(--bb-radius-nested, 16px);
-  max-height: 17rem;
-  overflow-y: auto;
+  /* The scrollable dialog body is the only vertical scroller. A second 17rem
+     search-results viewport trapped swipes and hid selected companions. */
   background: rgb(var(--v-theme-surface));
 }
 

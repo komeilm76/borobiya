@@ -99,7 +99,10 @@ const emit = defineEmits<{ close: []; 'open-route': [] }>();
 </script>
 
 <style scoped>
-.mission-desk__card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.mission-desk__card-header { position: sticky; top: -1rem; z-index: 1;
+  display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 18px;
+  margin: -1rem -1rem .75rem; padding: .75rem 1rem;
+  border-bottom: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface)); }
 .mission-desk__card-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; }
 .mission-desk__card-actions :deep(.v-btn), .mission-desk__card-header :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 .mission-desk__card-actions :deep(.v-chip) { max-width: calc(100% - 52px); }

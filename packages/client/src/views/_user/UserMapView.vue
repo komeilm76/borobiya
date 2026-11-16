@@ -2509,7 +2509,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  /* Search fields, feedback and results travel as one surface instead of
+     trapping gestures inside a tiny results-only viewport. */
+  max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; overscroll-behavior: contain;
 }
+:global(.user-map-view__search .place-search__results) { max-height: none; overflow: visible; }
+:global(.user-map-view__search .place-search.v-card) { overflow: visible; }
+:global(.user-map-view__live .live-companions__peers) { max-height: none; overflow: visible; }
 
 .user-map-view__playback {
   position: absolute;

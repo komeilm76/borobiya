@@ -46,7 +46,7 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(map).toContain('Math.ceil(window.innerHeight - element.getBoundingClientRect().top)');
     expect(map).toContain('window.addEventListener("resize", onResize)');
     expect(map).toContain('window.removeEventListener("resize", onResize)');
-    expect(point).toContain('.point-route.bb-map-navigation-card { max-height: max(7rem');
+    expect(point).toContain('.point-route.bb-map-navigation-card {\n    max-height: max(7rem');
     expect(transport).toContain('.point-transport-choices.bb-map-navigation-card { max-height: max(7rem');
     // One search surface is shared by guidance and the normal map; phones use the same modal.
     expect(map).toContain('id="map-navigation-search-toggle"');

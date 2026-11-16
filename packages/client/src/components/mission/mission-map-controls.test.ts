@@ -142,7 +142,7 @@ describe("mission map controls", () => {
     expect(room).toContain(':id="fullscreen ? \'mission-team-panel\' : undefined"');
     expect(room).toContain('aria-label="بستن پنل اعضای مأموریت"');
     expect(missionMap).toContain('.mission-desk__map-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }');
-    expect(room).toContain('max-height: max(5rem, calc(100dvh - 16rem');
-    expect(missionMap).toContain('max-height: max(5rem, calc(100dvh - 16rem');
+    expect(room).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(missionMap).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
   });
 });

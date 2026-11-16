@@ -303,11 +303,18 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
   .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important;
     max-height: min(52dvh, 27rem); }
+  /* Point sharing stays compact; the longer travel plan gets the available
+     space between the map controls and SOS instead of a 52vh scroll slot. */
+  .point-route-shell--expanded .point-route.bb-map-navigation-card {
+    max-height: min(40rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
   .point-route__header, .point-route__endpoints, .point-route__choices, .point-route__metrics, .point-route__actions {
     padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-route.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .point-route.bb-map-navigation-card {
+    max-height: max(7rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
 }
 
 /* The route actions and metrics must read as separate controls on a dark card. */

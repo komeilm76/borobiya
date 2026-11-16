@@ -89,8 +89,8 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
   .point-route-choices__list { padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-route-choices { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-    overflow-y: auto; } /* Allow the complete footer to scroll into view on short landscape phones. */
+  .point-route-choices { max-height: max(7rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto; } /* One scroll surface; footer remains reachable on short landscape phones. */
   .point-route-choices__header, .point-route-choices__hint, .point-route-choices__footer { flex-shrink: 0; }
   .point-route-choices__list { flex: none; overflow-y: visible; }
 }

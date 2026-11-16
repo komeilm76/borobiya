@@ -12,7 +12,7 @@ describe("mission map workspace", () => {
     expect(status).toContain('class="mission-desk__card bb-floating-card bb-map-navigation-card"');
     expect(view).toContain('<MissionLivePanel :mission="desk.activeMission.value" fullscreen');
     expect(view).not.toContain('background: #21383a');
-    expect(view).toContain('max-height: min(52dvh, 26rem)');
+    expect(view).toContain('max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))');
     const { descriptor } = parse(status, { filename: "MissionStatusPanel.vue" });
     const style = compileStyle({ source: descriptor.styles[0]!.content, filename: "MissionStatusPanel.vue", id: "data-v-mission-status", scoped: true });
     expect(style.errors).toEqual([]);

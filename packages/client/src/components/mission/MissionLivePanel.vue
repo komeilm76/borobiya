@@ -326,6 +326,7 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 6; inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
   width: min(27rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
+  scroll-padding-top: 6rem; /* Keyboard focus stays below the sticky team header. */
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
   background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
 }
@@ -343,13 +344,21 @@ onBeforeUnmount(() => {
   .live-panel--fullscreen .live-panel__members {
     inset-inline: .75rem; width: auto;
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: min(52dvh, 26rem);
+    max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+  .live-panel--fullscreen .live-panel__room-heading {
+    position: sticky; top: -1rem; z-index: 1; margin: -1rem -1rem .75rem;
+    padding: .75rem 1rem; background: rgb(var(--v-theme-surface));
+    border-bottom: 1px solid var(--bb-color-outline);
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
-  /* Keep the separate members launcher clear of the scrollable room on short phones. */
+  /* The room header has its own close button. Replace the stage/banner on
+     short screens, leaving the lower action strip clear of the room. */
   .live-panel--fullscreen .live-panel__members {
-    max-height: max(5rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    top: calc(.75rem + env(safe-area-inset-top, 0px));
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: none;
   }
 }
 

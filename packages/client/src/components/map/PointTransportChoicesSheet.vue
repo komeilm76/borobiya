@@ -94,7 +94,7 @@ section.point-transport-choices-shell { position: fixed; z-index: 7; pointer-eve
   .point-transport-choices__list { padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-transport-choices.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  .point-transport-choices.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto; }
   .point-transport-choices__header, .point-transport-choices__hint, .point-transport-choices__footer { flex-shrink: 0; }
   .point-transport-choices__list { flex: none; overflow-y: visible; }

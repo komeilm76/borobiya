@@ -1030,8 +1030,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
   width: min(42rem, calc(100vw - 1.5rem));
   margin: calc(8.5rem + env(safe-area-inset-top, 0px)) auto 0;
-  padding: .9rem; max-height: min(58dvh, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+  padding: .9rem; max-height: calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; overscroll-behavior: contain;
   background: rgb(var(--v-theme-surface));
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) {
@@ -1075,6 +1075,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
   width: min(28rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   margin: 0; padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
+  scroll-padding-top: 4.5rem; /* Focused controls clear the sticky close header. */
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
   box-shadow: var(--bb-shadow-overlay);
 }
@@ -1103,7 +1104,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__terminal-heading p { margin: .3rem 0 .75rem; font-size: .83rem; line-height: 1.6; }
 .mission-desk__terminal-error { padding: .55rem .7rem; border-radius: .7rem;
   background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.5; }
-.mission-desk__terminal-alert :deep(.v-btn) { min-height: 44px; height: auto; width: 100%; }
+.mission-desk__terminal-alert :deep(.v-btn) { position: sticky; bottom: 0;
+  min-height: 44px; height: auto; width: 100%; }
 .mission-desk__terminal-alert :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-desk--embedded.mission-desk--active .mission-desk__load-alert {
   top: calc(9.75rem + env(safe-area-inset-top, 0px));
@@ -1210,7 +1212,9 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk--active .mission-route {
     inset-inline: .75rem; width: auto;
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: min(52dvh, 26rem);
+    /* One generous scroll surface, clear of the mission heading above and
+       SOS/camera/dock actions below. Short phones replace the heading below. */
+    max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
   /* The shared vehicle sheet sits above SOS on the private mission map. */
   .mission-desk__workspace :deep(.point-transport-choices-shell) {
@@ -1224,17 +1228,15 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
   .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
-  /* Keep warning actions visible even when a long error needs scrolling. The
-     message scrolls independently; Stop never disappears inside that scroll. */
+  /* Do not nest a thumb-sized scroller inside the warning. The whole banner
+     scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
-    max-height: max(3.5rem, min(12rem, calc(100dvh - 25.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
-    overflow: hidden;
-  }
-  .mission-desk__guidance--warning span {
-    flex: 1 1 0; max-height: max(1.5rem, min(10rem, calc(100dvh - 27.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    flex-wrap: wrap; max-height: max(4.75rem, min(16rem, calc(100dvh - 25.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
     overflow-y: auto; overscroll-behavior: contain;
   }
-  .mission-desk__guidance--warning :deep(.v-btn) { min-height: 44px; height: auto; }
+  .mission-desk__guidance--warning span { flex: 1 1 100%; max-height: none; overflow: visible; }
+  .mission-desk__guidance--warning :deep(.v-btn) { position: sticky; bottom: 0; min-height: 44px; height: auto;
+    background: rgb(var(--v-theme-surface)); }
   /* Same right-hand 48px slots as the phone map, including side cutouts. */
   .mission-desk :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
@@ -1273,10 +1275,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
   .mission-desk__guidance--warning {
     top: calc(5.25rem + env(safe-area-inset-top, 0px));
-    max-height: max(3.5rem, min(12rem, calc(100dvh - 14.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
-  }
-  .mission-desk__guidance--warning span {
-    max-height: max(1.5rem, min(10rem, calc(100dvh - 16.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    max-height: max(4.75rem, min(14rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
   }
   .mission-desk__guidance--active { top: calc(5.25rem + env(safe-area-inset-top, 0px)); }
   .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
@@ -1306,12 +1305,15 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     top: calc(4.5rem + env(safe-area-inset-top, 0px));
     max-height: max(6rem, calc(100dvh - 10.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
+  .mission-desk--tool-open .mission-desk__map-heading { visibility: hidden; }
   .mission-desk--active .mission-desk__card,
   .mission-desk--active .mission-route {
-    max-height: max(5rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    top: calc(.75rem + env(safe-area-inset-top, 0px));
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: none;
   }
-  /* An open planner needs more than a header-only 5rem sliver. It temporarily
-     replaces the redundant stage/banner at the top, not the map or SOS below. */
+  /* The tool's own close header replaces the stage/banner on short screens;
+     the map, SOS and camera actions remain available beneath the sheet. */
   .mission-desk--route-open .mission-route {
     top: calc(.75rem + env(safe-area-inset-top, 0px));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
