@@ -147,8 +147,38 @@ a {
   font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
   letter-spacing: normal;
 }
+/* A network failure may be shown inside a white auth card, an inset share
+   panel or a dark map widget. Vuetify's translucent tonal error underlay lets
+   the surrounding card dictate the message's apparent contrast. Give error
+   alerts an opaque surface, readable body ink and a distinct semantic edge. */
+:is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error {
+  color: var(--bb-color-text) !important;
+  background: #fff0ee;
+  border: 1px solid rgb(var(--v-theme-error));
+  border-inline-start-width: 4px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+:is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error .v-alert__underlay {
+  display: none;
+}
+:is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error .v-alert__prepend {
+  color: rgb(var(--v-theme-error));
+}
+:root.dark :is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error {
+  background: #422f35;
+}
 @media (forced-colors: active) {
   :is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not(.v-field--focused):not(.v-field--error):not(.v-field--disabled) .v-field__outline {
+    color: CanvasText;
+  }
+  :is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error {
+    color: CanvasText !important;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+  :is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error .v-alert__prepend {
     color: CanvasText;
   }
 }
