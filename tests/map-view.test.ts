@@ -87,7 +87,6 @@ describe('saved destinations', () => {
     });
     // The cap is the reason the sheet fits on a phone; exceeding it pushes the trip button off.
     expect(wrapper.findAll('.place-row')).toHaveLength(4);
-    expect(wrapper.findAll('.quick-chip')).toHaveLength(4);
     wrapper.unmount();
   });
 
@@ -105,33 +104,6 @@ describe('saved destinations', () => {
       map.places = places(1) as never;
     });
     expect(wrapper.find('.place-row .mdi').classes()).toContain('mdi-warehouse');
-    wrapper.unmount();
-  });
-});
-
-describe('quick chips', () => {
-  it('moves the map to the place the chip names', async () => {
-    const seeded = places(3);
-    const { wrapper, map } = await render((store) => {
-      store.places = seeded as never;
-    });
-
-    await wrapper.findAll('.quick-chip')[1].trigger('click');
-    await flushPromises();
-
-    // The chip's whole purpose is this recentre; rendering without moving is a dead control.
-    expect(map.center).toEqual({ latitude: seeded[1].latitude, longitude: seeded[1].longitude });
-    wrapper.unmount();
-  });
-
-  it('labels each chip with the same place as the row below it', async () => {
-    const { wrapper } = await render((map) => {
-      map.places = places(2) as never;
-    });
-    const chips = wrapper.findAll('.quick-chip').map((chip) => chip.text());
-    const rows = wrapper.findAll('.place-row strong').map((row) => row.text());
-    // A chip pointing at a different place than its label is worse than no chip.
-    expect(chips).toEqual(rows);
     wrapper.unmount();
   });
 });

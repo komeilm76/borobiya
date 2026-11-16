@@ -157,12 +157,15 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 .round-control:hover { transform: translateY(-2px); }
 .avatar-control { position: relative; width: 58px; height: 58px; border-radius: var(--r16); background: var(--primary-soft); color: var(--primary); font-size: 21px; font-weight: 900; box-shadow: var(--shadow-md); }
 .avatar-control i { position: absolute; bottom: 7px; right: 7px; width: 11px; height: 11px; border-radius: 50%; background: var(--success); border: 2px solid #fff; }
-.sos-button { position: relative; overflow: hidden; width: 104px; height: 56px; border-radius: 999px; background: var(--danger); color: var(--on-accent); display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 900; letter-spacing: .5px; box-shadow: 0 10px 26px rgba(175,52,56,.35), 0 0 0 8px rgba(175,52,56,.10); }
+/* The SOS control is the one affordance that must never be unreachable. The route sheet (z-index 16)
+   would otherwise cover it completely at every detent, so the button paints above the sheet and rides
+   on the sheet's top edge instead of hiding behind it. */
+.sos-button { position: relative; overflow: hidden; width: 104px; height: 56px; z-index: 18; border-radius: 999px; background: var(--danger); color: var(--on-accent); display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 900; letter-spacing: .5px; box-shadow: 0 10px 26px rgba(175,52,56,.35), 0 0 0 8px rgba(175,52,56,.10); }
 .sos-button .mdi { font-size: 22px; }
-.sos-button__progress { position: absolute; right: 0; bottom: 0; height: 4px; width: 0; background: currentColor; opacity: .85; }
+.sos-button__progress { position: absolute; inset-inline-start: 14px; bottom: 8px; height: 5px; width: 0; border-radius: 999px; background: var(--on-accent); opacity: .9; }
 .sos-button.is-holding { animation: pulse .8s var(--ease) both; }
-.sos-button.is-holding .sos-button__progress { width: 100%; transition: width .8s linear; }
-.quick-chips { position: absolute; z-index: 10; left: 16px; right: 16px; bottom: 76px; display: flex; gap: 8px; justify-content: center; }
+.quick-chips { position: absolute; z-index: 17; left: 16px; right: 16px; bottom: 76px; display: flex; gap: 8px; justify-content: center; overflow-x: auto; scrollbar-width: none; }
+.quick-chips::-webkit-scrollbar { display: none; }
 .quick-chip { min-height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.96); color: var(--text); box-shadow: var(--shadow-sm); font-size: 12px; white-space: nowrap; }
 .quick-chip .mdi { color: var(--primary); font-size: 17px; }
 .search-bar { position: absolute; z-index: 12; left: 16px; right: 16px; bottom: 18px; height: 58px; display: flex; align-items: center; justify-content: space-between; padding: 0 8px 0 16px; border-radius: 999px; background: rgba(255,255,255,.98); box-shadow: var(--shadow-md); }
@@ -170,6 +173,21 @@ body[data-mode='map'] { overflow: hidden; background: #DDE7E3; }
 :root[data-theme='dark'] .search-bar { background: rgba(16,28,29,.98); }
 .search-bar input { flex: 1; border: 0; outline: 0; background: transparent; text-align: right; padding: 0 8px; }
 .search-bar button { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--primary-soft); color: var(--primary); font-size: 22px; }
+.sheet[data-detent='closed'] ~ .sos-button { inset-block-end: calc(28% + 18px); }
+.sheet[data-detent='half'] ~ .sos-button { inset-block-end: calc(52% + 18px); }
+.sheet[data-detent='open'] ~ .sos-button { inset-block-end: calc(76% + 18px); }
+/* On the map route the sheet carries saved places, not a task: the design keeps search, quick chips
+   and the SOS hold reachable above it, so they paint above the sheet there (only the map route renders
+   the chips; other routes keep them under it). */
+.sheet[data-sheet-route='map'][data-detent='closed'] ~ .search-bar { z-index: 17; bottom: calc(28% + 14px); }
+.sheet[data-sheet-route='map'][data-detent='half'] ~ .search-bar { z-index: 17; bottom: calc(52% + 14px); }
+.sheet[data-sheet-route='map'][data-detent='open'] ~ .search-bar { z-index: 17; bottom: calc(76% + 10px); }
+.sheet[data-sheet-route='map'][data-detent='closed'] ~ .sos-button { inset-block-end: calc(28% + 132px); }
+.sheet[data-sheet-route='map'][data-detent='half'] ~ .sos-button { inset-block-end: calc(52% + 132px); }
+.sheet[data-sheet-route='map'][data-detent='open'] ~ .sos-button { inset-block-end: calc(76% + 128px); }
+.sheet[data-sheet-route='map'][data-detent='closed'] ~ .quick-chips { bottom: calc(28% + 80px); }
+.sheet[data-sheet-route='map'][data-detent='half'] ~ .quick-chips { bottom: calc(52% + 80px); }
+.sheet[data-sheet-route='map'][data-detent='open'] ~ .quick-chips { bottom: calc(76% + 76px); }
 .home-indicator { position: absolute; z-index: 20; bottom: 8px; left: 50%; transform: translateX(-50%); width: 134px; height: 5px; border-radius: 999px; background: var(--text); opacity: .85; }
 /* Bottom sheet */
 .sheet { position: absolute; z-index: 16; left: 0; right: 0; bottom: 0; height: 52%; border-radius: var(--r26) var(--r26) 0 0; background: var(--surface); box-shadow: 0 -14px 40px rgba(18,42,42,.14); transition: height .42s var(--ease); display: flex; flex-direction: column; overflow: hidden; }

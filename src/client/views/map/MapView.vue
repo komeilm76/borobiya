@@ -113,18 +113,6 @@ async function saveDestination(): Promise<void> {
     </section>
     <p v-if="map.loading" class="sheet__status">در حال خواندن نقشه…</p>
     <p v-else-if="map.error" class="sheet__status sheet__status--error">{{ map.error }}</p>
-    <div class="quick-chips">
-      <button
-        v-for="place in places"
-        :key="place.id"
-        type="button"
-        class="quick-chip"
-        @click="map.center = { latitude: place.latitude, longitude: place.longitude }"
-      >
-        <span :class="['mdi', `mdi-${place.icon || 'map-marker-outline'}`]" aria-hidden="true" />
-        <span>{{ place.label }}</span>
-      </button>
-    </div>
     <TransitionGroup tag="ul" name="bb-list" class="place-list" :duration="motion.fast.value">
       <li v-for="place in places" :key="place.id" class="place-row">
         <span :class="['mdi', `mdi-${place.icon || 'map-marker-outline'}`]" aria-hidden="true" />

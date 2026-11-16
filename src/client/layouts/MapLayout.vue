@@ -284,12 +284,28 @@ async function logout(): Promise<void> {
       <MapCanvas />
 
       <Transition name="bb-sheet" mode="out-in" :duration="motion.base.value">
-        <section :key="String(route.name)" class="sheet" :data-detent="map.detent">
+        <section :key="String(route.name)" class="sheet" :data-detent="map.detent" :data-sheet-route="String(route.name)">
           <!-- Grab handle per the bottom-sheet reference; purely decorative. -->
           <div class="sheet__handle" aria-hidden="true" />
           <RouterView />
         </section>
       </Transition>
+
+      <!-- Quick-jump saved places. Lives outside the sheet (a sibling of it) so the detent-aware
+           floating CSS can paint the chips above the sheet on the map route; inside the sheet they
+           were clipped by its rounded top edge. See app.css and docs/VISUAL_ACCEPTANCE.md. -->
+      <div v-if="String(route.name) === ROUTE_NAMES.map && map.places.length" class="quick-chips">
+        <button
+          v-for="place in map.places.slice(0, 4)"
+          :key="place.id"
+          type="button"
+          class="quick-chip"
+          @click="map.center = { latitude: place.latitude, longitude: place.longitude }"
+        >
+          <span :class="['mdi', `mdi-${place.icon || 'map-marker-outline'}`]" aria-hidden="true" />
+          <span>{{ place.label }}</span>
+        </button>
+      </div>
 
       <button
         type="button"

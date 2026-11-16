@@ -400,6 +400,57 @@ describe('mobile shell', () => {
   });
 });
 
+describe('quick chips', () => {
+  const PLACE = {
+    id: 'plc_1', label: 'خانه مادر', latitude: 35.73, longitude: 51.39,
+    address: 'خیابان ولیعصر', icon: 'home-outline', rank: 1
+  };
+  const seeded = Array.from({ length: 3 }, (_, index) => ({
+    ...PLACE,
+    id: `plc_${index + 1}`,
+    label: `مقصد ${index + 1}`,
+    latitude: 35.7 + index / 100,
+    longitude: 51.4 + index / 100,
+    rank: index + 1
+  }));
+
+  it('moves the map to the place the chip names', async () => {
+    const shell = await mountShell();
+    shell.map.places = seeded as never;
+    await shell.wrapper.vm.$nextTick();
+
+    const chips = shell.wrapper.findAll('.quick-chip');
+    expect(chips).toHaveLength(3);
+    await chips[1].trigger('click');
+    await flushPromises();
+
+    // The chip's whole purpose is this recentre; rendering without moving is a dead control.
+    expect(shell.map.center).toEqual({ latitude: seeded[1].latitude, longitude: seeded[1].longitude });
+    shell.wrapper.unmount();
+  });
+
+  it('labels each chip with the same place as the row below it', async () => {
+    const shell = await mountShell();
+    shell.map.places = seeded.slice(0, 2) as never;
+    await shell.wrapper.vm.$nextTick();
+
+    const chips = shell.wrapper.findAll('.quick-chip').map((chip) => chip.text());
+    const rows = shell.wrapper.findAll('.place-row strong').map((row) => row.text());
+    // A chip pointing at a different place than its label is worse than no chip.
+    expect(chips).toEqual(rows);
+    shell.wrapper.unmount();
+  });
+
+  it('does not render the chips off the map route', async () => {
+    const shell = await mountShell('/_user/mission');
+    shell.map.places = seeded as never;
+    await shell.wrapper.vm.$nextTick();
+
+    expect(shell.wrapper.findAll('.quick-chip')).toHaveLength(0);
+    shell.wrapper.unmount();
+  });
+});
+
 describe('shell interactions', () => {
   it('reloads the SOS rail when dispatched and accepted events arrive', async () => {
     const shell = await mountShell();
