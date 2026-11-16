@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { compileStyle, parse } from "vue/compiler-sfc";
+import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
 
 const page = readFileSync(new URL("../../views/_user/UserMissionView.vue", import.meta.url), "utf8");
 const panel = readFileSync(new URL("./MissionStatusPanel.vue", import.meta.url), "utf8");
@@ -9,16 +9,16 @@ const info = readFileSync(new URL("./MissionBriefDetails.vue", import.meta.url),
 
 // Source-pinned by design: docs/TASKS.md prohibits mounting Vue components in unit tests.
 describe("at-a-glance mission progress and information", () => {
-  it("keeps the stage summary on the map and opens information from a separate bottom-left icon", () => {
-    expect(page).toContain('class="mission-desk__status-brief"');
+  it("removes the top step-lines widget and opens information from the bottom-left icon", () => {
+    expect(page).not.toContain('mission-desk__status-brief');
     expect(page).not.toContain('mission-desk__status-trigger');
     expect(page).toContain('id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"');
     expect(page).toContain('aria-controls="mission-status-panel"');
     expect(page).toContain(':aria-expanded="activeTool === \'status\'"');
     expect(page).toContain('@click="toggleTool(\'status\')"');
-    expect(page).toContain('class="mission-desk__stage-track" aria-hidden="true"');
-    expect(page).toContain('index <= activeStep');
-    expect(page).toContain('id="mission-tool-team" icon="mdi-account-group-outline"');
+    expect(page).not.toContain('mission-desk__stage-track');
+    expect(page).toContain('class="mission-desk__bottom-panel"');
+    expect(page).toContain('id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline"');
     const dock = page.slice(page.indexOf('<nav class="mission-desk__dock"'), page.indexOf('</nav>', page.indexOf('<nav class="mission-desk__dock"')));
     expect(dock.match(/<button\b/g)).toHaveLength(1);
     expect(dock).toContain('mission-tool-route');
@@ -49,6 +49,25 @@ describe("at-a-glance mission progress and information", () => {
     expect(info).toContain('getSosPhotoSrc(id, token)');
   });
 
+  it("resolves an approximate incident address, fetches available photos automatically and copies the complete ID", () => {
+    const template = parse(info).descriptor.template!.content;
+    expect(info).toContain('const shortMissionId = computed(() => props.missionId.length > 16');
+    expect(template).toContain('{{ shortMissionId }}');
+    expect(template).toContain('aria-label="شناسهٔ کامل مأموریت برای کپی دستی"');
+    expect(info).toContain('await navigator.clipboard.writeText(id)');
+    expect(info).toContain('current === generation && props.missionId === id');
+    expect(template).toContain('نشانی تقریبی محل حادثه · از مختصات ثبت‌شده');
+    expect(info).toContain('await reversePlace(mission.incident, controller?.signal)');
+    expect(info).toContain('current === generation && props.visible && auth.user?.id === owner');
+    expect(template).toContain('نشانی در دسترس نیست؛ برای راهبری از مختصات ثبت‌شدهٔ حادثه استفاده کنید.');
+    expect(info).toContain('if (result.hasPhoto) void loadPhoto();');
+    expect(template).not.toContain('نمایش تصویر ایمن');
+    expect(info).toContain('controller?.abort(); controller = null;');
+    expect(info).toContain('photoSrc.value = null; photoLoading.value = false; photoError.value = null;');
+    expect(page).toContain(':visible="visible && activeTool === \'status\'"');
+    expect(compileTemplate({ filename: "MissionBriefDetails.vue", id: "mission-brief-info", source: template }).errors).toEqual([]);
+  });
+
   it("keeps open surfaces compact and scrollable at narrow widths in both themes", () => {
     const viewStyle = parse(page).descriptor.styles[0]!.content;
     const cardStyle = parse(cards).descriptor.styles[0]!.content;
@@ -57,13 +76,13 @@ describe("at-a-glance mission progress and information", () => {
     for (const [filename, css] of [["UserMissionView.vue", viewStyle], ["MissionStatusPanel.vue", panelStyle],
       ["MissionMapCards.vue", cardStyle], ["MissionBriefDetails.vue", infoStyle]] as const)
       expect(compileStyle({ filename, id: "data-v-mission-brief", scoped: true, source: css }).errors).toEqual([]);
-    expect(viewStyle).toContain('.mission-desk__map-cards { position: absolute;');
-    expect(viewStyle).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
-    expect(viewStyle).toContain('bottom: calc(17rem + env(safe-area-inset-bottom, 0px));');
+    expect(viewStyle).toContain('.mission-desk__bottom-panel { position: absolute; z-index: 8;');
+    expect(viewStyle).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(viewStyle).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
+    expect(viewStyle).toContain('.mission-desk--active #mission-status-panel {');
+    expect(viewStyle).toContain('left: 0; right: 0; width: 100%;');
     expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 560px) {');
-    expect(viewStyle).toContain('.mission-desk__status-brief { position: absolute; width: 1px; height: 1px;');
-    expect(viewStyle).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
     expect(cardStyle).toContain('.mission-desk__phase-steps');
     expect(cardStyle).toContain('.mission-desk__phase-step--current');
     expect(infoStyle).toContain('.mission-brief__body');

@@ -61,7 +61,7 @@ describe("mission map controls", () => {
     expect(missionMap).toContain('v-if="!desk.terminalHold.value && activeTool !== \'route\'');
     expect(style).toContain('pointer-events: auto;');
     expect(style).toContain('color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));');
-    expect(style).toContain('.mission-desk--terminal-hold .mission-desk__map-heading { visibility: hidden; }');
+    expect(missionMap).toContain('v-if="!activeTool && !desk.terminalHold.value" class="mission-desk__bottom-panel"');
     expect(style).toContain('max-height: max(6rem, calc(100dvh - 10.5rem');
     expect(compiled.code).toContain('.mission-desk__terminal-alert[data-v-verification]');
     expect(missionMap).toContain('v-if="embedded && desk.cancelledMissionId.value"');
@@ -99,9 +99,9 @@ describe("mission map controls", () => {
     expect(phone).toContain('.mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }');
     expect(viewStyle).toContain('.mission-desk__dock { position: absolute; z-index: 10;');
     expect(viewStyle).toContain('left: 50%; transform: translateX(-50%);');
-    expect(phone).toContain('.mission-desk--tool-open :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right)');
+    expect(phone).toContain('.mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right)');
     expect(phone).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(phone).toContain('.mission-desk--tool-open .mission-desk__map-focus');
+    expect(phone).toContain('.mission-desk--active .mission-desk__map-focus');
     expect(phone).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
     expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 560px)');
     expect(viewStyle).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
@@ -137,13 +137,13 @@ describe("mission map controls", () => {
     expect(missionMap).toContain('id="mission-tool-status" class="mission-desk__info-action"');
     expect(dock).toContain('mission-tool-route');
     expect(dock).not.toContain('mission-tool-team');
-    expect(missionMap).toContain('id="mission-tool-team" icon="mdi-account-group-outline"');
-    expect(missionMap).toContain(":aria-label=\"activeTool === 'team' ? 'بستن پنل اعضای مأموریت' : 'نمایش اعضای مأموریت'\"");
-    expect(missionMap).toContain('aria-controls="mission-team-panel" :aria-expanded="activeTool === \'team\'"');
+    expect(missionMap).toContain('id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline"');
+    expect(missionMap).toContain('aria-label="نمایش اعضای مأموریت"');
+    expect(missionMap).toContain('aria-controls="mission-team-panel" :aria-expanded="false"');
     expect(missionMap).toContain('@click="toggleTool(\'team\')"');
     expect(room).toContain(':id="fullscreen ? \'mission-team-panel\' : undefined"');
     expect(room).toContain('aria-label="بستن پنل اعضای مأموریت"');
-    expect(missionMap).toContain('.mission-desk__map-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }');
+    expect(missionMap).toContain('<template #team>');
     expect(room).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     expect(missionMap).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
   });

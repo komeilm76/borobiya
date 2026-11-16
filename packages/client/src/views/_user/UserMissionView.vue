@@ -39,7 +39,7 @@
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
       <MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === 'status'"
-        :desk="desk" :visible="activeTool === 'status'" @close="closeTool('status')" />
+        :desk="desk" :visible="visible && activeTool === 'status'" @close="closeTool('status')" />
       <section v-else-if="!desk.error.value" class="mission-desk__empty">
         <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
           class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
@@ -228,21 +228,6 @@
         <PointTransportChoicesSheet :mission-id="desk.activeMission.value.id" :mission-profile="routing.profile.value"
           :open="activeTool === 'route' && routeSection === 'transport'" :show-search="false"
           @confirm="confirmMissionTransport" @close="closeRouteSection()" />
-        <header class="mission-desk__map-heading" aria-label="مأموریت فعال">
-          <h1 class="sr-only">مأموریت من</h1>
-          <div class="mission-desk__status-brief">
-            <small>مأموریت من · مرحلهٔ {{ (activeStep + 1).toLocaleString('fa-IR') }} از {{ steps.length.toLocaleString('fa-IR') }}</small>
-            <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
-            <span class="mission-desk__stage-track" aria-hidden="true">
-              <i v-for="(step, index) in steps" :key="step.status" :class="{ 'mission-desk__stage--reached': index <= activeStep }" />
-            </span>
-          </div>
-          <v-btn id="mission-tool-team" icon="mdi-account-group-outline" variant="text" size="small"
-            :aria-label="activeTool === 'team' ? 'بستن پنل اعضای مأموریت' : 'نمایش اعضای مأموریت'"
-            :title="activeTool === 'team' ? 'بستن اعضای مأموریت' : 'نمایش اعضای مأموریت'"
-            aria-controls="mission-team-panel" :aria-expanded="activeTool === 'team'"
-            @click="toggleTool('team')" />
-        </header>
         <div v-if="!desk.terminalHold.value && activeTool !== 'route' && (routing.error.value || navigation.error.value)"
           class="mission-desk__guidance mission-desk__guidance--warning" role="alert">
           <span>{{ routing.error.value || navigation.error.value }}</span>
@@ -276,22 +261,30 @@
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
-        <section v-if="routing.target.value && !activeTool && !desk.terminalHold.value"
-          class="mission-desk__map-legend" aria-labelledby="mission-map-legend-title" dir="rtl">
-          <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
-          <ul class="mission-desk__map-legend-body" aria-label="راهنمای نشانگرها">
-            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> حادثه</li>
-            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--origin" aria-hidden="true" /> مبدأ مسیر</li>
-            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--stop" aria-hidden="true" /> ایستگاه</li>
-            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--requester" aria-hidden="true" /> درخواست‌کننده</li>
-            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--rescuer" aria-hidden="true" /> امدادگر</li>
-            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--admin" aria-hidden="true" /> مدیر مرکز</li>
-          </ul>
-          <small>مبدأ مسیر زنده نیست؛ تازگی موقعیت‌های اشتراکی را بررسی کنید.</small>
-        </section>
-        <div v-if="!activeTool && !desk.terminalHold.value" class="mission-desk__map-cards">
-          <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep" :team-sharing="teamSharing"
-            :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel" />
+        <div v-if="!activeTool && !desk.terminalHold.value" class="mission-desk__bottom-panel">
+          <section v-if="routing.target.value"
+            class="mission-desk__map-legend" aria-labelledby="mission-map-legend-title" dir="rtl">
+            <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
+            <ul class="mission-desk__map-legend-body" aria-label="راهنمای نشانگرها">
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> حادثه</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--origin" aria-hidden="true" /> مبدأ مسیر</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--stop" aria-hidden="true" /> ایستگاه</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--requester" aria-hidden="true" /> درخواست‌کننده</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--rescuer" aria-hidden="true" /> امدادگر</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--admin" aria-hidden="true" /> مدیر مرکز</li>
+            </ul>
+            <small>مبدأ مسیر زنده نیست؛ تازگی موقعیت‌های اشتراکی را بررسی کنید.</small>
+          </section>
+          <div class="mission-desk__map-cards">
+            <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep" :team-sharing="teamSharing"
+              :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel">
+              <template #team>
+                <v-btn id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline" variant="tonal" size="small"
+                  aria-label="نمایش اعضای مأموریت" title="نمایش اعضای مأموریت"
+                  aria-controls="mission-team-panel" :aria-expanded="false" @click="toggleTool('team')" />
+              </template>
+            </MissionMapCards>
+          </div>
         </div>
         <v-btn id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"
           :color="activeTool === 'status' ? 'primary' : 'surface'" variant="flat"
@@ -1068,18 +1061,14 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__empty) {
   margin-top: .75rem; padding: 1rem;
 }
-.mission-desk--embedded .mission-desk__map-heading { top: calc(4.65rem + env(safe-area-inset-top, 0px));
-  left: auto; right: 1rem; transform: none; }
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }
 .mission-desk--embedded .mission-desk__load-alert { pointer-events: auto; }
 .mission-desk--embedded :deep(.live-panel--fullscreen) { background: transparent; pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__map) { pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__members),
 .mission-desk--embedded :deep(.live-panel__map-actions),
-.mission-desk--embedded .mission-desk__map-heading,
 .mission-desk--embedded .mission-desk__map-focus,
-.mission-desk--embedded .mission-desk__map-cards,
-.mission-desk--embedded .mission-desk__map-legend,
+.mission-desk--embedded .mission-desk__bottom-panel,
 .mission-desk--embedded .mission-desk__info-action,
 .mission-desk--embedded .mission-desk__map-hint,
 .mission-desk--embedded .mission-desk__dock,
@@ -1105,13 +1094,21 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
+/* Information is a full-width bottom sheet, like the route planner, but the
+   essential map/SOS/dock controls remain accessible in the clear strip below. */
+.mission-desk--active #mission-status-panel {
+  left: 0; right: 0; width: 100%;
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  max-height: min(60dvh, 33rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+}
 .mission-desk--active .mission-desk__load-alert {
   position: absolute; z-index: 12; top: calc(3.5rem + env(safe-area-inset-top, 0px));
   right: 1rem; width: min(27rem, calc(100vw - 1.5rem)); max-height: 30dvh; overflow-y: auto;
 }
 /* An unverified room event is not a confirmed cancellation. Keep its retry
-   action readable/clickable above the shared map, clear of the tab bar and
-   mission heading; never cover the guidance strip with a pale tonal alert. */
+   action readable/clickable above the shared map, clear of the tab bar;
+   never cover the guidance strip with a pale tonal alert. */
 .mission-desk__terminal-alert {
   position: absolute; z-index: 12;
   top: calc(9.75rem + env(safe-area-inset-top, 0px));
@@ -1139,28 +1136,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));
   box-shadow: var(--bb-shadow-overlay);
 }
-.mission-desk__map-heading {
-  position: absolute; z-index: 7; top: calc(.75rem + env(safe-area-inset-top, 0px));
-  left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: .5rem; max-width: calc(100vw - 8rem);
-  padding: .5rem .85rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
-  border-radius: var(--bb-radius-card, 24px); white-space: nowrap;
-  color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .95);
-  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px);
-}
-.mission-desk__map-heading h1 { margin: 0; font-size: .9rem; font-weight: 800; }
-.mission-desk__status-brief { display: grid; flex: 1; min-width: 0; min-height: 44px; align-content: center; gap: 2px; }
-.mission-desk__status-brief small { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 700; }
-.mission-desk__status-brief > span[role="status"] { font-size: .88rem; font-weight: 800; }
-.mission-desk__status-brief small, .mission-desk__status-brief > span[role="status"] {
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.mission-desk__stage-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; margin-top: 3px; }
-.mission-desk__stage-track i { height: 3px; border-radius: 3px; background: var(--bb-color-outline); }
-.mission-desk__stage-track .mission-desk__stage--reached { background: rgb(var(--v-theme-primary)); }
-.mission-desk__map-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 .mission-desk__guidance {
-  position: absolute; z-index: 7; top: calc(5.75rem + env(safe-area-inset-top, 0px));
+  position: absolute; z-index: 10; top: calc(5.75rem + env(safe-area-inset-top, 0px));
   left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .5rem;
   width: max-content; max-width: calc(100vw - 1.5rem); padding: .35rem .6rem;
   border-radius: var(--bb-radius-nested, 16px); color: rgb(var(--v-theme-on-surface));
@@ -1179,18 +1156,18 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
 .mission-desk__direct-distance { color: rgb(var(--v-theme-primary)); font-weight: 800; }
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
-/* Camera actions occupy the map page's next 48px slots below the compass.
-   The single-action case stays adjacent; two actions fill both lower slots. */
-/* Mission overlays use the same soft, translucent surface as Search/Sharing.
-   The legend stays fully visible; its color key is not a route/coordinate card. */
-.mission-desk__map-legend { position: absolute; z-index: 8;
-  left: calc(1rem + env(safe-area-inset-left, 0px));
-  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  width: min(18rem, calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-  padding: .55rem .65rem; pointer-events: auto;
+/* One full-width bottom surface for the legend and the only step list. The
+   key stays visible while the stages/action scroll; it never sits behind them. */
+.mission-desk__bottom-panel { position: absolute; z-index: 8;
+  left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  width: 100%; max-height: min(55dvh, 26rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden; pointer-events: auto;
+  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
-  background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
+  background: rgba(var(--v-theme-surface), .97); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+.mission-desk__map-legend { flex: none; min-width: 0; padding: .45rem .75rem;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: .85rem; font-weight: 800; }
 .mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .2rem .35rem;
   margin: 0; padding: 0; list-style: none; font-size: .8rem; line-height: 1.3; }
@@ -1205,14 +1182,14 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__legend-symbol--requester { background: #dc593b; }
 .mission-desk__legend-symbol--rescuer { background: #16826c; }
 .mission-desk__legend-symbol--admin { background: #5555ae; }
-/* One scroll surface for the entire, already-open step list and manual action;
-   never create a scroller for an individual row or hide progress behind a toggle. */
-.mission-desk__map-cards { position: absolute; z-index: 8; right: 1rem;
-  bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
-  width: min(18rem, calc(100vw - 2rem));
-  max-height: max(7rem, min(55dvh, 21rem, calc(100dvh - 27rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
-  overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;
-  border-radius: var(--bb-radius-card, 24px); }
+/* One scroll surface for the steps and guarded action, full width with the
+   guide above it. No individual stage has a nested scroller. */
+.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;
+  overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
+.mission-desk__map-cards :deep(.mission-map-cards) {
+  border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none;
+}
+.mission-desk__team-action { flex: none; min-width: 44px; min-height: 44px; }
 .mission-desk__info-action { position: absolute; z-index: 10;
   left: calc(1rem + env(safe-area-inset-left, 0px));
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
@@ -1266,8 +1243,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk--active .mission-route {
     inset-inline: .75rem; width: auto;
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    /* One generous scroll surface, clear of the mission heading above and
-       SOS/camera/dock actions below. Short phones replace the heading below. */
+    /* One generous scroll surface, clear of top tabs and guidance above and
+       SOS/camera/dock actions below. */
     max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
   /* The shared vehicle sheet sits above SOS on the private mission map. */
@@ -1275,16 +1252,12 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 11;
   }
-  /* Three non-overlapping bottom zones: info (left), route (center), SOS
-     (right). The open legend sits above that row; progress above the legend. */
+  /* Bottom sheet fills the map width; the essential camera, route, info and
+     SOS controls retain the same clear row below it as the route planner. */
   .mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
-  .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
-  .mission-desk__map-legend { left: calc(.75rem + env(safe-area-inset-left, 0px));
-    width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
-  .mission-desk__map-cards { right: calc(4.25rem + env(safe-area-inset-right, 0px));
-    bottom: calc(17rem + env(safe-area-inset-bottom, 0px));
-    width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-    max-height: max(6rem, min(50dvh, calc(100dvh - 24rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+  .mission-desk__bottom-panel { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: min(52dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk--active #mission-status-panel { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
@@ -1304,46 +1277,30 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
   }
   .mission-desk__map-focus--pair { bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
-  /* A full-width route/status/team sheet begins 9.5rem above the bottom. Keep
-     all map actions in one row between that sheet and the dock, like the map's
-     route-preview rail; don't leave the compass behind the sheet. */
-  .mission-desk--tool-open :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+  /* The progress sheet is also full-width: keep the compass and camera
+     actions in the clear row below it even when no tool is open. */
+  .mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
-  .mission-desk--tool-open .mission-desk__map-focus,
-  .mission-desk--tool-open .mission-desk__map-focus--pair {
+  .mission-desk--active .mission-desk__map-focus,
+  .mission-desk--active .mission-desk__map-focus--pair {
     right: calc(4.25rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
-  /* The map cannot fit a full-width progress list, legend and bottom controls
-     in 430px. Give the steps a real scroll surface beside a narrow, independently
-     readable key; neither surface covers the bottom camera/SOS/dock row. */
-  .mission-desk__map-cards {
-    top: calc(4.25rem + env(safe-area-inset-top, 0px));
-    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
-    width: min(18rem, calc(100vw - 12.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-    max-height: none;
-  }
-  .mission-desk__map-legend {
-    width: min(7rem, calc(100vw - 13rem));
-    max-height: calc(100dvh - 10rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-    overflow-y: auto; overscroll-behavior: contain;
-  }
-  .mission-desk__map-legend-body { grid-template-columns: minmax(0, 1fr); }
-  /* The always-visible stages replace the duplicate heading on short phones.
-     Keep its Team button in the narrow top-right lane, clear of the progress
-     surface (which ends 4.25rem from the right) and the network button. */
-  .mission-desk--embedded .mission-desk__map-heading,
-  .mission-desk__map-heading { left: auto; right: calc(.75rem + env(safe-area-inset-right, 0px));
-    top: calc(4.65rem + env(safe-area-inset-top, 0px)); transform: none; padding: .25rem; }
-  .mission-desk__status-brief { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-  /* A 560px phone cannot fit the taller mission heading, guidance and a
-     vertical rail. Put its controls in the open band above the dock/SOS. */
+  /* Short phones keep the one bottom-docked progress surface scrollable. No
+     duplicate heading competes with guidance or the top tab controls. */
+  .mission-desk__bottom-panel { max-height: min(48dvh, calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk__map-legend { padding: .2rem .6rem; }
+  .mission-desk__map-legend h2 { position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .mission-desk__map-legend small { position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  /* A short phone cannot fit guidance and a vertical camera rail.
+     Put map controls in the open band above the dock/SOS. */
   .mission-desk:not(.mission-desk--tool-open) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(7.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
@@ -1378,28 +1335,25 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
-  /* On short phones the heading and verification panel cannot both fit above
-     the dock. The pending state is the heading until the server verifies it. */
-  .mission-desk--terminal-hold .mission-desk__map-heading { visibility: hidden; }
   .mission-desk__terminal-alert {
     top: calc(4.5rem + env(safe-area-inset-top, 0px));
     max-height: max(6rem, calc(100dvh - 10.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
-  .mission-desk--tool-open .mission-desk__map-heading { visibility: hidden; }
   .mission-desk--active .mission-desk__card,
   .mission-desk--active .mission-route {
     top: calc(.75rem + env(safe-area-inset-top, 0px));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: none;
   }
-  /* The tool's own close header replaces the stage/banner on short screens;
+  .mission-desk--active #mission-status-panel { max-height: none; }
+  /* The tool's own close header replaces the stage sheet on short screens;
      the map, SOS and camera actions remain available beneath the sheet. */
   .mission-desk--route-open .mission-route {
     top: calc(.75rem + env(safe-area-inset-top, 0px));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: none;
   }
-  .mission-desk--route-open .mission-desk__map-heading { visibility: hidden; }
+
   .mission-desk--route-open .mission-desk__guidance { visibility: hidden; }
   .mission-desk--route-open .mission-route__header { gap: .4rem; padding: .55rem .75rem; }
   .mission-desk--route-open .mission-route__emblem { display: none; }

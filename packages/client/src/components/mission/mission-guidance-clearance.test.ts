@@ -7,14 +7,12 @@ const css = parse(page).descriptor.styles[0]!.content;
 
 // Source/compiled-style contract: Vue SFCs must not be mounted in unit tests (docs/TASKS.md).
 describe("mission guidance over the full-screen map", () => {
-  it("keeps the stage heading and guidance in distinct top slots on desktop and phones", () => {
+  it("keeps top guidance independent of the bottom-docked stages on desktop and phones", () => {
     const compiled = compileStyle({ source: css, filename: "UserMissionView.vue", id: "data-v-guidance", scoped: true });
     expect(compiled.errors).toEqual([]);
-    expect(css).toContain('.mission-desk__map-heading {\n  position: absolute; z-index: 7; top: calc(.75rem + env(safe-area-inset-top, 0px));');
-    expect(css).toContain('.mission-desk__guidance {\n  position: absolute; z-index: 7; top: calc(5.75rem + env(safe-area-inset-top, 0px));');
-    expect(css).not.toContain('.mission-desk__guidance { top: calc(4.25rem');
-    // Stage trigger is at least 44px, header padding is 16px and border 2px.
-    expect(5.75 * 16 - (.75 * 16 + 44 + 16 + 2)).toBeGreaterThanOrEqual(12);
+    expect(css).toContain('.mission-desk__guidance {\n  position: absolute; z-index: 10; top: calc(5.75rem + env(safe-area-inset-top, 0px));');
+    expect(css).toContain('.mission-desk__bottom-panel { position: absolute; z-index: 8;');
+    expect(page).not.toContain('mission-desk__map-heading');
     expect(compiled.code).toContain('.mission-desk__guidance[data-v-guidance]');
   });
   it("gives short-phone banners a scrollable corridor above the map actions and the dock", () => {

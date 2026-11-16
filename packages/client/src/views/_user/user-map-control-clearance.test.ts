@@ -54,7 +54,8 @@ describe("shared map icon clearance", () => {
     expect(map).toContain("'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool");
     const css = parse(map).descriptor.styles[0]!.content;
     expect(css).toContain(".user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right)");
-    expect(css).toContain(".user-map-view--mission-tool-open .user-map-view__canvas :deep(.maplibregl-ctrl-top-right)");
+    const active = css.slice(css.indexOf('.user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
+    expect(active).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain(".user-map-view--mission-active:not(.user-map-view--mission-tool-open)");
     const missionCss = parse(mission).descriptor.styles[0]!.content;
     expect(missionCss).toContain(".mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty");

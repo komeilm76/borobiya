@@ -68,16 +68,15 @@ describe("map workspace scroll ownership", () => {
     const css = style(mission, "UserMissionView.vue");
     const team = style(room, "MissionLivePanel.vue");
     const stage = style(status, "MissionStatusPanel.vue");
-    expect(css).toContain('.mission-desk--tool-open .mission-desk__map-heading { visibility: hidden; }');
+    expect(mission).toContain('v-if="!activeTool && !desk.terminalHold.value" class="mission-desk__bottom-panel"');
     expect(css).toContain('max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));\n    max-height: none;');
     expect(team).toContain('max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));');
     expect(team).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
-    // Normal phone panels start below the stage heading; short phone panels
-    // instead replace it, but never cover the 48px camera controls/SOS strip.
+    // Tools replace the progress sheet while the camera/SOS strip remains clear.
     for (const height of [561, 667, 800]) {
       const panelTop = height - 9.5 * 16 - (height - 19 * 16);
-      expect(panelTop - (4.65 + 3.5) * 16).toBeGreaterThanOrEqual(16);
+      expect(panelTop).toBeGreaterThanOrEqual(9 * 16);
     }
     for (const height of [320, 360, 560]) {
       const panelBottom = height - 9.5 * 16;

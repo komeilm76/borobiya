@@ -2785,9 +2785,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     left: auto; top: auto;
-    bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
-  }
-  .user-map-view--mission-tool-open .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
   /* Preserve MapLibre's attribution above the lower map edge and below the menu
@@ -2795,10 +2792,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
-  /* With an active mission the always-visible legend occupies the map's lower
-     left. Keep the actual scale above it, below the mission progress surface. */
+  /* The mission key now lives in the full-width bottom progress sheet. Keep
+     scale on exposed map instead of letting the sheet obscure it. */
   .user-map-view--mission-legend .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
-    bottom: calc(14rem + env(safe-area-inset-bottom, 0px));
+    bottom: auto; top: calc(8.5rem + env(safe-area-inset-top, 0px));
     left: calc(.75rem + env(safe-area-inset-left, 0px));
   }
   /* The compact planner occupies the scale's normal phone position. Keep the
@@ -2860,13 +2857,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 }
 
-/* Short mission phones use the same horizontal control row as the mission
- * focus buttons, including when the planner is open. */
+/* Short mission phones keep the external compass beside the workspace's
+ * camera actions; while a tool is open the camera rail shifts left instead. */
 @media (max-width: 599px) and (max-height: 560px) {
   .user-map-view--mission-active:not(.user-map-view--mission-tool-open)
     .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(7.75rem + env(safe-area-inset-right, 0px));
-    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

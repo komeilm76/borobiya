@@ -45,17 +45,16 @@ describe("Missions search, short phones and shared-map tab boundaries", () => {
     expect(map).toContain('showCompanions.value && (mode.value === "sharing" || !missionActive.value)');
   });
 
-  it("gives short phones room for a scrollable step list beside the key, with manual action reachable", () => {
+  it("gives short phones a full-width bottom panel with one scrollable step list and a reachable action", () => {
     const css = parse(mission).descriptor.styles[0]!.content;
     const short = css.slice(css.indexOf('@media (max-width: 599px) and (max-height: 560px) {'));
-    expect(short).toContain('.mission-desk__map-cards {\n    top: calc(4.25rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));');
-    expect(short).toContain('width: min(18rem, calc(100vw - 12.5rem');
-    expect(short).toContain('max-height: none;');
-    expect(short).toContain('.mission-desk__map-legend-body { grid-template-columns: minmax(0, 1fr); }');
+    expect(short).toContain('.mission-desk__bottom-panel { max-height: min(48dvh, calc(100dvh - 13.5rem');
+    expect(css).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
-    // 430px with 16px root font and no cutout: 430 - 68 - 144 = 218px,
-    // not the former 96px cap. Insets deliberately reduce the available space.
-    expect(430 - 4.25 * 16 - 9 * 16).toBeGreaterThan(200);
+    expect(short).toContain('.mission-desk__map-legend small { position: absolute;');
+    // At 320px, the sheet still has a 104px corridor above the control strip.
+    expect(320 - 13.5 * 16).toBeGreaterThanOrEqual(100);
     expect(cards.indexOf('class="mission-desk__phase-summary"')).toBeLessThan(cards.indexOf('class="mission-desk__next-step"'));
     const cardCss = parse(cards).descriptor.styles[0]!.content;
     expect(cardCss).toContain('.mission-desk__next-step { position: sticky; bottom: 0;');

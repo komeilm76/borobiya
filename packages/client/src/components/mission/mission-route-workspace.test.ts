@@ -37,7 +37,7 @@ describe("mission route workspace on a map", () => {
     expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
     expect(css).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('max-height: none;');
-    expect(css).toContain('.mission-desk--route-open .mission-desk__map-heading { visibility: hidden; }');
+    expect(page).not.toContain('mission-desk__map-heading');
     expect(css).toContain('.mission-desk--route-open .mission-desk__guidance { visibility: hidden; }');
     expect(css).toContain('.mission-desk--route-open .mission-route__emblem { display: none; }');
     expect(css).toContain('.mission-desk--route-open .mission-route__heading small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }');

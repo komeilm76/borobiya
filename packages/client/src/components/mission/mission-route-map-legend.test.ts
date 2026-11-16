@@ -26,7 +26,7 @@ describe("compact mission itinerary and visible map legend", () => {
   });
 
   it("displays the marker key on the map without a toggle or misplaced incident coordinates", () => {
-    const start = page.indexOf('<section v-if="routing.target.value && !activeTool && !desk.terminalHold.value"');
+    const start = page.indexOf('<section v-if="routing.target.value"');
     const mapLegend = page.slice(start, page.indexOf('</section>', start));
     expect(start).toBeGreaterThan(0);
     expect(mapLegend).toContain('class="mission-desk__map-legend" aria-labelledby="mission-map-legend-title"');
@@ -42,8 +42,9 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(page).toContain('class="mission-desk__map-cards"');
     expect(page).toContain('hasMapLegend: computed(() => !!routing.target.value && !activeTool.value && !desk.terminalHold.value)');
     expect(mapPage).toContain('user-map-view--mission-legend');
-    expect(css).toContain('.mission-desk--embedded .mission-desk__map-legend,');
-    expect(css).toContain('width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)))');
+    expect(css).toContain('.mission-desk--embedded .mission-desk__bottom-panel,');
+    expect(css).toContain('.mission-desk__bottom-panel { position: absolute; z-index: 8;');
+    expect(css).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px))');
     expect(css).toContain('.mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3,');
     expect(page).toContain('new MarkerClass({ color: "#2563a6" })');

@@ -13,8 +13,9 @@
       <div class="mission-desk__phase-heading">
         <div class="mission-desk__phase-copy">
           <strong>مراحل مأموریت</strong>
-          <span>{{ activeStep >= 0 ? `مرحلهٔ ${(activeStep + 1).toLocaleString('fa-IR')} از ${steps.length.toLocaleString('fa-IR')}` : 'در حال بررسی' }} · {{ currentStatusLabel }}</span>
+          <span role="status" aria-live="polite">{{ activeStep >= 0 ? `مرحلهٔ ${(activeStep + 1).toLocaleString('fa-IR')} از ${steps.length.toLocaleString('fa-IR')}` : 'در حال بررسی' }} · {{ currentStatusLabel }}</span>
         </div>
+        <slot name="team" />
         <v-menu location="top end">
           <template #activator="{ props }">
             <v-btn v-bind="props" class="mission-map-cards__more" variant="text" color="error" size="small" icon="mdi-dots-horizontal"

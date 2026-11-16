@@ -7,11 +7,11 @@ const descriptor = parse(page).descriptor;
 
 // Source/compiled SFC only; docs/TASKS.md disallows Vue mounting in unit tests.
 describe("default mission map brief", () => {
-  it("makes the one-button dock communicate route readiness, with mission status on the map", () => {
+  it("makes the one-button dock communicate route readiness, with mission status in the bottom panel", () => {
     const dock = page.slice(page.indexOf('<nav class="mission-desk__dock"'), page.indexOf('</nav>', page.indexOf('<nav class="mission-desk__dock"')));
     expect(dock.match(/<button\b/g)).toHaveLength(1);
-    expect(page).toContain('class="mission-desk__status-brief"');
-    expect(page).toContain('{{ currentStatusLabel }}');
+    expect(page).not.toContain('mission-desk__status-brief');
+    expect(page).toContain(':current-status-label="currentStatusLabel"');
     expect(dock).toContain('${routeCue.label}');
     expect(dock).toContain('mission-desk__dock-warning');
     expect(page).toContain('missionRouteCue({');
