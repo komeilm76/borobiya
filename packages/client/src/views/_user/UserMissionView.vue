@@ -1,5 +1,6 @@
 <template>
   <main class="mission-desk" :class="{ 'mission-desk--embedded': embedded, 'mission-desk--active': desk.activeMission.value,
+    'mission-desk--terminal-hold': !!desk.terminalHold.value,
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
     'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
     <!-- The map workspace owns the persistent public canvas even while idle. -->
@@ -13,18 +14,25 @@
         <div class="mission-hero__glow" aria-hidden="true" />
       </header>
 
-      <v-alert v-if="desk.cancelledMissionId.value" type="info" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
+      <v-alert v-if="desk.cancelledMissionId.value && !embedded" type="info" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
         مأموریت لغو شد. مرکز امداد برای جایگزینی امدادگر مطلع شده است.
       </v-alert>
-      <v-alert v-if="desk.completedMissionId.value" type="success" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
+      <v-alert v-if="desk.completedMissionId.value && !embedded" type="success" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
         امدادرسانی پایان یافت و وضعیت مأموریت در سرور ثبت شد.
       </v-alert>
-      <v-alert v-if="desk.terminalHold.value" type="warning" variant="tonal" rounded="lg"
-        class="mission-desk__load-alert mt-6" role="alert">
-        پایان مأموریت از اتاق زنده گزارش شد؛ راهبری متوقف شده است. تا تأیید وضعیت از سرور، تغییر مرحله و لغو ممکن نیست.
-        <span v-if="desk.error.value">{{ desk.error.value }}</span>
-        <v-btn class="ms-2" size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">بررسی وضعیت از سرور</v-btn>
-      </v-alert>
+      <section v-if="desk.terminalHold.value" class="mission-desk__terminal-alert" role="alert"
+        aria-labelledby="mission-terminal-title" dir="rtl">
+        <div class="mission-desk__terminal-heading">
+          <v-icon icon="mdi-shield-alert-outline" size="24" aria-hidden="true" />
+          <div>
+            <strong id="mission-terminal-title">پایان مأموریت گزارش شد · در انتظار تأیید سرور</strong>
+            <p>راهبری متوقف است. تا تأیید وضعیت، تغییر مرحله و لغو ممکن نیست.</p>
+          </div>
+        </div>
+        <p v-if="desk.error.value" class="mission-desk__terminal-error">{{ desk.error.value }}</p>
+        <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-refresh"
+          :loading="desk.loading.value" @click="desk.load()">بررسی دوبارهٔ وضعیت</v-btn>
+      </section>
       <v-alert v-else-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mission-desk__load-alert mt-6" role="alert">
         {{ desk.error.value }}
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
@@ -35,6 +43,10 @@
         :next-status-label="nextStatusLabel" :team-sharing="teamSharing"
         @close="closeTool('status')" @open-route="openRouteWorkspace" />
       <section v-else-if="!desk.error.value" class="mission-desk__empty">
+        <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
+          class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
+        <v-alert v-else-if="embedded && desk.completedMissionId.value" type="success" variant="tonal" rounded="lg"
+          class="mission-desk__inline-outcome" role="status">پایان امدادرسانی در سرور ثبت شد.</v-alert>
         <div class="mission-desk__empty-icon"><v-icon icon="mdi-check-decagram-outline" size="36" /></div>
         <h3>در حال حاضر مأموریت فعالی ندارید</h3>
         <p>پیشنهادهای دریافتی و جزئیات پذیرش در همین زبانه در دسترس‌اند.</p>
@@ -237,7 +249,7 @@
             aria-controls="mission-team-panel" :aria-expanded="activeTool === 'team'"
             @click="toggleTool('team')" />
         </header>
-        <div v-if="activeTool !== 'route' && (routing.error.value || navigation.error.value)"
+        <div v-if="!desk.terminalHold.value && activeTool !== 'route' && (routing.error.value || navigation.error.value)"
           class="mission-desk__guidance mission-desk__guidance--warning" role="alert">
           <span>{{ routing.error.value || navigation.error.value }}</span>
           <v-btn v-if="!desk.terminalHold.value && !desk.error.value && !desk.loading.value" size="small" variant="tonal"
@@ -260,13 +272,12 @@
           <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
         </div>
         <div v-show="!pickingWaypoint && activeTool !== 'status' && activeTool !== 'team'"
-          class="mission-desk__map-focus" :class="{ 'mission-desk__map-focus--pair': navigation.active.value && routing.visible.value && !!routing.target.value }"
+          class="mission-desk__map-focus" :class="{ 'mission-desk__map-focus--pair': routing.visible.value && !!routing.target.value }"
           role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت">
-          <v-btn v-if="navigation.active.value" :icon="followingGps ? 'mdi-crosshairs-gps' : 'mdi-navigation-variant'"
-            :color="followingGps ? 'primary' : 'warning'" variant="flat"
-            :aria-label="followingGps ? 'مرکز کردن موقعیت راهبری' : 'بازگشت به دنبال‌کردن GPS'"
-            :title="followingGps ? 'مرکز کردن موقعیت راهبری' : 'بازگشت به دنبال‌کردن GPS'"
-            :aria-pressed="followingGps" :disabled="!mapReady" @click="resumeGuidanceFollow" />
+          <v-btn :icon="ownFocus.icon" :color="ownFocus.color" variant="flat"
+            :aria-label="ownFocus.label" :title="ownFocus.label"
+            :aria-pressed="navigation.active.value ? followingGps : undefined" :disabled="!mapReady"
+            @click="navigation.active.value ? resumeGuidanceFollow() : emit('focus-own')" />
           <v-btn v-if="routing.visible.value && routing.target.value" icon="mdi-fit-to-screen" color="primary" variant="flat"
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
@@ -373,7 +384,9 @@ import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 // workspace passes its existing MapCanvas and Marker constructor here.
 const props = withDefaults(defineProps<{
   embedded?: boolean; visible?: boolean; externalMap?: MapLibreMap | null; externalMarker?: typeof Marker | null;
-}>(), { embedded: false, visible: true });
+  ownRecenterLabel?: string; ownLocationError?: boolean;
+}>(), { embedded: false, visible: true, ownRecenterLabel: "نمایش موقعیت من روی نقشه", ownLocationError: false });
+const emit = defineEmits<{ "focus-own": [] }>();
 const auth = useAuthStore();
 const inbox = useProposalInboxStore();
 const assignment = useRescuerMissionShareStore();
@@ -479,7 +492,7 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
   if (added) openRouteWorkspace();
   return added;
 }
-defineExpose({ addSearchWaypoint });
+defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value) });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
   const lon = Number(waypointLon.value);
@@ -596,6 +609,17 @@ const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
   (camera) => { if (followingGps.value) routeMap?.easeTo(camera); }, undefined,
   () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
+// Before guidance, the button calls the map owner's PRIVATE recenter/retry;
+// during guidance it resumes the mission's own GPS camera without a new watcher.
+const ownFocus = computed(() => {
+  if (navigation.active.value) return {
+    icon: followingGps.value ? "mdi-crosshairs-gps" : "mdi-navigation-variant",
+    color: followingGps.value ? "primary" : "warning",
+    label: followingGps.value ? "مرکز کردن موقعیت راهبری" : "بازگشت به دنبال‌کردن GPS"
+  };
+  return { icon: props.ownLocationError ? "mdi-crosshairs-question" : "mdi-crosshairs-gps",
+    color: props.ownLocationError ? "warning" : "primary", label: props.ownRecenterLabel };
+});
 // The GPS watcher clears fix immediately on timeout, denial, background or Stop.
 // Do not substitute the saved route origin or an old member marker here.
 const incidentDistance = computed(() => incidentDistanceMetres(navigation.fix.value, routing.target.value?.incident ?? null));
@@ -1005,14 +1029,16 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
   width: min(42rem, calc(100vw - 1.5rem));
-  margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;
-  padding: .9rem; max-height: min(68dvh, calc(100dvh - 10rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  margin: calc(8.5rem + env(safe-area-inset-top, 0px)) auto 0;
+  padding: .9rem; max-height: min(58dvh, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
   background: rgb(var(--v-theme-surface));
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) {
   padding: 0; background: transparent;
 }
+.mission-desk__inline-outcome { margin-bottom: .8rem; border: 1px solid rgb(var(--v-theme-success));
+  color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__hero) { padding: .75rem; }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__items) {
   max-height: none; overflow: visible; padding: 0;
@@ -1023,7 +1049,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded .mission-desk__map-heading { top: calc(4.65rem + env(safe-area-inset-top, 0px));
   left: auto; right: 1rem; transform: none; }
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }
-.mission-desk--embedded .mission-desk__load-alert { top: calc(9rem + env(safe-area-inset-top, 0px)); }
+.mission-desk--embedded .mission-desk__load-alert { pointer-events: auto; }
 .mission-desk--embedded :deep(.live-panel--fullscreen) { background: transparent; pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__map) { pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__members),
@@ -1056,6 +1082,35 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--active .mission-desk__load-alert {
   position: absolute; z-index: 12; top: calc(3.5rem + env(safe-area-inset-top, 0px));
   right: 1rem; width: min(27rem, calc(100vw - 1.5rem)); max-height: 30dvh; overflow-y: auto;
+}
+/* An unverified room event is not a confirmed cancellation. Keep its retry
+   action readable/clickable above the shared map, clear of the tab bar and
+   mission heading; never cover the guidance strip with a pale tonal alert. */
+.mission-desk__terminal-alert {
+  position: absolute; z-index: 12;
+  top: calc(9.75rem + env(safe-area-inset-top, 0px));
+  left: 50%; transform: translateX(-50%);
+  width: min(29rem, calc(100vw - 1.5rem));
+  max-height: min(38dvh, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  padding: .9rem; overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;
+  border: 1px solid rgb(var(--v-theme-warning)); border-inline-start-width: 4px;
+  border-radius: var(--bb-radius-card, 24px); box-shadow: var(--bb-shadow-overlay);
+  color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));
+}
+.mission-desk__terminal-heading { display: flex; gap: .7rem; align-items: flex-start; }
+.mission-desk__terminal-heading > :deep(.v-icon) { flex: 0 0 auto; color: rgb(var(--v-theme-warning)); }
+.mission-desk__terminal-heading strong { display: block; font-size: .92rem; line-height: 1.5; }
+.mission-desk__terminal-heading p { margin: .3rem 0 .75rem; font-size: .83rem; line-height: 1.6; }
+.mission-desk__terminal-error { padding: .55rem .7rem; border-radius: .7rem;
+  background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.5; }
+.mission-desk__terminal-alert :deep(.v-btn) { min-height: 44px; height: auto; width: 100%; }
+.mission-desk__terminal-alert :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.mission-desk--embedded.mission-desk--active .mission-desk__load-alert {
+  top: calc(9.75rem + env(safe-area-inset-top, 0px));
+  left: 50%; right: auto; transform: translateX(-50%);
+  pointer-events: auto; border: 1px solid rgb(var(--v-theme-error));
+  color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));
+  box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-heading {
   position: absolute; z-index: 7; top: calc(.75rem + env(safe-area-inset-top, 0px));
@@ -1244,6 +1299,13 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
+  /* On short phones the heading and verification panel cannot both fit above
+     the dock. The pending state is the heading until the server verifies it. */
+  .mission-desk--terminal-hold .mission-desk__map-heading { visibility: hidden; }
+  .mission-desk__terminal-alert {
+    top: calc(4.5rem + env(safe-area-inset-top, 0px));
+    max-height: max(6rem, calc(100dvh - 10.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
   .mission-desk--active .mission-desk__card,
   .mission-desk--active .mission-route {
     max-height: max(5rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));

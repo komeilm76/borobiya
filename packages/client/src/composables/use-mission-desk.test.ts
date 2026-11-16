@@ -87,6 +87,23 @@ describe("mission desk cancellation", () => {
     expect(desk.activeMission.value).toBeNull();
   });
 
+  it("replaces a pending room warning with the same mission's confirmed cancellation acknowledgement", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    const pending = deferred<void>();
+    vi.mocked(cancelRescuerMission).mockReturnValueOnce(pending.promise);
+    const saving = desk.confirmCancellation();
+    desk.markTerminalEvent(missionId);
+    expect(desk.terminalHold.value).toBe(missionId);
+    pending.resolve();
+    await saving;
+    expect(desk.terminalHold.value).toBeNull();
+    expect(desk.cancelledMissionId.value).toBe(missionId);
+    expect(desk.activeMission.value).toBeNull();
+  });
+
   it("renders the hidden more-action and explicit reason+confirmation in the accessible view", () => {
     const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8") +
       readFileSync(new URL("../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");

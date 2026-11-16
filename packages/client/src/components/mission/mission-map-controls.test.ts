@@ -40,6 +40,32 @@ describe("mission map controls", () => {
     expect(canvas).toContain('showCompass: true');
     expect(canvas).toContain('visualizePitch: true');
   });
+  it("offers one own-position button before guidance and reuses mission following during guidance", () => {
+    expect(companionMap).toContain(':own-recenter-label="recenterLabel" :own-location-error="!!(own.error.value || recenterError)"');
+    expect(companionMap).toContain('@focus-own="centerOnOwnLocation"');
+    expect(companionMap).toContain("!missionActive && (mode !== 'missions' || !missionWorkspace?.hasActiveMission)");
+    expect(companionMap).toContain('if (!instance || !fix || !markerConstructor) {');
+    expect(companionMap).toContain('user-map-view__own-marker--mission');
+    expect(missionMap).toContain('hasActiveMission: computed(() => !!desk.activeMission.value)');
+    expect(missionMap).toContain('if (navigation.active.value) return {');
+    expect(missionMap).toContain('label: props.ownRecenterLabel');
+    expect(missionMap).toContain("navigation.active.value ? resumeGuidanceFollow() : emit('focus-own')");
+    expect(missionMap).not.toContain('useOwnMapPosition'); // No second private GPS watcher.
+  });
+  it("keeps the unverified-terminal panel readable and its retry action tappable", () => {
+    const style = parse(missionMap).descriptor.styles[0]!.content;
+    const compiled = compileStyle({ filename: "UserMissionView.vue", id: "data-v-verification", scoped: true, source: style });
+    expect(compiled.errors).toEqual([]);
+    expect(missionMap).toContain('<section v-if="desk.terminalHold.value" class="mission-desk__terminal-alert" role="alert"');
+    expect(missionMap).toContain('در انتظار تأیید سرور');
+    expect(missionMap).toContain('v-if="!desk.terminalHold.value && activeTool !== \'route\'');
+    expect(style).toContain('pointer-events: auto;');
+    expect(style).toContain('color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));');
+    expect(style).toContain('.mission-desk--terminal-hold .mission-desk__map-heading { visibility: hidden; }');
+    expect(style).toContain('max-height: max(6rem, calc(100dvh - 10.5rem');
+    expect(compiled.code).toContain('.mission-desk__terminal-alert[data-v-verification]');
+    expect(missionMap).toContain('v-if="embedded && desk.cancelledMissionId.value"');
+  });
   it("positions both mission compasses in the same physical-right action rail as /_user/map", () => {
     const liveStyle = parse(room).descriptor.styles[0]!.content;
     const viewStyle = parse(missionMap).descriptor.styles[0]!.content;

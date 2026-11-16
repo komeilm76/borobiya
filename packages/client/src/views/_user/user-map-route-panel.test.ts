@@ -170,7 +170,7 @@ describe("progressive trip planning and editing", () => {
   });
 
   it("keeps SOS and route choices reachable above whichever phone route sheet is open", () => {
-    expect(map).toContain("'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value");
+    expect(map).toContain("'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value");
     expect(map).toContain('function measurePointSheet(): void {');
     expect(map).toContain('function pointSheetId(): string {');
     expect(map).toContain('new ResizeObserver(measurePointSheet)');

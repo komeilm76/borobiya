@@ -57,7 +57,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
   });
 
   it("adapts personal-map camera recovery to the private mission map without importing personal-map tools", () => {
-    expect(view).toContain('class="mission-desk__map-focus" :class="{ \'mission-desk__map-focus--pair\': navigation.active.value && routing.visible.value && !!routing.target.value }"');
+    expect(view).toContain('class="mission-desk__map-focus" :class="{ \'mission-desk__map-focus--pair\': routing.visible.value && !!routing.target.value }"');
     expect(view).toContain('role="group" aria-label="کنترل‌های نمای نقشهٔ مأموریت"');
     expect(view).toContain('v-show="!pickingWaypoint && activeTool !== \'status\' && activeTool !== \'team\'"');
     expect(view).toContain('aria-label="نمایش محل حادثه و مسیر مأموریت"');
@@ -69,10 +69,12 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('if (followingGps.value) routeMap?.easeTo(camera);');
     expect(view).toContain('followingGps.value = true; // Never carry a paused camera into another mission/watch.');
     expect(view).toContain('navigation.recenter(); // A fresh fix recenters now; otherwise await the next GPS sample.');
-    expect(view).toContain(":color=\"followingGps ? 'primary' : 'warning'\"");
+    expect(view).toContain('color: followingGps.value ? "primary" : "warning"');
+    expect(view).toContain('@click="navigation.active.value ? resumeGuidanceFollow() : emit(\'focus-own\')"');
+    expect(view).toContain('label: props.ownRecenterLabel');
     expect(view).toContain('دنبال‌کردن نقشه متوقف است');
     expect(view).toContain("followingGps ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'دوربین روی نمای انتخابی شماست؛ برای دنبال‌کردن دوبارهٔ GPS، دکمهٔ موقعیت را بزنید.'");
-    expect(view).toContain(':aria-pressed="followingGps" :disabled="!mapReady"');
+    expect(view).toContain(':aria-pressed="navigation.active.value ? followingGps : undefined" :disabled="!mapReady"');
     expect(view).toContain('@camera-selected="pauseGuidanceFollow"');
     expect(panel).toContain('if (userInitiated) {');
     expect(panel).toContain('emit("camera-selected"); // Preserve this explicit view against GPS follow.');

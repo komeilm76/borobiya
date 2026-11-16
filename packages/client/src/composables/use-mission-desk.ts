@@ -150,7 +150,11 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
         return;
       }
       missions.value = missions.value.map((item) => item.id === mission.id ? persisted : item);
-      if (persisted.status === "completed") completedMissionId.value = mission.id;
+      if (persisted.status === "completed") {
+        completedMissionId.value = mission.id;
+        // This HTTP acknowledgement confirms the terminal room signal.
+        if (terminalHold.value === mission.id) terminalHold.value = null;
+      }
     } catch (cause) {
       if (session !== sessionGeneration || userId.value !== owner) return;
       // Even a network failure might have committed. Do not guess or resend the old step.
@@ -224,6 +228,9 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
         ? { ...item, status: "cancelled_by_rescuer", cancelledBy: "rescuer", cancellationReasonId: reason.id }
         : item);
       cancelledMissionId.value = mission.id;
+      // An acknowledged cancellation is stronger than an earlier unverified
+      // room event. Do not leave its warning over the confirmed outcome.
+      if (terminalHold.value === mission.id) terminalHold.value = null;
       cancellationOpen.value = false;
       cancellationMissionId.value = null;
     } catch (cause) {

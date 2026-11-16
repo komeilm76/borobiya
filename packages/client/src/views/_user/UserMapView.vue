@@ -1,7 +1,7 @@
 <template>
   <section class="user-map-view" :class="{ 'user-map-view--mission': mode === 'missions',
-    'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value,
-    'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
+    'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
+    'user-map-view--navigating': mode === 'trips' && isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
@@ -25,7 +25,9 @@
       @click="selectTool('search')" />
     <UserMissionView v-if="auth.user?.role === 'user' && (mode === 'missions' || missionActive)"
       v-show="mode === 'missions'" ref="missionWorkspace"
-      embedded :visible="mode === 'missions'" :external-map="map" :external-marker="workspaceMarker" />
+      embedded :visible="mode === 'missions'" :external-map="map" :external-marker="workspaceMarker"
+      :own-recenter-label="recenterLabel" :own-location-error="!!(own.error.value || recenterError)"
+      @focus-own="centerOnOwnLocation" />
 
     <!-- On phones Search is modal; this map-side action makes other POIs reachable
          again after zooming into one without reopening the full-screen dialog. -->
@@ -125,7 +127,7 @@
          watcher; opening the map never starts outgoing location sharing. -->
     <v-btn
       class="user-map-view__recenter"
-      v-show="mode !== 'missions' && !missionActive && !(isShortPhone && activeTool)"
+      v-show="!missionActive && (mode !== 'missions' || !missionWorkspace?.hasActiveMission) && !(isShortPhone && activeTool)"
       :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : journey.navigating.value && !navigationFollowEnabled ? 'mdi-navigation-variant' : 'mdi-crosshairs-gps'"
       :color="own.error.value || recenterError ? 'warning' : 'primary'"
       :aria-label="journey.navigating.value && !navigationFollowEnabled ? 'بازگشت به دنبال‌کردن مسیر' : recenterLabel"
@@ -672,7 +674,7 @@ const recenterLabel = computed(() => {
 function syncOwnMarker(freshFix = false): void {
   const instance = map.value;
   const fix = own.position.value;
-  if (!instance || !fix || !markerConstructor || mode.value === "missions" || missionActive.value) {
+  if (!instance || !fix || !markerConstructor) {
     ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null; return;
   }
   const wasGuiding = ownMarker?.getElement().classList.contains("user-map-view__own-marker--navigating") ?? false;
@@ -717,8 +719,11 @@ function syncOwnMarker(freshFix = false): void {
   const element = ownMarker.getElement();
   element.classList.toggle("user-map-view__own-marker--navigating", reliableHeading);
   element.classList.toggle("user-map-view__own-marker--walking", reliableHeading && journey.profile.value === "foot");
-  element.setAttribute("aria-label", reliableHeading ? "موقعیت زندهٔ من؛ جهت راهبری" :
-    journey.navigating.value ? "موقعیت من؛ در انتظار مسیر و GPS دقیق" : "موقعیت زندهٔ من");
+  element.classList.toggle("user-map-view__own-marker--mission", mode.value === "missions");
+  element.setAttribute("title", mode.value === "missions" ? "موقعیت من روی این دستگاه؛ بدون شروع اشتراک جدید" : "موقعیت من (فقط روی این دستگاه)");
+  element.setAttribute("aria-label", mode.value === "missions" ? "موقعیت من روی این دستگاه؛ مستقل از نشانگر اشتراک مأموریت" :
+    reliableHeading ? "موقعیت زندهٔ من؛ جهت راهبری" :
+      journey.navigating.value ? "موقعیت من؛ در انتظار مسیر و GPS دقیق" : "موقعیت زندهٔ من");
 }
 function centerOnOwnLocation(initiatedByUser = true): void {
   const instance = map.value;
@@ -2431,6 +2436,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border-radius: 50%; background: rgba(var(--v-theme-primary), .22);
   cursor: default;
 }
+:global(.user-map-view .user-map-view__own-marker--mission) {
+  border: 2px dashed rgb(var(--v-theme-primary)); background: rgb(var(--v-theme-surface));
+}
 :global(.user-map-view .user-map-view__own-marker-icon) {
   display: grid; place-items: center; width: 32px; height: 32px;
   border: 3px solid rgb(var(--v-theme-on-primary)); border-radius: 50%;
@@ -2529,6 +2537,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   box-shadow: var(--bb-shadow-overlay);
 }
 .user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem); }
+/* Before accepting a mission, the same private recenter control remains
+   available beside Search, above the idle offer panel rather than over it. */
+.user-map-view--mission .user-map-view__recenter {
+  top: calc(4.85rem + env(safe-area-inset-top, 0px));
+  inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
+  inset-block-end: auto;
+}
 /* Off is neutral rather than another green/teal fill; the outline remains
  * visible over both pale map tiles and the dark raised surface. */
 .user-map-view__share--idle { border-color: var(--bb-color-outline); }
