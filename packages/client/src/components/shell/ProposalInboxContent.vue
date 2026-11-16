@@ -302,7 +302,7 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 
 <style scoped>
 .offers { min-height: 0; padding: clamp(12px, 3vw, 30px) 12px 32px; background: radial-gradient(ellipse at 80% 0%, rgba(48, 117, 106, .11), transparent 48%), rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background)); }
-.offers__shell { max-width: 1260px; margin-inline: auto; }
+.offers__shell { max-width: 1260px; margin-inline: auto; container-type: inline-size; }
 .offers__hero { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: var(--bb-radius-card, 24px); background: linear-gradient(118deg, #103c3d, #185352 60%, #29736b); color: #fff; box-shadow: var(--bb-shadow-hero); }
 .offers__intro { min-width: 0; }
 .offers__eyebrow { display: inline-flex; gap: 8px; align-items: center; color: #bbefdf; font-size: 0.82rem; font-weight: 700; }
@@ -331,10 +331,10 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offer-card__body { min-width: 0; width: 100%; display: grid; padding: 20px 19px; gap: 12px; }
 .offer-card__top, .offer-card__foot { display: flex; align-items: center; gap: 10px; }
 .offer-card__icon { display: inline-flex; justify-content: center; align-items: center; background: rgba(49,149,129,.12); color: rgb(var(--v-theme-primary)); border-radius: 11px; width: 36px; height: 36px; flex-shrink: 0; }
-.offer-card__title { font-weight: 800; font-size: .95rem; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.offer-card__title { font-weight: 800; font-size: .95rem; line-height: 1.55; flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .offer-card__severity, .offer-detail__pill { font-weight: 750; font-size: 0.82rem; border-radius: 50px; padding: 5px 10px; white-space: nowrap; }
 .offer-card__severity--urgent { background: #ffe7e4; color: #a2241e; }.offer-card__severity--important { background: #fff0d4; color: #875000; }.offer-card__severity--standard { background: #d9f4ed; color: #066b57; }
-.offer-card__description { font-size: .83rem; opacity: .77; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.offer-card__description { font-size: .85rem; line-height: 1.65; opacity: .9; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .offer-card__foot { justify-content: space-between; flex-wrap: wrap; font-size: 0.82rem; color: rgb(var(--v-theme-primary)); }
 .offer-card__foot span { min-width: 0; overflow-wrap: anywhere; }
 .offer-card__foot span:first-child { opacity: .9; }
@@ -372,6 +372,20 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
   .offer-confirm-actions :deep(.v-spacer) { display: none; }
   .offer-confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
   .offer-confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
+/* The inbox is also embedded in a narrow map sheet on wide screens.
+   Measure its own space rather than relying on the viewport breakpoint. */
+@container (max-width: 42rem) {
+  .offers__layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+@container (max-width: 28rem) {
+  .offers__hero { flex-wrap: wrap; align-items: flex-start; }
+  .offers__stat { flex-direction: row; min-width: 0; min-height: 44px; gap: 6px; padding: 6px 10px; }
+  .offers__toolbar { flex-wrap: wrap; }
+  .offers__toolbar > div { flex: 1 1 100%; min-width: 0; }
+  .offer-card__body { padding: 14px 12px; gap: 8px; }
+  .offer-card__top { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 7px 9px; }
+  .offer-card__severity { grid-column: 2; justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .offer-card { transition: none; }.offer-card:not(:disabled):not(.offer-card--selected):hover { transform: none; } }
 

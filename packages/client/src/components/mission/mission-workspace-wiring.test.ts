@@ -16,7 +16,7 @@ describe("mission map workspace", () => {
     const { descriptor } = parse(status, { filename: "MissionStatusPanel.vue" });
     const style = compileStyle({ source: descriptor.styles[0]!.content, filename: "MissionStatusPanel.vue", id: "data-v-mission-status", scoped: true });
     expect(style.errors).toEqual([]);
-    expect(style.code).toContain(".mission-steps__item");
+    expect(style.code).toContain(".mission-desk__phase-step");
   });
   it("separates plan, transport and alternatives; only explicit acceptance commits a preview", () => {
     expect(view).toContain('routeWorkspace.openTransport()');

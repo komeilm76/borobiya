@@ -48,9 +48,13 @@ describe("mission member and rating controls contrast", () => {
       const tint = blend("#6f8a82", palettes[theme].surface, 0.09);
       expect(contrast(palettes[theme].text, tint)).toBeGreaterThanOrEqual(4.5);
     }
-    expect(missionView).toMatch(/\.mission-steps__item \{[^}]*color: rgb\(var\(--v-theme-on-surface\)\);[^}]*\}/);
-    expect(missionView).not.toMatch(/\.mission-steps__item \{[^}]*opacity: \.6;/);
-    expect(missionView).toContain(".mission-steps__item--reached { background:");
+    for (const mode of ["light", "dark"] as const) {
+      expect(contrast(palettes[mode].muted, palettes[mode].inset)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(missionView).toMatch(/\.mission-desk__phase-step \{[^}]*color: var\(--bb-color-muted\);[^}]*\}/);
+    expect(missionView).not.toMatch(/\.mission-desk__phase-step \{[^}]*opacity: \.6;/);
+    expect(missionView).toContain(".mission-desk__phase-step--current { border-color: var(--bb-color-outline); color: rgb(var(--v-theme-on-surface));");
+    expect(missionView).toContain(".mission-desk__phase-step--passed { color: rgb(var(--v-theme-primary));");
   });
 
   it("keeps star controls, saved stars and their borders distinguishable in both themes", () => {

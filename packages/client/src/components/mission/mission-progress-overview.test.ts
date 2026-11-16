@@ -24,12 +24,18 @@ describe("at-a-glance mission progress", () => {
   });
 
   it("shows verified progress and the guarded manual next action before optional history and explanation", () => {
-    expect(panel).toContain('class="mission-desk__phase-track" role="progressbar"');
-    expect(panel).toContain(':aria-valuenow="Math.max(0, activeStep + 1)"');
-    expect(panel).toContain(':aria-valuemax="steps.length"');
-    expect(panel).toContain("steps[activeStep]?.label ?? 'در حال بررسی'");
+    expect(panel).toContain('<ol class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">');
+    expect(panel.match(/v-for="\(step, index\) in steps"/g)).toHaveLength(1);
+    expect(panel).toContain(':aria-current="index === activeStep ? \'step\' : undefined"');
+    expect(panel).toContain('index < activeStep');
+    expect(panel).toContain('index === activeStep');
+    expect(panel).toContain('activeStep >= 0 ?');
+    expect(panel).toContain('نمایش شناسهٔ پیگیری');
+    expect(panel).not.toContain('نمایش همهٔ مراحل و شناسهٔ مأموریت');
+    expect(panel).not.toContain('class="mission-steps"');
     expect(panel).toContain('v-if="desk.nextStatus.value && !desk.terminalHold.value" class="mission-desk__next-step"');
-    expect(panel.indexOf('class="mission-desk__next-step"')).toBeLessThan(panel.indexOf('<details class="mission-desk__timeline">'));
+    expect(panel.indexOf('class="mission-desk__next-step"')).toBeLessThan(panel.indexOf('<ol class="mission-desk__phase-steps"'));
+    expect(panel.indexOf('<ol class="mission-desk__phase-steps"')).toBeLessThan(panel.indexOf('<details class="mission-desk__timeline">'));
     expect(panel).toContain(':disabled="!desk.canAdvance.value"');
     expect(panel).toContain('@click="desk.advanceStatus()"');
     expect(panel).toContain('desk.cancellationNeedsRefresh.value');
@@ -47,7 +53,7 @@ describe("at-a-glance mission progress", () => {
     }
     expect(panel).toContain('aria-controls="mission-route-panel"');
     expect(panel).toContain('title="قادر به ادامه نیستم"');
-    expect(panel).toContain('grid-template-columns: minmax(0, 1fr);'); // A 28rem floating card cannot fit five text columns.
+    expect(panel).toContain('grid-template-columns: 28px minmax(0, 1fr) auto;'); // Labels wrap in a single column at 28rem.
     expect(panel).toContain('class="mission-desk__tracking-id"');
   });
 
@@ -60,7 +66,9 @@ describe("at-a-glance mission progress", () => {
     expect(viewStyle).toContain('.mission-desk__status-trigger:focus-visible');
     expect(viewStyle).toContain('.mission-desk__stage-track');
     expect(viewStyle).toContain('max-width: calc(100vw - 7rem);');
-    expect(panelStyle).toContain('.mission-desk__phase-track');
+    expect(panelStyle).toContain('.mission-desk__phase-steps');
+    expect(panelStyle).toContain('.mission-desk__phase-step--current');
+    expect(panelStyle).toContain('.mission-desk__phase-step--passed:not(:last-child)::after');
     expect(panelStyle).toContain('background: rgb(var(--v-theme-primary));');
     expect(panelStyle).toContain('background: var(--bb-color-inset);');
   });

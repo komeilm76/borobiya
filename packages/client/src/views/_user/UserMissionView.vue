@@ -1039,6 +1039,9 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 .mission-desk__inline-outcome { margin-bottom: .8rem; border: 1px solid rgb(var(--v-theme-success));
   color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); }
+/* This card is at most 42rem even on desktop: viewport breakpoints in the
+   reusable inbox cannot decide whether its list and detail fit side by side. */
+.mission-desk__empty :deep(.offers__layout) { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__hero) { padding: .75rem; }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__items) {
   max-height: none; overflow: visible; padding: 0;
