@@ -248,7 +248,10 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
   top: calc(50% + 8px); height: calc(100% + .3rem - 16px);
   border-inline-start: 2px dashed rgba(var(--v-theme-on-surface), .3); }
 .point-route__endpoint-name { font-weight: 800; font-size: .82rem; }
-.point-route__endpoint-address { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; font-size: .87rem; }
+/* Full origin/destination details remain readable on narrow phones; the
+   containing trip card scrolls when either address grows beyond the viewport. */
+.point-route__endpoint-address { display: block; min-width: 0; white-space: normal;
+  overflow-wrap: anywhere; text-align: start; font-size: .82rem; line-height: 1.5; }
 .point-route__choices { display: grid; gap: .45rem; padding: .65rem .85rem; }
 .point-route__choice { display: flex; align-items: center; gap: .55rem; width: 100%; min-height: 56px; padding: .5rem .7rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .12); border-radius: var(--bb-radius-nested, 16px);

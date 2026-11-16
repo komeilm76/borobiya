@@ -54,6 +54,25 @@ describe("progressive trip planning and editing", () => {
     expect(styles).toContain('min-height: 44px');
   });
 
+  it("shows complete start and destination addresses in the scrollable trip panel", () => {
+    expect(sheet).toContain('class="point-route__endpoints" aria-label="مبدأ و مقصد مسیر"');
+    expect(sheet).toContain('class="point-route__endpoint-address" dir="auto" :title="originAddress">{{ originAddress }}</bdi>');
+    expect(sheet).toContain('class="point-route__endpoint-address" dir="auto" :title="destinationAddress">{{ destinationAddress }}</bdi>');
+    expect(sheet).toContain('return props.originReverse.address.value.formattedAddress;');
+    expect(sheet).toContain('if (props.api.address.value) return props.api.address.value;');
+    const styles = css(sheet, "PointRouteSheet.vue");
+    const selector = '.point-route__endpoint-address[data-v-route-panel] {';
+    const start = styles.indexOf(selector);
+    expect(start).toBeGreaterThan(-1);
+    const address = styles.slice(start, styles.indexOf('}', start));
+    expect(address).toContain('min-width: 0; white-space: normal;');
+    expect(address).toContain('overflow-wrap: anywhere;');
+    expect(address).toContain('font-size: .82rem; line-height: 1.5;');
+    expect(address).not.toMatch(/text-overflow|overflow:\s*hidden|white-space:\s*nowrap|line-clamp/);
+    expect(styles).toMatch(/\.point-route__content\[data-v-route-panel\]\s*\{[^}]*overflow-y: auto;[^}]*overscroll-behavior: contain;[^}]*min-height: 0;/);
+    expect(styles).toContain('overflow-y: auto; /* One scroll surface when the header and footer alone fill the card. */');
+  });
+
   it("shares only the selected destination through a user gesture with safe fallback", () => {
     expect(sheet).toContain('import { useShare } from "@vueuse/core"');
     expect(sheet).toContain('const { isSupported, share } = useShare()');
