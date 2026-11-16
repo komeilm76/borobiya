@@ -30,7 +30,8 @@ export const palettes = {
     background: "#f4f7f6", surface: "#ffffff", primary: "#0e6666",
     secondary: "#e9b35a", accent: "#d77a58", error: "#b83f42",
     success: "#347c61", info: "#4a7c91", warning: "#fb8c00",
-    text: "#193536", muted: "#627a7a", onPrimary: "#ffffff", brand: "#0e6666",
+    // Small labels also sit on the pale inset, not only on white cards.
+    text: "#193536", muted: "#586f6f", onPrimary: "#ffffff", brand: "#0e6666",
     inset: "#f4f7f6", outline: "#627a7a"
   },
   dark: {

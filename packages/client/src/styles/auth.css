@@ -114,7 +114,7 @@
 
 .auth-trust-row small {
   margin-top: 0.18rem;
-  color: #7c9090;
+  color: var(--bb-color-muted);
   font-size: 0.84rem;
   line-height: 1.7;
 }
@@ -285,10 +285,6 @@
   background: #fff;
 }
 
-.auth-form .v-field__outline {
-  --v-field-border-opacity: 0.16;
-}
-
 .auth-form .v-input__details {
   padding-inline: 0.8rem;
   font-size: 0.82rem;
@@ -342,7 +338,7 @@
   align-items: center;
   gap: 0.8rem;
   margin: 1.3rem 0 0.9rem;
-  color: #9aa9a7;
+  color: var(--bb-color-muted);
   font-size: 0.82rem;
 }
 
@@ -356,7 +352,7 @@
 
 .auth-switch-copy {
   margin: 0;
-  color: #758989;
+  color: var(--bb-color-muted);
   font-size: 0.9rem;
   text-align: center;
 }
@@ -376,7 +372,7 @@
   justify-content: center;
   gap: 0.45rem;
   margin: 1.25rem 0 0;
-  color: #8a9a99;
+  color: var(--bb-color-muted);
   font-size: 0.84rem;
 }
 
@@ -399,7 +395,7 @@
 
 .auth-form-intro {
   margin: -0.3rem 0 0.2rem;
-  color: #748887;
+  color: var(--bb-color-muted);
   font-size: 0.94rem;
   line-height: 1.9;
 }
@@ -538,7 +534,7 @@
 
 .auth-success-state > p:not(.auth-eyebrow) {
   margin: 0 0 0.65rem;
-  color: #748887;
+  color: var(--bb-color-muted);
   font-size: 0.94rem;
   line-height: 1.9;
 }

@@ -76,7 +76,7 @@ a {
 }
 
 .brand-tagline {
-  color: #718686;
+  color: var(--bb-color-muted);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -118,6 +118,39 @@ a {
 }
 .app-shell--workspace :is(.text-h5, .text-subtitle-1, .text-subtitle-2, .text-body-2, .text-caption) {
   letter-spacing: normal !important;
+}
+
+/* Shared interactive primitives on every route, including dialogs teleported
+   outside v-app. Vuetify otherwise gives Persian buttons uppercase/letter
+   spacing and 4px corners, and outlines fields at only 38% (16% on auth).
+   Keep explicit rounded pills, icon circles, semantic error/focus colors and
+   the project's separate surface/elevation tiers intact. */
+:is(.app-shell, .v-overlay-container) button { font-family: inherit; }
+:is(.app-shell, .v-overlay-container) .v-btn {
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
+  letter-spacing: normal; text-indent: 0; text-transform: none;
+}
+:is(.app-shell, .v-overlay-container) .v-btn:not(.v-btn--icon):not(.v-btn--tile):not([class*="rounded-"]):is(.v-btn--variant-flat, .v-btn--variant-tonal, .v-btn--variant-outlined) {
+  border-radius: var(--bb-radius-nested, 16px);
+}
+:is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not([class*="rounded-"]) {
+  border-radius: var(--bb-radius-nested, 16px);
+}
+:is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not(.v-field--focused):not(.v-field--error):not(.v-field--disabled) .v-field__outline {
+  color: var(--bb-color-outline);
+  --v-field-border-opacity: 1;
+}
+:is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not(.v-field--focused):not(.v-field--error):not(.v-field--disabled) .v-field-label {
+  color: var(--bb-color-muted); opacity: 1;
+}
+:is(.app-shell, .v-overlay-container) :is(.v-field, .v-field__input, .v-label, input, textarea, select) {
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
+  letter-spacing: normal;
+}
+@media (forced-colors: active) {
+  :is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not(.v-field--focused):not(.v-field--error):not(.v-field--disabled) .v-field__outline {
+    color: CanvasText;
+  }
 }
 
 .app-main {
@@ -209,7 +242,7 @@ a {
 .hero-copy {
   max-width: 42rem;
   margin: 0;
-  color: #627a7a;
+  color: var(--bb-color-muted);
   font-size: clamp(1rem, 1.5vw, 1.12rem);
   line-height: 2;
 }
@@ -309,7 +342,7 @@ a {
 
 .welcome-copy {
   margin: 0 auto 1.4rem;
-  color: #758989;
+  color: var(--bb-color-muted);
   font-size: 0.9rem;
   line-height: 1.9;
 }
@@ -349,13 +382,13 @@ a {
 
 .note-copy {
   margin-top: 0.2rem;
-  color: #7d9090;
+  color: var(--bb-color-muted);
   font-size: 0.82rem;
 }
 
 .note-version {
   margin-inline-start: auto;
-  color: #97a8a6;
+  color: var(--bb-color-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.82rem;
 }
@@ -368,7 +401,7 @@ a {
   gap: var(--bb-space-two, 16px);
   padding: 0.75rem clamp(var(--bb-space-two, 1rem), 4vw, var(--bb-space-six, 3rem));
   border-top: 1px solid rgba(26, 67, 68, 0.07);
-  color: #819292;
+  color: var(--bb-color-muted);
   background: rgba(255, 255, 255, 0.76);
   font-size: 0.82rem;
 }
