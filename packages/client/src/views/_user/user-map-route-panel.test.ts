@@ -49,7 +49,7 @@ describe("progressive trip planning and editing", () => {
     const styles = css(sheet, "PointRouteSheet.vue");
     expect(styles).toContain('section.point-route-shell[data-v-route-panel] { position: fixed; z-index: 7');
     expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto');
-    expect(styles).toContain('max-height: min(52dvh, 27rem)');
+    expect(styles).toContain('max-height: min(52dvh, 27rem, max(7rem, calc(100dvh - 17rem');
     expect(styles).toContain('overflow-y: auto');
     expect(styles).toContain('min-height: 44px');
   });
@@ -93,7 +93,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('estimateRemainingRouteSeconds(');
     const styles = css(map, "UserMapView.vue");
     expect(styles).toContain('.user-map-view__journey-stack[data-v-route-panel] { position: fixed;');
-    expect(styles).toContain('max-height: min(72dvh, 36rem)');
+    expect(styles).toContain('max-height: min(72dvh, 36rem, max(7rem, calc(100dvh - 12.25rem');
     expect(styles).toContain('width: min(36rem, calc(100vw - 1.5rem))'); // Desktop card stays within viewport.
     expect(styles).toContain('width: min(30rem, calc(100vw - 7.5rem'); // Tablet SOS rail stays reachable.
     expect(styles).toContain('grid-template-columns: minmax(0, 1.35fr) repeat(2, minmax(0, 1fr))');
@@ -220,6 +220,30 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('overflow-y: auto'); // Landscape keeps full-size buttons scrollable.
   });
 
+  it("caps all phone trip and guidance cards before they push SOS into the workspace tabs", () => {
+    const clearance = 'max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))';
+    for (const [component, filename] of [[sheet, "PointRouteSheet.vue"],
+      [choices, "PointRouteChoicesSheet.vue"], [transport, "PointTransportChoicesSheet.vue"]] as const) {
+      expect(css(component, filename)).toContain(clearance);
+    }
+    expect(css(sheet, "PointRouteSheet.vue")).toContain('max-height: min(40rem, ' + clearance);
+    expect(css(map, "UserMapView.vue")).toContain('max-height: min(72dvh, 36rem, max(7rem, calc(100dvh - 12.25rem');
+    expect(shell).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem');
+    expect(shell).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem');
+    // At 430px even the old 52dvh/62dvh caps would put SOS offscreen. The
+    // new cap leaves the 48px target below the 4.5rem top-tab corridor.
+    for (const height of [430, 568, 667]) {
+      const available = Math.max(7 * 16, height - 17 * 16);
+      for (const card of [Math.min(.52 * height, 27 * 16, available),
+        Math.min(62 / 100 * height, 32 * 16, available), Math.min(40 * 16, available)]) {
+        expect(height - card - 9.5 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
+      }
+      const guidance = Math.min(.72 * height, 36 * 16, Math.max(7 * 16, height - 12.25 * 16));
+      // Navigation measurement includes the card's .75rem bottom offset.
+      expect(height - guidance - .75 * 16 - 4 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
+    }
+  });
+
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
     const hold = map.slice(map.indexOf('function attachHold('), map.indexOf('const pointer = (event: PointerEvent)', map.indexOf('function attachHold(')));
     expect(hold).toContain('if (!auth.user?.id || missionActive.value || mode.value === "missions" || journey.navigating.value || map.value !== instance) return;');
@@ -311,7 +335,7 @@ describe("progressive trip planning and editing", () => {
     expect(styles).toContain('section.point-transport-choices-shell[data-v-route-panel] { left: calc(.75rem + env(safe-area-inset-left, 0px));');
     expect(styles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
     expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto');
-    expect(styles).toContain('max-height: min(62dvh, 32rem)');
+    expect(styles).toContain('max-height: min(62dvh, 32rem, max(7rem, calc(100dvh - 17rem');
     expect(styles).toContain('overflow-y: auto'); // Full-size footer is reachable on short phones.
   });
 

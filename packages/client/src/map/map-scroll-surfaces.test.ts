@@ -40,14 +40,16 @@ describe("map workspace scroll ownership", () => {
 
   it("keeps trip options and confirmation reachable without a seven-rem phone viewport", () => {
     const trip = style(point, "PointRouteSheet.vue");
-    expect(trip).toContain('.point-route-shell--expanded .point-route.bb-map-navigation-card {\n    max-height: min(40rem, calc(100dvh - 10.25rem');
+    expect(trip).toContain('.point-route-shell--expanded .point-route.bb-map-navigation-card {\n    max-height: min(40rem, max(7rem, calc(100dvh - 17rem');
     expect(trip).toContain('.point-route__content { overflow-y: auto;');
+    expect(trip).toContain('.point-route__content { flex: none; overflow: visible; }');
+    expect(trip).toContain('overflow-y: auto; /* One scroll surface when the header and footer alone fill the card. */');
     for (const [sfc, filename, list] of [
       [routes, "PointRouteChoicesSheet.vue", ".point-route-choices__list"],
       [transport, "PointTransportChoicesSheet.vue", ".point-transport-choices__list"]
     ]) {
       const css = style(sfc, filename);
-      expect(css).toContain('max-height: max(7rem, calc(100dvh - 10.25rem');
+      expect(css).toContain('max-height: max(7rem, calc(100dvh - 17rem');
       expect(css).toContain(`${list} { flex: none; overflow-y: visible; }`); // Short phones: outer card only.
       expect(css).toContain('overflow-y: auto; }');
     }

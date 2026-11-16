@@ -301,20 +301,23 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
   section.point-route-shell { left: calc(.75rem + env(safe-area-inset-left, 0px));
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
+  /* The two-row SOS/Search rail needs 17rem above the sheet: 9.5rem SOS
+     offset, 3rem hit area and 4.5rem for the workspace tabs. Scroll the card
+     instead of pushing emergency actions behind the tabs on short phones. */
   .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important;
-    max-height: min(52dvh, 27rem); }
-  /* Point sharing stays compact; the longer travel plan gets the available
-     space between the map controls and SOS instead of a 52vh scroll slot. */
+    max-height: min(52dvh, 27rem, max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   .point-route-shell--expanded .point-route.bb-map-navigation-card {
-    max-height: min(40rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(40rem, max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
   }
   .point-route__header, .point-route__endpoints, .point-route__choices, .point-route__metrics, .point-route__actions {
     padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
   .point-route.bb-map-navigation-card {
-    max-height: max(7rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: max(7rem, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto; /* One scroll surface when the header and footer alone fill the card. */
   }
+  .point-route__content { flex: none; overflow: visible; }
 }
 
 /* The route actions and metrics must read as separate controls on a dark card. */

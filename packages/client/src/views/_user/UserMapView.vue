@@ -2626,7 +2626,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__journey-stack { left: calc(.75rem + env(safe-area-inset-left, 0px));
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     transform: none; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); width: auto; }
-  .user-map-view__journey-content.bb-map-navigation-card { max-height: min(72dvh, 36rem);
+  /* Measurement includes the card's .75rem bottom offset; reserve another
+     11.5rem for SOS, Search and the top tabs before capping its height. */
+  .user-map-view__journey-content.bb-map-navigation-card {
+    max-height: min(72dvh, 36rem, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
     padding: .65rem .75rem;
     border-radius: var(--bb-radius-card, 24px) !important; }
   /* Keep three named, glanceable values in one row. The full GPS/ETA caveats
