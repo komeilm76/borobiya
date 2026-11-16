@@ -283,7 +283,6 @@
         <v-card-text>
           <bdi dir="auto">{{ pendingMissionStop?.name }}</bdi> فقط به‌عنوان ایستگاه میانی افزوده می‌شود؛ محل حادثه مقصد نهایی می‌ماند.
           <p v-if="missionActive" class="mt-2">اگر راهبری فعال باشد، برای ویرایش مسیر متوقف می‌شود.</p>
-          <p v-else role="status" class="mt-2">برای افزودن ایستگاه ابتدا یک مأموریت را بپذیرید.</p>
           <p v-if="missionActive && !missionShare.mission" role="status" class="mt-2">در انتظار تأیید مأموریت از سرور؛ مسیر تغییر نمی‌کند.</p>
           <p v-if="missionStopError" role="alert" class="text-error">{{ missionStopError }}</p>
         </v-card-text>
@@ -1407,7 +1406,10 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   if (isPhone.value && activeTool.value === "search") closeTool(false);
   removeSelectedCompanion();
   if (missionActive.value || mode.value === "missions") {
-    // The same search result is a proposed stop, never an incident replacement.
+    // With no assignment, Search is still useful for exploring the shared map;
+    // do not open a waypoint confirmation whose action cannot be taken.
+    if (!missionActive.value && !missionShare.mission) return;
+    // A search result can only propose a stop, never replace the incident.
     // An explicit confirmation controls every mutation of the mission route.
     pendingMissionStop.value = place;
     missionStopError.value = null;

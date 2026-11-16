@@ -67,8 +67,8 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('if (!navigation.active.value) frameMissionRoute();');
     expect(view).toContain('map.on("movestart", onMissionMapMove);');
     expect(view).toContain('map.off("movestart", onMissionMapMove);');
-    expect(view).toContain('if (event.originalEvent) pauseGuidanceFollow();');
-    expect(view).toContain('if (followingGps.value) routeMap?.easeTo(camera);');
+    expect(view).toContain('if (props.visible && event.originalEvent) pauseGuidanceFollow();');
+    expect(view).toContain('if (props.visible && followingGps.value) routeMap?.easeTo(camera);');
     expect(view).toContain('followingGps.value = true; // Never carry a paused camera into another mission/watch.');
     expect(view).toContain('navigation.recenter(); // A fresh fix recenters now; otherwise await the next GPS sample.');
     expect(view).toContain('color: followingGps.value ? "primary" : "warning"');

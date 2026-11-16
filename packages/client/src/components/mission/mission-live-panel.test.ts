@@ -38,7 +38,7 @@ describe("three-role mission live UI (T3.5.7)", () => {
   it("preserves a manually panned room camera when a new member begins sharing", () => {
     const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
     expect(panel).toContain('instance.on("movestart", onMove);');
-    expect(panel).toContain('if (event.originalEvent) cameraIntent.noteGesture();');
+    expect(panel).toContain('if (props.visible && event.originalEvent) cameraIntent.noteGesture();');
     expect(panel).toContain('detachCameraGesture = () => instance.off("movestart", onMove);');
     expect(panel).toContain('detachCameraGesture?.();\n  detachCameraGesture = null;');
     expect(panel).toContain('cameraIntent.shouldAutoFrame(props.routeActive)');

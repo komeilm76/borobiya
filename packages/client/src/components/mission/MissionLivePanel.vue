@@ -129,10 +129,10 @@ import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 
 const props = withDefaults(defineProps<{
   mission: LiveMissionIdentity; center?: [number, number]; routeActive?: boolean;
-  fullscreen?: boolean; roomOpen?: boolean;
+  fullscreen?: boolean; roomOpen?: boolean; visible?: boolean;
   externalCanvas?: boolean; externalMap?: MapLibreMap | null; externalMarker?: typeof Marker | null;
 }>(), {
-  center: () => [51.4, 35.7], routeActive: false, fullscreen: false, roomOpen: false
+  center: () => [51.4, 35.7], routeActive: false, fullscreen: false, roomOpen: false, visible: true
 });
 const emit = defineEmits<{
   ready: [map: MapLibreMap, marker: typeof Marker];
@@ -177,6 +177,9 @@ function clearMarkers(): void {
   }
 }
 function syncMarkers(): void {
+  // A hidden mission stays subscribed for safety, but its DOM markers live in
+  // the shared MapCanvas, outside the v-show-hidden mission subtree.
+  if (!props.visible) { clearMarkers(); return; }
   const instance = map.value;
   const MarkerClass = markerConstructor;
   if (!instance || !MarkerClass) return;
@@ -201,7 +204,7 @@ function syncMarkers(): void {
   }
 }
 function focusMembers(userInitiated = false) {
-  if (!map.value) return;
+  if (!props.visible || !map.value) return;
   const camera = missionLiveCamera(Object.values(live.locations.value).filter((entry) => entry != null));
   if (!camera) return;
   if (userInitiated) {
@@ -214,7 +217,7 @@ function focusMembers(userInitiated = false) {
 }
 function focusMember(role: Role): void {
   const center = freshMissionMemberCamera(live.participantStatus.value, role);
-  if (!center || !map.value) return;
+  if (!props.visible || !center || !map.value) return;
   cameraIntent.noteGesture(); // Do not auto-frame a later peer over the selected member.
   emit("camera-selected"); // An intentional selection suspends route GPS follow.
   if (props.fullscreen) emit("close-room"); // The sheet otherwise covers the centered marker on phones.
@@ -225,7 +228,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
     clearMarkers();
     detachCameraGesture?.();
     cameraIntent.reset();
-    const onMove = (event: MapMovementEvent) => { if (event.originalEvent) cameraIntent.noteGesture(); };
+    const onMove = (event: MapMovementEvent) => { if (props.visible && event.originalEvent) cameraIntent.noteGesture(); };
     instance.on("movestart", onMove);
     detachCameraGesture = () => instance.off("movestart", onMove);
   }
@@ -233,8 +236,12 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
   map.value = instance;
   syncMarkers();
   emit("ready", instance, MarkerClass);
-  if (!props.routeActive) focusMembers();
+  if (props.visible && !props.routeActive) focusMembers();
 }
+watch(() => props.visible, (visible) => {
+  syncMarkers(); // Never leave mission-member pins in the Sharing workspace.
+  if (visible && !props.routeActive) { cameraIntent.reset(); frameRoom(); }
+}, { flush: "sync" });
 // When embedded in the map workspace the parent owns MapCanvas. The room owns
 // only its private markers/listeners, and never creates a second WebGL context.
 watch(() => [props.externalMap, props.externalMarker] as const, ([instance, MarkerClass]) => {
@@ -245,6 +252,7 @@ watch(() => [props.externalMap, props.externalMarker] as const, ([instance, Mark
   }
 }, { immediate: true, flush: "post" });
 function frameRoom(): void {
+  if (!props.visible) return;
   if (hasMarkers.value) focusMembers();
   // Never leave the camera on a withdrawn participant's last known position.
   else map.value?.easeTo({ center: props.center, zoom: 13, duration: 350 });
@@ -252,6 +260,7 @@ function frameRoom(): void {
 // Live room updates can change markers, but must not steal the camera from
 // active route planning/guidance or an explicitly explored part of the map.
 watch(presentRoles, (next, previous) => {
+  if (!props.visible) return;
   if (next === "" && previous && !props.routeActive) {
     // A withdrawn final fix is a privacy boundary, even if someone moved the camera.
     cameraIntent.reset();

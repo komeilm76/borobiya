@@ -1,10 +1,5 @@
 <template>
   <section class="mission-map-cards" dir="rtl" aria-label="پیشرفت مأموریت">
-    <div v-if="desk.nextStatus.value && !desk.terminalHold.value" class="mission-desk__next-step" aria-label="اقدام بعدی مأموریت">
-      <span>اقدام بعدی · با تأیید شما</span>
-      <v-btn color="primary" variant="flat" rounded="lg" :loading="desk.progressing.value"
-        :disabled="!desk.canAdvance.value" @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
-    </div>
     <p v-if="desk.loading.value" role="status" class="mission-map-cards__notice">در حال تأیید وضعیت از سرور؛ تغییر مرحله متوقف است.</p>
     <v-alert v-if="desk.progressError.value || desk.error.value || desk.cancellationNeedsRefresh.value"
       type="warning" variant="tonal" rounded="lg" role="alert">
@@ -46,7 +41,11 @@
         </li>
       </ol>
     </div>
-
+    <div v-if="desk.nextStatus.value && !desk.terminalHold.value" class="mission-desk__next-step" aria-label="اقدام بعدی مأموریت">
+      <span>اقدام بعدی · با تأیید شما</span>
+      <v-btn color="primary" variant="flat" rounded="lg" :loading="desk.progressing.value"
+        :disabled="!desk.canAdvance.value" @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
+    </div>
   </section>
 </template>
 
@@ -93,4 +92,11 @@ defineProps<{
 .mission-desk__phase-label { min-width: 0; overflow-wrap: anywhere; }
 .mission-desk__phase-now { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
 .mission-map-cards__more { flex: none; min-width: 44px; min-height: 44px; }
+@media (max-width: 599px) and (max-height: 560px) {
+  /* Keep the manual, server-guarded action in reach while the single card
+     scrolls. Stages come first, rather than hiding behind the button. */
+  .mission-desk__next-step { position: sticky; bottom: 0; z-index: 1;
+    padding-top: .25rem; background: rgb(var(--v-theme-surface)); }
+  .mission-desk__phase-step { min-height: 25px; }
+}
 </style>

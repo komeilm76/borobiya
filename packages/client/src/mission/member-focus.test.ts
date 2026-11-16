@@ -27,7 +27,7 @@ describe("full-screen mission member focus", () => {
     expect(panel).toContain('freshMissionMemberCamera(live.participantStatus.value, role)');
     expect(panel).toContain('cameraIntent.noteGesture();');
     expect(panel).toContain('emit("camera-selected");');
-    expect(panel).toContain('if (!center || !map.value) return;');
+    expect(panel).toContain('if (!props.visible || !center || !map.value) return;');
     expect(panel).toContain('if (props.fullscreen) emit("close-room"); // The sheet otherwise covers the centered marker on phones.');
     expect(panel).toContain('if (props.fullscreen) emit("close-room"); // Reveal the points rather than covering them with the sheet.');
     expect(panel).toContain('v-if="fullscreen" class="live-panel__presence-details"');

@@ -52,7 +52,7 @@
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
-          :external-canvas="embedded" :external-map="externalMap" :external-marker="externalMarker"
+          :visible="visible" :external-canvas="embedded" :external-map="externalMap" :external-marker="externalMarker"
           :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady"
           @close-room="closeTool('team')" @sharing-change="teamSharing = $event"
           @mission-ended="onMissionEnded" @camera-selected="pauseGuidanceFollow">
@@ -616,8 +616,8 @@ function onRouteMapClick(event: MapMouseEvent): void {
 
 const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
-  (camera) => { if (followingGps.value) routeMap?.easeTo(camera); }, undefined,
-  () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
+  (camera) => { if (props.visible && followingGps.value) routeMap?.easeTo(camera); }, undefined,
+  () => { if (props.visible) routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }); });
 // Before guidance, the button calls the map owner's PRIVATE recenter/retry;
 // during guidance it resumes the mission's own GPS camera without a new watcher.
 const ownFocus = computed(() => {
@@ -671,7 +671,7 @@ function pauseGuidanceFollow(): void {
 function onMissionMapMove(event: MapMovementEvent): void {
   // MapLibre camera animations have no originalEvent; only a person's drag,
   // wheel or zoom-control action suspends follow, as on /_user/map.
-  if (event.originalEvent) pauseGuidanceFollow();
+  if (props.visible && event.originalEvent) pauseGuidanceFollow();
 }
 function resumeGuidanceFollow(): void {
   if (!navigation.active.value) return;
@@ -681,7 +681,7 @@ function resumeGuidanceFollow(): void {
 function frameMissionRoute(): void {
   const map = routeMap;
   const incident = routing.visible.value ? routing.target.value?.incident : null;
-  if (!map || !incident) return;
+  if (!props.visible || !map || !incident) return;
   pauseGuidanceFollow();
   const camera = missionMapCamera(incident, routing.from.value, routing.via.value,
     routing.selectedRoute.value ? routeSnapshot.value.bounds : null);
@@ -712,7 +712,9 @@ function clearRouteOverlays(removeLayer = true): void {
 function syncRouteMap(): void {
   const map = routeMap;
   const MarkerClass = markerConstructor;
-  const incident = routing.visible.value ? routing.target.value?.incident : null;
+  // The route state and GPS watch survive a switch to Sharing, but its private
+  // pins and line belong only to the Missions tab on the shared MapCanvas.
+  const incident = props.visible && routing.visible.value ? routing.target.value?.incident : null;
   clearRouteOverlays(!incident);
   if (!map || !incident || !MarkerClass) return;
   waypointMarkers = routing.via.value.map((point, index) => {
@@ -742,9 +744,13 @@ function syncRouteMap(): void {
   if (!navigation.active.value) frameMissionRoute();
   applyRouteLayer();
 }
+watch(() => props.visible, (visible) => {
+  syncRouteMap(); // Remove/recreate DOM pins and the private line at the tab boundary.
+  if (visible && navigation.active.value && followingGps.value) navigation.recenter();
+}, { flush: "sync" });
 function applyRouteLayer(): void {
   const map = routeMap;
-  if (!map || !map.isStyleLoaded()) return;
+  if (!props.visible || !map || !map.isStyleLoaded()) return;
   try {
     const source = map.getSource(ROUTE_SOURCE) as GeoJSONSource | undefined;
     if (source) source.setData(routeSnapshot.value.data);
@@ -755,7 +761,7 @@ function applyRouteLayer(): void {
 }
 function restoreRouteLayer(): void {
   const map = routeMap;
-  if (!map || !routing.visible.value || !routing.target.value || !needsOverlayRestore({
+  if (!props.visible || !map || !routing.visible.value || !routing.target.value || !needsOverlayRestore({
     styleLoaded: Boolean(map.isStyleLoaded()),
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
@@ -1313,6 +1319,21 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
+  /* The map cannot fit a full-width progress list, legend and bottom controls
+     in 430px. Give the steps a real scroll surface beside a narrow, independently
+     readable key; neither surface covers the bottom camera/SOS/dock row. */
+  .mission-desk__map-cards {
+    top: calc(4.25rem + env(safe-area-inset-top, 0px));
+    bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
+    width: min(18rem, calc(100vw - 12.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: none;
+  }
+  .mission-desk__map-legend {
+    width: min(7rem, calc(100vw - 13rem));
+    max-height: calc(100dvh - 10rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  .mission-desk__map-legend-body { grid-template-columns: minmax(0, 1fr); }
   /* The always-visible stages replace the duplicate heading on short phones.
      Keep its Team button in the narrow top-right lane, clear of the progress
      surface (which ends 4.25rem from the right) and the network button. */

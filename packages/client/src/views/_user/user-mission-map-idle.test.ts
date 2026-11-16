@@ -53,7 +53,7 @@ describe("mission map style restoration", () => {
     expect(close).toContain('clearRouteOverlays();');
     expect(close).not.toContain('detachRouteMap?.()');
     expect(close).not.toContain('mapReady.value = false');
-    expect(view).toContain('if (!map || !routing.visible.value || !routing.target.value || !needsOverlayRestore({');
+    expect(view).toContain('if (!props.visible || !map || !routing.visible.value || !routing.target.value || !needsOverlayRestore({');
     expect(view).toContain('if (routeMap?.getLayer(ROUTE_LAYER)) routeMap.removeLayer(ROUTE_LAYER);');
     expect(view).toContain('if (routeMap?.getSource(ROUTE_SOURCE)) routeMap.removeSource(ROUTE_SOURCE);');
     expect(view).toContain('map.on("click", onRouteMapClick);');
