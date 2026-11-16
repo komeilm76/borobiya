@@ -10,7 +10,7 @@ Pixel-diff gates would either block every intentional redesign or rubber-stamp r
 
 The captures and the harness are generated review aids. They are committed so a reviewer can compare implementation against reference without running anything (mirroring how `design/` carries the references); their dependency tree is not:
 
-- `docs/visual-acceptance/screens/` — one `<reference-id>-impl.png` per canonical reference exercised in a capture run (92 captures).
+- `docs/visual-acceptance/screens/` — one `<reference-id>-impl.png` per canonical reference exercised in a capture run, plus five `dark-*` aid shots (97 captures).
 - `scripts/visual-acceptance/` — the capture harness (Node, `puppeteer-core` over `@sparticuz/chromium`), pinned by `package.json`. `scenarios.json` is the machine-readable capture plan keyed by reference id: route, persona, viewport and DPR, an ordered list of input steps (click, clickAt, clickText, type, upload, hold, hover, offline, dark, network latency, wait, clip), and optional per-scenario or per-shot viewport clips for transient states. `node_modules/` inside it is gitignored; nothing under it ships to production.
 
 Regenerating the evidence requires no credentials — the demo bundle is the only requirement.
@@ -57,6 +57,8 @@ Four more captures were added on 2026-11-16, produced against the demo bundle wi
 - `admin-states/03-error` — the users console with `?fail=admin` (shared inline `AdminInlineError` panel with retry; mock copy stands in for the server's). The designed full-screen error composition is not built.
 
 All four rows remain `partial` in `docs/DESIGN_MATRIX.md`; no row was flipped to `done` and the human P5 review remains the approval gate.
+
+Five further captures document the dark theme (`dark-map-idle`, `dark-sos-compose`, `dark-history`, `dark-sharing`, `dark-admin-overview`), taken with `prefers-color-scheme: dark` via the harness's `darkStart` flag. They exist to show that the dark surfaces render coherently (legible chrome, readable sheets and tables, visible accents); no dark-theme row was flipped, and they are aids, not acceptance evidence. The map tiles themselves are deterministic SVG tiles and render light regardless of theme. A reduced-motion capture pass was not produced (the harness has no `prefers-reduced-motion` emulation yet); the reduced-motion contract is enforced by the motion layer itself, which zeroes durations under the media query.
 
 ## Maintenance contract
 
