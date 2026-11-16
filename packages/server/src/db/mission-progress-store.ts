@@ -1,9 +1,9 @@
 import { and, asc, count, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
-import type { Mission, MissionPresence, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail, MissionRatingInput } from "@borobiya/shared";
+import type { Mission, MissionPresence, MissionNavigationTarget, MissionBrief, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail, MissionRatingInput } from "@borobiya/shared";
 import { readCancellationReason } from "./cancellation-detail";
 import type { Database } from "./client";
 import { PRESENCE_STALE_MS } from "../realtime/presence";
-import { missions, missionRatings, missionStatusHistory, sosRequests, userSessions, users } from "./schema";
+import { incidentTypes, missions, missionRatings, missionStatusHistory, sosRequests, userSessions, users } from "./schema";
 
 const NEXT_STATUS: Partial<Record<MissionStatus, MissionProgressStatus>> = {
   pending: "on_the_way",
@@ -23,6 +23,7 @@ export type MissionRatingResult = "rated" | "not_found" | "not_completed" | "alr
 export interface MissionProgressStore {
   findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null>;
   findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null>;
+  findBrief?(id: string, rescuerId: string): Promise<MissionBrief | null>;
   findActiveMissionPresence?(id: string, userId: string, role: "admin" | "user"): Promise<MissionPresence | null>;
   listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number, sosRequestId?: string): Promise<{
     items: Mission[]; total: number; page: number; limit: number; totalPages: number
@@ -103,6 +104,26 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
         lastSeenAt: last?.toISOString() ?? null };
     };
     return { missionId: id, requester: describe(row.requesterId), rescuer: describe(row.rescuerId) };
+  }
+
+  async findBrief(id: string, rescuerId: string): Promise<MissionBrief | null> {
+    // Authorization is in SQL; a foreign, expired or terminal mission exposes no incident data.
+    const [row] = await this.db.select({
+      missionId: missions.id, sosRequestId: sosRequests.id,
+      requesterName: users.username, incidentTypeName: incidentTypes.name,
+      description: sosRequests.description, photoUrl: sosRequests.photoUrl,
+      lat: sql<number>`ST_Y(${sosRequests.location}::geometry)::float8`,
+      lon: sql<number>`ST_X(${sosRequests.location}::geometry)::float8`
+    }).from(missions)
+      .innerJoin(sosRequests, eq(sosRequests.id, missions.sosRequestId))
+      .innerJoin(users, eq(users.id, missions.requesterId))
+      .innerJoin(incidentTypes, eq(incidentTypes.id, sosRequests.incidentTypeId))
+      .where(and(eq(missions.id, id), eq(missions.rescuerId, rescuerId),
+        inArray(missions.status, ACTIVE_STATUSES))).limit(1);
+    return row ? { missionId: row.missionId, sosRequestId: row.sosRequestId,
+      requesterName: row.requesterName, incidentTypeName: row.incidentTypeName,
+      description: row.description, incident: { lat: row.lat, lon: row.lon },
+      hasPhoto: Boolean(row.photoUrl) } : null;
   }
 
   async findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null> {

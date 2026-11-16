@@ -112,6 +112,20 @@ export async function registerMissionProgressRoutes(
     return response.code(200).send(presence);
   });
 
+  const briefRoute = apiRoutes.sos.getMissionBrief;
+  app.get(briefRoute.url, async (request, reply) => {
+    const response = reply.header("cache-control", "no-store");
+    const user = request.authenticatedUser;
+    if (!user) return response.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const params = briefRoute.schema.params.safeParse(request.params);
+    const brief = params.success && user.role === "user"
+      ? await store.findBrief?.(params.data.id, user.userId) : null;
+    if (!brief) return response.code(404).send({
+      error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: []
+    });
+    return response.code(200).send(brief);
+  });
+
   const navigationRoute = apiRoutes.sos.getMissionNavigationTarget;
   app.get(navigationRoute.url, async (request, reply) => {
     const response = reply.header("cache-control", "no-store");

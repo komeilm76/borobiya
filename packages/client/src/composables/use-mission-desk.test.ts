@@ -522,10 +522,11 @@ describe("mission desk cancellation", () => {
 describe("rescuer mission progression", () => {
   it("exposes an explicit accessible next-step control and error/refresh state without mounting the view", () => {
     const view = readFileSync(new URL("../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
-    expect(view).toContain('desk.nextStatus.value');
-    expect(view).toContain('desk.advanceStatus()');
-    expect(view).toContain(':loading="desk.progressing.value"');
-    expect(view).toContain(':disabled="!desk.canAdvance.value"');
+    const cards = readFileSync(new URL("../components/mission/MissionMapCards.vue", import.meta.url), "utf8");
+    expect(cards).toContain('desk.nextStatus.value');
+    expect(cards).toContain('desk.advanceStatus()');
+    expect(cards).toContain(':loading="desk.progressing.value"');
+    expect(cards).toContain(':disabled="!desk.canAdvance.value"');
     expect(view).toContain('desk.progressError.value');
     expect(view).toContain('role="alert"');
   });

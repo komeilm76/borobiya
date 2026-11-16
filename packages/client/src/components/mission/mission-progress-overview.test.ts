@@ -4,6 +4,8 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 
 const page = readFileSync(new URL("../../views/_user/UserMissionView.vue", import.meta.url), "utf8");
 const panel = readFileSync(new URL("./MissionStatusPanel.vue", import.meta.url), "utf8");
+const cards = readFileSync(new URL("./MissionMapCards.vue", import.meta.url), "utf8");
+const info = readFileSync(new URL("./MissionBriefDetails.vue", import.meta.url), "utf8");
 
 // Source-pinned by design: docs/TASKS.md prohibits mounting Vue components in unit tests.
 describe("at-a-glance mission progress", () => {
@@ -23,53 +25,42 @@ describe("at-a-glance mission progress", () => {
     expect(dock.match(/<button\b/g)).toHaveLength(2);
   });
 
-  it("shows verified progress and the guarded manual next action before optional history and explanation", () => {
-    expect(panel).toContain('<ol class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">');
-    expect(panel.match(/v-for="\(step, index\) in steps"/g)).toHaveLength(1);
-    expect(panel).toContain(':aria-current="index === activeStep ? \'step\' : undefined"');
-    expect(panel).toContain('index < activeStep');
-    expect(panel).toContain('index === activeStep');
-    expect(panel).toContain('activeStep >= 0 ?');
-    expect(panel).toContain('نمایش شناسهٔ پیگیری');
-    expect(panel).not.toContain('نمایش همهٔ مراحل و شناسهٔ مأموریت');
-    expect(panel).not.toContain('class="mission-steps"');
-    expect(panel).toContain('v-if="desk.nextStatus.value && !desk.terminalHold.value" class="mission-desk__next-step"');
-    expect(panel.indexOf('class="mission-desk__next-step"')).toBeLessThan(panel.indexOf('<ol class="mission-desk__phase-steps"'));
-    expect(panel.indexOf('<ol class="mission-desk__phase-steps"')).toBeLessThan(panel.indexOf('<details class="mission-desk__timeline">'));
-    expect(panel).toContain(':disabled="!desk.canAdvance.value"');
-    expect(panel).toContain('@click="desk.advanceStatus()"');
+  it("moves the only step list and guarded action onto the map without losing status warnings", () => {
+    expect(page).toContain('class="mission-desk__map-cards"');
+    expect(page).toContain('<MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep"');
+    expect(cards).toContain('<ol class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">');
+    expect(cards.match(/v-for="\(step, index\) in steps"/g)).toHaveLength(1);
+    expect(cards).toContain(':aria-current="index === activeStep ? \'step\' : undefined"');
+    expect(cards).toContain('v-if="desk.nextStatus.value && !desk.terminalHold.value"');
+    expect(cards).toContain(':disabled="!desk.canAdvance.value"');
+    expect(cards).toContain('@click="desk.advanceStatus()"');
+    expect(panel).not.toContain('class="mission-desk__next-step"');
+    expect(panel).not.toContain('class="mission-desk__phase-summary"');
     expect(panel).toContain('desk.cancellationNeedsRefresh.value');
     expect(panel).toContain('desk.showCancellation()');
     expect(panel).toContain('v-if="!teamSharing" class="mission-desk__sharing" role="status"');
-    expect(panel).toContain('اشتراک موقعیت مأموریت برقرار نشده');
-    expect(panel).toContain('هشدار اتصال یا اجازهٔ GPS را بررسی کنید.');
-    for (const redundant of [
-      'تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.',
-      'اشتراک موقعیت مأموریت برقرار است',
-      'برای این مأموریت به‌صورت خودکار فعال است.',
-      'لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.'
-    ]) {
-      expect(panel).not.toContain(redundant);
-    }
+    expect(panel).toContain('<MissionBriefDetails :mission-id="desk.activeMission.value?.id ?? \'\'" />');
+    expect(info).toContain('<summary>اطلاعات مأموریت</summary>');
+    expect(info).toContain('getMissionBrief(token, id, controller.signal)');
+    expect(info).toContain('getSosPhotoSrc(id, token)');
     expect(panel).toContain('aria-controls="mission-route-panel"');
     expect(panel).toContain('title="قادر به ادامه نیستم"');
-    expect(panel).toContain('grid-template-columns: 28px minmax(0, 1fr) auto;'); // Labels wrap in a single column at 28rem.
-    expect(panel).toContain('class="mission-desk__tracking-id"');
   });
 
   it("keeps a compact header and readable progress indicators at narrow widths in both themes", () => {
     const viewStyle = parse(page, { filename: "UserMissionView.vue" }).descriptor.styles[0]!.content;
+    const cardStyle = parse(cards, { filename: "MissionMapCards.vue" }).descriptor.styles[0]!.content;
     const panelStyle = parse(panel, { filename: "MissionStatusPanel.vue" }).descriptor.styles[0]!.content;
-    for (const [filename, css] of [["UserMissionView.vue", viewStyle], ["MissionStatusPanel.vue", panelStyle]] as const) {
+    const infoStyle = parse(info, { filename: "MissionBriefDetails.vue" }).descriptor.styles[0]!.content;
+    for (const [filename, css] of [["UserMissionView.vue", viewStyle], ["MissionStatusPanel.vue", panelStyle],
+      ["MissionMapCards.vue", cardStyle], ["MissionBriefDetails.vue", infoStyle]] as const) {
       expect(compileStyle({ filename, id: "data-v-mission-brief", scoped: true, source: css }).errors).toEqual([]);
     }
-    expect(viewStyle).toContain('.mission-desk__status-trigger:focus-visible');
-    expect(viewStyle).toContain('.mission-desk__stage-track');
-    expect(viewStyle).toContain('max-width: calc(100vw - 7rem);');
-    expect(panelStyle).toContain('.mission-desk__phase-steps');
-    expect(panelStyle).toContain('.mission-desk__phase-step--current');
-    expect(panelStyle).toContain('.mission-desk__phase-step--passed:not(:last-child)::after');
-    expect(panelStyle).toContain('background: rgb(var(--v-theme-primary));');
-    expect(panelStyle).toContain('background: var(--bb-color-inset);');
+    expect(viewStyle).toContain('.mission-desk__map-cards { position: absolute;');
+    expect(viewStyle).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
+    expect(viewStyle).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(cardStyle).toContain('.mission-desk__phase-steps');
+    expect(cardStyle).toContain('.mission-desk__phase-step--current');
+    expect(infoStyle).toContain('.mission-brief__body');
   });
 });

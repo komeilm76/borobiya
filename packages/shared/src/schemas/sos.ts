@@ -136,6 +136,18 @@ export const missionNavigationTargetSchema = z.strictObject({
 });
 export type MissionNavigationTarget = z.infer<typeof missionNavigationTargetSchema>;
 
+/** Private incident briefing for the assigned rescuer while the mission is active. */
+export const missionBriefSchema = z.strictObject({
+  missionId: idSchema,
+  sosRequestId: idSchema,
+  requesterName: usernameSchema,
+  incidentTypeName: z.string(),
+  description: z.string(),
+  incident: coordinatesSchema,
+  hasPhoto: z.boolean()
+});
+export type MissionBrief = z.infer<typeof missionBriefSchema>;
+
 /** Transport presence only. Neither value implies the person is sharing GPS or physically safe. */
 export const missionPresenceSchema = z.strictObject({
   missionId: idSchema,

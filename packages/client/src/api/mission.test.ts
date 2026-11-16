@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { advanceRescuerMission, getMission, listRescuerMissions, rateMission } from "./mission";
+import { advanceRescuerMission, getMission, getMissionBrief, listRescuerMissions, rateMission } from "./mission";
 
 const id = "30000000-0000-4000-8000-000000000003";
 afterEach(() => vi.unstubAllGlobals());
@@ -25,6 +25,23 @@ describe("mission rating API client", () => {
       cancellationReason: null, rating: 3
     }))));
     expect((await getMission("token", id)).rating).toBe(3);
+  });
+});
+
+describe("private active-mission brief", () => {
+  it("validates the scoped reply and rejects a brief for a different mission", async () => {
+    const brief = { missionId: id, sosRequestId: id, requesterName: "requester",
+      incidentTypeName: "امداد", description: "کمک در محل حادثه", incident: { lat: 35.7, lon: 51.4 }, hasPhoto: false };
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(brief)));
+    vi.stubGlobal("fetch", fetcher);
+    expect(await getMissionBrief("token", id)).toEqual(brief);
+    const [path, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(path).toBe(`/api/_user/sos/missions/${id}/brief`);
+    expect(init.cache).toBe("no-store");
+    expect(init.credentials).toBe("same-origin");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer token");
+    fetcher.mockImplementationOnce(async () => new Response(JSON.stringify({ ...brief, missionId: "60000000-0000-4000-8000-000000000006" })));
+    await expect(getMissionBrief("token", id)).rejects.toThrow("MISSION_BRIEF_MISMATCH");
   });
 });
 

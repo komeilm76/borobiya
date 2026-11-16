@@ -4,6 +4,7 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 
 const view = readFileSync(new URL("../../views/_user/UserMissionView.vue", import.meta.url), "utf8");
 const status = readFileSync(new URL("./MissionStatusPanel.vue", import.meta.url), "utf8");
+const cards = readFileSync(new URL("./MissionMapCards.vue", import.meta.url), "utf8");
 
 // No Vue component mounting in unit tests (docs/TASKS.md).
 describe("mission map workspace", () => {
@@ -16,7 +17,8 @@ describe("mission map workspace", () => {
     const { descriptor } = parse(status, { filename: "MissionStatusPanel.vue" });
     const style = compileStyle({ source: descriptor.styles[0]!.content, filename: "MissionStatusPanel.vue", id: "data-v-mission-status", scoped: true });
     expect(style.errors).toEqual([]);
-    expect(style.code).toContain(".mission-desk__phase-step");
+    expect(style.code).toContain(".mission-desk__card-header");
+    expect(cards).toContain('.mission-desk__phase-step');
   });
   it("separates plan, transport and alternatives; only explicit acceptance commits a preview", () => {
     expect(view).toContain('routeWorkspace.openTransport()');
@@ -39,7 +41,7 @@ describe("mission map workspace", () => {
     expect(view).toContain('if (navigation.active.value || !routing.target.value) return;');
     expect(view).toContain('routing.clearPlan();');
     expect(status).toContain('desk.showCancellation()');
-    expect(status).toContain('desk.advanceStatus()');
-    expect(status).toContain(':disabled="!desk.canAdvance.value"');
+    expect(cards).toContain('desk.advanceStatus()');
+    expect(cards).toContain(':disabled="!desk.canAdvance.value"');
   });
 });

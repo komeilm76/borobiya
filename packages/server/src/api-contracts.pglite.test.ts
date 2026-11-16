@@ -1007,6 +1007,15 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       { url: adminTimelineUrl, headers: adminHeaders });
     expect(adminTimeline).toEqual(requesterTimeline);
     expect((await app.inject({ method: "GET", url: adminTimelineUrl, headers: requesterHeaders })).statusCode).toBe(403);
+    const briefUrl = apiRoutes.sos.getMissionBrief.url.replace(":id", accepted.missionId);
+    const brief = await callContract<{ missionId: string; requesterName: string; description: string }>(
+      apiRoutes.sos.getMissionBrief, 200, { url: briefUrl, headers: responderHeaders }
+    );
+    expect(brief.missionId).toBe(accepted.missionId);
+    expect(brief.requesterName).toBeTruthy();
+    expect(brief.description).toBeTruthy();
+    expect((await app.inject({ method: "GET", url: briefUrl, headers: requesterHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: briefUrl, headers: adminHeaders })).statusCode).toBe(404);
     const navUrl = apiRoutes.sos.getMissionNavigationTarget.url.replace(":id", accepted.missionId);
     const nav = await callContract<{ missionId: string; incident: { lat: number; lon: number } }>(
       apiRoutes.sos.getMissionNavigationTarget, 200, { url: navUrl, headers: responderHeaders }

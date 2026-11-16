@@ -17,7 +17,7 @@ describe("shared km-api route descriptors", () => {
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
     // 70 routes: remote-session termination adds one owner-scoped DELETE to the documented surface.
-    expect(allApiRoutes).toHaveLength(70);
+    expect(allApiRoutes).toHaveLength(71);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 

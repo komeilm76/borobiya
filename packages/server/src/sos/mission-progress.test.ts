@@ -101,6 +101,40 @@ describe("PATCH /_user/missions/:id/status", () => {
     } finally { await app.close(); }
   });
 
+  it("exposes incident brief only to the assigned active rescuer, never an admin or requester", async () => {
+    const app = Fastify({ logger: false });
+    let currentUser = rescuerId;
+    let role: "user" | "admin" = "user";
+    const findBrief = vi.fn(async (_id: string, userId: string) => userId === rescuerId
+      ? { missionId, sosRequestId: randomUUID(), requesterName: "requester", incidentTypeName: "امداد",
+        description: "کمک در محل حادثه", incident: { lat: 35.7, lon: 51.4 }, hasPhoto: true } : null);
+    app.addHook("onRequest", async (request) => {
+      request.authenticatedUser = {
+        userId: currentUser, role, sessionId: randomUUID(), deviceId: randomUUID(),
+        username: "rescuer", isActive: true, isSuspended: false,
+        mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date()
+      };
+    });
+    await registerMissionProgressRoutes(app, {
+      advanceStatus: async () => ({ status: "not_found" }), findMission: async () => null,
+      listMissions: async (_id, _role, page, limit) => ({ items: [], total: 0, page, limit, totalPages: 0 }),
+      findNavigationTarget: async () => null, findBrief
+    });
+    try {
+      const url = `/_user/sos/missions/${missionId}/brief`;
+      const own = await app.inject({ method: "GET", url });
+      expect(own.statusCode).toBe(200);
+      expect(own.headers["cache-control"]).toBe("no-store");
+      expect(own.json()).toMatchObject({ missionId, requesterName: "requester", hasPhoto: true });
+      currentUser = requesterId;
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+      role = "admin";
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+      expect((await app.inject({ method: "GET", url: "/_user/sos/missions/invalid/brief" })).statusCode).toBe(404);
+      expect(findBrief).toHaveBeenCalledTimes(2);
+    } finally { await app.close(); }
+  });
+
   it("refuses an admin even if that account ID is still assigned as the rescuer", async () => {
     const { app, advanceStatus } = await appFor({ status: "updated", mission }, true, undefined, "rated", "admin");
     try {

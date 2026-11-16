@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
-import { missionSchema, missionTimelineSchema } from "@borobiya/shared";
+import { missionBriefSchema, missionSchema, missionTimelineSchema } from "@borobiya/shared";
 import type { Database } from "./client";
 import * as schema from "./schema";
 import { DrizzleMissionProgressStore, missionTransition } from "./mission-progress-store";
@@ -102,6 +102,12 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect(await store.findNavigationTarget(MISSION, RESCUER)).toEqual({
       missionId: MISSION, incident: { lat: 35.7, lon: 51.4 }
     });
+    expect(missionBriefSchema.parse(await store.findBrief(MISSION, RESCUER))).toMatchObject({
+      missionId: MISSION, sosRequestId: SOS, requesterName: "mission_requester", incidentTypeName: "Rescue",
+      description: "A person needs urgent rescue.", incident: { lat: 35.7, lon: 51.4 }, hasPhoto: false
+    });
+    expect(await store.findBrief(MISSION, REQUESTER)).toBeNull();
+    expect(await store.findBrief("90000000-0000-4000-8000-000000000009", RESCUER)).toBeNull();
     expect(await store.findNavigationTarget(MISSION, REQUESTER)).toBeNull();
     expect(await store.findNavigationTarget("90000000-0000-4000-8000-000000000009", RESCUER)).toBeNull();
     await pg.query(`UPDATE "users" SET "is_on_mission" = true WHERE "id" = $1`, [RESCUER]);
@@ -123,6 +129,7 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect((await pg.query<{ is_on_mission: boolean }>(`SELECT "is_on_mission" FROM "users" WHERE "id" = $1`, [RESCUER])).rows[0]?.is_on_mission).toBe(false);
     expect((await pg.query<{ status: string }>(`SELECT "status" FROM "sos_requests" WHERE "id" = $1`, [SOS])).rows[0]?.status).toBe("completed");
     expect(await store.findNavigationTarget(MISSION, RESCUER)).toBeNull();
+    expect(await store.findBrief(MISSION, RESCUER)).toBeNull();
     expect(await store.canJoinMissionRoom(MISSION, RESCUER, "user")).toBe(false);
     expect(await store.canJoinMissionRoom(MISSION, REQUESTER, "admin")).toBe(false);
     expect(missionTimelineSchema.parse(await store.findTimeline(MISSION, RESCUER, "user"))

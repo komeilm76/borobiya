@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiRoutes } from "@shared/api";
-import { cancellationReasonSchema, cancellationSchema, missionStatusUpdateSchema, missionSchema, missionDetailSchema, missionTimelineSchema, missionPresenceSchema, paginatedResponseSchema, missionRatingSchema,
-  type CancellationReason, type Mission, type MissionDetail, type MissionRatingInput, type MissionTimeline, type MissionPresence } from "@shared/index";
+import { cancellationReasonSchema, cancellationSchema, missionStatusUpdateSchema, missionSchema, missionDetailSchema, missionTimelineSchema, missionPresenceSchema, missionBriefSchema, paginatedResponseSchema, missionRatingSchema,
+  type CancellationReason, type Mission, type MissionDetail, type MissionRatingInput, type MissionTimeline, type MissionPresence, type MissionBrief } from "@shared/index";
 import { requestJson } from "./http";
 
 export async function listRescuerMissions(token: string, page = 1): Promise<{ items: Mission[]; total: number; totalPages: number }> {
@@ -43,6 +43,16 @@ export async function getMissionPresence(token: string, missionId: string, signa
   const id = route.schema.params.parse({ id: missionId }).id;
   return missionPresenceSchema.parse(await requestJson<unknown>(route.url.replace(":id", encodeURIComponent(id)),
     { accessToken: token, signal }));
+}
+
+export async function getMissionBrief(token: string, missionId: string, signal?: AbortSignal): Promise<MissionBrief> {
+  const route = apiRoutes.sos.getMissionBrief;
+  const id = route.schema.params.parse({ id: missionId }).id;
+  const brief = missionBriefSchema.parse(await requestJson<unknown>(route.url.replace(":id", encodeURIComponent(id)), {
+    accessToken: token, cache: "no-store", signal
+  }));
+  if (brief.missionId !== id) throw new Error("MISSION_BRIEF_MISMATCH");
+  return brief;
 }
 
 export async function getMission(token: string, id: string): Promise<MissionDetail> {

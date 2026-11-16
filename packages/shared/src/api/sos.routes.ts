@@ -16,6 +16,7 @@ import {
   missionTimelineSchema,
   missionPresenceSchema,
   missionNavigationTargetSchema,
+  missionBriefSchema,
   userSyncResponseSchema,
   missionStatusUpdateSchema,
   nearestResponderSchema,
@@ -258,6 +259,19 @@ export const sosRoutes = {
     meta: {
       operationId: "sosGetMissionPresence",
       summary: "Read active mission participant transport presence and last activity",
+      tags: ["sos", "user"], access: "authenticated"
+    }
+  }),
+  getMissionBrief: defineRoute({
+    method: "GET",
+    url: "/_user/sos/missions/:id/brief",
+    schema: {
+      params: missionParamsSchema,
+      responses: { 200: missionBriefSchema, 401: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "sosGetMissionBrief",
+      summary: "Read active incident briefing for the assigned rescuer",
       tags: ["sos", "user"], access: "authenticated"
     }
   }),

@@ -337,6 +337,8 @@ POST  /_user/missions/:id/rate           { rating:1-5, comment? } // live; compl
 GET   /_user/sos/requests/:id/nearest    // optional shortcut to admin nearest logic
 ```
 
+`GET /_user/sos/missions/:id/brief` returns `{missionId,sosRequestId,requesterName,incidentTypeName,description,incident:{lat,lon},hasPhoto}` only to the assigned rescuer of an active mission. The joined SQL enforces ownership and active status; unknown/foreign/terminal missions, requesters and admins share `404`, and responses use `Cache-Control: no-store`. The photo flag is not a public URL: the rescuer obtains an expiring participant-scoped link through `GET /_user/sos/requests/:id/photo-access` only on demand.
+
 `GET /_user/sos/missions/:id/presence` returns `{missionId,requester:{online,lastSeenAt},rescuer:{online,lastSeenAt}}` only for active-mission participants or an active admin session; foreign, unknown and terminal missions return the same 404. This no-store transport snapshot does **not** reveal GPS fixes, indicate human presence or authorize navigation. A session with a stale heartbeat is offline even if its persisted bit remains true; the client shows a five-minute grace badge followed by **manual review**, not automatic cancellation. HTTP refresh does not extend that grace.
 
 `GET /_user/sos/missions/:id` includes `rating: 1..5 | null` in its participant/admin-scoped detail response. Requesters can see whether their rating was already recorded; assigned rescuers can view their mission's received stars in history. List rows do not include the rating.

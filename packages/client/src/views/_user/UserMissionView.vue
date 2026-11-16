@@ -39,8 +39,7 @@
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
       <MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === 'status'"
-        :desk="desk" :steps="steps" :active-step="activeStep" :current-status-label="currentStatusLabel"
-        :next-status-label="nextStatusLabel" :team-sharing="teamSharing"
+        :desk="desk" :current-status-label="currentStatusLabel" :team-sharing="teamSharing"
         @close="closeTool('status')" @open-route="openRouteWorkspace" />
       <section v-else-if="!desk.error.value" class="mission-desk__empty">
         <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
@@ -282,6 +281,11 @@
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
+        <div v-if="!activeTool && !desk.terminalHold.value"
+          class="mission-desk__map-cards">
+          <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep"
+            :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel" />
+        </div>
         <nav class="mission-desk__dock" aria-label="ابزارهای مأموریت">
           <button id="mission-tool-status" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'status' }"
             :aria-label="`وضعیت مأموریت: ${currentStatusLabel}؛ ${activeTool === 'status' ? 'بستن' : 'باز کردن'} پنل وضعیت`"
@@ -362,6 +366,7 @@ import { useRouteNavigation } from "@/composables/use-route-navigation";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionStatusPanel from "@/components/mission/MissionStatusPanel.vue";
+import MissionMapCards from "@/components/mission/MissionMapCards.vue";
 import ProposalInboxContent from "@/components/shell/ProposalInboxContent.vue";
 import PointTransportChoicesSheet from "@/components/map/PointTransportChoicesSheet.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
@@ -1059,6 +1064,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded :deep(.live-panel__map-actions),
 .mission-desk--embedded .mission-desk__map-heading,
 .mission-desk--embedded .mission-desk__map-focus,
+.mission-desk--embedded .mission-desk__map-cards,
 .mission-desk--embedded .mission-desk__map-hint,
 .mission-desk--embedded .mission-desk__dock,
 .mission-desk--embedded .mission-desk__guidance,
@@ -1165,6 +1171,14 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
 /* Camera actions occupy the map page's next 48px slots below the compass.
    The single-action case stays adjacent; two actions fill both lower slots. */
+/* The two actionable cards live on the map, not inside the status sheet.
+   Keep their one scroll surface clear of the compass/camera rail and SOS. */
+.mission-desk__map-cards { position: absolute; z-index: 8; right: 1rem;
+  bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
+  width: min(18rem, calc(100vw - 2rem));
+  max-height: max(7rem, min(44dvh, 19rem, calc(100dvh - 27rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;
+  border-radius: var(--bb-radius-nested, 16px); }
 .mission-desk__map-focus {
   position: absolute; z-index: 9; right: 1.25rem;
   bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);
@@ -1231,6 +1245,12 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
   .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
+  /* The compass/camera keep the physical-right 48px rail. Place the cards
+     immediately beside that rail, above the dock, rather than covering SOS. */
+  .mission-desk__map-cards { right: calc(4.25rem + env(safe-area-inset-right, 0px));
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: max(6rem, min(36dvh, calc(100dvh - 20rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
