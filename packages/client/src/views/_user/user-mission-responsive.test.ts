@@ -23,8 +23,10 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
 
   it("states the actual mission outcome and keeps optional stops out of the primary route path", () => {
     expect(view).toContain('<h1>{{ missionHeadline }}</h1>');
-    expect(status).toContain('v-if="desk.cancellationNeedsRefresh.value && !desk.cancellationOpen.value"');
-    expect(status).toContain('پیش از تغییر مرحله، وضعیت مأموریت را از سرور تازه کنید.');
+    const cards = readFileSync(new URL("../../components/mission/MissionMapCards.vue", import.meta.url), "utf8");
+    expect(cards).toContain('desk.cancellationNeedsRefresh.value');
+    expect(cards).toContain('@click="desk.load()"');
+    expect(status).not.toContain('desk.cancellationNeedsRefresh.value');
     expect(view).toContain('if (desk.error.value) return "وضعیت تازهٔ مأموریت تأیید نشد.";');
     expect(view).toContain('if (desk.activeMission.value) return "کمک در جریان است.";');
     expect(view).toContain('if (desk.loading.value) return "در حال بررسی مأموریت…";');
@@ -100,11 +102,12 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('aria-label="بستن هشدار راهبری"');
     expect(view).toContain('<MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === \'status\'"');
     expect(status).toContain('id="mission-status-panel"');
-    expect(view).toContain('@close="closeTool(\'status\')" @open-route="openRouteWorkspace"');
+    expect(view).toContain('@close="closeTool(\'status\')" />');
     expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\' && routeSection !== \'transport\'" id="mission-route-panel"');
     expect(view).toContain(':room-open="activeTool === \'team\'"');
     expect(view).toContain('const activeTool = ref<"status" | "route" | "team" | null>(null);');
-    expect(view).toContain('aria-label="ابزارهای مأموریت"');
+    expect(view).toContain('aria-label="ابزارهای مسیر مأموریت"');
+    expect(view).toContain('id="mission-tool-status" class="mission-desk__info-action"');
     expect(view).toContain('function dismissTool(): void {');
     expect(view).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
     expect(view).toContain('if (navigation.start()) closeTool("route");');
@@ -137,7 +140,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).not.toContain('mission-desk__dock-sharing');
     expect(view).not.toContain('اشتراک روشن');
     const dock = view.slice(view.indexOf('<nav class="mission-desk__dock"'), view.indexOf('</nav>', view.indexOf('<nav class="mission-desk__dock"')));
-    expect(dock.match(/<button\b/g)).toHaveLength(2);
+    expect(dock.match(/<button\b/g)).toHaveLength(1);
     expect(dock).not.toContain('mission-tool-team');
     expect(panel).toContain('watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)');
     expect(panel).toContain(': live.sharing.value, (sharing) => emit("sharing-change", sharing)');

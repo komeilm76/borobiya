@@ -39,8 +39,7 @@
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
       <MissionStatusPanel v-else-if="desk.activeMission.value" v-show="activeTool === 'status'"
-        :desk="desk" :current-status-label="currentStatusLabel" :team-sharing="teamSharing"
-        @close="closeTool('status')" @open-route="openRouteWorkspace" />
+        :desk="desk" :visible="activeTool === 'status'" @close="closeTool('status')" />
       <section v-else-if="!desk.error.value" class="mission-desk__empty">
         <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
           class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
@@ -231,16 +230,13 @@
           @confirm="confirmMissionTransport" @close="closeRouteSection()" />
         <header class="mission-desk__map-heading" aria-label="مأموریت فعال">
           <h1 class="sr-only">مأموریت من</h1>
-          <button id="mission-status-trigger" type="button" class="mission-desk__status-trigger"
-            :aria-label="`وضعیت مأموریت: ${currentStatusLabel}؛ مرحلهٔ ${(activeStep + 1).toLocaleString('fa-IR')} از ${steps.length.toLocaleString('fa-IR')}؛ ${activeTool === 'status' ? 'بستن' : 'باز کردن'} پنل وضعیت`"
-            aria-controls="mission-status-panel" :aria-expanded="activeTool === 'status'"
-            @click="toggleTool('status', 'mission-status-trigger')">
+          <div class="mission-desk__status-brief">
             <small>مأموریت من · مرحلهٔ {{ (activeStep + 1).toLocaleString('fa-IR') }} از {{ steps.length.toLocaleString('fa-IR') }}</small>
             <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
             <span class="mission-desk__stage-track" aria-hidden="true">
               <i v-for="(step, index) in steps" :key="step.status" :class="{ 'mission-desk__stage--reached': index <= activeStep }" />
             </span>
-          </button>
+          </div>
           <v-btn id="mission-tool-team" icon="mdi-account-group-outline" variant="text" size="small"
             :aria-label="activeTool === 'team' ? 'بستن پنل اعضای مأموریت' : 'نمایش اعضای مأموریت'"
             :title="activeTool === 'team' ? 'بستن اعضای مأموریت' : 'نمایش اعضای مأموریت'"
@@ -280,41 +276,30 @@
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
-        <details v-if="routing.target.value && !activeTool && !desk.terminalHold.value"
-          ref="mapLegendEl" class="mission-desk__map-legend" aria-label="راهنمای نشانگرها و مختصات حادثه"
-          @toggle="onMapLegendToggle">
-          <summary title="راهنمای نشانگرهای نقشه" aria-label="راهنمای نشانگرها و مختصات حادثه">
-            <v-icon icon="mdi-information-outline" size="22" aria-hidden="true" />
-            <span class="mission-desk__map-legend-label">راهنمای نقشه</span>
-            <span class="sr-only">راهنمای نشانگرها و مختصات حادثه</span>
-          </summary>
-          <div class="mission-desk__map-legend-body" dir="rtl">
-            <strong>راهنمای نشانگرها</strong>
-            <ul>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> محل حادثه (مقصد ثابت)</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--origin" aria-hidden="true" /> مبدأ محاسبهٔ مسیر (نه موقعیت زنده)</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--stop" aria-hidden="true" /> ایستگاه میانی</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--requester" aria-hidden="true" /> موقعیت اشتراکی درخواست‌کننده</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--rescuer" aria-hidden="true" /> موقعیت اشتراکی امدادگر</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--admin" aria-hidden="true" /> موقعیت اشتراکی مدیر مرکز</li>
-            </ul>
-            <p>نشانگرهای اشتراکی ممکن است با محل حادثه هم‌پوشانی داشته باشند؛ تازه‌بودن موقعیت را جداگانه بررسی کنید.</p>
-            <p>مختصات حادثه: <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi></p>
-          </div>
-        </details>
-        <div v-if="!activeTool && !desk.terminalHold.value && !legendOpen"
-          class="mission-desk__map-cards">
-          <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep"
+        <section v-if="routing.target.value && !activeTool && !desk.terminalHold.value"
+          class="mission-desk__map-legend" aria-labelledby="mission-map-legend-title" dir="rtl">
+          <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
+          <ul class="mission-desk__map-legend-body" aria-label="راهنمای نشانگرها">
+            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> حادثه</li>
+            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--origin" aria-hidden="true" /> مبدأ مسیر</li>
+            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--stop" aria-hidden="true" /> ایستگاه</li>
+            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--requester" aria-hidden="true" /> درخواست‌کننده</li>
+            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--rescuer" aria-hidden="true" /> امدادگر</li>
+            <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--admin" aria-hidden="true" /> مدیر مرکز</li>
+          </ul>
+          <small>مبدأ مسیر زنده نیست؛ تازگی موقعیت‌های اشتراکی را بررسی کنید.</small>
+        </section>
+        <div v-if="!activeTool && !desk.terminalHold.value" class="mission-desk__map-cards">
+          <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep" :team-sharing="teamSharing"
             :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel" />
         </div>
-        <nav class="mission-desk__dock" aria-label="ابزارهای مأموریت">
-          <button id="mission-tool-status" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'status' }"
-            :aria-label="`وضعیت مأموریت: ${currentStatusLabel}؛ ${activeTool === 'status' ? 'بستن' : 'باز کردن'} پنل وضعیت`"
-            :aria-expanded="activeTool === 'status'" aria-controls="mission-status-panel"
-            @click="toggleTool('status')">
-            <v-icon icon="mdi-clipboard-text-outline" size="22" aria-hidden="true" /><strong>وضعیت</strong>
-            <small aria-hidden="true">{{ currentStatusLabel }}</small>
-          </button>
+        <v-btn id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"
+          :color="activeTool === 'status' ? 'primary' : 'surface'" variant="flat"
+          :aria-label="activeTool === 'status' ? 'بستن اطلاعات مأموریت' : 'نمایش اطلاعات مأموریت'"
+          :title="activeTool === 'status' ? 'بستن اطلاعات مأموریت' : 'اطلاعات مأموریت'"
+          :aria-expanded="activeTool === 'status'" aria-controls="mission-status-panel"
+          @click="toggleTool('status')" />
+        <nav class="mission-desk__dock" aria-label="ابزارهای مسیر مأموریت">
           <button id="mission-tool-route" type="button"
             :class="{ 'mission-desk__dock-active': activeTool === 'route', 'mission-desk__dock-warning': routeCue.tone === 'warning', 'mission-desk__dock-ready': routeCue.tone === 'ready' }"
             :aria-label="`مسیر مأموریت: ${routeCue.label}؛ ${activeTool === 'route' ? 'بستن' : 'باز کردن'} پنل مسیر`"
@@ -322,7 +307,6 @@
             :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
             @click="toggleTool('route')">
             <v-icon icon="mdi-routes" size="22" aria-hidden="true" /><strong>مسیر</strong>
-            <small aria-hidden="true">{{ routeCue.label }}</small>
           </button>
         </nav>
       </div>
@@ -449,16 +433,6 @@ const mapReady = ref(false);
 const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
-const legendOpen = ref(false);
-const mapLegendEl = ref<HTMLDetailsElement | null>(null);
-function onMapLegendToggle(event: Event): void {
-  legendOpen.value = (event.currentTarget as HTMLDetailsElement).open;
-}
-function closeMapLegend(): void {
-  if (mapLegendEl.value) mapLegendEl.value.open = false;
-  legendOpen.value = false;
-}
-let statusFocusOrigin = "mission-tool-status";
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
 const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
@@ -527,7 +501,8 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
   if (added) openRouteWorkspace();
   return added;
 }
-defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value) });
+defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
+  hasMapLegend: computed(() => !!routing.target.value && !activeTool.value && !desk.terminalHold.value) });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
   const lon = Number(waypointLon.value);
@@ -551,20 +526,18 @@ function openRouteWorkspace(): void {
   activeTool.value = "route";
   void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
-function toggleTool(tool: "status" | "route" | "team", focusOrigin?: string): void {
+function toggleTool(tool: "status" | "route" | "team"): void {
   if (routeDeleteConfirmOpen.value) return;
   if (pickingWaypoint.value) pickingWaypoint.value = false;
-  if (activeTool.value === tool) { closeTool(tool, focusOrigin); return; }
+  if (activeTool.value === tool) { closeTool(tool); return; }
   if (tool === "route") { openRouteWorkspace(); return; }
   if (activeTool.value === "route") closeRouteSection();
-  if (tool === "status") statusFocusOrigin = focusOrigin ?? "mission-tool-status";
   activeTool.value = tool;
   void nextTick(() => document.getElementById(`mission-${tool}-panel`)?.focus({ preventScroll: true }));
 }
-function closeTool(tool: "status" | "route" | "team", focusOrigin?: string): void {
+function closeTool(tool: "status" | "route" | "team"): void {
   if (tool === "route") closeRouteSection();
-  const focusTarget = focusOrigin ?? (tool === "status" ? statusFocusOrigin : `mission-tool-${tool}`);
-  if (tool === "status") statusFocusOrigin = "mission-tool-status";
+  const focusTarget = `mission-tool-${tool}`;
   activeTool.value = null;
   void nextTick(() => document.getElementById(focusTarget)?.focus({ preventScroll: true }));
 }
@@ -820,7 +793,6 @@ function closeRoutes(): void {
   navigation.dismissError();
   routing.reset();
   activeTool.value = null;
-  statusFocusOrigin = "mission-tool-status";
   pickingWaypoint.value = false;
   waypointError.value = "";
   draggingWaypoint = null;
@@ -836,8 +808,6 @@ function releaseRouteMap(): void {
   routeMap = null;
   markerConstructor = null;
 }
-watch(() => [routing.target.value, activeTool.value, desk.terminalHold.value] as const,
-  closeMapLegend, { flush: "sync" });
 watch(() => [routing.visible.value, routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const,
   () => syncRouteMap(), { flush: "sync" });
 watch(pickingWaypoint, (picking) => {
@@ -901,7 +871,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 <style scoped>
 .mission-desk { min-height: calc(100vh - 130px); padding: clamp(18px, 4vw, 52px) 18px 100px; color: rgb(var(--v-theme-on-background)); background: radial-gradient(ellipse at 86% 4%, rgba(33,130,113,.10), transparent 52%), rgb(var(--v-theme-background)); }
 .mission-desk__workspace { scroll-margin-top: 16px; }
-.mission-route { margin-top: 12px; padding: clamp(14px, 2vw, 22px); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px); }
+.mission-route { margin-top: 12px; padding: clamp(14px, 2vw, 22px); border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px); }
 .mission-desk__map-hint { position: absolute; z-index: 2; inset-inline: 12px; bottom: 32px; width: fit-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-surface); font-size: .85rem; }
 .mission-desk__map-hint button { margin-inline-start: 12px; color: rgb(var(--v-theme-primary)); text-decoration: underline; font: inherit; font-weight: 700; }
 :global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; cursor: pointer; }
@@ -998,8 +968,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 34px 0 18px; }
 .mission-desk__toolbar h2 { font-size: 1.2rem; font-weight: 800; margin: 0; }
 .mission-desk__toolbar p { font-size: 0.9rem; opacity: .72; margin: 4px 0 0; }
-.mission-desk__card, .mission-desk__empty { border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.25); box-shadow: var(--bb-shadow-surface); }
-.mission-desk__card { padding: clamp(16px, 2vw, 24px); margin-top: 16px; }
+.mission-desk__card, .mission-desk__empty { border-radius: var(--bb-radius-card, 24px); background: rgba(var(--v-theme-surface), .95); border: 1px solid rgba(var(--v-theme-on-surface), .1); box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+.mission-desk__card { padding: clamp(12px, 2vw, 18px); margin-top: 16px; }
 .mission-desk__empty { text-align: center; padding: 58px 24px; }
 .mission-desk__empty-icon { width: 70px; height: 70px; border-radius: 20px; background: rgba(34,145,116,.13); color: rgb(var(--v-theme-primary)); display: grid; place-items: center; margin: 0 auto 16px; }
 .mission-desk__empty h3 { font-size: 1.2rem; margin: 0 0 8px; }.mission-desk__empty p { opacity: .7; margin-bottom: 22px; }
@@ -1103,6 +1073,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded .mission-desk__map-focus,
 .mission-desk--embedded .mission-desk__map-cards,
 .mission-desk--embedded .mission-desk__map-legend,
+.mission-desk--embedded .mission-desk__info-action,
 .mission-desk--embedded .mission-desk__map-hint,
 .mission-desk--embedded .mission-desk__dock,
 .mission-desk--embedded .mission-desk__guidance,
@@ -1123,7 +1094,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   width: min(28rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   margin: 0; padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
   scroll-padding-top: 4.5rem; /* Focused controls clear the sticky close header. */
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
   box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
@@ -1165,22 +1136,16 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   position: absolute; z-index: 7; top: calc(.75rem + env(safe-area-inset-top, 0px));
   left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: .5rem; max-width: calc(100vw - 8rem);
-  padding: .5rem .85rem; border: 1px solid var(--bb-color-outline);
-  border-radius: var(--bb-radius-nested, 16px); white-space: nowrap;
-  color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+  padding: .5rem .85rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-card, 24px); white-space: nowrap;
+  color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .95);
+  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px);
 }
 .mission-desk__map-heading h1 { margin: 0; font-size: .9rem; font-weight: 800; }
-.mission-desk__status-trigger {
-  display: grid; flex: 1; min-width: 0; min-height: 44px; gap: 2px;
-  padding: .15rem .25rem; border: 0; border-radius: 10px;
-  background: transparent; color: rgb(var(--v-theme-on-surface));
-  text-align: start; font: inherit; cursor: pointer;
-}
-.mission-desk__status-trigger:hover { background: var(--bb-color-inset); }
-.mission-desk__status-trigger:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.mission-desk__status-trigger small { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 700; }
-.mission-desk__status-trigger > span[role="status"] { font-size: .88rem; font-weight: 800; }
-.mission-desk__status-trigger small, .mission-desk__status-trigger > span[role="status"] {
+.mission-desk__status-brief { display: grid; flex: 1; min-width: 0; min-height: 44px; align-content: center; gap: 2px; }
+.mission-desk__status-brief small { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 700; }
+.mission-desk__status-brief > span[role="status"] { font-size: .88rem; font-weight: 800; }
+.mission-desk__status-brief small, .mission-desk__status-brief > span[role="status"] {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .mission-desk__stage-track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; margin-top: 3px; }
@@ -1209,47 +1174,45 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
 /* Camera actions occupy the map page's next 48px slots below the compass.
    The single-action case stays adjacent; two actions fill both lower slots. */
-/* A map-side legend stays compact until requested; it never takes space in
-   the planner or covers the physical-right compass/SOS rail when expanded. */
-.mission-desk__map-legend { position: absolute; z-index: 9;
+/* Mission overlays use the same soft, translucent surface as Search/Sharing.
+   The legend stays fully visible; its color key is not a route/coordinate card. */
+.mission-desk__map-legend { position: absolute; z-index: 8;
   left: calc(1rem + env(safe-area-inset-left, 0px));
-  bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); pointer-events: auto; }
-.mission-desk__map-legend summary { display: flex; align-items: center; gap: .4rem; min-width: 44px; height: 44px;
-  padding: .35rem .65rem; border: 1px solid var(--bb-color-outline); border-radius: 14px;
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-primary));
-  box-shadow: var(--bb-shadow-overlay); cursor: pointer; list-style: none; font-size: .82rem; font-weight: 800; }
-.mission-desk__map-legend summary::-webkit-details-marker { display: none; }
-.mission-desk__map-legend summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.mission-desk__map-legend[open] summary { border-color: rgb(var(--v-theme-primary)); }
-.mission-desk__map-legend-body { position: absolute; bottom: calc(100% + .5rem); left: 0;
-  width: min(17.5rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-  max-height: max(6rem, min(42dvh, 16rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
-  padding: .7rem .8rem; overflow-y: auto; overscroll-behavior: contain;
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: var(--bb-shadow-overlay); font-size: .82rem; line-height: 1.65; }
-.mission-desk__map-legend-body strong { display: block; margin-bottom: .4rem; font-size: .88rem; }
-.mission-desk__map-legend-body ul { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none; }
-.mission-desk__map-legend-body li { display: flex; align-items: baseline; gap: .5rem; }
-.mission-desk__map-legend-body p { margin: .5rem 0 0; }
-.mission-desk__map-legend-body bdi { overflow-wrap: anywhere; }
-.mission-desk__legend-symbol { display: inline-grid; place-items: center; align-self: center;
-  flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  width: min(18rem, calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  padding: .55rem .65rem; pointer-events: auto;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+.mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: .85rem; font-weight: 800; }
+.mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .2rem .35rem;
+  margin: 0; padding: 0; list-style: none; font-size: .8rem; line-height: 1.3; }
+.mission-desk__map-legend-body li { display: flex; align-items: center; min-width: 0; gap: .25rem; overflow-wrap: anywhere; }
+.mission-desk__map-legend small { display: block; margin-top: .3rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.35; }
+.mission-desk__legend-symbol { display: inline-grid; place-items: center; flex: none;
+  width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;
   box-shadow: 0 0 0 1px var(--bb-color-outline); }
-.mission-desk__legend-symbol--incident { background: #b91c1c; border-radius: 4px; color: white; font: 900 10px/1 sans-serif; }
+.mission-desk__legend-symbol--incident { background: #b91c1c; border-radius: 3px; color: white; font: 900 9px/1 sans-serif; }
 .mission-desk__legend-symbol--origin { background: #2563a6; }
 .mission-desk__legend-symbol--stop { background: #c27c14; }
 .mission-desk__legend-symbol--requester { background: #dc593b; }
 .mission-desk__legend-symbol--rescuer { background: #16826c; }
 .mission-desk__legend-symbol--admin { background: #5555ae; }
-/* The two actionable cards live on the map, not inside the status sheet.
-   Keep their one scroll surface clear of the compass/camera rail and SOS. */
+/* One scroll surface for the entire, already-open step list and manual action;
+   never create a scroller for an individual row or hide progress behind a toggle. */
 .mission-desk__map-cards { position: absolute; z-index: 8; right: 1rem;
   bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
   width: min(18rem, calc(100vw - 2rem));
-  max-height: max(7rem, min(44dvh, 19rem, calc(100dvh - 27rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  max-height: max(7rem, min(55dvh, 21rem, calc(100dvh - 27rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
   overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;
-  border-radius: var(--bb-radius-nested, 16px); }
+  border-radius: var(--bb-radius-card, 24px); }
+.mission-desk__info-action { position: absolute; z-index: 10;
+  left: calc(1rem + env(safe-area-inset-left, 0px));
+  bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+  width: 48px; min-width: 48px; height: 48px;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: 50%;
+  box-shadow: var(--bb-shadow-overlay); }
+.mission-desk__info-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__map-focus {
   position: absolute; z-index: 9; right: 1.25rem;
   bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);
@@ -1263,33 +1226,22 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   border: 1px solid var(--bb-color-outline); border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.mission-desk__dock {
-  position: absolute; z-index: 10; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
-  left: 50%; transform: translateX(-50%); display: flex; gap: 3px;
-  width: min(15rem, calc(100vw - 6rem)); padding: 4px;
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
-  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
-}
-.mission-desk__dock button {
-  display: grid; grid-template-rows: 22px auto auto; align-content: center; place-items: center;
-  flex: 1 1 0; gap: 1px; min-width: 0; min-height: 64px; padding: 3px 5px;
+.mission-desk__dock { position: absolute; z-index: 10;
+  bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  width: 5.75rem; padding: 3px; border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-card, 24px); background: rgba(var(--v-theme-surface), .95);
+  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+.mission-desk__dock button { display: grid; place-items: center; gap: 1px;
+  width: 100%; min-width: 0; min-height: 56px; padding: 3px 5px;
   border: 0; border-radius: var(--bb-radius-nested, 16px); background: transparent;
-  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font-family: inherit; line-height: 1.2;
-}
+  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font: inherit; line-height: 1.2; }
 .mission-desk__dock button strong { font-size: .82rem; }
-.mission-desk__dock button small {
-  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: .8rem; font-weight: 600;
-}
 .mission-desk__dock .mission-desk__dock-warning { box-shadow: inset 3px 0 rgb(var(--v-theme-warning)); }
 .mission-desk__dock .mission-desk__dock-ready { box-shadow: inset 3px 0 rgb(var(--v-theme-primary)); }
-.mission-desk__dock .mission-desk__dock-active {
-  background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary));
-}
+.mission-desk__dock .mission-desk__dock-active { background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); }
 .mission-desk__dock button:disabled { opacity: .48; cursor: not-allowed; }
 .mission-desk__dock button:focus-visible, .mission-desk__map-hint button:focus-visible {
-  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
-}
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk--active .mission-desk__map-hint {
   bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   inset-inline: 50% auto; transform: translateX(50%);
@@ -1309,22 +1261,16 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 11;
   }
-  /* Reserve the physical-right SOS target and its focus ring; a centered
-     15rem dock overlapped it on 320px phones. */
-  .mission-desk__dock {
-    left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;
-    width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-  }
+  /* Three non-overlapping bottom zones: info (left), route (center), SOS
+     (right). The open legend sits above that row; progress above the legend. */
+  .mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
   .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
-  .mission-desk__map-legend { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
-  .mission-desk__map-legend summary { width: 44px; padding: 0; justify-content: center; }
-  .mission-desk__map-legend-label { display: none; }
-  /* Reserve 44px for the collapsed legend on the physical-left, and 48px
-     for the compass/camera on the physical-right, with focus-ring gutters. */
+  .mission-desk__map-legend { left: calc(.75rem + env(safe-area-inset-left, 0px));
+    width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
   .mission-desk__map-cards { right: calc(4.25rem + env(safe-area-inset-right, 0px));
-    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    width: min(18rem, calc(100vw - 8rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
-    max-height: max(6rem, min(36dvh, calc(100dvh - 20rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+    bottom: calc(17rem + env(safe-area-inset-bottom, 0px));
+    width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-height: max(6rem, min(50dvh, calc(100dvh - 24rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
@@ -1359,6 +1305,14 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
+  /* The always-visible stages replace the duplicate heading on short phones.
+     Keep its Team button in the narrow top-right lane, clear of the progress
+     surface (which ends 4.25rem from the right) and the network button. */
+  .mission-desk--embedded .mission-desk__map-heading,
+  .mission-desk__map-heading { left: auto; right: calc(.75rem + env(safe-area-inset-right, 0px));
+    top: calc(4.65rem + env(safe-area-inset-top, 0px)); transform: none; padding: .25rem; }
+  .mission-desk__status-brief { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
   /* A 560px phone cannot fit the taller mission heading, guidance and a
      vertical rail. Put its controls in the open band above the dock/SOS. */
   .mission-desk:not(.mission-desk--tool-open) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {

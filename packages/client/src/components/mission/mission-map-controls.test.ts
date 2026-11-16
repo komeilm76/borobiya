@@ -96,8 +96,9 @@ describe("mission map controls", () => {
     expect(phone).toContain('bottom: calc(16rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('bottom: calc(9rem + env(safe-area-inset-bottom, 0px));');
-    expect(phone).toContain('left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;');
-    expect(phone).toContain('width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));');
+    expect(phone).toContain('.mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }');
+    expect(viewStyle).toContain('.mission-desk__dock { position: absolute; z-index: 10;');
+    expect(viewStyle).toContain('left: 50%; transform: translateX(-50%);');
     expect(phone).toContain('.mission-desk--tool-open :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right)');
     expect(phone).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('.mission-desk--tool-open .mission-desk__map-focus');
@@ -131,8 +132,9 @@ describe("mission map controls", () => {
   it("keeps members accessible without making automatic rescuer sharing look like a switch in the dock", () => {
     const start = missionMap.indexOf('<nav class="mission-desk__dock"');
     const dock = missionMap.slice(start, missionMap.indexOf('</nav>', start));
-    expect(dock.match(/<button\b/g)).toHaveLength(2);
-    expect(dock).toContain('mission-tool-status');
+    expect(dock.match(/<button\b/g)).toHaveLength(1);
+    expect(dock).not.toContain('mission-tool-status');
+    expect(missionMap).toContain('id="mission-tool-status" class="mission-desk__info-action"');
     expect(dock).toContain('mission-tool-route');
     expect(dock).not.toContain('mission-tool-team');
     expect(missionMap).toContain('id="mission-tool-team" icon="mdi-account-group-outline"');

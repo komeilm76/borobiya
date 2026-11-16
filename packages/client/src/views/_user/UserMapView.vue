@@ -1,5 +1,6 @@
 <template>
   <section class="user-map-view" :class="{ 'user-map-view--mission': mode === 'missions',
+    'user-map-view--mission-legend': mode === 'missions' && !!missionWorkspace?.hasMapLegend,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
     'user-map-view--navigating': mode === 'trips' && isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
@@ -2765,6 +2766,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
    * launcher, never buried beneath an open tool or the SOS pill. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  /* With an active mission the always-visible legend occupies the map's lower
+     left. Keep the actual scale above it, below the mission progress surface. */
+  .user-map-view--mission-legend .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+    bottom: calc(14rem + env(safe-area-inset-bottom, 0px));
+    left: calc(.75rem + env(safe-area-inset-left, 0px));
   }
   /* The compact planner occupies the scale's normal phone position. Keep the
      scale on the visible map, clear of both the planner and the attribution. */

@@ -81,11 +81,10 @@
             اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
           </v-chip>
         </div>
-        <details v-if="fullscreen" class="live-panel__presence-details">
-          <summary>راهنمای اتصال و موقعیت</summary>
-          <p>وضعیت اتصال، مستقل از اشتراک موقعیت مأموریت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</p>
-          <p>نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. موقعیت قدیمی برای راهبری مناسب نیست و فقط موقعیت تازه را می‌توان روی نقشه مرکز کرد.</p>
-        </details>
+        <p v-if="fullscreen" class="live-panel__presence-details">
+          اتصال، مستقل از اشتراک موقعیت است؛ پس از ۵ دقیقه بررسی دستی لازم است و مأموریت خودکار لغو نمی‌شود.
+          موقعیت قدیمی برای راهبری مناسب نیست؛ فقط موقعیت تازه را می‌توان روی نقشه مرکز کرد.
+        </p>
         <p v-else class="live-panel__note">این نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
         <template v-if="fullscreen">
           <p class="live-panel__note" role="status">
@@ -291,7 +290,7 @@ onBeforeUnmount(() => {
 .live-panel--routing .live-panel__map { height: min(50dvh, 450px); min-height: 310px; }
 .live-panel--routing .live-panel__map :deep(.map-canvas) { min-height: 0; }
 .live-panel__members { display: grid; gap: 12px; align-content: start; }
-.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
 .live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .live-panel__member :deep(.v-btn) { flex: none; min-width: 44px; height: 44px; }
 .live-panel__member :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
@@ -327,16 +326,14 @@ onBeforeUnmount(() => {
   width: min(27rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
   padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
   scroll-padding-top: 6rem; /* Keyboard focus stays below the sticky team header. */
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
-  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px);
 }
 .live-panel__room-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .live-panel__room-heading h2 { flex: 1 1 auto; margin: 0; font-size: 1.05rem; }
 .live-panel__room-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
-.live-panel__presence-details { padding: .7rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); font-size: .82rem; line-height: 1.6; }
-.live-panel__presence-details summary { cursor: pointer; color: rgb(var(--v-theme-primary)); font-weight: 800; }
-.live-panel__presence-details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.live-panel__presence-details p { margin: .5rem 0 0; }
+.live-panel__presence-details { margin: .25rem 0 0; padding: .5rem .65rem; border-radius: var(--bb-radius-nested, 16px);
+  background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.6; }
 .live-panel__presence-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .live-panel--fullscreen .live-panel__member { padding: .6rem .7rem; }
 .live-panel--fullscreen .live-panel__member > .v-chip { max-width: 100%; }

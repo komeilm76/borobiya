@@ -40,7 +40,8 @@ describe("mission map workspace", () => {
     expect(view).toContain('محل حادثه و مأموریت حذف نمی‌شوند');
     expect(view).toContain('if (navigation.active.value || !routing.target.value) return;');
     expect(view).toContain('routing.clearPlan();');
-    expect(status).toContain('desk.showCancellation()');
+    expect(status).not.toContain('desk.showCancellation()');
+    expect(cards).toContain('desk.showCancellation()');
     expect(cards).toContain('desk.advanceStatus()');
     expect(cards).toContain(':disabled="!desk.canAdvance.value"');
   });

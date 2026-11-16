@@ -53,7 +53,7 @@ describe("mission member and rating controls contrast", () => {
     }
     expect(missionView).toMatch(/\.mission-desk__phase-step \{[^}]*color: var\(--bb-color-muted\);[^}]*\}/);
     expect(missionView).not.toMatch(/\.mission-desk__phase-step \{[^}]*opacity: \.6;/);
-    expect(missionView).toContain(".mission-desk__phase-step--current { border-color: var(--bb-color-outline); color: rgb(var(--v-theme-on-surface));");
+    expect(missionView).toContain(".mission-desk__phase-step--current { color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset);");
     expect(missionView).toContain(".mission-desk__phase-step--passed { color: rgb(var(--v-theme-primary));");
   });
 

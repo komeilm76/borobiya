@@ -106,8 +106,8 @@ describe("mission desk cancellation", () => {
 
   it("renders the hidden more-action and explicit reason+confirmation in the accessible view", () => {
     const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8") +
-      readFileSync(new URL("../components/mission/MissionStatusPanel.vue", import.meta.url), "utf8");
-    expect(view).toContain("<v-menu location=\"bottom end\">");
+      readFileSync(new URL("../components/mission/MissionMapCards.vue", import.meta.url), "utf8");
+    expect(view).toContain("<v-menu location=\"top end\">");
     expect(view).toContain("قادر به ادامه نیستم");
     expect(view).toContain('v-radio-group v-if="desk.reasons.value.length && !desk.missionChanged.value"');
     expect(view).toContain('desk.selectedReason.value?.requiresCustomText');
@@ -527,8 +527,9 @@ describe("rescuer mission progression", () => {
     expect(cards).toContain('desk.advanceStatus()');
     expect(cards).toContain(':loading="desk.progressing.value"');
     expect(cards).toContain(':disabled="!desk.canAdvance.value"');
-    expect(view).toContain('desk.progressError.value');
-    expect(view).toContain('role="alert"');
+    expect(cards).toContain('desk.progressError.value');
+    expect(cards).toContain('role="alert"');
+    expect(view).not.toContain('desk.progressError.value');
   });
 
   it("advances each server-confirmed step in order, exactly once per pending write, and completes the mission", async () => {
