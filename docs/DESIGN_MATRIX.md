@@ -64,7 +64,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). Search works since P1 (offline: saved places + config POIs). |
-| navigation/02-map-press-hold.png | partial | P2/H | Hold gesture works (0.8s, progress bar); SOS dock now bottom-left per approved decision 5 (DEV-04 resolved); quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
+| navigation/02-map-press-hold.png | partial | P2/H | The reference shows a press-and-hold point picker; the product implements tap-to-select (no long-press gesture, no callout). Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/navigation-02-map-press-hold-impl.png`, tap on the canvas; destination panel renders with coordinates). SOS dock now bottom-left per approved decision 5 (DEV-04 resolved); quick chips moved above the sheet as a detent-aware sibling; quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
 | navigation/03-bookmark-form.png | partial | P2/M | Save-the-pin form implemented inline in the destination sheet (name, label, address, icon); the dedicated designed bookmark screen is not built. |
 | navigation/04-bookmark-saved.png | partial | P2/M | Profile screen lists saved places with inline edit (full PATCH payload incl. preserved rank) and delete; reorder UI remains API-only. |
 | navigation/05-search-open.png | done | P1/H | Real offline search: saved places + road POIs from the map configuration (projection-converted), Persian/Arabic-insensitive normalization, keyboard navigation (combobox semantics), loading/empty/error+retry states, result selection moves and zooms the map with a dedicated pin. |
@@ -89,20 +89,20 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | sos/01-sos-entry.png | partial | P2/H | SOS button present; bottom-left dock since P1 (decision 5); style differs from reference pending P5. |
-| sos/02-sos-hold-to-open.png | partial | P2/H | 0.8s hold implemented with progress bar; not the designed ring; placement aligned to bottom-left dock (decision 5). |
+| sos/02-sos-hold-to-open.png | partial | P2/H | 0.8s hold implemented with progress pill (a bottom-inset pill bound to inline size; a competing full-width rule was removed in Stage F). Captured mid-hold 2026-11-16 (`screens/sos-02-sos-hold-to-open-impl.png`); not the designed ring; placement aligned to bottom-left dock (decision 5). |
 | sos/03-sos-compose.png | partial | P1/H | Four-section composer implemented (severity, type, description, location, photo, review) with counters and inline validation; visual parity pending P5. |
 | sos/04-sos-location-picker.png | partial | P2/H | Step 2 now supports tap-to-place manual incident pin (arm button, crosshair cursor, tap on canvas drops the pin, dashed alarm marker, review shows "manual", recovery button re-adopts GPS fix and clears the flag). `isManual` and a zero accuracy flow to the server and render on the offer/review surfaces. Not designed: drag-to-adjust, reverse-geocoded address of the pin. |
 | sos/05-sos-photo.png | done | P1/C | Browser pipeline: validate (jpeg/png/webp, 15 MB ceiling), decode, downscale to ≤1280px, re-encode JPEG along a quality ladder, subject to the server's 160000-char wire cap (~119,981 B effective — the designed 128 KB target is not reachable under that cap). Retryable error state with Persian copy; submit-time size guard; picker resets for re-pick. |
 | sos/06-sos-review.png | done | P2/M | Review step submits to the API; disabled state + inline error surface. |
-| sos/07-sos-sending.png | missing | P2/M | A full-screen sending dialog renders while the SOS is mid-submit (heading, staged request steps, photo/note lines only when staged, no fake progress). See Stage H review log. Status stays `missing` pending human visual acceptance. |
+| sos/07-sos-sending.png | partial | P2/M | A full-screen sending dialog renders while the SOS is mid-submit (ring, staged request steps, photo/note lines only when staged, informational note, no fake progress); rows are centered and carry no per-row done timestamps and the dim covers the sheet, not the whole map. Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-07-sos-sending-impl.png`); the demo answers `POST /_user/sos` after an artificial delay so the transient state is screenshottable. |
 | sos/08-sos-pending.png | missing | P2/M | No dedicated pending surface; the mission rail approximates it. |
 | sos/09-sos-dispatched.png | missing | P2/M | No dedicated dispatched surface. |
 | sos/10-sos-rescuer-en-route.png | missing | P2/M | No en-route surface/ETA (ETA needs routing data — superseded area; a status-only surface remains possible). |
 | sos/11-sos-rescuer-arrived.png | missing | P2/L | Rail covers it only. |
 | sos/12-sos-completed.png | partial | P2/M | Rail + one-time rating implemented; no designed completion card. |
-| sos/13-sos-cancel-reason.png | done | P1/C | Mission view offers the requester an inline cancel panel: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. |
+| sos/13-sos-cancel-reason.png | partial | P1/C | Mission view offers the requester an inline cancel panel below the rail: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. Materially different from the reference (inline panel, four server-catalog reasons, no 200-character counter). Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-13-sos-cancel-reason-impl.png`, requester-only rail via `?missions=empty&offers=empty`). |
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
-| sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with a remove-photo button or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
+| sos/15-sos-photo-retry.png | partial | P1/H | The photo rides `POST /_user/sos`; there is no post-submit photo-upload step and therefore no designed retry surface. The retryable error exists inline in composer step 3 (size, type), the preview resets for re-pick and a submit-time size guard rejects oversized sources; the designed full-screen surface does not exist. Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/sos-15-sos-photo-retry-impl.png`). |
 | sos/16-sos-offline.png | missing | P2/M | The SOS composer now carries its offline stance: an explicit no-SOS-reaches-the-center card (no offline queue exists, last catalog sync shown where known) and a disabled, relabelled send button on review while the link is down. See Stage H review log. Status stays `missing`. |
 | sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, day-grouped date, tracked-code, Persian status label); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | partial | P2/M | Expandable per-request detail in HistoryView: description, tracking code, manual-fix flag, severity, and the server-held status timeline from `GET /_user/sos/:id`; not the designed full-screen detail. |
@@ -245,7 +245,7 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 
 ## Summary tally (canonical 141)
 
-Counts over the 141 canonical rows above: `done` 23, `partial` 71, `missing` 30, `superseded` 11, `reference` 5, intentional `deviation` 1.
+Counts over the 141 canonical rows above: `done` 21, `partial` 74, `missing` 29, `superseded` 11, `reference` 5, intentional `deviation` 1.
 
 ## Stage C review log (2026-11-08)
 
@@ -486,3 +486,37 @@ Evaluated and deliberately not changed:
 
 The demo-auth limitation stands: any credential logs in (persona follows the username), so the
 auth error path stays server-side-tested only.
+
+## Stage F fourth pass (2026-11-16) — capture harness and hold-bar fix, no approvals
+
+Two code defects closed on code evidence, three rows moved on captured evidence;
+nothing was accepted visually — P5 stays a human call.
+
+Defects fixed:
+
+- **The SOS hold progress bar painted nowhere** (`.sos-button__progress` in `src/client/app.css`):
+  it sat flush against the bottom/inline-end edges where the button's `overflow: hidden` and
+  999px radius clipped it entirely, and a competing `.is-holding` rule forced `width: 100%`
+  regardless of the inline-size binding. The bar is now a bottom-inset (8px) pill inset 14px
+  from the inline start, 5px tall, painted in the on-accent color; hold captures at ~50 percent
+  fill (`navigation/02`, `sos/02`, viewport clips — full-page screenshots do not paint the hold
+  indicator in headless Chromium) confirm it renders mid-hold.
+- **The SOS dock painted under the route sheet** (`z-index` 16) and was effectively unreachable
+  at every detent: now `z-index: 18`, and the quick-jump saved-place chips moved out of the
+  sheet (they were clipped by its rounded top edge) into a detent-aware sibling that paints
+  above the sheet only on the map route; the map-route search bar joins them there.
+- **The submitting state was unreachable in captures**: the demo answered `POST /_user/sos`
+  inside one microtask, so the full-screen sending card could never be screenshotted. A
+  preview-only 1500 ms delay now makes the transient state capturable (`sos/07`). Two new
+  preview-only knobs (`?missions=empty&offers=empty`) serve the requester-only mission rail for
+  `sos/13`; `clickAt` joined the harness step set for canvas point taps.
+
+Rows moved on code/capture evidence: `sos/07` missing → `partial`, `sos/13` done → `partial`,
+`sos/15` done → `partial`. Tally: `done` 21, `partial` 74, `missing` 29, `superseded` 11,
+`reference` 5, intentional `deviation` 1.
+
+Evidence: 88 implementation captures (393 × 852, DPR 2) under `docs/visual-acceptance/screens/`,
+generated with the harness committed at `scripts/visual-acceptance/` and documented in
+`docs/VISUAL_ACCEPTANCE.md`. They are byte-stable and reproducible from the demo bundle; their
+`node_modules/` stays gitignored. Pixel-level fidelity against the references remains unverified
+for every row; the human P5 review is the approval gate.

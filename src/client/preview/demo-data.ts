@@ -301,6 +301,21 @@ export const demoTripInvitations = [
   }
 ];
 
+/** Detail for the planned demo trip so the leader controls (including stop reorder) render in preview. */
+export const demoPlannedTripDetail = {
+  ...demoTrips[2],
+  stops: [
+    { id: 'stp_r1', rank: 1, label: 'خانه', latitude: 35.7242, longitude: 51.3312, placeId: 'plc_home' },
+    { id: 'stp_r2', rank: 2, label: 'ایستگاه آتش‌نشانی ۱۲', latitude: 35.7422, longitude: 51.3787, placeId: null },
+    { id: 'stp_r3', rank: 3, label: 'محل تمرین', latitude: 35.7335, longitude: 51.4108, placeId: null },
+    { id: 'stp_r4', rank: 4, label: 'ایستگاه پلیس میدان سهروردی', latitude: 35.7501, longitude: 51.4261, placeId: null }
+  ],
+  members: [
+    { userId: DEMO_USER_ID, username: DEMO_USERNAME, role: 'leader', joinedAt: T0 - 2 * DAY }
+  ],
+  invitations: []
+};
+
 /** Full detail for the featured trip; the stops follow `recordedTrack`. */
 export const demoTripDetail = {
   ...demoTrips[0],

@@ -16,7 +16,7 @@ const REQUIRED_DOCUMENTS = [
   'docs/DEVELOPMENT.md', 'docs/DEPLOYMENT.md', 'docs/USER_MANUAL.md',
   'docs/ADMIN_MANUAL.md', 'docs/TESTING.md', 'docs/SECURITY.md',
   'docs/PERFORMANCE.md', 'docs/AUTOMATION.md', 'docs/DESIGN_SYSTEM.md',
-  'docs/LEGACY_REVIEW.md', 'docs/STATUS.md', 'docs/ACCEPTANCE.md',
+  'docs/LEGACY_REVIEW.md', 'docs/STATUS.md', 'docs/ACCEPTANCE.md', 'docs/VISUAL_ACCEPTANCE.md',
   'docs/RELEASE_NOTES.md', 'docs/OPERATIONS.md'
 ];
 

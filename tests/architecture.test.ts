@@ -6,10 +6,15 @@ import { ROOT } from '../src/server/core/config.ts';
 const read = (relative: string): Promise<string> => Bun.file(path.join(ROOT, relative)).text();
 const exists = (relative: string): Promise<boolean> => Bun.file(path.join(ROOT, relative)).exists();
 
-/** Lists files below a directory with Bun's glob. */
+/**
+ * Lists files below a directory with Bun's glob. Dependencies are never source, so any path
+ * crossing a `node_modules` segment is dropped — the local visual-capture tool in
+ * `scripts/visual-acceptance/` brings its own (gitignored) dependency tree.
+ */
 async function glob(directory: string, pattern: string): Promise<string[]> {
   const found: string[] = [];
   for await (const relative of new Bun.Glob(pattern).scan({ cwd: directory, onlyFiles: true })) {
+    if (relative.split('/').includes('node_modules')) continue;
     found.push(path.join(directory, relative));
   }
   return found.sort();
@@ -74,8 +79,12 @@ describe('architecture guards', () => {
   });
 
   it('no hand-authored JavaScript ships as source', async () => {
+    // `scripts/visual-acceptance/` is the gitignored local capture tool documented in
+    // `docs/VISUAL_ACCEPTANCE.md` (Stage F); it never ships, so it is excluded by name.
+    const ignoredLocalTool = path.join('scripts', 'visual-acceptance', path.sep);
     for (const pattern of ['src/**/*.{js,mjs,cjs}', 'scripts/**/*.{js,mjs,cjs}', 'tests/**/*.{js,mjs,cjs}']) {
-      expect(await glob(ROOT, pattern)).toEqual([]);
+      const offenders = (await glob(ROOT, pattern)).filter((file) => !file.startsWith(path.join(ROOT, ignoredLocalTool)));
+      expect(offenders).toEqual([]);
     }
     expect(await exists('public/js/protocol.js')).toBe(false);
   });

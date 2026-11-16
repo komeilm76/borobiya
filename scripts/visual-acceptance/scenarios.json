@@ -1,0 +1,1665 @@
+[
+ {
+  "ref": "admin-01-overview",
+  "route": "/_admin/overview",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "admin-02-dispatch-board",
+  "route": "/_admin/dispatch",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "admin-03-reports",
+  "route": "/_admin/reports",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "services-01-groups",
+  "route": "/_admin/groups",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "services-02-group-edit",
+  "route": "/_admin/groups",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "click": "[data-testid=\"group-edit-grp_north\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "services-03-members",
+  "route": "/_admin/groups",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "click": "[data-testid=\"group-members-grp_north\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "services-04-incident-types",
+  "route": "/_admin/incidents",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "states-04-offline",
+  "route": "/_admin/overview",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "offline": true
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "states-05-forbidden",
+  "route": "/_forbidden",
+  "persona": "user",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "system-01-audit-log",
+  "route": "/_admin/audit",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "system-02-alerts",
+  "route": "/_admin/alerts",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "system-03-settings",
+  "route": "/_admin/settings",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "users-01-list",
+  "route": "/_admin/users",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "users-02-account",
+  "route": "/_admin/users",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "click": "[data-testid=\"user-detail-usr_demo\"]"
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "states-02-empty",
+  "route": "/_admin/users",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-text-field input",
+     "text": "zzzz-no-such-user",
+     "enter": true
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "auth-01-login",
+  "route": "/_auth/login",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "auth-02-login-empty",
+  "route": "/_auth/login",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "auth-03-register",
+  "route": "/_auth/register",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 1400,
+  "dsf": 1
+ },
+ {
+  "ref": "auth-04-register-error",
+  "route": "/_auth/register",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 1400,
+  "dsf": 1,
+  "steps": [
+   {
+    "type": {
+     "selector": "#reg-username",
+     "text": "saeed.k"
+    }
+   },
+   {
+    "type": {
+     "selector": "#reg-password",
+     "text": "Abcdefgh1234"
+    }
+   },
+   {
+    "type": {
+     "selector": "#reg-confirm",
+     "text": "Abcdefgh9999"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ساخت حساب"
+    }
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "auth-05-recovery-account",
+  "route": "/_auth/recovery",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "auth-06-recovery-account-error",
+  "route": "/_auth/recovery",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "type": {
+     "selector": "input",
+     "text": "no-such-user"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "دریافت پرسش‌ها"
+    }
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "auth-07-recovery-questions",
+  "route": "/_auth/recovery",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 1100,
+  "dsf": 1,
+  "steps": [
+   {
+    "type": {
+     "selector": "input",
+     "text": "leila.n"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "دریافت پرسش‌ها"
+    }
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "auth-09-recovery-password",
+  "route": "/_auth/recovery",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 1000,
+  "dsf": 1,
+  "steps": [
+   {
+    "type": {
+     "selector": "input",
+     "text": "leila.n"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "دریافت پرسش‌ها"
+    }
+   },
+   {
+    "wait": 500
+   },
+   {
+    "type": {
+     "selector": "#answer-0",
+     "text": "خواننده"
+    }
+   },
+   {
+    "type": {
+     "selector": "#answer-1",
+     "text": "راکت"
+    }
+   },
+   {
+    "type": {
+     "selector": "#answer-2",
+     "text": "تهران"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "تأیید پاسخ‌ها"
+    }
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "auth-10-recovery-done",
+  "route": "/_auth/recovery",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "type": {
+     "selector": "input",
+     "text": "leila.n"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "دریافت پرسش‌ها"
+    }
+   },
+   {
+    "wait": 500
+   },
+   {
+    "type": {
+     "selector": "#answer-0",
+     "text": "خواننده"
+    }
+   },
+   {
+    "type": {
+     "selector": "#answer-1",
+     "text": "راکت"
+    }
+   },
+   {
+    "type": {
+     "selector": "#answer-2",
+     "text": "تهران"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "تأیید پاسخ‌ها"
+    }
+   },
+   {
+    "wait": 500
+   },
+   {
+    "type": {
+     "selector": "input[type=password]",
+     "text": "NewPassword123"
+    }
+   },
+   {
+    "wait": 400
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ذخیره گذرواژه"
+    }
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "auth-11-onboarding",
+  "route": "/_auth/onboarding",
+  "persona": "onboarding",
+  "width": 1440,
+  "height": 1000,
+  "dsf": 1
+ },
+ {
+  "ref": "auth-15-dark",
+  "route": "/_auth/login",
+  "persona": null,
+  "anon": true,
+  "width": 1440,
+  "height": 900,
+  "dsf": 1,
+  "darkStart": true
+ },
+ {
+  "ref": "auth-16-responsive",
+  "route": "/_auth/login",
+  "persona": null,
+  "anon": true,
+  "width": 1439,
+  "height": 600,
+  "dsf": 2
+ },
+ {
+  "ref": "history-01-history-trips",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-trips\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-02-history-missions",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-missions\"]"
+   },
+   {
+    "click": "[data-testid=\"history-subtab-requests\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-03-history-missions-agent",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-missions\"]"
+   },
+   {
+    "click": "[data-testid=\"history-subtab-missions\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-05-history-filter",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-status-completed\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-06-history-details",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-trips\"]"
+   },
+   {
+    "clickPrefix": "[data-testid^=\"history-trip-trp_target\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "history-07-history-playback",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-trips\"]"
+   },
+   {
+    "clickPrefix": "[data-testid^=\"history-trip-trp_target\"]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 900
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-17-sos-history",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-missions\"]"
+   },
+   {
+    "click": "[data-testid=\"history-subtab-requests\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-14-sos-cancelled",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-missions\"]"
+   },
+   {
+    "click": "[data-testid=\"history-subtab-requests\"]"
+   },
+   {
+    "click": "[data-testid=\"history-status-cancelled\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "history-18-sos-history-detail",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-missions\"]"
+   },
+   {
+    "click": "[data-testid=\"history-subtab-requests\"]"
+   },
+   {
+    "clickPrefix": "[data-testid^=\"history-request-\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "mission-01-mission-ready-on",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 120
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "mission-02-mission-ready-off",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"ready-toggle\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 120
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "mission-03-mission-offer",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "mission-05-mission-accepted",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"mission-offer-accept\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "click": "[data-testid=\"accept-confirm-accept\"]"
+   },
+   {
+    "wait": 900
+   },
+   {
+    "scrollInto": ".rail-block"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "mission-06-mission-dispatch",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollInto": ".rail-block"
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "mission-09-mission-arrived",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "رسیدم"
+    }
+   },
+   {
+    "wait": 900
+   },
+   {
+    "scrollInto": ".rail-block"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "wait": 2200
+   }
+  ]
+ },
+ {
+  "ref": "mission-10-mission-in-progress",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "رسیدم"
+    }
+   },
+   {
+    "wait": 800
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "شروع رسیدگی"
+    }
+   },
+   {
+    "wait": 900
+   },
+   {
+    "wait": 400
+   },
+   {
+    "scrollInto": "[data-testid=\"mission-next-actions\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "wait": 2200
+   }
+  ]
+ },
+ {
+  "ref": "mission-17-mission-completed",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "رسیدم"
+    }
+   },
+   {
+    "wait": 800
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "شروع رسیدگی"
+    }
+   },
+   {
+    "wait": 800
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "پایان"
+    }
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "scrollInto": "[data-testid=\"mission-next-actions\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "wait": 2200
+   }
+  ]
+ },
+ {
+  "ref": "mission-18-mission-no-offer",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"mission-offer-decline\"]"
+   },
+   {
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "ref": "mission-19-mission-offline",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "offline": true
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "mission-11-support-request",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"open-support-composer\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "mission-12-support-pending",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 1100
+    }
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "mission-14-team-leader-dashboard",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 700
+    }
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "mission-15-mission-cancel",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"cancel-mission\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 1400
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "sos-03-sos-compose",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "sos-04-sos-location-picker",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "sos-05-sos-photo",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "sos-06-sos-review",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "sos-19-sos-validation",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "sos-16-sos-offline",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "offline": true
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "sos-01-sos-entry",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "sos-02-sos-hold-to-open",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "mouseDown": "[data-testid=\"sos-hold\"]"
+   },
+   {
+    "wait": 620
+   }
+  ],
+  "clip": {
+   "x": 8,
+   "y": 208,
+   "width": 118,
+   "height": 80
+  }
+ },
+ {
+  "ref": "sos-08-sos-pending",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[data-testid=\"sos-submit\"]"
+   },
+   {
+    "wait": 1800
+   },
+   {
+    "clickText": {
+     "tag": "a",
+     "contains": "مأموریت"
+    }
+   },
+   {
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "ref": "navigation-01-map-idle",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "navigation-03-bookmark-form",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "mouseClick": {
+     "x": 196,
+     "y": 300
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "click": "[data-testid=\"open-save-place\"]"
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "navigation-05-search-open",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "mouseClick": {
+     "x": 120,
+     "y": 440
+    }
+   },
+   {
+    "wait": 400
+   },
+   {
+    "type": {
+     "selector": "[data-testid=\"map-search\"]",
+     "text": "بیمارستان"
+    }
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "ref": "navigation-06-destination-selected",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": ".map-canvas"
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "navigation-17-destination-reordering",
+  "route": "/_user/trips",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"trips-row-trp_round\"]"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 700
+    }
+   },
+   {
+    "wait": 300
+   },
+   {
+    "click": "[data-testid=\"trips-reorder-open\"]"
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "navigation-16-multi-destination",
+  "route": "/_user/trips",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "profile-01-profile-home",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "profile-03-login-history",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 1200
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "profile-04-active-devices",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 600
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "profile-06-logout-confirm",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"logout-button\"]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 0
+    }
+   }
+  ]
+ },
+ {
+  "ref": "profile-08-bookmarks",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 1800
+    }
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "companions-06-share-location",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"share-create-toggle\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "companions-01-companions-hub",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "companions-02-companion-add",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"share-create-toggle\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "type": {
+     "selector": "[data-testid=\"share-search\"]",
+     "text": "reza"
+    }
+   },
+   {
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "ref": "companions-07-share-history",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"share-create-toggle\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "click": "[data-testid=\"share-kind-history\"]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 900
+    }
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "companions-08-shared-with-me",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"share-direction-incoming\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "companions-10-companions-offline",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "offline": true
+   },
+   {
+    "wait": 600
+   }
+  ]
+ },
+ {
+  "ref": "companions-04-companion-talk",
+  "route": "/_user/talk",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "navigation-02-map-press-hold",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickAt": {
+     "x": 250,
+     "y": 250
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "profile-02-profile-edit",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"edit-username\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "profile-05-security",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 350
+    }
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "profile-09-bookmark-edit",
+  "route": "/_user/profile",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"edit-place-plc_home\"]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 1500
+    }
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "history-04-history-companions",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-shares\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "history-08-history-companion",
+  "route": "/_user/history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"history-tab-shares\"]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 700
+    }
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "navigation-20-trip-completed",
+  "route": "/_user/trips",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"trips-row-trp_target\"]"
+   },
+   {
+    "wait": 700
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 750
+    }
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "navigation-19-trip-cancel",
+  "route": "/_user/trips",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"trips-row-trp_round\"]"
+   },
+   {
+    "wait": 700
+   },
+   {
+    "scrollEl": {
+     "selector": ".sheet__body",
+     "y": 760
+    }
+   },
+   {
+    "wait": 300
+   },
+   {
+    "click": "[data-testid=\"trips-cancel\"]"
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "sos-13-sos-cancel-reason",
+  "route": "/_user/mission?missions=empty&offers=empty",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"cancel-request\"]"
+   },
+   {
+    "wait": 450
+   },
+   {
+    "clickText": {
+     "tag": "label",
+     "contains": "دلیل دیگر"
+    }
+   },
+   {
+    "wait": 200
+   },
+   {
+    "type": {
+     "selector": "[data-testid=\"cancel-detail\"]",
+     "text": "همسایه‌ها کمک کردند و مصدوم را جابه‌جا کردند."
+    }
+   },
+   {
+    "wait": 150
+   },
+   {
+    "scrollInto": "[data-testid=\"cancel-request-panel\"]"
+   }
+  ]
+ }
+]

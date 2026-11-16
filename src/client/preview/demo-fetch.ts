@@ -21,7 +21,11 @@ export type PreviewPersonaFull = 'user' | 'admin' | 'onboarding';
 const state = {
   persona: 'user' as PreviewPersonaFull,
   sessionActive: true,
-  onboarded: false
+  onboarded: false,
+  // Preview harness knobs so a capture can render the requester-only view of the mission
+  // screen (own cancellable request, no responder mission shadowing it) and the empty inbox.
+  emptyMissions: false,
+  emptyOffers: false
 };
 
 /** Selects which demo account `/_user/me` resolves to. */
@@ -34,11 +38,19 @@ export function setPreviewSession(active: boolean): void {
   state.sessionActive = active;
 }
 
+/** Empties selected collections; used by capture scenarios that need the requester view. */
+export function setPreviewSections(sections: { missions?: boolean; offers?: boolean }): void {
+  if (sections.missions !== undefined) state.emptyMissions = sections.missions;
+  if (sections.offers !== undefined) state.emptyOffers = sections.offers;
+}
+
 /** Restores the pristine demo state; used by the smoke test between pages. */
 export function resetPreviewState(): void {
   state.persona = 'user';
   state.sessionActive = true;
   state.onboarded = false;
+  state.emptyMissions = false;
+  state.emptyOffers = false;
 }
 
 const envelope = (data: unknown, init?: ResponseInit): Response =>
@@ -47,6 +59,29 @@ const envelope = (data: unknown, init?: ResponseInit): Response =>
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     ...init
   });
+
+/**
+ * Preview-only in-memory mission state so the responder flow is clickable end to end.
+ * The production server owns the real state machine; here the plain responder mission
+ * advances through arrive → start → complete (or cancel) exactly as the clicked buttons
+ * ask, seeded fresh on every page load so captures stay deterministic.
+ */
+type PreviewMission = {
+  id: string;
+  sosId: string;
+  status: string;
+  updatedAt: number;
+  rating?: number | null;
+  ratingNote?: string | null;
+  [key: string]: unknown;
+};
+const previewMissions: PreviewMission[] = D.userMissions.map((mission) => ({ ...mission }) as PreviewMission);
+const PROGRESS_NEXT: Record<string, string> = {
+  arrive: 'arrived',
+  start: 'in_progress',
+  complete: 'completed',
+  cancel: 'cancelled'
+};
 
 const failure = (status: number, code: string, message: string): Response =>
   new Response(JSON.stringify({ ok: false, error: { code, message } }), {
@@ -65,7 +100,7 @@ function currentUser(): Record<string, unknown> {
 
 /* ------------------------------------------------------------------- */
 
-type Handler = (params: { args: string[]; query: URLSearchParams; body: Record<string, unknown> }) => Response;
+type Handler = (params: { args: string[]; query: URLSearchParams; body: Record<string, unknown> }) => Response | Promise<Response>;
 
 const items = (list: unknown[], extra: Record<string, unknown> = {}): Response =>
   envelope({ items: list, total: list.length, ...extra });
@@ -177,16 +212,34 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
     const hit = all[id];
     return hit ? envelope({ ...hit.sos, timeline: hit.timeline }) : failure(404, 'NOT_FOUND', 'درخواستی با این شناسه وجود ندارد.');
   }],
-  ['POST', /^\/_user\/sos$/, ({ body }) =>
-    envelope({ sos: { id: `sos_demo_${Date.now()}`, trackingCode: 978, requesterId: D.DEMO_USER_ID, incidentLabel: 'درخواست جدید', incidentTypeId: String(body.incidentTypeId ?? 'inc_rescue'), severity: String(body.severity ?? 'medium'), description: String(body.description ?? ''), latitude: Number(body.latitude ?? D.LAT), longitude: Number(body.longitude ?? D.LNG), accuracy: Number(body.accuracy ?? 10), isManual: Boolean(body.isManual), status: 'pending', createdAt: Date.now(), updatedAt: Date.now() } })],
+  // A 1500 ms preview-only delay so the full-screen submitting card is actually rendered (and
+  // screenshotted) before the created request resolves; production latency does the rest.
+  ['POST', /^\/_user\/sos$/, async ({ body }) => {
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return envelope({ sos: { id: `sos_demo_${Date.now()}`, trackingCode: 978, requesterId: D.DEMO_USER_ID, incidentLabel: 'درخواست جدید', incidentTypeId: String(body.incidentTypeId ?? 'inc_rescue'), severity: String(body.severity ?? 'medium'), description: String(body.description ?? ''), latitude: Number(body.latitude ?? D.LAT), longitude: Number(body.longitude ?? D.LNG), accuracy: Number(body.accuracy ?? 10), isManual: Boolean(body.isManual), status: 'pending', createdAt: Date.now(), updatedAt: Date.now() } });
+  }],
   ['POST', /^\/_user\/sos\/[^/]+\/cancel$/, () => envelope({ ok: true })],
   ['POST', /^\/_user\/sos\/[^/]+\/accept$/, () => envelope({ missionId: 'mis_single', missionStatus: 'accepted' })],
   ['POST', /^\/_user\/sos\/[^/]+\/decline$/, () => envelope({ ok: true })],
 
-  ['GET', /^\/_user\/missions$/, () => items([...D.userMissions])],
-  ['GET', /^\/_user\/mission-offers$/, () => items([D.pendingOfferSos])],
-  ['POST', /^\/_user\/missions\/[^/]+\/progress$/, () => envelope({ ok: true })],
-  ['POST', /^\/_user\/missions\/[^/]+\/rating$/, () => envelope({ ok: true })],
+  ['GET', /^\/_user\/missions$/, () => items(state.emptyMissions ? [] : previewMissions.map((mission) => ({ ...mission })))],
+  ['GET', /^\/_user\/mission-offers$/, () => items(state.emptyOffers ? [] : [D.pendingOfferSos])],
+  ['POST', /^\/_user\/missions\/([^/]+)\/progress$/, ({ args, body }) => {
+    const target = previewMissions.find((mission) => mission.id === args[0]);
+    if (target) {
+      target.status = PROGRESS_NEXT[String(body.action ?? '')] ?? target.status;
+      target.updatedAt = Date.now();
+    }
+    return envelope({ ok: true });
+  }],
+  ['POST', /^\/_user\/missions\/([^/]+)\/rating$/, ({ args, body }) => {
+    const target = previewMissions.find((mission) => mission.id === args[0]);
+    if (target) {
+      target.rating = Number(body.rating ?? 0) || null;
+      target.ratingNote = typeof body.note === 'string' ? body.note : null;
+    }
+    return envelope({ ok: true });
+  }],
 
   /* ----------------------------------- user: teams / support requests */
   ['GET', /^\/_user\/missions\/([^/]+)\/team$/, ({ args }) => {
@@ -217,7 +270,7 @@ const routes: Array<[method: string, pattern: RegExp, handler: Handler]> = [
   ['POST', /^\/_user\/trips\/invitations\/[^/]+\/(accept|decline)$/, () => envelope({ ok: true })],
   ['DELETE', /^\/_user\/trips\/invitations\/[^/]+$/, () => envelope({ ok: true })],
   ['GET', /^\/_user\/trips\/([^/]+)$/, ({ args }) =>
-    args[0] === 'trp_target' ? envelope(D.demoTripDetail) : failure(404, 'NOT_FOUND', 'سفری با این شناسه وجود ندارد.')],
+    args[0] === 'trp_target' ? envelope(D.demoTripDetail) : args[0] === 'trp_round' ? envelope(D.demoPlannedTripDetail) : failure(404, 'NOT_FOUND', 'سفری با این شناسه وجود ندارد.')],
   ['PATCH', /^\/_user\/trips\/[^/]+$/, ({ args, body }) => envelope({ ...D.demoTripDetail, ...(body.name ? { name: String(body.name) } : {}), id: args[0] })],
   ['POST', /^\/_user\/trips\/[^/]+\/start$/, () => envelope({ ...D.demoTripDetail, status: 'active', startedAt: Date.now() })],
   ['POST', /^\/_user\/trips\/[^/]+\/complete$/, () => envelope({ ...D.demoTripDetail, status: 'completed', completedAt: Date.now() })],
@@ -376,7 +429,7 @@ export function installDemoFetch(): void {
       if (!match) continue;
       // eslint-disable-next-line no-console
       console.info(`[preview] ${method} ${parsed.pathname}`);
-      return handler({ args: match.slice(1), query: parsed.searchParams, body });
+      return await handler({ args: match.slice(1), query: parsed.searchParams, body });
     }
     console.warn(`[preview] unmocked ${method} ${parsed.pathname}`);
     return failure(404, 'PREVIEW_UNMOCKED', `پیش‌نمایش برای ${method} ${parsed.pathname} ساخته نشده است.`);
