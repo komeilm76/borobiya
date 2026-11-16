@@ -556,10 +556,11 @@ preview), `profile/06-logout-confirm`, `admin-panel/dashboard/03-reports`,
 `admin-panel/services/02-group-edit`, `admin-panel/services/03-members`,
 `admin-panel/users/02-account`.
 
-Capture alignment (same pass): every committed capture under `docs/visual-acceptance/screens/`
-is now named by at least one row (90 of 92; the two exceptions are `navigation-19-trip-cancel` and
-`navigation-20-trip-completed`, which map to `superseded` rows and are deliberately not wired in as
-acceptance evidence). Two stale row notes fixed in the same sweep: `admin-panel/states/02-empty`
+Capture alignment (two passes): every committed capture under `docs/visual-acceptance/screens/`
+is now named by at least one row — all 90 light captures that map to non-superseded rows are wired
+in, the two exceptions are `navigation-19-trip-cancel` and `navigation-20-trip-completed`, which
+map to `superseded` rows and are deliberately not wired in as acceptance evidence, and the five
+`dark-*` aid shots are named as dark-theme aids on their rows (not acceptance evidence). Two stale row notes fixed in the same sweep: `admin-panel/states/02-empty`
 (the users screen gained the designed filter-empty composition in Stage G) and
 `admin-panel/states/05-forbidden` (a designed 403 surface replaced the silent redirect in Stage
 G/H; the note still claimed neither existed).
