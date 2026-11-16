@@ -388,6 +388,13 @@
   gap: 0.65rem;
 }
 
+/* Keep Persian labels and field icons in the RTL form. Only the editable
+   password value is LTR, including when the user chooses to reveal it. */
+.auth-password-field .v-field__input {
+  direction: ltr;
+  text-align: left;
+}
+
 .auth-show-password {
   margin-top: -0.85rem;
   margin-bottom: -0.4rem;
@@ -459,15 +466,20 @@
 
 .auth-button-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
   gap: 0.7rem;
   margin-top: 0.25rem;
 }
 
-.auth-submit-inline {
-  flex: 1;
+.auth-button-row .auth-back,
+.auth-button-row .auth-submit-inline {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  height: auto;
 }
+.auth-button-row .auth-submit { margin-top: 0; }
+.auth-button-row .v-btn__content { white-space: normal; text-align: center; }
 
 .recovery-steps {
   display: grid;

@@ -59,7 +59,7 @@
               hide-details="auto"
               :disabled="submitting"
             />
-            <v-text-field
+            <v-text-field class="auth-password-field"
               v-model="password"
               label="گذرواژه"
               name="password"

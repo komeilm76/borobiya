@@ -71,7 +71,7 @@
                 />
               </div>
               <div class="auth-button-row">
-                <v-btn variant="tonal" rounded="lg" :disabled="submitting" @click="step = 1">بازگشت</v-btn>
+                <v-btn class="auth-back" variant="tonal" size="large" rounded="lg" :disabled="submitting" @click="step = 1">بازگشت</v-btn>
                 <v-btn class="auth-submit auth-submit-inline" color="primary" type="submit" size="large" rounded="lg" :loading="submitting">
                   بررسی پاسخ‌ها <v-icon class="ms-2" icon="mdi-arrow-left" />
                 </v-btn>
@@ -80,7 +80,7 @@
 
             <form v-else class="auth-form" @submit.prevent="resetPassword">
               <p class="auth-form-intro">یک گذرواژهٔ تازه بسازید تا دوباره به حساب‌تان دسترسی پیدا کنید.</p>
-              <v-text-field
+              <v-text-field class="auth-password-field"
                 v-model="newPassword"
                 label="گذرواژهٔ تازه"
                 autocomplete="new-password"
@@ -93,7 +93,7 @@
                 persistent-hint
                 :disabled="submitting"
               />
-              <v-text-field
+              <v-text-field class="auth-password-field"
                 v-model="confirmPassword"
                 label="تکرار گذرواژهٔ تازه"
                 autocomplete="new-password"
@@ -106,7 +106,7 @@
               />
               <v-checkbox v-model="showPassword" class="auth-show-password" label="نمایش گذرواژه‌ها" color="primary" density="compact" hide-details />
               <div class="auth-button-row">
-                <v-btn variant="tonal" rounded="lg" :disabled="submitting" @click="restartRecovery">شروع دوباره</v-btn>
+                <v-btn class="auth-back" variant="tonal" size="large" rounded="lg" :disabled="submitting" @click="restartRecovery">شروع دوباره</v-btn>
                 <v-btn class="auth-submit auth-submit-inline" color="primary" type="submit" size="large" rounded="lg" :loading="submitting">
                   تغییر گذرواژه <v-icon class="ms-2" icon="mdi-arrow-left" />
                 </v-btn>

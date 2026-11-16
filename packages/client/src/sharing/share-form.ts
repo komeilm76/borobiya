@@ -22,6 +22,13 @@ import { ApiError } from "../api/http";
 /** The picker's modes: live (`timed` / `permanent`) or past route window (`history`). */
 export type ShareMode = "timed" | "permanent" | "history";
 
+/** Only a server-confirmed, current-session grant produces this UI event. */
+export interface ShareCreatedResult {
+  mode: ShareMode;
+  created: number;
+  reused: number;
+}
+
 export interface ShareDraft {
   mode: ShareMode;
   /** Ordered by selection, because the server reports `createdShareIds` in request order. */

@@ -369,6 +369,7 @@ import {
   shareDraftIssues,
   shareRejections,
   shouldSearch,
+  type ShareCreatedResult,
   type ShareDraft,
   type ShareMode
 } from "@/sharing/share-form";
@@ -382,7 +383,7 @@ import {
 const props = defineProps<{ modelValue: boolean; fullscreen?: boolean }>();
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
-  (event: "shared"): void;
+  (event: "shared", result: ShareCreatedResult): void;
 }>();
 
 const auth = useAuthStore();
@@ -570,7 +571,7 @@ async function submit(): Promise<void> {
       if (!submissionFence.isCurrent(submission)) return;
       createdCount.value = created.createdShareIds.length;
       reusedCount.value = created.reusedShareIds.length;
-      emit("shared");
+      emit("shared", { mode: current.mode, created: createdCount.value, reused: reusedCount.value });
       return;
     }
 
@@ -586,7 +587,7 @@ async function submit(): Promise<void> {
     createdCount.value = created.createdShareIds.length;
     reusedCount.value = created.reusedShareIds.length;
     deviceChooserOpen.value = false;
-    emit("shared");
+    emit("shared", { mode: current.mode, created: createdCount.value, reused: reusedCount.value });
   } catch (error) {
     if (!submissionFence.isCurrent(submission)) return;
     createdCount.value = 0;

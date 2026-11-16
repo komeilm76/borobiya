@@ -167,6 +167,15 @@ watch(() => props.userId, () => {
   open.value = false; detailsOpen.value = false; selectedOfferId.value = null;
   returnFocusOnClose.value = false;
 });
+// Acceptance is confirmed by the store before the map switches tabs. Close
+// both review layers even when the user was already on the Missions tab.
+watch(() => props.inbox.acceptedMissionId, (id, previous) => {
+  if (!id || id === previous) return;
+  open.value = false;
+  detailsOpen.value = false;
+  selectedOfferId.value = null;
+  returnFocusOnClose.value = false;
+});
 let lastEntryIntent: string | null = null;
 watch(() => route.fullPath, () => {
   // A tab change closes an open drawer; it must not replay an earlier offer

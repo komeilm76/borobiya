@@ -58,7 +58,7 @@
             />
 
             <div class="auth-password-grid">
-              <v-text-field
+              <v-text-field class="auth-password-field"
                 v-model="password"
                 label="گذرواژه"
                 name="new-password"
@@ -72,7 +72,7 @@
                 persistent-hint
                 :disabled="submitting"
               />
-              <v-text-field
+              <v-text-field class="auth-password-field"
                 v-model="confirmPassword"
                 label="تکرار گذرواژه"
                 name="confirm-password"

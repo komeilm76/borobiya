@@ -21,6 +21,9 @@
         <v-icon :icon="item.icon" size="19" aria-hidden="true" /><span>{{ item.label }}</span>
       </button>
     </nav>
+    <v-alert v-if="shareSuccess && !shareOpen" id="map-share-success" class="user-map-view__share-success" type="success"
+      variant="tonal" rounded="lg" role="status" aria-live="polite" tabindex="-1" closable
+      @click:close="shareSuccess = null">{{ shareSuccess }}</v-alert>
     <v-btn v-if="isPhone && mode === 'missions'" class="user-map-view__mission-search" icon="mdi-magnify"
       variant="flat" color="primary" aria-label="جست‌وجوی ایستگاه میانی" title="جست‌وجوی ایستگاه میانی"
       @click="selectTool('search')" />
@@ -350,6 +353,8 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import UserMissionView from "./UserMissionView.vue";
 import { mapModeAvailability, type MapMode } from "@/map/map-mode-policy";
 import { workspaceTabQuery } from "@/map/workspace-tab-query";
+import type { ShareCreatedResult } from "@/sharing/share-form";
+import { shareCreatedMessage } from "@/sharing/share-feedback";
 import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
@@ -411,6 +416,13 @@ const workspaceModes: { id: MapMode; label: string; icon: string }[] = [
   { id: "history", label: "تاریخچه", icon: "mdi-map-clock-outline" }
 ];
 const confirmedAcceptance = ref<string | null>(null);
+// Both the fullscreen offer review and the inline mission inbox share this store.
+// Navigate only on a newly server-confirmed acceptance, never on a failed write,
+// a stale account result or each subsequent switch between Sharing and Missions.
+watch(() => proposals.acceptedMissionId, (id, previous) => {
+  if (!id || id === previous || auth.user?.role !== "user" || route.path !== "/_user/map") return;
+  void router.replace({ path: "/_user/map", query: workspaceTabQuery(route.query, "missions") });
+}, { flush: "post" });
 watch(() => missionShare.mission?.id, (id) => {
   if (id && id === proposals.acceptedMissionId) confirmedAcceptance.value = id;
 }, { flush: "sync" });
@@ -454,6 +466,7 @@ function chooseMode(next: MapMode): void {
   void router.push({ path: "/_user/map", query: workspaceTabQuery(route.query, next) });
 }
 watch(mode, (next) => {
+  if (next !== "sharing") shareSuccess.value = null;
   if (next === "missions") {
     if (mapTripSession.navigating.value) clearPointRoute();
     closeTool(false);
@@ -484,13 +497,25 @@ const routeChoicesOpen = ref(false);
 const transportChoicesOpen = ref(false);
 const pointSheetRef = ref<InstanceType<typeof PointRouteSheet> | null>(null);
 const shareOpen = ref(false);
-function onShareCreated(): void {
+const shareSuccess = ref<string | null>(null);
+function onShareCreated(result: ShareCreatedResult): void {
+  if (!shareOpen.value) return;
+  // The server confirmed this grant. Close both the share dialog and its phone
+  // companion overlay so the announcement is visible on the map, not behind it.
+  shareOpen.value = false;
+  if (isPhone.value && activeTool.value === "live") closeTool(false);
+  shareSuccess.value = shareCreatedMessage(result);
   // A new outgoing grant can change the device assigned to broadcast; do not start GPS here.
   void broadcast.refreshPriority();
 }
 watch(shareOpen, (open, previous) => {
-  if (!open && previous) void nextTick(() => document.getElementById("map-share-location-button")?.focus());
+  if (open) shareSuccess.value = null;
+  if (!open && previous) void nextTick(() => {
+    if (shareSuccess.value && isPhone.value) document.getElementById("map-share-success")?.focus({ preventScroll: true });
+    else document.getElementById("map-share-location-button")?.focus();
+  });
 });
+watch(() => auth.user?.id, () => { shareSuccess.value = null; });
 // A popstate changes Vue Router's history position before route-leave guards run.
 // Vuetify's overlay Back hook is not guaranteed to intercept that navigation;
 // keep the map visible on the first Back and dismiss just the open tool. Ordinary
@@ -2212,6 +2237,18 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__modes .user-map-view__mode--active { background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); }
 .user-map-view__modes button:disabled { opacity: .42; cursor: not-allowed; }
 .user-map-view__modes button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+/* Confirm the actual server write after the share sheet closes. An opaque
+   surface remains readable over light/dark tiles, without hiding in a phone
+   companion dialog or disappearing before assistive technology announces it. */
+.user-map-view__share-success { position: fixed; z-index: 15;
+  top: calc(5rem + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  width: min(28rem, calc(100vw - 1.5rem)); max-height: min(40dvh, 12rem); overflow-y: auto;
+  border: 1px solid rgb(var(--v-theme-success)); border-inline-start-width: 4px;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)) !important;
+  box-shadow: var(--bb-shadow-overlay); pointer-events: auto; }
+.user-map-view__share-success :deep(.v-alert__underlay) { display: none; }
+.user-map-view__share-success :deep(.v-alert__prepend) { color: rgb(var(--v-theme-success)); }
+.user-map-view__share-success:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .user-map-view__mission-search { position: absolute; z-index: 8; top: calc(4.85rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px)); width: 48px; height: 48px; }
 @media (max-width: 700px) {
