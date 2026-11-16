@@ -18,6 +18,7 @@ export const useRescuerMissionShareStore = defineStore("rescuer-mission-share", 
     gpsError: manager.live.error,
     statusError: manager.error,
     refreshing: manager.refreshing,
+    verified: manager.verified,
     hadActiveMission: manager.hadActiveMission,
     refresh: manager.refresh,
     retry: manager.retry

@@ -95,7 +95,7 @@ describe("UserMapView live overlay", () => {
   it("never moves the camera for a peer; only explicit selection, cluster drill-in, track framing and private GPS guidance move it", () => {
     expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(10);
     expect(body("activateResultCluster")).toContain("instance.easeTo(");
-    expect(view).toContain("if (!instance || journey.point.value || track.length === 0");
+    expect(view).toContain('if (!instance || mode.value !== "history" || journey.point.value || track.length === 0');
     expect(body("showAllSearchResults")).toContain("instance.fitBounds(");
     expect(body("frameCamera")).toContain("fitBounds");
     expect(body("frameCamera")).toContain("userControlledCamera.value");
@@ -134,7 +134,7 @@ describe("UserMapView live overlay", () => {
     const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
     expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />');
     expect(view).toContain('usePlaceSearch({');
-    expect(view).toContain('const library = map.value?.getMaxBounds() ?? null');
+    expect(view).toContain('const library = map.value?.getMaxBounds() ?? map.value?.getBounds() ?? null'); // Unbounded mission map remains searchable.
     expect(view).toContain('placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library)');
     expect(view).toContain('@return-to-track="showTrack"');
     expect(search).toContain('api.setScope(api.scope.value === \'viewport\' ? \'library\' : \'viewport\')');
@@ -382,7 +382,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("repaintOverlays")).toContain('routePaintDeferred ||');
     expect(body("paintPointRoute")).toContain('routePaintDeferred = true');
     expect(body("repaintOverlays")).toContain('!!journey.point.value');
-    expect(body("paintPlayback")).toContain('if (journey.point.value || historySuppressedAfterRouteClear.value)');
+    expect(body("paintPlayback")).toContain('if (mode.value !== "history" || journey.point.value || historySuppressedAfterRouteClear.value)');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
     expect(body("syncOwnMarker")).toContain('user-map-view__direction-arrow');
     expect(body("syncOwnMarker")).toContain('navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value)');
@@ -399,7 +399,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(view).not.toContain('transform: perspective(120px) rotateX(18deg)');
     expect(view).toContain('transform: none;');
     expect(body("startPointNavigation")).toContain('bounds.contains([fix.lon, fix.lat])');
-    expect(view).toContain('<PointRouteSheet ref="pointSheetRef" :api="journey"');
+    expect(view).toContain('<PointRouteSheet v-show="mode === \'trips\' && !missionActive" ref="pointSheetRef" :api="journey"');
   });
 
   it("does not refresh POI searches or leave unrelated POI pins on a GPS-following map", () => {

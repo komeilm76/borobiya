@@ -12,35 +12,25 @@ describe("rescuer inbox content in the map dialog", () => {
     expect(app).toContain("path: '/_user/map', query: { offer: proposal.id }");
   });
 
-  it("provides a focused incident map, consent-based distance and signed photo access", () => {
-    expect(view).toContain("<MapCanvas");
-    expect(view).toContain("@click=\"locateMe\"");
-    expect(view).toContain("getSosPhotoSrc");
+  it("keeps consent-based distance and signed photo access in the offer details", () => {
+    expect(view).toContain('@click="locateMe"');
+    expect(view).toContain('getSosPhotoSrc');
     expect(view).toContain('referrerpolicy="no-referrer"');
     expect(view).not.toContain(':src="selected.details.sosRequest.photoUrl"');
   });
 
-  it("defers MapLibre until a proposal or accepted-mission map is ready", () => {
-    // MapCanvas sends the already-loaded constructor to both ready handlers. The route
-    // must not import its large runtime chunk before an incident map even mounts.
-    expect(view).toContain('import type { Map as MapLibreMap, Marker } from "maplibre-gl"');
-    expect(view).not.toMatch(/import\s*\{\s*Marker\b/);
-    expect(view).toContain('function markIncident(map: MapLibreMap, MarkerClass: typeof Marker)');
-    expect(view).toContain('marker = new MarkerClass(');
-    expect(view).toContain('function onAcceptedMapReady(map: MapLibreMap, MarkerClass: typeof Marker)');
-    expect(view).toContain('markerConstructor = MarkerClass;');
-    expect(view).toContain('const MarkerClass = markerConstructor;');
-    expect(view).toContain('acceptedIncidentMarker = new MarkerClass(');
-    expect(view).toContain('acceptedRescuerMarker = new MarkerClass(');
+  it("does not mount a second map or import MapLibre inside the proposal dialog", () => {
+    expect(view).not.toContain('<MapCanvas');
+    expect(view).not.toContain('from "maplibre-gl"');
+    expect(view).toContain('پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود.');
   });
 
-  it("shows the accepted incident map, explicit location consent, and a two-point fitBounds camera", () => {
+  it("links accepted incident coordinates to the one map workspace", () => {
     expect(view).toContain('v-if="inbox.acceptedOffer?.details"');
     expect(view).toContain('aria-label="نمای مأموریت پذیرفته‌شده"');
-    expect(view).toContain("missionMapCamera(incident, myPosition.value)");
-    expect(view).toContain("map.fitBounds(camera.bounds");
-    expect(view).toContain('v-if="!myPosition"');
-    expect(view).toContain("موقعیت شما فقط با اجازهٔ دستگاه");
+    expect(view).toContain('to="/_user/map?tab=missions"');
+    expect(view).toContain('inbox.acceptedOffer.details.sosRequest.location.lat.toFixed(5)');
+    expect(view).not.toContain('onAcceptedMapReady');
   });
 
   it("keeps proposal confirmation reachable on short and narrow phones", () => {

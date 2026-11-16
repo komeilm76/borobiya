@@ -433,7 +433,7 @@ describe("the panel and the view", () => {
     expect(view).toContain("const state = playbackMapState(instance);");
     expect(view).toContain("planPlaybackSync(state, style, frame, lastPlaybackPaint)");
     expect(view).toContain("if (state.styleLoaded) lastPlaybackPaint = { style, frame }");
-    expect(view).toMatch(/if \(journey\.point\.value \|\| historySuppressedAfterRouteClear\.value\) \{\s*lastPlaybackPaint = null;/);
+    expect(view).toMatch(/if \(mode\.value !== "history" \|\| journey\.point\.value \|\| historySuppressedAfterRouteClear\.value\) \{\s*lastPlaybackPaint = null;/);
     expect(view).toMatch(/function onMapReady\([\s\S]*?lastPlaybackPaint = null;/);
     expect(view).toMatch(/watch\(\(\) => playbackStyle\.value, \(\) => \{\s*lastPlaybackPaint = null;/);
   });

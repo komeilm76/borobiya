@@ -16,13 +16,16 @@ describe("map place search handoff", () => {
     const point = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
     const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
     expect(view).toContain('v-show="!isPhone || activeTool === \'search\'"'); // Persistent tablet/desktop widget.
-    expect(view).toContain('<PointRouteSheet ref="pointSheetRef" :api="journey"');
+    expect(view).toContain('<PointRouteSheet v-show="mode === \'trips\' && !missionActive" ref="pointSheetRef" :api="journey"');
     expect(view).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"');
-    expect(view).toContain('<PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"');
+    expect(view).toContain('<PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen && mode === \'trips\' && !missionActive" :show-search="isPhone"');
     expect(point).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
     expect(choices).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
     expect(view).toContain('<v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify"');
-    expect(view).toContain('navigationSearchOpen.value = false;\n    if (wasSearching)'); // Resize clears stale inline search.
+    expect(view).toContain('const wasSearching = activeTool.value === "search";'); // Resize reuses the one search surface.
+    expect(view).toContain('if (wasSearching) void nextTick(');
+    expect(view.match(/<PlaceSearchPanel :api="placeSearch"/g)).toHaveLength(1);
+    expect(view).not.toContain('id="map-navigation-search"');
     expect(view).toContain("document.getElementById('map-search-panel')?.focus({ preventScroll: true })");
   });
 
@@ -70,7 +73,7 @@ describe("map place search handoff", () => {
     expect(selection).toContain('removeSelectedCompanion()');
     expect(selection).toContain('journey.select({ lat: place.lat, lon: place.lon }, place)');
     expect(selection).not.toContain('placeSearch.clear()');
-    expect(view).toContain('<PointRouteSheet ref="pointSheetRef" :api="journey"');
+    expect(view).toContain('<PointRouteSheet v-show="mode === \'trips\' && !missionActive" ref="pointSheetRef" :api="journey"');
     expect(view).not.toContain('PlaceDetailSheet');
     expect(view).not.toContain('placeDetailOpen');
     expect(view).not.toContain('openSelectedPlaceDetail');

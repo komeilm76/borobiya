@@ -293,6 +293,7 @@ import { pinia } from "./stores";
 import { useAdminSosStore } from "./stores/admin-sos";
 import { useProposalInboxStore } from "./stores/proposal-inbox";
 import { useRescuerMissionShareStore } from "./stores/rescuer-mission-share";
+import { mapTripSession } from "./map/trip-session";
 import { useBroadcastStore } from "./stores/broadcast";
 import { useAuthStore } from "./stores/auth";
 import { useSosSheetStore } from "./stores/sos-sheet";
@@ -305,6 +306,19 @@ const missionShare = useRescuerMissionShareStore(pinia);
 const broadcast = useBroadcastStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
 watch(() => proposalInbox.acceptedMissionId, (id) => { if (id) void missionShare.refresh(); }, { flush: "sync" });
+const confirmedOfferId = ref<string | null>(null);
+watch(() => proposalInbox.acceptedMissionId, (id) => { if (!id) confirmedOfferId.value = null; }, { flush: "sync" });
+watch(() => missionShare.mission?.id, (id) => {
+  if (id && id === proposalInbox.acceptedMissionId) confirmedOfferId.value = id;
+}, { flush: "sync" });
+watch(() => [missionShare.refreshing, missionShare.mission?.id, missionShare.statusError] as const,
+  ([refreshing, id, error]) => {
+    // Do not reopen offers after a network failure or an unverified room event.
+    if (!refreshing && !id && !error && confirmedOfferId.value) {
+      proposalInbox.releaseAcceptedMission(confirmedOfferId.value);
+      confirmedOfferId.value = null;
+    }
+  }, { flush: "post" });
 const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
   () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
@@ -332,7 +346,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   }
   return [
     { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
-    { to: "/_user/mission", label: "مأموریت من", icon: "mdi-lifebuoy" },
+    { to: "/_user/map?tab=missions", label: "مأموریت‌ها", icon: "mdi-lifebuoy" },
     { to: "/_user/sos-history", label: "درخواست‌های من", icon: "mdi-history" },
     { to: "/_user/mission-history", label: "سوابق امدادگری", icon: "mdi-timeline-clock-outline" },
     { to: "/_user/location-shares", label: "اشتراک موقعیت", icon: "mdi-crosshairs-gps" },
@@ -341,10 +355,17 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
 });
 // Admins can reach the user map; keep its current-route link available in the
 // map sidebar alongside their admin destinations without changing other headers.
-const mapNavItems = computed(() => auth.user?.role === "admin" && !auth.mustCompleteSecurityQuestions
-  ? [{ to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" }, ...navItems.value]
-  : navItems.value
-);
+const mapNavItems = computed(() => {
+  const items = auth.user?.role === "admin" && !auth.mustCompleteSecurityQuestions
+    ? [{ to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" }, ...navItems.value]
+    : navItems.value;
+  if (route.name !== "user-map") return items;
+  return items.filter((item) => {
+    if (item.to === "/_user/mission-history" && (mapTripSession.navigating.value || missionShare.mission || proposalInbox.acceptedMissionId)) return false;
+    if (item.to.includes("tab=missions") && mapTripSession.navigating.value) return false;
+    return true;
+  });
+});
 const router = useRouter();
 const route = useRoute();
 // Both map-first workspaces use the same full-viewport shell and navigation drawer.

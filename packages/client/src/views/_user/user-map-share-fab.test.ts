@@ -42,7 +42,7 @@ describe("map sharing quick action", () => {
     expect(base).toContain('width: 48px;');
     expect(base).toContain('height: 48px;');
     expect(base).toContain('border-radius: 50%;');
-    expect(view).toContain('v-show="!(isShortPhone && activeTool)"');
+    expect(view).toContain('v-show="!missionActive && !(isShortPhone && activeTool)"');
     expect(view).toContain('inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))');
     expect(view).toContain('inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))');
     expect(view).toContain('class="user-map-view__history-dialog"');

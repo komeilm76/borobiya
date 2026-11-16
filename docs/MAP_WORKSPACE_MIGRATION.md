@@ -1,26 +1,20 @@
-# One map workspace: migration contract
+# One map workspace (`/_user/map`)
 
-The target is one `/_user/map` route and one mounted MapCanvas, with four top-level modes: **Missions**, **Trips**, **Sharing**, and **History**. `/_user/mission` becomes a legacy redirect only *after* the mission map and its private overlays have moved into the shared canvas. Do not implement a cosmetic tab bar that merely switches between two live map instances or silently drops a GPS watch on query changes.
+The user map owns the **only MapCanvas** used for personal trips, rescuer mission execution, live companion sharing and location history. `/_user/mission` redirects to `/_user/map?tab=missions` (including any existing query parameters). Offer review remains available from the global bell even when Missions is disabled; its details no longer mount a second WebGL map. The MissionLivePanel still supports its own canvas in the unrelated requester/admin detail pages, but uses the map's existing instance and Marker constructor in the rescuer workspace. This preserves the separate authenticated mission room and route state without duplicating the map lifecycle. The current embedded mission component retains its filename, `UserMissionView.vue`, but is no longer routed as a page.
 
 ## Interaction and safety rules
 
-| State | Missions | Trips | Sharing | History | Mission offers |
+| Verified state | Missions | Trips | Sharing | History | Mission offers |
 |---|---|---|---|---|---|
 | Idle | Available | Available | Available | Available | Available |
 | Trip guidance active or awaiting GPS | Disabled | Available | Available | Disabled | Still received; acceptance needs explicit confirmation |
 | Active mission | Available | Disabled | Available | Disabled | Existing mission remains available |
+| Mission status unavailable | Available unless already navigating a trip | Only an already-started trip remains accessible | Available | Disabled | Inbox remains separate from status |
 
-If a trip is active, accepting an offer must show a confirmation to **end the current trip and start the mission**. End/cancel the personal watcher, pending route requests and destination before calling the accept API; if stopping fails, do not submit acceptance. The confirmation must state that an unsuccessful accept does not restore the old trip. Sharing remains accessible in either mode; mission-specific rescuer sharing stays automatic, distinct from the general broadcast control.
+A pending personal Start counts as a trip. Accepting an offer during a trip explicitly confirms ending it first; its watcher, route requests and destination are cleared **before** the accept API request. A failed Stop blocks acceptance. Failed acceptance does not restore the old trip. An assignment received on another device also stops a local personal trip before the mission can take over the canvas. The automatic rescuer mission-room publisher remains app-owned across tabs/pages and distinct from the general broadcast icon; Sharing remains accessible in either navigation state.
 
-Search is a **single shared map widget/controller** across modes. On Missions, selecting a result must offer an *explicit* add-as-intermediate-stop action, never replace the incident or silently commit a route. Search results, map interactions and live members must not leak across account or mission changes. Keep SOS, Stop guidance, keyboard focus and screen-reader labels usable while tabs or sheets are open.
+The same `PlaceSearchPanel` and `usePlaceSearch` serve every mode, including phone guidance. On an active mission, a selected result opens an explicit add-*intermediate-station* dialog; confirmation stops guidance before mutating the mission's waypoint list, never replaces the incident. With no verified mission, the add action is disabled. The shared map releases its installed-library camera clamp for mission incidents outside coverage and restores it for personal modes. Mission/member overlays are scoped to the authenticated mission and removed on session change or verified end. Source tests cannot substitute for browser/device testing of GPS permissions, camera transitions, overlay stacking, focus, safe areas and short phones.
 
-## Incremental migration (do not mistake an intermediate step for completion)
+## Verification
 
-1. **Safety boundary (implemented):** model mode availability and publish only the trip's active/pending flag and synchronous Stop callback to the proposal confirmation. Preserve the map instance on offer/tab query changes. This does **not** yet display tabs or remove the mission page.
-2. **Shared shell:** expose accessible top tabs, selected mode in a stable map route (query changes must not remount the canvas), and a mode-aware proposal bell. Disable tabs according to the policy, including after server-verified mission changes. Preserve Sharing access during trip/mission navigation.
-3. **One canvas:** move mission live-room markers, private target and route overlays onto the map's single MapCanvas, keeping private incident data scoped to the current verified mission. Extract shared search surface and map-camera controls; avoid duplicating personal-trip and mission GPS watchers. Mission-only search results offer explicit waypoint insertion.
-4. **Retire legacy page:** redirect old mission bookmarks and accepted-offer links to Missions mode. Delete the separate mission view and redundant map lifecycle, then update route tests, manual, and navigation links. Confirm no concurrent canvases, stale private overlays, GPS consent regression or missing SOS/Stop controls.
-
-## Verification gates
-
-Unit tests must not mount Vue SFCs (`docs/TASKS.md`). Add pure policy tests plus source/compiled-style wiring tests; verify stop-before-accept in foreground and weak-GPS pending states, account changes, rejected accepts and stale callbacks. Run typechecks, lint, full tests and build per increment. Browser/device verification is still necessary for responsive tab overlap, modal focus, map/sheet stacking, safe areas, and switching with actual navigation; source tests cannot prove these visually.
+Unit tests do not mount Vue SFCs (`docs/TASKS.md`). Pure policy/handoff tests, compiled-template/source wiring, route redirects, store lifecycle tests and repository checks should run before push. Device/browser verification is still required, especially accepting an offer mid-guidance, switching Sharing while mission navigation runs, GPS-denied search and mission completion after a network outage.

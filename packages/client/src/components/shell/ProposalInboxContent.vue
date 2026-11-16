@@ -19,7 +19,7 @@
       <v-alert v-if="inbox.acceptedMissionId" class="mb-5" type="success" variant="tonal" role="status">
         مأموریت پذیرفته شد. پیشنهادهای دیگر شما به‌صورت خودکار بسته شدند. شناسهٔ مأموریت:
         <bdi dir="ltr">{{ inbox.acceptedMissionId }}</bdi>
-        <v-btn class="ms-3" to="/_user/mission" color="primary" variant="tonal" size="small">مشاهدهٔ مأموریت</v-btn>
+        <v-btn class="ms-3" to="/_user/map?tab=missions" color="primary" variant="tonal" size="small">مشاهدهٔ مأموریت</v-btn>
       </v-alert>
       <v-alert v-if="inbox.failed && inbox.proposals.length" class="mb-5" type="warning" variant="tonal" role="alert">
         به‌روزرسانی پیشنهادها انجام نشد؛ موارد زیر آخرین فهرست شناخته‌شده‌اند و ممکن است تغییر کرده باشند.
@@ -29,24 +29,13 @@
       <section v-if="inbox.acceptedOffer?.details" class="accepted-map" aria-label="نمای مأموریت پذیرفته‌شده">
         <div class="accepted-map__intro">
           <div>
-            <h2>نمای آغاز مأموریت</h2>
-            <p>محل حادثه با رنگ قرمز نمایش داده می‌شود. موقعیت شما فقط با اجازهٔ دستگاه و به‌صورت موقت روی این نقشه دیده می‌شود.</p>
+            <h2>مأموریت پذیرفته‌شده</h2>
+            <p>محل حادثه و اعضای مأموریت روی نقشهٔ اصلی در زبانهٔ مأموریت‌ها نمایش داده می‌شوند؛ اینجا نقشهٔ دوم یا درخواست GPS جداگانه باز نمی‌شود.</p>
           </div>
-          <v-btn v-if="!myPosition" color="primary" variant="tonal" rounded="lg"
-            prepend-icon="mdi-crosshairs-gps" :loading="locating" @click="locateMe">
-            نمایش موقعیت من و هر دو نقطه
-          </v-btn>
-        </div>
-        <p v-if="locationError" class="offer-detail__hint" role="status">{{ locationError }}</p>
-        <div class="accepted-map__canvas">
-          <MapCanvas :center="[inbox.acceptedOffer.details.sosRequest.location.lon, inbox.acceptedOffer.details.sosRequest.location.lat]"
-            :zoom="14" :constrain-bounds="false" :style-url="mapStyleUrl"
-            aria-label="نقشهٔ مأموریت پذیرفته‌شده با محل حادثه و موقعیت امدادگر در صورت اجازه" @ready="onAcceptedMapReady" />
+          <v-btn color="primary" variant="tonal" rounded="lg" to="/_user/map?tab=missions" @click="emit('close')">نمایش روی نقشه</v-btn>
         </div>
         <p class="accepted-map__caption" role="status">
-          <span v-if="myPosition">هر دو نقطه در قاب نقشه هستند؛ قرمز: حادثه، سبز: شما. این خط مسیر جاده‌ای یا زمان رسیدن نیست.</span>
-          <span v-else>فعلاً فقط محل حادثه نمایش داده می‌شود. اگر مکان‌یابی ممکن نیست، مختصات حادثه را برای پیگیری نگه دارید.</span>
-          <bdi dir="ltr">{{ inbox.acceptedOffer.details.sosRequest.location.lat.toFixed(5) }}, {{ inbox.acceptedOffer.details.sosRequest.location.lon.toFixed(5) }}</bdi>
+          محل حادثه: <bdi dir="ltr">{{ inbox.acceptedOffer.details.sosRequest.location.lat.toFixed(5) }}, {{ inbox.acceptedOffer.details.sosRequest.location.lon.toFixed(5) }}</bdi>
         </p>
       </section>
 
@@ -130,10 +119,7 @@
             </div>
             <div class="offer-detail__section">
               <h3><v-icon icon="mdi-map-marker-outline" size="19" /> محل حادثه</h3>
-              <div class="offer-detail__map">
-                <MapCanvas :key="selected.id" :center="[selected.details.sosRequest.location.lon, selected.details.sosRequest.location.lat]"
-                  :zoom="14" :constrain-bounds="false" :style-url="mapStyleUrl" aria-label="نقشهٔ محل حادثه" @ready="markIncident" />
-              </div>
+              <p class="offer-detail__map">پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود. جزئیات و مختصات را پیش از تصمیم بررسی کنید.</p>
               <p class="offer-detail__coords">مختصات: <bdi dir="ltr">{{ selected.details.sosRequest.location.lat.toFixed(5) }}, {{ selected.details.sosRequest.location.lon.toFixed(5) }}</bdi>
                 <span v-if="selected.details.sosRequest.location.isManual"> · انتخاب دستی</span></p>
             </div>
@@ -175,7 +161,7 @@
           </p>
           <p v-else-if="confirmAction === 'accept'">با پذیرش این مأموریت، پیشنهادهای دیگر شما خودکار بسته می‌شوند. برای ادامه مطمئن هستید؟</p>
           <p v-if="tripEndError" role="alert" class="text-error">{{ tripEndError }}</p>
-          <template v-else>
+          <template v-if="confirmAction === 'decline'">
             <p class="mb-4">اگر نمی‌توانید این مأموریت را انجام دهید، می‌توانید دلیل کوتاهی ثبت کنید (اختیاری).</p>
             <v-textarea v-model="declineReason" label="دلیل رد (اختیاری)" :counter="500" maxlength="500" rows="3" variant="outlined" />
           </template>
@@ -193,23 +179,17 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import type { ProposalInboxItem } from "@shared/index";
-import MapCanvas from "@/components/map/MapCanvas.vue";
-import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { getSosPhotoSrc } from "@/api/admin-sos";
-import { missionMapCamera } from "@/sos/mission-map";
 import { mapTripSession } from "@/map/trip-session";
 import { proposalDistance, proposalSeverity, proposalTime } from "@/sos/proposal-presentation";
 import { useAuthStore } from "@/stores/auth";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
-import { useThemeStore } from "@/stores/theme";
 
 const props = defineProps<{ selectedOfferId: string | null }>();
 const emit = defineEmits<{ close: [] }>();
 const inbox = useProposalInboxStore();
 const auth = useAuthStore();
-const theme = useThemeStore();
 const selectedId = ref<string | null>(props.selectedOfferId);
 const selected = computed(() => selectedId.value
   ? inbox.proposals.find((item) => item.id === selectedId.value) ?? null
@@ -220,7 +200,6 @@ async function selectOffer(id: string): Promise<void> {
   await nextTick();
   detailRef.value?.scrollIntoView({ block: "start" });
 }
-const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const confirmAction = ref<"accept" | "decline" | null>(null);
 const tripEndError = ref<string | null>(null);
 watch(confirmAction, () => { tripEndError.value = null; });
@@ -233,49 +212,10 @@ const locationError = ref<string | null>(null);
 const locating = ref(false);
 let photoGeneration = 0;
 let locationGeneration = 0;
-let marker: Marker | null = null;
-let acceptedMap: MapLibreMap | null = null;
-let markerConstructor: typeof Marker | null = null;
-let acceptedIncidentMarker: Marker | null = null;
-let acceptedRescuerMarker: Marker | null = null;
 
 function severity(item: ProposalInboxItem) {
   return proposalSeverity[item.details?.sosRequest.severity ?? "medium"];
 }
-function markIncident(map: MapLibreMap, MarkerClass: typeof Marker): void {
-  marker?.remove();
-  marker = null;
-  const point = selected.value?.details?.sosRequest.location;
-  if (!point) return;
-  marker = new MarkerClass({ color: "#e4564f" }).setLngLat([point.lon, point.lat]).addTo(map);
-}
-function syncAcceptedMap(): void {
-  const incident = inbox.acceptedOffer?.details?.sosRequest.location;
-  const map = acceptedMap;
-  const MarkerClass = markerConstructor;
-  if (!incident || !map || !MarkerClass) return;
-  acceptedIncidentMarker?.remove();
-  acceptedRescuerMarker?.remove();
-  acceptedIncidentMarker = new MarkerClass({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
-  acceptedIncidentMarker.getElement().setAttribute("aria-label", "محل حادثه");
-  if (myPosition.value) {
-    acceptedRescuerMarker = new MarkerClass({ color: "#16826c" })
-      .setLngLat([myPosition.value.lon, myPosition.value.lat]).addTo(map);
-    acceptedRescuerMarker.getElement().setAttribute("aria-label", "موقعیت من");
-  } else acceptedRescuerMarker = null;
-  const camera = missionMapCamera(incident, myPosition.value);
-  if (camera.kind === "both") {
-    map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 650 });
-  } else {
-    map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 650 });
-  }
-}
-function onAcceptedMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
-  acceptedMap = map;
-  markerConstructor = MarkerClass;
-  syncAcceptedMap();
-}
-
 async function loadPhoto(): Promise<void> {
   const id = selected.value?.sosRequestId;
   const token = auth.accessToken;
@@ -337,25 +277,17 @@ watch(() => selected.value?.id, () => {
   photoSrc.value = null;
   photoError.value = null;
   photoLoading.value = false;
-  marker?.remove();
-  marker = null;
   confirmAction.value = null;
   declineReason.value = "";
 });
-watch(myPosition, () => syncAcceptedMap());
-watch(() => inbox.acceptedOffer?.id, () => syncAcceptedMap());
 watch(() => auth.user?.id, () => {
   myPosition.value = null;
   locating.value = false;
   locationGeneration++;
-  acceptedIncidentMarker?.remove();
-  acceptedRescuerMarker?.remove();
-  acceptedMap = null;
-  markerConstructor = null;
   photoGeneration++;
   photoSrc.value = null;
 });
-onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acceptedRescuerMarker?.remove(); acceptedMap = null; markerConstructor = null; photoGeneration++; locationGeneration++; photoSrc.value = null; });
+onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value = null; });
 </script>
 
 <style scoped>
@@ -373,8 +305,6 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .accepted-map__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
 .accepted-map__intro h2 { font-size: 1.25rem; font-weight: 800; margin: 0 0 5px; }
 .accepted-map__intro p { font-size: .86rem; opacity: .78; max-width: 650px; margin: 0; line-height: 1.7; }
-.accepted-map__canvas { height: min(52vh, 440px); min-height: 300px; overflow: hidden; border-radius: var(--bb-radius-nested, 16px); }
-.accepted-map__canvas :deep(.map-canvas), .accepted-map__canvas :deep(.map-canvas__viewport) { min-height: 0; }
 .accepted-map__caption { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; font-size: .83rem; margin: 16px 0 0; line-height: 1.7; }
 .accepted-map__caption bdi { font-weight: 700; }
 .offers__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 18px 0 12px; }
@@ -406,7 +336,7 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offer-detail__facts { display: flex; flex-wrap: wrap; gap: 12px; padding: 22px clamp(22px, 3vw, 36px) 0; }
 .offer-detail__facts > div { flex: 1 1 180px; display: grid; gap: 5px; padding: 14px 17px; background: rgba(128,155,151,.08); border-radius: var(--bb-radius-nested, 16px); }.offer-detail__facts span { opacity: .65; font-size: 0.82rem; }.offer-detail__facts strong { font-size: .92rem; }
 .offer-detail__section { padding: 23px clamp(22px, 3vw, 36px) 0; }.offer-detail__section h3 { display: flex; align-items: center; gap: 8px; font-size: .91rem; font-weight: 800; margin-bottom: 11px; color: rgb(var(--v-theme-primary)); }.offer-detail__description { line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .92rem; }
-.offer-detail__map { height: 216px; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; background: rgba(43,112,104,.08); }.offer-detail__map :deep(.map-canvas) { min-height: 0; height: 100%; }.offer-detail__map :deep(.map-canvas__viewport) { min-height: 0; }
+.offer-detail__map { padding: .75rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); line-height: 1.7; }
 .offer-detail__coords { margin: 10px 0 0; font-size: 0.82rem; opacity: .7; }.offer-detail__photo { max-width: 100%; overflow: hidden; border-radius: var(--bb-radius-nested, 16px); background: #163b39; }.offer-detail__photo img { max-width: 100%; max-height: 360px; display: block; margin-inline: auto; object-fit: contain; }
 .offer-detail__hint { font-size: 0.82rem; line-height: 1.7; opacity: .7; margin: 6px 32px 0; }
 .offer-detail__actions { margin-top: 26px; padding: 22px clamp(22px, 3vw, 36px) 27px; border-top: 1px solid rgba(128,155,151,.18); }.offer-detail__actions p { margin: 0 0 16px; display: flex; gap: 8px; align-items: center; font-size: .8rem; opacity: .75; }.offer-detail__buttons { display: flex; flex-wrap: wrap; gap: 10px; }

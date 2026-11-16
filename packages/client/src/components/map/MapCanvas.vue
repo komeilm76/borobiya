@@ -26,6 +26,7 @@ import { createMapStartupAttempt, prepareMapRuntime, registerMapCacheWorker } fr
 import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
+  DEFAULT_MAP_BOUNDS,
   bboxCenter,
   createMapCanvasOptions,
   lngLatInBbox,
@@ -150,6 +151,16 @@ function handleServiceWorkerMessage(event: MessageEvent): void {
 }
 
 watch(() => props.styleUrl, updateStyle);
+// A mission incident can be outside the installed companion-map bbox. Reuse
+// the same canvas without clamping its camera, then restore the library bounds
+// when returning to ordinary trips/history (including after the mission ends).
+let libraryBounds = DEFAULT_MAP_BOUNDS;
+watch(() => props.constrainBounds, (constrain) => {
+  const instance = map.value;
+  if (!instance) return;
+  instance.setMaxBounds(constrain ? libraryBounds : null);
+  emit("coverage-changed", instance);
+}, { flush: "sync" });
 
 function fetchRuntimeConfig(controller: AbortController): void {
   const instance = map.value;
@@ -158,6 +169,7 @@ function fetchRuntimeConfig(controller: AbortController): void {
   void getMapConfig(controller.signal).then((config) => {
     if (controller.signal.aborted || map.value !== instance) return;
     configFailed = false;
+    libraryBounds = config.bbox;
     instance.setMinZoom(config.minZoom);
     instance.setMaxZoom(config.maxZoom);
     const oldBounds = props.constrainBounds ? instance.getMaxBounds() : null;
@@ -248,6 +260,7 @@ onBeforeUnmount(() => {
   configRequest?.abort();
   configRequest = null;
   startMap = null;
+  libraryBounds = DEFAULT_MAP_BOUNDS;
   map.value?.remove();
   map.value = null;
   activeStyleUrl = null;

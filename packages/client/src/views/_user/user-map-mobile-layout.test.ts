@@ -70,7 +70,7 @@ describe("mobile map viewport and overlay tools", () => {
 
   it("keeps full-size controls mounted and offers three accessible launchers with one scrollable panel", () => {
     expect(view).toContain('useMediaQuery("(max-width: 599px)")');
-    expect(view).toContain('<div v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">');
+    expect(view).toContain('<div v-if="isPhone && !journey.navigating.value && mode !== \'missions\'" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">');
     expect(view).toContain('<v-layout class="user-map-view__dock-layout">');
     expect(view).toContain('<v-bottom-navigation');
     expect(view).toContain('class="user-map-view__dock"');
@@ -226,7 +226,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain(":is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content");
     expect(phoneMap).toContain(".v-dialog > .v-overlay__content > .v-card > .v-card-text");
     expect(phoneMap).toContain("max-height: none !important;"); // Remove the old 56dvh/26rem card cap.
-    expect(view).toContain('v-show="!(isShortPhone && activeTool)"');
+    expect(view).toContain('v-show="!missionActive && !(isShortPhone && activeTool)"');
     expect(phoneMap).toContain(".user-map-view__recenter");
     expect(phoneMap).toContain("inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))");
     expect(phoneMap).toContain("inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))");

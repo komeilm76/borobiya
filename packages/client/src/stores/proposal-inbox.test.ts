@@ -120,6 +120,33 @@ describe("proposal inbox", () => {
     expect(inbox.total).toBe(0);
   });
 
+  it("reopens offers only after the server-verified end of the accepted mission", async () => {
+    let items = [proposal];
+    const list = vi.fn(async () => page(items));
+    configureProposalInboxForTests({ list, accept: async () => "77777777-7777-4777-8777-777777777777",
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(1));
+    expect(await inbox.decide(proposal.id, "accept")).toBe(true);
+    items = [];
+    const before = list.mock.calls.length;
+    inbox.releaseAcceptedMission("another-mission");
+    await inbox.refresh();
+    expect(inbox.acceptedMissionId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(list).toHaveBeenCalledTimes(before);
+    inbox.releaseAcceptedMission("77777777-7777-4777-8777-777777777777");
+    await vi.waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(before));
+    expect(inbox.acceptedMissionId).toBeNull();
+    expect(inbox.acceptedOffer).toBeNull();
+    items = [proposal];
+    await inbox.refresh();
+    expect(inbox.total).toBe(1);
+  });
+
   it("reopens a failed SOS socket on the next inbox poll without retrying after logout", async () => {
     vi.useFakeTimers();
     try {

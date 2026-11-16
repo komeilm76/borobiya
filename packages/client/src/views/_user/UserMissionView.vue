@@ -1,11 +1,8 @@
 <template>
-  <main class="mission-desk" :class="{ 'mission-desk--active': desk.activeMission.value,
+  <main class="mission-desk" :class="{ 'mission-desk--embedded': embedded, 'mission-desk--active': desk.activeMission.value,
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
     'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
-    <!-- No active mission means no private markers. Show the same full-viewport
-         canvas for context, then replace it with the live canvas once assigned. -->
-    <MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"
-      :constrain-bounds="false" :show-zoom="false" compass-action aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید" />
+    <!-- The map workspace owns the persistent public canvas even while idle. -->
     <div class="mission-desk__shell">
       <header v-if="!desk.activeMission.value" class="mission-hero">
         <span class="mission-hero__eyebrow"><v-icon icon="mdi-lifebuoy" size="18" /> میز مأموریت امدادگر</span>
@@ -40,11 +37,12 @@
       <section v-else-if="!desk.error.value" class="mission-desk__empty">
         <div class="mission-desk__empty-icon"><v-icon icon="mdi-check-decagram-outline" size="36" /></div>
         <h3>در حال حاضر مأموریت فعالی ندارید</h3>
-        <p>برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.</p>
-        <v-btn color="primary" variant="flat" rounded="lg" to="/_user/map?inbox=1">مشاهدهٔ پیشنهادها</v-btn>
+        <p>پیشنهادهای دریافتی و جزئیات پذیرش در همین زبانه در دسترس‌اند.</p>
+        <ProposalInboxContent :selected-offer-id="null" />
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
+          :external-canvas="embedded" :external-map="externalMap" :external-marker="externalMarker"
           :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady"
           @close-room="closeTool('team')" @sharing-change="teamSharing = $event"
           @mission-ended="onMissionEnded" @camera-selected="pauseGuidanceFollow">
@@ -353,8 +351,8 @@ import { useRouteNavigation } from "@/composables/use-route-navigation";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionStatusPanel from "@/components/mission/MissionStatusPanel.vue";
+import ProposalInboxContent from "@/components/shell/ProposalInboxContent.vue";
 import PointTransportChoicesSheet from "@/components/map/PointTransportChoicesSheet.vue";
-import MapCanvas from "@/components/map/MapCanvas.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { createMissionRouteWorkspace, type RouteWorkspaceSection } from "@/mission/route-workspace";
 import { missionMapCamera, missionRouteStop } from "@/sos/mission-map";
@@ -368,8 +366,21 @@ import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { useMissionDesk } from "@/composables/use-mission-desk";
 import { decodeAccessTokenClaims } from "@/composables/device-identity";
 import { useAuthStore } from "@/stores/auth";
+import { useProposalInboxStore } from "@/stores/proposal-inbox";
+import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 
+// Standalone support is retained only while old bookmarks migrate; the map
+// workspace passes its existing MapCanvas and Marker constructor here.
+const props = withDefaults(defineProps<{
+  embedded?: boolean; visible?: boolean; externalMap?: MapLibreMap | null; externalMarker?: typeof Marker | null;
+}>(), { embedded: false, visible: true });
 const auth = useAuthStore();
+const inbox = useProposalInboxStore();
+const assignment = useRescuerMissionShareStore();
+watch(() => assignment.mission?.id, (id) => { if (id) void desk.load(); }, { flush: "post" });
+// The workspace remains mounted through offer acceptance; the desk no longer
+// relies on a route remount to fetch the newly committed assignment.
+watch(() => inbox.acceptedMissionId, (id) => { if (id) void desk.load(); }, { flush: "post" });
 const desk = useMissionDesk(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   () => auth.ensureSession());
 const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
@@ -457,6 +468,18 @@ function focusRouteStep(index: number): void {
   highlightRouteStop();
   routeMap.easeTo({ center: [point.lon, point.lat], zoom: Math.max(14, Math.min(routeMap.getZoom(), 15)), duration: 450 });
 }
+// Shared map search proposes a stop, never a new incident. The parent requires
+// a second explicit confirmation; guidance is stopped before altering its route.
+function addSearchWaypoint(lat: number, lon: number): boolean {
+  if (!desk.activeMission.value || desk.error.value || desk.terminalHold.value || !routing.target.value ||
+    routing.via.value.length >= 6 || !Number.isFinite(lat) || lat < -90 || lat > 90 ||
+    !Number.isFinite(lon) || lon < -180 || lon > 180) return false;
+  if (navigation.active.value) stopGuidance();
+  const added = routing.addWaypoint({ lat, lon });
+  if (added) openRouteWorkspace();
+  return added;
+}
+defineExpose({ addSearchWaypoint });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
   const lon = Number(waypointLon.value);
@@ -547,8 +570,14 @@ function onWaypointDrop(index: number): void {
   if (draggingWaypoint !== null && !navigation.active.value) routing.moveWaypoint(draggingWaypoint, index);
   draggingWaypoint = null;
 }
+watch(() => props.visible, (visible) => {
+  if (!visible && pickingWaypoint.value) {
+    pickingWaypoint.value = false;
+    activeTool.value = "route"; // Hidden map taps cannot add a private stop.
+  }
+}, { flush: "sync" });
 function onRouteMapClick(event: MapMouseEvent): void {
-  if (!pickingWaypoint.value || navigation.active.value) return;
+  if (!props.visible || !pickingWaypoint.value || navigation.active.value) return;
   // Unbounded MapLibre maps repeat world copies; normalize the longitude before
   // validating the stop, without allowing an invalid click to dismiss pick mode.
   const lon = event.lngLat.lng;
@@ -963,6 +992,34 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk:not(.mission-desk--active) .mission-desk__empty-icon { display: none; }
 .mission-desk:not(.mission-desk--active) .mission-desk__shell { padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)); }
 
+/* The parent map owns the ONLY canvas. Keep mission cards interactive while
+   letting taps through the transparent room to the shared map beneath it. */
+.mission-desk--embedded { position: absolute !important; inset: 0; z-index: 4; width: 100%; height: 100%;
+  background: transparent !important; pointer-events: none; }
+.mission-desk--embedded .mission-desk__shell,
+.mission-desk--embedded .mission-desk__workspace { pointer-events: none; }
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
+  width: min(42rem, calc(100vw - 1.5rem)); padding: .75rem;
+  max-height: min(62dvh, 38rem); overflow-y: auto; overscroll-behavior: contain;
+  background: rgb(var(--v-theme-surface));
+}
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) { padding: .5rem; }
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__hero) { padding: .75rem; }
+.mission-desk--embedded .mission-desk__map-heading { top: calc(4.65rem + env(safe-area-inset-top, 0px));
+  left: auto; right: 1rem; transform: none; }
+.mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }
+.mission-desk--embedded .mission-desk__load-alert { top: calc(9rem + env(safe-area-inset-top, 0px)); }
+.mission-desk--embedded :deep(.live-panel--fullscreen) { background: transparent; pointer-events: none; }
+.mission-desk--embedded :deep(.live-panel__map) { pointer-events: none; }
+.mission-desk--embedded :deep(.live-panel__members),
+.mission-desk--embedded :deep(.live-panel__map-actions),
+.mission-desk--embedded .mission-desk__map-heading,
+.mission-desk--embedded .mission-desk__map-focus,
+.mission-desk--embedded .mission-desk__map-hint,
+.mission-desk--embedded .mission-desk__dock,
+.mission-desk--embedded .mission-desk__guidance,
+.mission-desk--embedded .mission-desk__card,
+.mission-desk--embedded .mission-route { pointer-events: auto; }
 /* Match /_user/map: the canvas owns the viewport, with independent scrollable
    tools that can all close. No tall card or persistent planner takes map space. */
 .mission-desk--active {

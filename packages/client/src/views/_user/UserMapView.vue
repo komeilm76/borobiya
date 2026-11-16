@@ -1,14 +1,31 @@
 <template>
-  <section class="user-map-view" :class="{ 'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value,
+  <section class="user-map-view" :class="{ 'user-map-view--mission': mode === 'missions',
+    'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value,
     'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
+      :constrain-bounds="!missionActive && mode !== 'missions'"
       :show-zoom="false" compass-action
       aria-label="نقشهٔ تعاملی"
       @ready="onMapReady"
       @coverage-changed="onMapCoverageChanged"
     />
+    <nav class="user-map-view__modes" aria-label="بخش‌های نقشه" dir="rtl">
+      <button v-for="item in workspaceModes" :key="item.id" type="button"
+        :class="{ 'user-map-view__mode--active': mode === item.id }"
+        :aria-label="modeReason(item.id)" :title="modeReason(item.id)" :aria-current="mode === item.id ? 'page' : undefined"
+        :disabled="!modeAvailability[item.id] || (item.id === 'missions' && auth.user?.role !== 'user')"
+        @click="chooseMode(item.id)">
+        <v-icon :icon="item.icon" size="19" aria-hidden="true" /><span>{{ item.label }}</span>
+      </button>
+    </nav>
+    <v-btn v-if="isPhone && mode === 'missions'" class="user-map-view__mission-search" icon="mdi-magnify"
+      variant="flat" color="primary" aria-label="جست‌وجوی ایستگاه میانی" title="جست‌وجوی ایستگاه میانی"
+      @click="selectTool('search')" />
+    <UserMissionView v-if="auth.user?.role === 'user' && (mode === 'missions' || missionActive)"
+      v-show="mode === 'missions'" ref="missionWorkspace"
+      embedded :visible="mode === 'missions'" :external-map="map" :external-marker="workspaceMarker" />
 
     <!-- On phones Search is modal; this map-side action makes other POIs reachable
          again after zooming into one without reopening the full-screen dialog. -->
@@ -55,7 +72,7 @@
     </section>
 
     <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
-    <div v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
+    <div v-if="isPhone && !journey.navigating.value && mode !== 'missions'" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
       <v-layout class="user-map-view__dock-layout">
         <v-bottom-navigation
           class="user-map-view__dock"
@@ -74,6 +91,7 @@
             :id="`map-tool-${tool.id}`"
             :key="tool.id"
             :value="tool.id"
+            :disabled="tool.id === 'history' && !modeAvailability.history"
             :color="activeTool === tool.id ? 'primary' : undefined"
             variant="text"
             :aria-label="tool.label"
@@ -95,7 +113,7 @@
       <!-- Keep the teleported button vnode stable while point selection and
            reverse geocoding trigger consecutive updates; its target is kept
            mounted in App.vue to prevent patching an unmounted vnode. -->
-      <v-btn v-show="!!journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
+      <v-btn v-show="!!journey.point.value && mode !== 'missions' && !missionActive" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
         icon="mdi-routes" variant="flat" color="primary" :disabled="!journey.point.value" :aria-expanded="routeChoicesOpen"
         aria-controls="map-point-route-choices-sheet"
         :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
@@ -107,7 +125,7 @@
          watcher; opening the map never starts outgoing location sharing. -->
     <v-btn
       class="user-map-view__recenter"
-      v-show="!(isShortPhone && activeTool)"
+      v-show="mode !== 'missions' && !missionActive && !(isShortPhone && activeTool)"
       :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : journey.navigating.value && !navigationFollowEnabled ? 'mdi-navigation-variant' : 'mdi-crosshairs-gps'"
       :color="own.error.value || recenterError ? 'warning' : 'primary'"
       :aria-label="journey.navigating.value && !navigationFollowEnabled ? 'بازگشت به دنبال‌کردن مسیر' : recenterLabel"
@@ -121,7 +139,7 @@
     <v-btn
       class="user-map-view__share"
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!(isShortPhone && activeTool)"
+      v-show="!missionActive && !(isShortPhone && activeTool)"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
       :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
@@ -138,7 +156,7 @@
     </span>
 
     <div v-if="journey.point.value && journey.navigating.value && !journey.sheetOpen.value"
-      class="user-map-view__journey-stack" aria-label="راهبری فعال" @keydown.esc.stop="closeNavigationSearch">
+      class="user-map-view__journey-stack" aria-label="راهبری فعال">
       <v-card id="map-navigation-sheet" class="user-map-view__journey-content bb-floating-card bb-map-navigation-card"
         elevation="3" rounded="xl" dir="rtl">
         <div class="user-map-view__journey-bar">
@@ -149,8 +167,8 @@
           </div>
           <span class="sr-only" role="status" aria-live="polite">{{ journeyAnnouncement }}</span>
           <v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify" variant="text"
-            aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان" aria-controls="map-navigation-search"
-            :aria-expanded="navigationSearchOpen" @click="navigationSearchOpen = !navigationSearchOpen" />
+            aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان" aria-controls="map-search-panel"
+            :aria-expanded="activeTool === 'search'" @click="selectTool('search')" />
           <dl class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
             <div class="user-map-view__telemetry-item user-map-view__telemetry-item--eta">
               <dt><v-icon icon="mdi-timer-outline" size="18" aria-hidden="true" />تا مقصد</dt>
@@ -189,20 +207,16 @@
           <p v-if="journey.rerouteMessage.value" class="user-map-view__reroute-status"
             role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
         </div>
-        <div v-if="navigationSearchOpen" id="map-navigation-search" class="user-map-view__navigation-search"
-          role="region" aria-label="جست‌وجوی مکان در مسیر" @keydown.esc.stop="closeNavigationSearch">
-          <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />
-        </div>
       </v-card>
     </div>
-    <PointRouteSheet ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
+    <PointRouteSheet v-show="mode === 'trips' && !missionActive" ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
       :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"
       :search-place="isSelectedSearchDestination ? journey.knownPlace.value : null" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices" @choose-transport="openTransportChoices"
       @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
-    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"
+    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen && mode === 'trips' && !missionActive" :show-search="isPhone"
       @choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices" @search="openRouteSearch" />
-    <PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen" :show-search="isPhone"
+    <PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen && mode === 'trips' && !missionActive" :show-search="isPhone"
       @confirm="confirmTransportChoice" @close="closeTransportChoices" @search="openRouteSearch" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
@@ -211,7 +225,7 @@
 
     <!-- Phone search gets the same full-height dialog treatment as Companions;
          wider maps retain the existing in-flow/side search panel. -->
-    <component :is="isPhone ? VDialog : 'div'" v-if="!isPhone || !journey.navigating.value" class="user-map-view__search-dialog"
+    <component :is="isPhone ? VDialog : 'div'" class="user-map-view__search-dialog"
       v-bind="isPhone ? phoneSearchDialogProps : {}"
       @update:model-value="onSearchDialogVisibilityChange">
       <v-card class="user-map-view__search-surface" rounded="xl">
@@ -240,7 +254,7 @@
           <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
         </v-card-title>
         <v-card-text class="user-map-view__history-body">
-          <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
+          <aside id="map-history-panel" v-show="mode === 'history' && (!isPhone || activeTool === 'history')"
             class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
             :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
             <HistoryPlaybackPanel
@@ -249,6 +263,10 @@
               :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
               @return-to-track="showTrack"
             />
+            <nav class="user-map-view__history-links" aria-label="سوابق دیگر">
+              <v-btn to="/_user/mission-history" variant="tonal" prepend-icon="mdi-lifebuoy">سوابق مأموریت‌ها</v-btn>
+              <v-btn to="/_user/sos-history" variant="tonal" prepend-icon="mdi-alert-outline">درخواست‌های امداد</v-btn>
+            </nav>
           </aside>
         </v-card-text>
       </v-card>
@@ -268,7 +286,7 @@
           <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
         </v-card-title>
         <v-card-text class="user-map-view__live-body">
-          <aside id="map-live-panel" class="user-map-view__live user-map-view__panel"
+          <aside id="map-live-panel" v-show="mode === 'sharing'" class="user-map-view__live user-map-view__panel"
             :role="isPhone ? 'region' : undefined" aria-label="همراهان"
             tabindex="-1" @keydown.esc="onPanelEscape">
             <LiveCompanionPanel :api="live" :visible="showCompanions" :selected-user-id="selectedCompanionId"
@@ -298,17 +316,38 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+    <v-dialog :model-value="!!pendingMissionStop" max-width="28rem" :close-on-back="false"
+      aria-labelledby="mission-search-stop-title" @update:model-value="(open: boolean) => { if (!open) pendingMissionStop = null; }">
+      <v-card dir="rtl" rounded="xl">
+        <v-card-title id="mission-search-stop-title">افزودن ایستگاه به مسیر مأموریت؟</v-card-title>
+        <v-card-text>
+          <bdi dir="auto">{{ pendingMissionStop?.name }}</bdi> فقط به‌عنوان ایستگاه میانی افزوده می‌شود؛ محل حادثه مقصد نهایی می‌ماند.
+          <p v-if="missionActive" class="mt-2">اگر راهبری فعال باشد، برای ویرایش مسیر متوقف می‌شود.</p>
+          <p v-else role="status" class="mt-2">برای افزودن ایستگاه ابتدا یک مأموریت را بپذیرید.</p>
+          <p v-if="missionActive && !missionShare.mission" role="status" class="mt-2">در انتظار تأیید مأموریت از سرور؛ مسیر تغییر نمی‌کند.</p>
+          <p v-if="missionStopError" role="alert" class="text-error">{{ missionStopError }}</p>
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" @click="pendingMissionStop = null">انصراف</v-btn>
+          <v-btn color="primary" variant="flat" :disabled="!missionShare.mission" @click="addMissionStop">افزودن ایستگاه میانی</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <ShareDialog v-model="shareOpen" :fullscreen="isPhone" @shared="onShareCreated" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRoute, useRouter } from "vue-router";
 import { useMediaQuery } from "@vueuse/core";
 import { VDialog } from "vuetify/components";
 import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import UserMissionView from "./UserMissionView.vue";
+import { mapModeAvailability, type MapMode } from "@/map/map-mode-policy";
+import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
+import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
@@ -357,6 +396,70 @@ import { useThemeStore } from "@/stores/theme";
 const theme = useThemeStore();
 const auth = useAuthStore();
 const broadcast = useBroadcastStore();
+const missionShare = useRescuerMissionShareStore();
+const proposals = useProposalInboxStore();
+const route = useRoute();
+const router = useRouter();
+const workspaceModes: { id: MapMode; label: string; icon: string }[] = [
+  { id: "missions", label: "مأموریت‌ها", icon: "mdi-lifebuoy" },
+  { id: "trips", label: "سفرها", icon: "mdi-routes" },
+  { id: "sharing", label: "اشتراک", icon: "mdi-account-group-outline" },
+  { id: "history", label: "تاریخچه", icon: "mdi-map-clock-outline" }
+];
+const confirmedAcceptance = ref<string | null>(null);
+watch(() => missionShare.mission?.id, (id) => {
+  if (id && id === proposals.acceptedMissionId) confirmedAcceptance.value = id;
+}, { flush: "sync" });
+// Keep the accepted assignment locked until the server verifies it; once a
+// confirmed mission ends, an old inbox success banner cannot lock Trips forever.
+const missionActive = computed(() => !!missionShare.mission ||
+  (!!proposals.acceptedMissionId && confirmedAcceptance.value !== proposals.acceptedMissionId));
+const modeAvailability = computed(() => {
+  const allowed = mapModeAvailability(mapTripSession.navigating.value, missionActive.value);
+  // A failed/unfinished assignment read cannot prove it is safe to plan a new
+  // personal trip. Do not confuse this uncertainty with a confirmed mission.
+  if (auth.user?.role === "user" && !missionActive.value && !missionShare.verified) {
+    allowed.trips = mapTripSession.navigating.value; // Never strand guidance already in progress.
+    allowed.history = false;
+  }
+  return allowed;
+});
+function modeReason(id: MapMode): string {
+  const label = workspaceModes.find((item) => item.id === id)?.label ?? id;
+  if (id === "missions" && auth.user?.role !== "user") return `${label}؛ فقط برای امدادگر`;
+  if (modeAvailability.value[id]) return label;
+  if (mapTripSession.navigating.value) return `${label}؛ در سفر فعال نیست. پیشنهاد مأموریت از زنگ اعلان قابل بررسی است.`;
+  if (missionActive.value) return `${label}؛ در مأموریت فعال نیست`;
+  return `${label}؛ وضعیت مأموریت هنوز تأیید نشده است`;
+}
+const requestedMode = computed(() => workspaceModes.find((item) => item.id === route.query.tab)?.id ??
+  (missionActive.value ? "missions" : "trips"));
+const mode = computed<MapMode>(() => {
+  const candidate = requestedMode.value;
+  if (modeAvailability.value[candidate] && (candidate !== "missions" || auth.user?.role === "user")) return candidate;
+  if (modeAvailability.value.missions && auth.user?.role === "user") return "missions";
+  return modeAvailability.value.trips ? "trips" : "sharing";
+});
+function chooseMode(next: MapMode): void {
+  if (!modeAvailability.value[next] || (next === "missions" && auth.user?.role !== "user")) return;
+  if (next === mode.value) {
+    if (next === "history") void selectTool("history");
+    else if (next === "sharing") void selectTool("live");
+    return;
+  }
+  void router.push({ path: "/_user/map", query: { ...route.query, tab: next } });
+}
+watch(mode, (next) => {
+  if (next === "missions") {
+    if (mapTripSession.navigating.value) clearPointRoute();
+    closeTool(false);
+  }
+  if (next === "sharing") void selectTool("live");
+  else if (next === "history") { void selectTool("history"); frameCamera(); }
+  else closeTool(false);
+  paintPlayback(); paintLive(); syncPeerAvatars();
+  syncOwnMarker(); syncDestinationMarker(); syncRouteOriginMarker(); syncSelectedPlaceMarker(); paintPointRoute();
+}, { flush: "post" });
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
@@ -372,17 +475,10 @@ const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 const activeTool = ref<MapTool | null>(null);
-const navigationSearchOpen = ref(false);
 const routeDeleteConfirmOpen = ref(false);
 const routeChoicesOpen = ref(false);
 const transportChoicesOpen = ref(false);
 const pointSheetRef = ref<InstanceType<typeof PointRouteSheet> | null>(null);
-function closeNavigationSearch(event?: KeyboardEvent): void {
-  if (!navigationSearchOpen.value) return;
-  event?.preventDefault();
-  navigationSearchOpen.value = false;
-  void nextTick(() => document.getElementById("map-navigation-search-toggle")?.focus());
-}
 const shareOpen = ref(false);
 function onShareCreated(): void {
   // A new outgoing grant can change the device assigned to broadcast; do not start GPS here.
@@ -416,12 +512,11 @@ onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
   if (isPhone.value &&
     (arrivalDialogOpen.value || shareOpen.value || activeTool.value ||
-      selectedCompanionId.value || journey.sheetOpen.value || navigationSearchOpen.value) && typeof position === "number" &&
+      selectedCompanionId.value || journey.sheetOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
     if (arrivalDialogOpen.value) closeArrivalDialog();
     else if (shareOpen.value) shareOpen.value = false;
     else if (activeTool.value) closeTool();
-    else if (navigationSearchOpen.value) closeNavigationSearch();
     else if (journey.sheetOpen.value) {
       if (!pointSheetRef.value?.returnToPoint()) journey.sheetOpen.value = false;
     } else if (selectedCompanionId.value) removeSelectedCompanion();
@@ -447,6 +542,11 @@ const phoneHistoryDialogProps = computed(() => ({
 // Keep selection and panel visibility on the same state, then move keyboard focus.
 async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
+  if (selected === "history" && !modeAvailability.value.history) return;
+  if (selected === "history" && mode.value !== "history")
+    void router.push({ path: "/_user/map", query: { ...route.query, tab: "history" } });
+  if (selected === "live" && mode.value !== "sharing")
+    void router.push({ path: "/_user/map", query: { ...route.query, tab: "sharing" } });
   const previous = activeTool.value;
   if (selected === previous) return;
   if (selected) closeNearbyResults();
@@ -506,11 +606,9 @@ function onPanelEscape(event: KeyboardEvent): void {
 
 watch(isPhone, (phone) => {
   if (!phone) {
+    const wasSearching = activeTool.value === "search";
     activeTool.value = null;
-    // The permanent wide-screen search widget replaces the phone's in-trip
-    // search; do not leave an extra expanded search panel without its toggle.
-    const wasSearching = navigationSearchOpen.value;
-    navigationSearchOpen.value = false;
+    // The same search panel becomes permanently visible on wide screens.
     if (wasSearching) void nextTick(() => document.getElementById('map-search-panel')?.focus({ preventScroll: true }));
   }
   fittedFor = null;
@@ -530,6 +628,29 @@ const playback = useHistoryPlayback({
   refreshSession: () => auth.refreshSession()
 });
 const map = shallowRef<MapLibreMap | null>(null);
+const workspaceMarker = shallowRef<typeof Marker | null>(null);
+const missionWorkspace = ref<InstanceType<typeof UserMissionView> | null>(null);
+const pendingMissionStop = shallowRef<GeocodeResult | null>(null);
+const missionStopError = ref<string | null>(null);
+async function addMissionStop(): Promise<void> {
+  const place = pendingMissionStop.value;
+  const assignmentId = missionShare.mission?.id;
+  if (!place || !assignmentId) return;
+  // Make the route editor visible before mutating it, even when the result was
+  // selected in Sharing. A changed/ended assignment invalidates this consent.
+  if (mode.value !== "missions") await router.push({ path: "/_user/map", query: { ...route.query, tab: "missions" } });
+  if (pendingMissionStop.value !== place || mode.value !== "missions" || assignmentId !== missionShare.mission?.id) return;
+  if (!missionWorkspace.value?.addSearchWaypoint(place.lat, place.lon)) {
+    missionStopError.value = "ایستگاه افزوده نشد؛ مأموریت یا محل حادثه را دوباره بررسی کنید. مقصد حادثه تغییر نکرده است.";
+    return;
+  }
+  pendingMissionStop.value = null;
+  missionStopError.value = null;
+  chooseMode("missions");
+}
+watch([() => auth.user?.id, () => missionShare.mission?.id], () => {
+  pendingMissionStop.value = null; missionStopError.value = null;
+}, { flush: "sync" });
 const own = useOwnMapPosition(computed(() => auth.user?.id ?? null));
 let ownMarker: Marker | null = null;
 // Animate only the visual arrow: route safety and arrival continue to use raw GPS fixes.
@@ -550,7 +671,7 @@ const recenterLabel = computed(() => {
 function syncOwnMarker(freshFix = false): void {
   const instance = map.value;
   const fix = own.position.value;
-  if (!instance || !fix || !markerConstructor) {
+  if (!instance || !fix || !markerConstructor || mode.value === "missions" || missionActive.value) {
     ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null; return;
   }
   const wasGuiding = ownMarker?.getElement().classList.contains("user-map-view__own-marker--navigating") ?? false;
@@ -691,6 +812,16 @@ const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.positio
 // Proposals are App-owned; register only a revocable, synchronous stop callback.
 // A pending Start with weak GPS is still a trip and must be ended before acceptance.
 const unregisterTrip = mapTripSession.register(clearPointRoute);
+watch(missionActive, (active) => {
+  if (!active) return;
+  // Another device may accept an offer while this tab is navigating. Private
+  // trip GPS/route cannot continue underneath a newly verified mission.
+  if (journey.point.value || journey.navigating.value || journey.navigationPending.value) clearPointRoute();
+  pendingMissionStop.value = null;
+  closeNearbyResults();
+  removeSelectedCompanion();
+  paintLive(); paintPlayback(); syncPeerAvatars(); syncSelectedPlaceMarker();
+}, { flush: "sync" });
 watch([() => journey.navigating.value, () => journey.navigationPending.value], ([active, pending]) => {
   mapTripSession.update(active || pending);
 }, { flush: "sync", immediate: true });
@@ -706,7 +837,7 @@ watch(() => journey.arrived.value, (arrived) => {
 // The guidance card can be teleported outside the map shell. Measure from its top
 // to the viewport bottom (including its safe-area inset), so the map rail and SOS
 // stay clear even when content expands or the phone rotates.
-watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => journey.sheetOpen.value],
+watch([isPhone, () => journey.navigating.value, () => journey.sheetOpen.value],
   async (_values, _previous, onCleanup) => {
     let disposed = false;
     let observer: ResizeObserver | undefined;
@@ -897,7 +1028,6 @@ function confirmTransportChoice(mode: TransportProfile): void {
 }
 function openRouteSearch(): void { void selectTool("search"); }
 function backToTravelPlan(): void {
-  closeNavigationSearch();
   journey.editNavigation(); // Pauses guidance before editing the route or transport.
   void nextTick(() => document.getElementById("map-point-route-sheet")?.focus({ preventScroll: true }));
 }
@@ -913,7 +1043,9 @@ function focusDestinationMarker(): void {
 }
 const placeSearch = usePlaceSearch({
   area: (scope) => {
-    const library = map.value?.getMaxBounds() ?? null;
+    // Mission cameras are intentionally unbounded; search its visible extent
+    // instead of disabling the shared widget when getMaxBounds() is null.
+    const library = map.value?.getMaxBounds() ?? map.value?.getBounds() ?? null;
     return placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library);
   }
 });
@@ -1182,7 +1314,7 @@ async function showAllSearchResults(): Promise<void> {
   userControlledCamera.value = true;
   if (journey.navigating.value) {
     navigationFollowEnabled.value = false; // Keep the result overview until the user explicitly resumes following.
-    closeNavigationSearch();
+    if (isPhone.value && activeTool.value === "search") closeTool(false);
     await nextTick(); // Fit to the compact sheet, not the tall search-results surface.
     if (map.value !== instance || !journey.navigating.value) return;
   }
@@ -1198,7 +1330,6 @@ async function showAllSearchResults(): Promise<void> {
     maxZoom: 15, duration: 700
   }, { placeSearchSelection: true }); // Framing must not requery its own viewport.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
-  if (navigationSearchOpen.value) closeNavigationSearch();
 }
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   result => result.placeId === placeSearch.selectedPlaceId.value) ??
@@ -1241,7 +1372,10 @@ function syncSelectedPlaceMarker(): void {
       event.preventDefault(); event.stopPropagation(); openSelectedPlaceRoute();
     });
   } else selectedPlaceMarker.setLngLat([place.lon, place.lat]);
-  selectedPlaceMarker.getElement().setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}؛ نمایش مسیر`);
+  const element = selectedPlaceMarker.getElement();
+  const station = mode.value === "missions" || missionActive.value;
+  element.setAttribute("aria-controls", station ? "mission-search-stop-title" : "map-point-route-sheet");
+  element.setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}؛ ${station ? "پیشنهاد ایستگاه میانی" : "نمایش مسیر"}`);
   // DOM text, never HTML or a hover-only/native tooltip.
   const label = selectedPlaceMarker.getElement().querySelector<HTMLElement>(".user-map-view__selected-place-label");
   if (label) label.textContent = place.name;
@@ -1282,8 +1416,14 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   // Dismiss the full-screen search before opening route choices over the map.
   // Keep results mounted; a later query refresh must not change this destination.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
-  navigationSearchOpen.value = false;
   removeSelectedCompanion();
+  if (missionActive.value || mode.value === "missions") {
+    // The same search result is a proposed stop, never an incident replacement.
+    // An explicit confirmation controls every mutation of the mission route.
+    pendingMissionStop.value = place;
+    missionStopError.value = null;
+    return;
+  }
   journey.select({ lat: place.lat, lon: place.lon }, place);
   // The source marker or cluster dialog disappears as soon as this result is
   // selected. Do not strand keyboard focus on body, and never steal it if a
@@ -1427,7 +1567,8 @@ watch(() => auth.accessToken, () => {
 /** MapLibre DOM markers keep a 44px focus/tap target; changing a fix moves rather than rebuilds it. */
 function syncPeerAvatars(): void {
   const instance = map.value;
-  const permitted = instance && markerConstructor && showCompanions.value ? live.mapPeers.value : [];
+  const permitted = instance && markerConstructor && showCompanions.value && (mode.value === "sharing" || !missionActive.value)
+    ? live.mapPeers.value : [];
   const ids = new Set(permitted.map((peer) => peer.userId));
   for (const [id, marker] of peerMarkers) {
     if (ids.has(id)) continue;
@@ -1546,7 +1687,8 @@ function paintLive(): void {
   if (!instance) return;
   // The live overlay owns the top of the stack, so it names no `beforeLayerId`: appending is the only
   // order that does not depend on a layer the base style might not declare.
-  for (const op of planOverlaySync(mapState(instance), liveStyle.value, () => showCompanions.value ? live.overlay.value : emptyCompanionOverlay)) applyOp(instance, op);
+  for (const op of planOverlaySync(mapState(instance), liveStyle.value, () => showCompanions.value && (mode.value === "sharing" || !missionActive.value)
+    ? live.overlay.value : emptyCompanionOverlay)) applyOp(instance, op);
 }
 
 function playbackMapState(instance: MapLibreMap) {
@@ -1563,7 +1705,7 @@ function paintPlayback(): void {
   if (!instance) return;
   // Route planning owns the map while a destination is selected; a historical track
   // behind the live route is misleading. The history panel's data remains intact.
-  if (journey.point.value || historySuppressedAfterRouteClear.value) {
+  if (mode.value !== "history" || journey.point.value || historySuppressedAfterRouteClear.value) {
     lastPlaybackPaint = null;
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     return;
@@ -1578,7 +1720,7 @@ function paintPlayback(): void {
 function frameCamera(): void {
   const instance = map.value;
   const track = playback.frames.value;
-  if (!instance || journey.point.value || track.length === 0 || userControlledCamera.value) return;
+  if (!instance || mode.value !== "history" || journey.point.value || track.length === 0 || userControlledCamera.value) return;
   const compact = window.matchMedia("(max-width: 1023px)").matches;
   const bounds = playback.boundsForMap.value;
   // The canvas may shrink within one breakpoint (e.g. phone rotation), and a
@@ -1630,7 +1772,7 @@ function repaintOverlays(): void {
 
 function syncDestinationMarker(): void {
   const instance = map.value, point = journey.point.value;
-  if (!instance || !markerConstructor || !point) { destinationMarker?.remove(); destinationMarker = null; return; }
+  if (!instance || !markerConstructor || !point || mode.value === "missions" || missionActive.value) { destinationMarker?.remove(); destinationMarker = null; return; }
   if (!destinationMarker) {
     // The existing amber route pin owns a selected POI; do not stack two pins.
     destinationMarker = new markerConstructor({ color: "#d97706" }).setLngLat([point.lon, point.lat]).addTo(instance);
@@ -1661,7 +1803,7 @@ function syncDestinationMarker(): void {
 }
 function syncRouteOriginMarker(): void {
   const instance = map.value, origin = journey.plannedFrom.value;
-  if (!instance || !markerConstructor || !origin || !journey.selectedRoute.value || !journey.routesVisible.value ||
+  if (!instance || !markerConstructor || !origin || mode.value === "missions" || missionActive.value || !journey.selectedRoute.value || !journey.routesVisible.value ||
     journey.navigating.value || journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value) {
     routeOriginMarker?.remove(); routeOriginMarker = null; return;
   }
@@ -1679,7 +1821,7 @@ function paintPointRoute(): void {
   if (!instance) return;
   if (!instance.isStyleLoaded()) { routePaintDeferred = true; return; }
   routePaintDeferred = false;
-  const geometries = journey.point.value && journey.routesVisible.value ? routeGeometries.value : [];
+  const geometries = mode.value !== "missions" && !missionActive.value && journey.point.value && journey.routesVisible.value ? routeGeometries.value : [];
   if (!geometries.length) {
     if (instance.getLayer(ROUTE_LAYER)) instance.removeLayer(ROUTE_LAYER);
     if (instance.getLayer(ROUTE_COMPLETED_LAYER)) instance.removeLayer(ROUTE_COMPLETED_LAYER);
@@ -1738,7 +1880,7 @@ function attachHold(instance: MapLibreMap): () => void {
   let suppressContextUntil = 0;
   const hold = createHoldToSelect((x, y, type) => {
     if (type === "touch") suppressContextUntil = Date.now() + 900; // Native contextmenu can follow the timer.
-    if (!auth.user?.id || journey.navigating.value || map.value !== instance) return;
+    if (!auth.user?.id || missionActive.value || mode.value === "missions" || journey.navigating.value || map.value !== instance) return;
     const rect = canvas.getBoundingClientRect();
     const location = instance.unproject([x - rect.left, y - rect.top]);
     const bounds = instance.getMaxBounds();
@@ -1858,7 +2000,6 @@ watch(() => journey.navigating.value, (active) => {
   syncDestinationMarker(); // A named search callout belongs to planning, not active guidance.
   progressRoute = null; completedRouteMetres = 0;
   if (active) updateRouteProgress();
-  navigationSearchOpen.value = false;
   showNavigationSearchResults.value = false;
   if (active && activeTool.value) closeTool(false);
   if (!active) {
@@ -1941,6 +2082,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   }
   markerConstructor = MarkerClass;
   map.value = instance;
+  workspaceMarker.value = MarkerClass;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
   // `ready` (and every `styledata`/`idle` after an async style reload) re-ensures the overlay instead
   // of assuming it is still there. Live markers go first because playback asks to be inserted beneath them.
@@ -2005,6 +2147,7 @@ onBeforeUnmount(() => {
   // still alive here and nothing else can paint after this point.
   const instance = map.value;
   map.value = null;
+  workspaceMarker.value = null;
   markerConstructor = null;
   own.stop();
   navigationAlert.dispose();
@@ -2048,6 +2191,28 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   isolation: isolate;
 }
 
+.user-map-view__modes {
+  position: absolute; z-index: 10; top: calc(.75rem + env(safe-area-inset-top, 0px));
+  left: 50%; transform: translateX(-50%); display: flex; gap: .2rem;
+  padding: .25rem; border: 1px solid var(--bb-color-outline); border-radius: 1.1rem;
+  background: rgba(var(--v-theme-surface), .97); box-shadow: var(--bb-shadow-overlay);
+  max-width: calc(100% - 8.5rem); overflow-x: auto;
+}
+.user-map-view__modes button { display: flex; align-items: center; justify-content: center; gap: .35rem;
+  min-height: 44px; min-width: 44px; padding: .35rem .65rem; border: 0; border-radius: .85rem;
+  background: transparent; color: rgb(var(--v-theme-on-surface)); font: 700 .82rem/1.2 var(--bb-font-family, "Vazirmatn", sans-serif);
+  white-space: nowrap; cursor: pointer; }
+.user-map-view__modes .user-map-view__mode--active { background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); }
+.user-map-view__modes button:disabled { opacity: .42; cursor: not-allowed; }
+.user-map-view__modes button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.user-map-view__mission-search { position: absolute; z-index: 8; top: calc(4.85rem + env(safe-area-inset-top, 0px));
+  left: calc(.75rem + env(safe-area-inset-left, 0px)); width: 48px; height: 48px; }
+@media (max-width: 700px) {
+  .user-map-view__modes { max-width: calc(100% - 7.8rem); }
+  .user-map-view__modes button { padding: 0; }
+  .user-map-view__modes button span { position: absolute; width: 1px; height: 1px; padding: 0;
+    margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+}
 .user-map-view__search-map-actions { display: none; }
 
 /* Compact category pins leave the map visible; the selected pin alone has a
@@ -2210,13 +2375,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   font-size: .8rem; font-weight: 800; color: rgb(var(--v-theme-primary)); }
 .user-map-view__journey-bar > .v-btn { min-width: 44px; height: 44px; }
 .user-map-view__journey-bar > .v-btn:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
-.user-map-view__navigation-search { max-height: 32dvh; min-height: 0; overflow-y: auto; }
-/* Search remains complete, but inside guidance it is content, not a second floating surface. */
-.user-map-view__navigation-search :deep(.place-search.v-card.bb-floating-card) {
-  width: 100%; max-height: none; padding: .4rem 0; border: 0; background: transparent;
-  backdrop-filter: none; box-shadow: none !important;
-}
-.user-map-view__navigation-search :deep(.place-search__results) { max-height: none; overflow: visible; }
 .user-map-view__navigation-status { display: grid; gap: .35rem; pointer-events: none; }
 .user-map-view__gps-warning, .user-map-view__reroute-status { margin: 0; padding: .55rem .85rem;
   border: 1px solid rgba(var(--v-theme-on-warning), .2); border-radius: var(--bb-radius-nested, 16px);
@@ -2735,4 +2893,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-inline-start-color: var(--bb-color-outline);
   }
 }
+/* Mission controls own this map only in Missions mode. Do not leave hidden
+   personal route/companion/history controls keyboard-accessible behind them. */
+.user-map-view--mission .user-map-view__journey-stack,
+.user-map-view--mission .user-map-view__dock-frame,
+.user-map-view--mission .user-map-view__playback,
+.user-map-view--mission .user-map-view__live { display: none !important; }
+.user-map-view--mission .user-map-view__search { z-index: 7; }
 </style>

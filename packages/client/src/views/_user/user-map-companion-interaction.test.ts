@@ -61,7 +61,8 @@ describe("map companions tool", () => {
     expect(view).toContain(':visible="showCompanions"');
     expect(view).toContain('@update:visible="showCompanions = $event"');
     expect(view).toContain('@select="selectCompanion"');
-    expect(functionBody("paintLive")).toContain('showCompanions.value ? live.overlay.value : emptyCompanionOverlay');
+    expect(functionBody("paintLive")).toContain('showCompanions.value && (mode.value === "sharing" || !missionActive.value)');
+    expect(functionBody("paintLive")).toContain('live.overlay.value : emptyCompanionOverlay');
     expect(view).toContain('watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); syncPeerAvatars(); }, { flush: "sync" })');
   });
 

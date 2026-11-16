@@ -60,7 +60,7 @@
           <v-icon icon="mdi-check-circle-outline" size="30" color="success" aria-hidden="true" />
           <strong>مأموریت پذیرفته شد</strong>
           <span>پیشنهادهای دیگر شما خودکار بسته شدند.</span>
-          <RouterLink class="map-proposal__inline-link" to="/_user/mission" @click="open = false">مشاهدهٔ مأموریت</RouterLink>
+          <RouterLink class="map-proposal__inline-link" to="/_user/map?tab=missions" @click="open = false">مشاهدهٔ مأموریت</RouterLink>
         </div>
         <div v-else-if="!inbox.failed && !inbox.loading && !inbox.proposals.length" class="map-proposal__state" role="status">
           <v-icon icon="mdi-bell-check-outline" size="32" color="primary" aria-hidden="true" />

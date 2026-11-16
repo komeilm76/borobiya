@@ -48,12 +48,13 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(map).toContain('window.removeEventListener("resize", onResize)');
     expect(point).toContain('.point-route.bb-map-navigation-card { max-height: max(7rem');
     expect(transport).toContain('.point-transport-choices.bb-map-navigation-card { max-height: max(7rem');
-    expect(map).toContain('id="map-navigation-search"');
+    // One search surface is shared by guidance and the normal map; phones use the same modal.
+    expect(map).toContain('id="map-navigation-search-toggle"');
+    expect(map).toContain('class="user-map-view__search-dialog"');
     expect(map).toContain('PlaceSearchPanel :api="placeSearch"');
-    expect(map).toContain('.user-map-view__navigation-search :deep(.place-search.v-card.bb-floating-card)');
-    expect(css(map, 'UserMapView.vue')).toContain('.user-map-view__navigation-search[data-v-navigation] .place-search.v-card.bb-floating-card');
-    expect(map).toContain('box-shadow: none !important;');
-    expect(map).toContain('.user-map-view__navigation-search :deep(.place-search__results) { max-height: none; overflow: visible; }');
+    expect(map).not.toContain('id="map-navigation-search"');
+    expect(css(map, 'UserMapView.vue')).toContain('.user-map-view__search-dialog');
+    expect(map).toContain('.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }');
     expect(map).toContain('بازگشت به برنامهٔ سفر');
     expect(map).toContain('توقف و پایان سفر');
     expect(point).toContain('aria-label="حذف مقصد و مسیر"');

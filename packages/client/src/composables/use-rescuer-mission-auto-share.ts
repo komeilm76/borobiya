@@ -20,6 +20,7 @@ export function useRescuerMissionAutoShare(
   const mission = ref<LiveMissionIdentity | null>(null);
   const error = ref<string | null>(null);
   const refreshing = ref(false);
+  const verified = ref(false);
   const hadActiveMission = ref(false);
   const live = useMissionLiveLocations(mission, token, owner, ensureSession, runtime.live, true);
   let generation = 0;
@@ -39,11 +40,13 @@ export function useRescuerMissionAutoShare(
       const active = page.items.find((item: Mission) => item.rescuerId === userId && isActiveMission(item.status));
       mission.value = active ? { id: active.id, rescuerId: active.rescuerId, requesterId: active.requesterId } : null;
       hadActiveMission.value = Boolean(active);
+      verified.value = true;
       error.value = null;
     } catch {
       if (current === generation && session.value === key) {
         // A failed status read is not proof the assignment is still active: fail closed.
         mission.value = null;
+        verified.value = false;
         error.value = "وضعیت مأموریت تأیید نشد؛ اشتراک موقعیت متوقف شد. دوباره بررسی کنید.";
       }
     } finally {
@@ -59,6 +62,7 @@ export function useRescuerMissionAutoShare(
   watch(session, (next) => {
     ++generation;
     mission.value = null; // Revoke old GPS/room synchronously, before any new account can render.
+    verified.value = false;
     refreshing.value = false;
     hadActiveMission.value = false;
     error.value = null;
@@ -73,5 +77,5 @@ export function useRescuerMissionAutoShare(
   const timer = setInterval(() => { if (session.value) void refresh(); }, POLL_MS);
   timer.unref?.();
   onScopeDispose(() => { clearInterval(timer); ++generation; mission.value = null; });
-  return { mission, live, refreshing, error, hadActiveMission, refresh, retry };
+  return { mission, live, refreshing, verified, error, hadActiveMission, refresh, retry };
 }

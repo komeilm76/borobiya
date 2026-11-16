@@ -107,12 +107,12 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
     expect(view).toContain('if (navigation.start()) closeTool("route");');
     expect(view).not.toContain('scrollIntoView(');
-    expect(view).toContain('<MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"');
+    expect(view).not.toContain("<MapCanvas");
     expect(view).toContain('<div v-if="desk.activeMission.value" id="mission-workspace"');
-    expect(view.match(/<MapCanvas\b/g)).toHaveLength(1); // Public fallback, never alongside the active mission.
+    expect(view.match(/<MapCanvas\b/g)).toBeNull(); // The map workspace owns the only canvas.
     expect(panel.match(/<MapCanvas\b/g)).toHaveLength(1);
     expect(panel.indexOf('<slot name="route-planner"')).toBeGreaterThan(panel.indexOf('<MapCanvas'));
-    expect(panel).toContain('fullscreen?: boolean; roomOpen?: boolean;');
+    expect(panel).toContain('externalCanvas?: boolean; externalMap?: MapLibreMap | null;');
     expect(panel).toContain('v-show="!fullscreen || roomOpen"');
     expect(panel).toContain('v-if="!fullscreen && live.error.value"');
     expect(panel).toContain('v-if="fullscreen" class="live-panel__room-heading"');

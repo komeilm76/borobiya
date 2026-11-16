@@ -60,11 +60,8 @@ export const routeRecords: RouteRecordRaw[] = [
     name: "user-location-shares",
     component: () => import("@client/views/_user/UserLocationSharesView.vue")
   },
-  {
-    path: "/_user/mission",
-    name: "user-mission",
-    component: () => import("@client/views/_user/UserMissionView.vue")
-  },
+  // Bookmarks now enter the mission mode of the one persistent map workspace.
+  { path: "/_user/mission", redirect: (to) => ({ path: "/_user/map", query: { ...to.query, tab: "missions" } }) },
   {
     path: "/_user/sos-history",
     name: "user-sos-history",

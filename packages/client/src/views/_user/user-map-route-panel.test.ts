@@ -102,9 +102,9 @@ describe("progressive trip planning and editing", () => {
   it("preserves search, Back, GPS warnings and arrival while changing steps", () => {
     expect(sheet).toContain('icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان"');
     expect(map).toContain('function openRouteSearch(): void { void selectTool("search"); }');
-    expect(map).toContain('aria-label="جست‌وجوی مکان در مسیر"');
-    expect(map.match(/<PlaceSearchPanel :api="placeSearch"/g)).toHaveLength(2);
-    expect(map).toContain('if (navigationSearchOpen.value) closeNavigationSearch();');
+    expect(map).toContain('aria-controls="map-search-panel"');
+    expect(map.match(/<PlaceSearchPanel :api="placeSearch"/g)).toHaveLength(1);
+    expect(map).toContain('function openRouteSearch(): void { void selectTool("search"); }');
     expect(map).toContain('journey.gpsWarning.value');
     expect(map).toContain('navigationAlert.playArrival()');
     expect(sheet).toContain('@keydown.esc.stop.prevent="onEscape"');
@@ -137,7 +137,7 @@ describe("progressive trip planning and editing", () => {
     expect(app.indexOf('id="map-route-choices-action-anchor"')).toBeLessThan(app.indexOf('<v-main class="app-main'));
     expect(app).toContain('<SosTriggerButton v-if="showSosButton"');
     expect(map).toContain('<Teleport defer to="#map-route-choices-action-anchor">');
-    expect(map).toContain('<v-btn v-show="!!journey.point.value" id="map-route-choices-toggle"');
+    expect(map).toContain('<v-btn v-show="!!journey.point.value && mode !== \'missions\' && !missionActive" id="map-route-choices-toggle"');
     expect(map).not.toContain('<v-btn v-if="journey.point.value" id="map-route-choices-toggle"');
     const { descriptor } = parse(map, { filename: "UserMapView.vue" });
     const rendered = compileTemplate({
@@ -146,7 +146,7 @@ describe("progressive trip planning and editing", () => {
     expect(rendered.errors).toEqual([]);
     const teleport = rendered.code.slice(rendered.code.indexOf('_createBlock(_Teleport'), rendered.code.indexOf('Keep location a map feature'));
     expect(teleport).toContain('_withDirectives(_createVNode(_component_v_btn');
-    expect(teleport).toContain('[_vShow, !!_ctx.journey.point.value]');
+    expect(teleport).toContain("[_vShow, !!_ctx.journey.point.value && _ctx.mode !== 'missions' && !_ctx.missionActive]");
     expect(teleport).not.toContain('_ctx.journey.point.value)\n        ?'); // No conditional component vnode in the Teleport block.
     const routeSelector = '.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle';
     const base = shell.slice(shell.indexOf(`${routeSelector} {`), shell.indexOf('}', shell.indexOf(`${routeSelector} {`)));
@@ -196,7 +196,7 @@ describe("progressive trip planning and editing", () => {
   });
 
   it("keeps the Search/History/Companions dock clickable below a selected point and its route chooser", () => {
-    expect(map).toContain('v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame"');
+    expect(map).toContain('v-if="isPhone && !journey.navigating.value && mode !== \'missions\'" class="user-map-view__dock-frame"');
     expect(map).toContain('@update:model-value="selectTool"');
     expect(map).toContain('modelValue: activeTool.value === "search"');
     expect(map).toContain('modelValue: activeTool.value === "history"');
@@ -219,7 +219,7 @@ describe("progressive trip planning and editing", () => {
 
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
     const hold = map.slice(map.indexOf('function attachHold('), map.indexOf('const pointer = (event: PointerEvent)', map.indexOf('function attachHold(')));
-    expect(hold).toContain('if (!auth.user?.id || journey.navigating.value || map.value !== instance) return;');
+    expect(hold).toContain('if (!auth.user?.id || missionActive.value || mode.value === "missions" || journey.navigating.value || map.value !== instance) return;');
     expect(hold).toContain('if (bounds && !bounds.contains(location)) return;');
     expect(hold.indexOf('journey.select({ lat: location.lat, lon: location.lng })'))
       .toBeLessThan(hold.indexOf('instance.easeTo({ center: [location.lng, location.lat], duration: 450 }'));
@@ -284,7 +284,7 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).not.toContain('api.changeProfile('); // No inline picker/recalculation.
     expect(map).toContain('@choose-transport="openTransportChoices"');
     expect(map).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen"');
-    expect(map).toContain('<PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen" :show-search="isPhone"');
+    expect(map).toContain('<PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen && mode === \'trips\' && !missionActive" :show-search="isPhone"');
     expect(map).toContain('@confirm="confirmTransportChoice" @close="closeTransportChoices" @search="openRouteSearch"');
     expect(transport).toContain('role="region" aria-label="انتخاب وسیلهٔ حرکت"');
     expect(transport).toContain('v-for="mode in transportOptions"');

@@ -92,6 +92,16 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     void refresh();
   }
 
+  // Only a server-verified end of this exact accepted mission may reopen the
+  // inbox. A transient room disconnect or failed status read is not an end.
+  function releaseAcceptedMission(id: string): void {
+    if (!id || acceptedMissionId.value !== id) return;
+    acceptedMissionId.value = null;
+    acceptedOffer.value = null;
+    page.value = 1;
+    void refresh();
+  }
+
   async function decide(id: string, action: "accept" | "decline", reason?: string): Promise<boolean> {
     // Lock before the first await; a double-click cannot create two concurrent writes.
     const userId = identity.value;
@@ -212,5 +222,5 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     }
   });
 
-  return { proposals, total, page, totalPages, loading, failed, decidingId, decisionError, acceptedMissionId, acceptedOffer, refresh, setPage, decide, stop };
+  return { proposals, total, page, totalPages, loading, failed, decidingId, decisionError, acceptedMissionId, acceptedOffer, refresh, setPage, releaseAcceptedMission, decide, stop };
 });

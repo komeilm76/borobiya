@@ -31,7 +31,7 @@
     <div class="live-panel__grid">
       <div class="live-panel__map-area">
         <div class="live-panel__map">
-          <MapCanvas :center="center" :zoom="13" :constrain-bounds="false" :show-zoom="!fullscreen"
+          <MapCanvas v-if="!externalCanvas" :center="center" :zoom="13" :constrain-bounds="false" :show-zoom="!fullscreen"
             :compass-action="fullscreen" :style-url="mapStyleUrl"
             :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت به‌اشتراک‌گذاشته‌شدهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
             @ready="onMapReady" />
@@ -131,6 +131,7 @@ import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 const props = withDefaults(defineProps<{
   mission: LiveMissionIdentity; center?: [number, number]; routeActive?: boolean;
   fullscreen?: boolean; roomOpen?: boolean;
+  externalCanvas?: boolean; externalMap?: MapLibreMap | null; externalMarker?: typeof Marker | null;
 }>(), {
   center: () => [51.4, 35.7], routeActive: false, fullscreen: false, roomOpen: false
 });
@@ -235,6 +236,15 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
   emit("ready", instance, MarkerClass);
   if (!props.routeActive) focusMembers();
 }
+// When embedded in the map workspace the parent owns MapCanvas. The room owns
+// only its private markers/listeners, and never creates a second WebGL context.
+watch(() => [props.externalMap, props.externalMarker] as const, ([instance, MarkerClass]) => {
+  if (instance && MarkerClass) onMapReady(instance, MarkerClass);
+  else if (map.value) {
+    clearMarkers(); detachCameraGesture?.(); detachCameraGesture = null;
+    map.value = null; markerConstructor = null;
+  }
+}, { immediate: true, flush: "post" });
 function frameRoom(): void {
   if (hasMarkers.value) focusMembers();
   // Never leave the camera on a withdrawn participant's last known position.

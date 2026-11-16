@@ -11,7 +11,7 @@ const room = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "u
 describe("mission map controls", () => {
   it("keeps the shared MapCanvas compass while removing impractical +/- on full-screen and idle mission maps", () => {
     expect(companionMap).toContain(':show-zoom="false"');
-    expect(missionMap).toContain(':constrain-bounds="false" :show-zoom="false" compass-action aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید"');
+    expect(missionMap).not.toContain('<MapCanvas');
     expect(room).toContain(':constrain-bounds="false" :show-zoom="!fullscreen"');
     expect(canvas).toContain('showCompass: true,');
     expect(canvas).toContain('showZoom: props.showZoom,');
@@ -23,7 +23,7 @@ describe("mission map controls", () => {
     expect(compiled.errors).toEqual([]);
     expect(canvas).toContain("'map-canvas--action-compass': compassAction");
     expect(companionMap).toContain(':show-zoom="false" compass-action');
-    expect(missionMap).toContain(':show-zoom="false" compass-action');
+    expect(missionMap).toContain(':external-canvas="embedded"');
     expect(room).toContain(':show-zoom="!fullscreen"');
     expect(room).toContain(':compass-action="fullscreen"');
     expect(sharedStyle).toContain('.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass)');
@@ -86,7 +86,7 @@ describe("mission map controls", () => {
     const compiled = compileStyle({ filename: "UserMissionView.vue", id: "data-v-idle-compass", scoped: true, source: css });
     const network = readFileSync(new URL("../shell/NetworkStatusIcon.vue", import.meta.url), "utf8");
     expect(compiled.errors).toEqual([]);
-    expect(missionMap).toContain('v-if="!desk.activeMission.value" class="mission-desk__idle-map"');
+    expect(missionMap).not.toContain('<MapCanvas');
     expect(css).toContain('margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;');
     expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
     expect(network).toContain('width: 44px; height: 44px;');
