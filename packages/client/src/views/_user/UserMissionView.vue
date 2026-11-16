@@ -121,16 +121,19 @@
                       @click="routing.findRoutes()">{{ routing.from.value ? 'محاسبهٔ دوبارهٔ مسیر' : 'دریافت موقعیت و مسیر' }}</v-btn>
                   </template>
                 </section>
-                <div v-if="routeSection === 'plan'" class="mission-route__endpoints" aria-label="مبدأ و مقصد">
+                <div v-if="routeSection === 'plan'" class="mission-route__endpoints" role="group" aria-label="مبدأ و مقصد">
                   <div class="mission-route__endpoint">
-                    <span class="mission-route__endpoint-mark" aria-hidden="true">۱</span>
-                    <div><small>مبدأ مسیر</small><strong>{{ routing.from.value ? 'موقعیت ثبت‌شده برای مسیریابی' : 'پس از دریافت موقعیت مشخص می‌شود' }}</strong>
+                    <span class="mission-route__endpoint-mark" aria-hidden="true" />
+                    <div class="mission-route__endpoint-copy">
+                      <span><strong>مبدأ</strong> <small>موقعیت مسیر؛ نه موقعیت زنده</small></span>
                       <bdi v-if="routing.from.value" dir="ltr">{{ routing.from.value.lat.toFixed(5) }}, {{ routing.from.value.lon.toFixed(5) }}</bdi>
+                      <span v-else class="mission-route__endpoint-pending">پس از دریافت موقعیت مشخص می‌شود</span>
                     </div>
                   </div>
                   <div class="mission-route__endpoint">
-                    <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">۲</span>
-                    <div><small>مقصد نهایی</small><strong>محل حادثه</strong>
+                    <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">!</span>
+                    <div class="mission-route__endpoint-copy">
+                      <span><strong>محل حادثه</strong> <small>مقصد نهایی · ثابت</small></span>
                       <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
                     </div>
                   </div>
@@ -181,10 +184,6 @@
                     :disabled="navigation.active.value || !routing.via.value.length" hide-details color="primary"
                     @update:model-value="routing.setOptimize(Boolean($event))" />
                 </details>
-              <details v-if="routeSection === 'plan'" class="mission-route__legend"><summary>راهنمای نشانگرها و مختصات حادثه</summary><p>مربع قرمز (!): محل حادثه · آبی: مبدأ محاسبهٔ مسیر · زرد: ایستگاه میانی.
-                نارنجی/سبز/بنفش: موقعیت به‌اشتراک‌گذاشته‌شدهٔ درخواست‌کننده/امدادگر/مدیر؛ این نشانگرها ممکن است با محل حادثه هم‌پوشانی داشته باشند. مختصات حادثه:
-                  <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
-                </p></details>
                 <div v-if="routeSection === 'plan' && routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
                   <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
                     label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
@@ -281,7 +280,29 @@
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
-        <div v-if="!activeTool && !desk.terminalHold.value"
+        <details v-if="routing.target.value && !activeTool && !desk.terminalHold.value"
+          ref="mapLegendEl" class="mission-desk__map-legend" aria-label="راهنمای نشانگرها و مختصات حادثه"
+          @toggle="onMapLegendToggle">
+          <summary title="راهنمای نشانگرهای نقشه" aria-label="راهنمای نشانگرها و مختصات حادثه">
+            <v-icon icon="mdi-information-outline" size="22" aria-hidden="true" />
+            <span class="mission-desk__map-legend-label">راهنمای نقشه</span>
+            <span class="sr-only">راهنمای نشانگرها و مختصات حادثه</span>
+          </summary>
+          <div class="mission-desk__map-legend-body" dir="rtl">
+            <strong>راهنمای نشانگرها</strong>
+            <ul>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> محل حادثه (مقصد ثابت)</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--origin" aria-hidden="true" /> مبدأ محاسبهٔ مسیر (نه موقعیت زنده)</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--stop" aria-hidden="true" /> ایستگاه میانی</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--requester" aria-hidden="true" /> موقعیت اشتراکی درخواست‌کننده</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--rescuer" aria-hidden="true" /> موقعیت اشتراکی امدادگر</li>
+              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--admin" aria-hidden="true" /> موقعیت اشتراکی مدیر مرکز</li>
+            </ul>
+            <p>نشانگرهای اشتراکی ممکن است با محل حادثه هم‌پوشانی داشته باشند؛ تازه‌بودن موقعیت را جداگانه بررسی کنید.</p>
+            <p>مختصات حادثه: <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi></p>
+          </div>
+        </details>
+        <div v-if="!activeTool && !desk.terminalHold.value && !legendOpen"
           class="mission-desk__map-cards">
           <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep"
             :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel" />
@@ -428,6 +449,15 @@ const mapReady = ref(false);
 const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
+const legendOpen = ref(false);
+const mapLegendEl = ref<HTMLDetailsElement | null>(null);
+function onMapLegendToggle(event: Event): void {
+  legendOpen.value = (event.currentTarget as HTMLDetailsElement).open;
+}
+function closeMapLegend(): void {
+  if (mapLegendEl.value) mapLegendEl.value.open = false;
+  legendOpen.value = false;
+}
 let statusFocusOrigin = "mission-tool-status";
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
@@ -806,6 +836,8 @@ function releaseRouteMap(): void {
   routeMap = null;
   markerConstructor = null;
 }
+watch(() => [routing.target.value, activeTool.value, desk.terminalHold.value] as const,
+  closeMapLegend, { flush: "sync" });
 watch(() => [routing.visible.value, routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const,
   () => syncRouteMap(), { flush: "sync" });
 watch(pickingWaypoint, (picking) => {
@@ -870,7 +902,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk { min-height: calc(100vh - 130px); padding: clamp(18px, 4vw, 52px) 18px 100px; color: rgb(var(--v-theme-on-background)); background: radial-gradient(ellipse at 86% 4%, rgba(33,130,113,.10), transparent 52%), rgb(var(--v-theme-background)); }
 .mission-desk__workspace { scroll-margin-top: 16px; }
 .mission-route { margin-top: 12px; padding: clamp(14px, 2vw, 22px); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px); }
-.mission-route__legend { margin: 10px 0; font-size: .82rem; line-height: 1.7; }
 .mission-desk__map-hint { position: absolute; z-index: 2; inset-inline: 12px; bottom: 32px; width: fit-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-surface); font-size: .85rem; }
 .mission-desk__map-hint button { margin-inline-start: 12px; color: rgb(var(--v-theme-primary)); text-decoration: underline; font: inherit; font-weight: 700; }
 :global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; cursor: pointer; }
@@ -885,13 +916,23 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-route__emblem { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-primary), .15); color: rgb(var(--v-theme-primary)); }
 .mission-route__header :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }
 .mission-route__header h2 { margin: 0; font-size: 1.08rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mission-route__endpoints { display: grid; gap: .45rem; margin-bottom: .85rem; }
-.mission-route__endpoint { display: flex; align-items: center; gap: .7rem; min-width: 0; padding: .55rem .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
-.mission-route__endpoint-mark { display: grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); font-size: .9rem; font-weight: 800; }
-.mission-route__endpoint-mark--incident { border-radius: 10px; background: rgb(var(--v-theme-error)); color: rgb(var(--v-theme-on-error)); }
-.mission-route__endpoint > div { display: grid; gap: 1px; min-width: 0; font-size: .85rem; line-height: 1.45; }
-.mission-route__endpoints small { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
-.mission-route__endpoints strong { font-weight: 700; }
+/* One compact itinerary instead of two independently padded cards. Its divider
+   separates the route snapshot from the fixed incident, never from live GPS. */
+.mission-route__endpoints { display: grid; gap: 0; margin: .4rem 0 .85rem; padding: .25rem .65rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.mission-route__endpoint { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center;
+  gap: .6rem; min-width: 0; padding: .32rem 0; }
+.mission-route__endpoint + .mission-route__endpoint { border-top: 1px solid var(--bb-color-outline); }
+.mission-route__endpoint-mark { position: relative; display: grid; place-items: center; width: 22px; height: 22px;
+  border: 2px solid white; border-radius: 50%; background: #2563a6; box-shadow: 0 0 0 1px var(--bb-color-outline); }
+.mission-route__endpoint-mark--incident { border-radius: 6px; background: #b91c1c; color: white;
+  font: 900 .85rem/1 sans-serif; }
+.mission-route__endpoint-copy { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .55rem; row-gap: 0;
+  min-width: 0; font-size: .82rem; line-height: 1.6; }
+.mission-route__endpoint-copy > span:first-child { flex: 1 1 11rem; min-width: 0; }
+.mission-route__endpoint-copy strong { color: rgb(var(--v-theme-on-surface)); font-weight: 800; }
+.mission-route__endpoint-copy small { color: var(--bb-color-muted); font-size: .8rem; }
+.mission-route__endpoint-copy bdi, .mission-route__endpoint-pending { font-size: .8rem; color: var(--bb-color-muted); overflow-wrap: anywhere; }
 .mission-route__endpoints bdi { overflow-wrap: anywhere; }
 .mission-route__decision {
   display: grid; gap: .65rem; margin: .8rem 0; padding: .85rem;
@@ -923,10 +964,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-route__metrics > div { display: grid; gap: .25rem; padding: .75rem; background: var(--bb-color-inset); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
 .mission-route__metrics span { font-size: .8rem; opacity: .8; }
 .mission-route__metrics strong { font-size: 1.02rem; }
-.mission-route__legend { padding: .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
-.mission-route__legend summary { cursor: pointer; font-weight: 700; }
-.mission-route__legend p { margin: .65rem 0 0; }
-.mission-route__legend summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-route__header p { font-size: 0.9rem; opacity: .78; }
 .mission-route__stops { margin-block: 16px; padding: 16px; border: 1px solid rgba(98,146,137,.3); border-radius: var(--bb-radius-nested, 16px); }
 .mission-route__stops-toggle { cursor: pointer; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
@@ -1065,6 +1102,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded .mission-desk__map-heading,
 .mission-desk--embedded .mission-desk__map-focus,
 .mission-desk--embedded .mission-desk__map-cards,
+.mission-desk--embedded .mission-desk__map-legend,
 .mission-desk--embedded .mission-desk__map-hint,
 .mission-desk--embedded .mission-desk__dock,
 .mission-desk--embedded .mission-desk__guidance,
@@ -1171,6 +1209,39 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
 /* Camera actions occupy the map page's next 48px slots below the compass.
    The single-action case stays adjacent; two actions fill both lower slots. */
+/* A map-side legend stays compact until requested; it never takes space in
+   the planner or covers the physical-right compass/SOS rail when expanded. */
+.mission-desk__map-legend { position: absolute; z-index: 9;
+  left: calc(1rem + env(safe-area-inset-left, 0px));
+  bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); pointer-events: auto; }
+.mission-desk__map-legend summary { display: flex; align-items: center; gap: .4rem; min-width: 44px; height: 44px;
+  padding: .35rem .65rem; border: 1px solid var(--bb-color-outline); border-radius: 14px;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-primary));
+  box-shadow: var(--bb-shadow-overlay); cursor: pointer; list-style: none; font-size: .82rem; font-weight: 800; }
+.mission-desk__map-legend summary::-webkit-details-marker { display: none; }
+.mission-desk__map-legend summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.mission-desk__map-legend[open] summary { border-color: rgb(var(--v-theme-primary)); }
+.mission-desk__map-legend-body { position: absolute; bottom: calc(100% + .5rem); left: 0;
+  width: min(17.5rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  max-height: max(6rem, min(42dvh, 16rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  padding: .7rem .8rem; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); font-size: .82rem; line-height: 1.65; }
+.mission-desk__map-legend-body strong { display: block; margin-bottom: .4rem; font-size: .88rem; }
+.mission-desk__map-legend-body ul { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none; }
+.mission-desk__map-legend-body li { display: flex; align-items: baseline; gap: .5rem; }
+.mission-desk__map-legend-body p { margin: .5rem 0 0; }
+.mission-desk__map-legend-body bdi { overflow-wrap: anywhere; }
+.mission-desk__legend-symbol { display: inline-grid; place-items: center; align-self: center;
+  flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid white;
+  box-shadow: 0 0 0 1px var(--bb-color-outline); }
+.mission-desk__legend-symbol--incident { background: #b91c1c; border-radius: 4px; color: white; font: 900 10px/1 sans-serif; }
+.mission-desk__legend-symbol--origin { background: #2563a6; }
+.mission-desk__legend-symbol--stop { background: #c27c14; }
+.mission-desk__legend-symbol--requester { background: #dc593b; }
+.mission-desk__legend-symbol--rescuer { background: #16826c; }
+.mission-desk__legend-symbol--admin { background: #5555ae; }
 /* The two actionable cards live on the map, not inside the status sheet.
    Keep their one scroll surface clear of the compass/camera rail and SOS. */
 .mission-desk__map-cards { position: absolute; z-index: 8; right: 1rem;
@@ -1245,11 +1316,14 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     width: min(15rem, calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
   .mission-desk__map-heading { max-width: calc(100vw - 7rem); }
-  /* The compass/camera keep the physical-right 48px rail. Place the cards
-     immediately beside that rail, above the dock, rather than covering SOS. */
+  .mission-desk__map-legend { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
+  .mission-desk__map-legend summary { width: 44px; padding: 0; justify-content: center; }
+  .mission-desk__map-legend-label { display: none; }
+  /* Reserve 44px for the collapsed legend on the physical-left, and 48px
+     for the compass/camera on the physical-right, with focus-ring gutters. */
   .mission-desk__map-cards { right: calc(4.25rem + env(safe-area-inset-right, 0px));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    width: min(18rem, calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    width: min(18rem, calc(100vw - 8rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
     max-height: max(6rem, min(36dvh, calc(100dvh - 20rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
