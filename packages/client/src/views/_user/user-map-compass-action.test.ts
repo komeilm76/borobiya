@@ -29,7 +29,9 @@ describe("map-only compass action", () => {
     expect(css.errors).toEqual([]);
     const control = block(".user-map-view__canvas :deep(.maplibregl-ctrl-top-right)");
     expect(control).toContain("position: fixed;");
-    expect(control).toContain("inset-inline-start: 1.25rem;");
+    expect(control).toContain("right: 1.25rem;");
+    expect(control).toContain("left: auto;");
+    expect(control).not.toContain("inset-inline-start:");
     expect(control).toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);");
     expect(control).toContain("z-index: 6;");
     expect(view).toContain(':show-zoom="false" compass-action');
@@ -45,9 +47,9 @@ describe("map-only compass action", () => {
     const phone = descriptor.styles[0]!.content.split("@media (max-width: 599px) {")[1]!;
     expect(phone).toContain(".maplibregl-ctrl-top-right");
     expect(phone).toContain("inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px))");
-    expect(phone).toContain("inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px))");
+    expect(phone).toContain("right: calc(0.75rem + env(safe-area-inset-right, 0px))");
     const short = descriptor.styles[0]!.content.split("@media (max-width: 599px) and (max-height: 360px) {")[1]!;
     expect(short).toContain("inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))");
-    expect(short).toContain("inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px))");
+    expect(short).toContain("right: calc(0.75rem + env(safe-area-inset-right, 0px))");
   });
 });

@@ -1249,12 +1249,12 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 @media (max-width: 599px) {
   .mission-desk--active { padding: 0; }
-  /* The idle offer list must not cover the shared map-action rail. Keep its
-     single scroll surface usable on short screens without blocking SOS. */
+  /* The shared map owns the idle action rail above this panel. Do not shrink
+     and offset the offers to one side: use a centered, single scroll surface. */
   .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
-    width: calc(100vw - 5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
-    margin: calc(8.5rem + env(safe-area-inset-top, 0px)) 0 0 calc(.75rem + env(safe-area-inset-left, 0px));
-    max-height: max(7rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    width: min(42rem, calc(100vw - 1.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    margin: calc(8.5rem + env(safe-area-inset-top, 0px)) auto 0;
+    max-height: max(3.75rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
   .mission-desk--active .mission-desk__card,
   .mission-desk--active .mission-route {

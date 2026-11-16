@@ -233,7 +233,7 @@ describe("UserMapView live overlay", () => {
     const { descriptor } = parse(view);
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-map-test", scoped: true });
     expect(css.errors).toEqual([]);
-    expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*position: fixed;[^}]*inset-inline-start: 1\.25rem;[^}]*inset-block-end:/);
+    expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*position: fixed;[^}]*right: 1\.25rem;[^}]*inset-block-end:/);
     expect(view).toContain('compass-action');
     expect(canvas).toContain('.map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass)');
     const compass = css.code.match(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*\}/)?.[0];

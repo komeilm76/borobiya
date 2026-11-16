@@ -2,6 +2,7 @@
   <section class="user-map-view" :class="{ 'user-map-view--mission': mode === 'missions',
     'user-map-view--mission-legend': mode === 'missions' && !!missionWorkspace?.hasMapLegend,
     'user-map-view--mission-active': mode === 'missions' && !!missionWorkspace?.hasActiveMission,
+    'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission,
     'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
     'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
@@ -2495,7 +2496,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   right: auto;
   bottom: auto;
   left: auto;
-  inset-inline-start: 1.25rem;
+  /* MapLibre may use a different text direction than the surrounding RTL UI.
+     Anchor its control to a physical edge, not an inherited inline-start. */
+  right: 1.25rem;
   inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);
   width: 48px;
 }
@@ -2625,15 +2628,16 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (max-width: 599px) {
   /* Leave the journey label a full row even on narrow phones; the controls wrap separately. */
   .user-map-view__reroute-status { top: calc(12.5rem + env(safe-area-inset-top, 0px)); }
-  .user-map-view__journey-stack { left: calc(.75rem + env(safe-area-inset-left, 0px));
-    right: calc(.75rem + env(safe-area-inset-right, 0px));
-    transform: none; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); width: auto; }
-  /* Measurement includes the card's .75rem bottom offset; reserve another
-     11.5rem for SOS, Search and the top tabs before capping its height. */
+  /* Guidance is a bottom dock on phones, not a floating card with a strip of
+     unusable map below it. The inset belongs inside the scrollable surface so
+     actions remain clear of the home indicator without opening a visual gap. */
+  .user-map-view__journey-stack { left: 0; right: 0;
+    transform: none; bottom: 0; width: auto; }
+  /* Reserve the two 48px map-action rows and tabs above the measured dock. */
   .user-map-view__journey-content.bb-map-navigation-card {
     max-height: min(72dvh, 36rem, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
-    padding: .65rem .75rem;
-    border-radius: var(--bb-radius-card, 24px) !important; }
+    padding: .65rem .75rem calc(.65rem + env(safe-area-inset-bottom, 0px));
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important; }
   /* Keep three named, glanceable values in one row. The full GPS/ETA caveats
      remain in the accessible labels; an unknown limit never resembles a number. */
   .user-map-view__telemetry { gap: 0; padding: .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
@@ -2767,8 +2771,27 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
   /* On phones the compass clears the SOS/share/recenter and Search stack. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
+    right: calc(0.75rem + env(safe-area-inset-right, 0px));
+    left: auto;
     inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
+  }
+  /* With no active mission, park the three map actions in the open band under
+   * the tabs. The centered offer list starts below them, so none of its
+   * content has to be squeezed sideways to make room for a vertical rail. */
+  .user-map-view--mission-idle .user-map-view__recenter,
+  .user-map-view--mission-idle .user-map-view__share,
+  .user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: calc(4.85rem + env(safe-area-inset-top, 0px));
+    bottom: auto;
+  }
+  .user-map-view--mission-idle .user-map-view__recenter {
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-idle .user-map-view__share {
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   /* The mission overlay is a sibling of MapCanvas: its scoped compass rules
    * cannot reach this shared canvas. Match its focus-button rail here. */
@@ -2865,6 +2888,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(0.75rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
   }
 }

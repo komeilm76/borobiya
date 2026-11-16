@@ -71,7 +71,7 @@ describe("map-only proposal notifications", () => {
     expect(map).toMatch(/\.user-map-view__playback\s*\{[^}]*inset-block-start: calc\(5rem/); // Right history.
     const phone = map.split("@media (max-width: 599px) {")[1]!;
     // The compass is now below the bell in the right-hand action rail, not a top zoom strip.
-    expect(phone).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*inset-inline-start: calc\(0\.75rem[^}]*inset-block-end: calc\(16rem/);
+    expect(phone).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*right: calc\(0\.75rem[^}]*left: auto;[^}]*inset-block-end: calc\(16rem/);
     expect(phone).toContain('.user-map-view__search-action');
     expect(phone).toContain('.maplibregl-ctrl-bottom-right');
   });

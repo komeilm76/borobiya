@@ -14,8 +14,37 @@ describe("shared map icon clearance", () => {
     expect(map).toContain(".user-map-view--navigating .user-map-view__share");
     expect(map).toContain(".user-map-view--navigating .user-map-view__recenter");
     expect(map).toContain(".user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right)");
+    // MapLibre's direction is independent of the RTL app; physical-right
+    // anchoring must agree with the SOS, Sharing and recenter controls.
+    const css = parse(map).descriptor.styles[0]!.content;
+    const compass = css.slice(css.indexOf('.user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
+    expect(compass).toContain('right: 1.25rem;');
+    expect(compass.slice(0, compass.indexOf('}'))).not.toContain('inset-inline-start:');
+    expect(css).toContain('right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;');
     // Editing the trip route is not a Sharing-tab action, even while guidance continues.
     expect(map).toContain('v-show="!!journey.point.value && mode === \'trips\' && !missionActive"');
+  });
+
+  it("centers idle mission offers beneath a dedicated icon row, clear of SOS", () => {
+    expect(map).toContain("'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission");
+    const mapCss = parse(map).descriptor.styles[0]!.content;
+    for (const action of ["recenter", "share"]) {
+      expect(mapCss).toContain(`.user-map-view--mission-idle .user-map-view__${action}`);
+    }
+    const compass = mapCss.slice(mapCss.indexOf('.user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
+    expect(compass).toContain('top: calc(4.85rem + env(safe-area-inset-top, 0px))');
+    expect(compass).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;');
+    const missionCss = parse(mission).descriptor.styles[0]!.content;
+    const phone = missionCss.slice(missionCss.indexOf('@media (max-width: 599px) {'));
+    const panel = phone.slice(phone.indexOf('.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {'));
+    expect(panel).toContain('margin: calc(8.5rem + env(safe-area-inset-top, 0px)) auto 0;');
+    expect(panel).toContain('width: min(42rem, calc(100vw - 1.5rem');
+    expect(panel).toContain('max-height: max(3.75rem, calc(100dvh - 16rem');
+    expect(panel).not.toContain('margin: calc(8.5rem + env(safe-area-inset-top, 0px)) 0 0 calc(');
+    // At 320px the card is centered: 12px margins; at 568px high it
+    // ends 4px above the fixed SOS hit area, even though it can scroll.
+    expect((320 - (320 - 24)) / 2).toBe(12);
+    expect(568 - 7.5 * 16).toBeLessThan(568 - 4.25 * 16 - 48);
   });
 
   it("places the shared compass beside mission focus on phones, not behind its panels", () => {

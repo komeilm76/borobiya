@@ -30,11 +30,10 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(common).toContain('.v-card.bb-floating-card {'); // Existing desktop/phone depth tiers.
   });
 
-  it("uses inset fully rounded phone cards and keeps map controls above their measured edge", () => {
+  it("docks phone guidance flush with the bottom while preview and choice cards stay floating", () => {
     for (const [source, name, root] of [[point, "PointRouteSheet.vue", ".point-route"],
       [routes, "PointRouteChoicesSheet.vue", ".point-route-choices"],
-      [transport, "PointTransportChoicesSheet.vue", ".point-transport-choices"],
-      [map, "UserMapView.vue", ".user-map-view__journey-content"]] as const) {
+      [transport, "PointTransportChoicesSheet.vue", ".point-transport-choices"]] as const) {
       const styles = css(source, name);
       expect(styles).toContain(`${root}.bb-map-navigation-card[data-v-navigation]`);
       expect(styles).toContain('border-radius: var(--bb-radius-card, 24px) !important');
@@ -43,6 +42,11 @@ describe("map navigation card visual language (nonmounted)", () => {
       expect(styles).toContain('left: calc(.75rem + env(safe-area-inset-left, 0px))');
       expect(styles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px))');
     }
+    const guidance = css(map, "UserMapView.vue");
+    expect(guidance).toContain('.user-map-view__journey-stack[data-v-navigation]');
+    expect(guidance).toContain('transform: none; bottom: 0; width: auto;');
+    expect(guidance).toContain('padding: .65rem .75rem calc(.65rem + env(safe-area-inset-bottom, 0px))');
+    expect(guidance).toContain('border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important');
     expect(map).toContain('Math.ceil(window.innerHeight - element.getBoundingClientRect().top)');
     expect(map).toContain('window.addEventListener("resize", onResize)');
     expect(map).toContain('window.removeEventListener("resize", onResize)');

@@ -240,8 +240,9 @@ describe("progressive trip planning and editing", () => {
         expect(height - card - 9.5 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
       }
       const guidance = Math.min(.72 * height, 36 * 16, Math.max(7 * 16, height - 12.25 * 16));
-      // Navigation measurement includes the card's .75rem bottom offset.
-      expect(height - guidance - .75 * 16 - 4 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
+      // The dock reaches the screen edge; its measured height keeps the
+      // second safety-action row below the top tabs, even on a short phone.
+      expect(height - guidance - 4 * 16 - 48).toBeGreaterThanOrEqual(4.5 * 16);
     }
   });
 
