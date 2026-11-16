@@ -340,7 +340,6 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   }
   return [
     { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
-    { to: "/_user/map?tab=missions", label: "مأموریت‌ها", icon: "mdi-lifebuoy" },
     { to: "/_user/sos-history", label: "درخواست‌های من", icon: "mdi-history" },
     { to: "/_user/mission-history", label: "سوابق امدادگری", icon: "mdi-timeline-clock-outline" },
     { to: "/_user/location-shares", label: "اشتراک موقعیت", icon: "mdi-crosshairs-gps" },
@@ -356,7 +355,6 @@ const mapNavItems = computed(() => {
   if (route.name !== "user-map") return items;
   return items.filter((item) => {
     if (item.to === "/_user/mission-history" && (mapTripSession.navigating.value || missionShare.mission || proposalInbox.acceptedMissionId)) return false;
-    if (item.to.includes("tab=missions") && mapTripSession.navigating.value) return false;
     return true;
   });
 });

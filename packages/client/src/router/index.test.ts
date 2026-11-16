@@ -160,7 +160,7 @@ describe("client route records", () => {
       "/_admin/categories",
       "/_admin/incidents",
       "/_user/map",
-      "/_user/mission",
+      "/_user/mission-history",
       "/_user/location-shares",
       "/_user/devices",
       "d-xxl-none"

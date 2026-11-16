@@ -153,6 +153,11 @@ describe("mobile map viewport and overlay tools", () => {
     expect(app).toContain(':items="mapNavItems"');
     expect(app).toContain('auth.user?.role === "admin" && !auth.mustCompleteSecurityQuestions');
     expect(app).toContain('[{ to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" }, ...navItems.value]');
+    const navigation = app.slice(app.indexOf('const navItems = computed'), app.indexOf('const router = useRouter()'));
+    expect(navigation).not.toContain('to: "/_user/map?tab=missions"'); // Missions is a tab within the map, not a second page.
+    expect(navigation).not.toContain('item.to.includes("tab=missions")'); // No obsolete menu filter.
+    expect(navigation).toContain('to: "/_user/mission-history"'); // Actual history page remains linked.
+    expect(view).toContain('{ id: "missions", label: "مأموریت‌ها"'); // The map tab stays available.
     expect(app).toContain(':user="auth.user"');
     expect(app).toContain(':categories="auth.userCategories"');
     expect(app).toContain('@change-theme="appTheme.setPreference"');
