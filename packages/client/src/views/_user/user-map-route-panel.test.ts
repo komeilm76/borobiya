@@ -78,7 +78,8 @@ describe("progressive trip planning and editing", () => {
     const bar = map.slice(map.indexOf('class="user-map-view__journey-bar"'), map.indexOf('class="user-map-view__navigation-status"'));
     expect(map).toContain('v-if="journey.point.value && journey.navigating.value && !journey.sheetOpen.value"');
     expect(map).not.toContain('VBottomSheet');
-    expect(bar).toContain('id="map-navigation-search-toggle" icon="mdi-magnify"');
+    expect(bar).not.toContain('map-navigation-search-toggle');
+    expect(map).toContain('id="map-tool-search" class="user-map-view__search-action"');
     expect(bar).toContain('سرعت فعلی');
     expect(bar).toContain('حد مجاز');
     expect(bar).toContain('زمان باقی‌مانده');
@@ -159,11 +160,11 @@ describe("progressive trip planning and editing", () => {
     const phoneRoute = phone.slice(phone.indexOf(`${routeSelector} {`), phone.indexOf('}', phone.indexOf(`${routeSelector} {`)));
     expect(phoneSos).toContain('inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px))');
     expect(phoneRoute).toContain('inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px))');
-    expect(phoneRoute).toContain('inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))');
-    expect(phoneSos).toContain('inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))');
+    expect(phoneRoute).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
+    expect(phoneSos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     const navigatingSos = phone.slice(phone.indexOf('.app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {'));
     const navigatingRoute = phone.slice(phone.indexOf(`.app-shell--map:has(.user-map-view--navigating) .user-map-view__route-choices-toggle`));
-    const offset = 'inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 0.5rem)';
+    const offset = 'inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem)';
     expect(navigatingSos).toContain(offset);
     expect(navigatingRoute).toContain(offset);
     expect(map).not.toContain('.user-map-view--navigating .user-map-view__route-choices-toggle,'); // Teleported element is not a map descendant.
@@ -179,7 +180,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });');
     const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
     const rule = '.app-shell--map:has(.user-map-view--route-preview)';
-    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px))';
+    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem + env(safe-area-inset-bottom, 0px))';
     for (const selector of ['.sos-fab.sos-fab', '.user-map-view__route-choices-toggle.user-map-view__route-choices-toggle']) {
       const start = phone.indexOf(`${rule} ${selector} {`);
       expect(start).toBeGreaterThan(0);
@@ -195,26 +196,28 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('role="region"'); // No overlay focus trap: the map and actions remain reachable.
   });
 
-  it("keeps the Search/History/Companions dock clickable below a selected point and its route chooser", () => {
-    expect(map).toContain('v-if="isPhone && !journey.navigating.value && mode !== \'missions\'" class="user-map-view__dock-frame"');
-    expect(map).toContain('@update:model-value="selectTool"');
+  it("keeps Search below SOS and above trip sheets; History and Sharing use their tabs", () => {
+    expect(map).toContain('v-if="isPhone" id="map-tool-search" class="user-map-view__search-action"');
+    expect(map).toContain(':id="`map-mode-${item.id}`"');
     expect(map).toContain('modelValue: activeTool.value === "search"');
     expect(map).toContain('modelValue: activeTool.value === "history"');
     expect(map).toContain('modelValue: activeTool.value === "live"');
     expect(map).toContain('@create-share="shareOpen = true"');
     expect(map).toContain('<ShareDialog v-model="shareOpen" :fullscreen="isPhone"');
-    const planner = css(sheet, "PointRouteSheet.vue");
-    const chooser = css(choices, "PointRouteChoicesSheet.vue");
-    const dock = css(map, "UserMapView.vue");
-    for (const panel of [planner, chooser, css(transport, "PointTransportChoicesSheet.vue")]) {
+    for (const panel of [css(sheet, "PointRouteSheet.vue"), css(choices, "PointRouteChoicesSheet.vue"),
+      css(transport, "PointTransportChoicesSheet.vue")]) {
       expect(panel).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto;');
       expect(panel).toContain('pointer-events: auto');
     }
-    expect(dock).toContain('inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(dock).toContain('height: 4rem');
-    // Dock top is 4.75rem above the viewport bottom; panels end at 5.5rem.
-    expect(5.5 - (0.75 + 4)).toBeGreaterThanOrEqual(0.5);
-    expect(planner).toContain('overflow-y: auto'); // Landscape keeps full-size buttons scrollable.
+    const search = css(map, "UserMapView.vue");
+    expect(search).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(search).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px))');
+    expect(search).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem)');
+    // A 48px Search target sits below SOS with an 8px gap in all three states.
+    expect(4.25 - (.75 + 3)).toBe(.5);
+    expect(9.5 - (6 + 3)).toBe(.5);
+    expect(4 - (.5 + 3)).toBe(.5);
+    expect(sheet).toContain('overflow-y: auto'); // Landscape keeps full-size buttons scrollable.
   });
 
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
@@ -284,7 +287,7 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).not.toContain('api.changeProfile('); // No inline picker/recalculation.
     expect(map).toContain('@choose-transport="openTransportChoices"');
     expect(map).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen"');
-    expect(map).toContain('<PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen && mode === \'trips\' && !missionActive" :show-search="isPhone"');
+    expect(map).toContain('<PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen && mode === \'trips\' && !missionActive" :show-search="false"');
     expect(map).toContain('@confirm="confirmTransportChoice" @close="closeTransportChoices" @search="openRouteSearch"');
     expect(transport).toContain('role="region" aria-label="انتخاب وسیلهٔ حرکت"');
     expect(transport).toContain('v-for="mode in transportOptions"');

@@ -12,16 +12,18 @@ function body(name: string): string {
 }
 
 describe("map place search handoff", () => {
-  it("shows navigation search icons only when the wide-screen search widget is absent", () => {
+  it("uses one shared phone Search action and a persistent wide-screen widget", () => {
     const point = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
     const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
     expect(view).toContain('v-show="!isPhone || activeTool === \'search\'"'); // Persistent tablet/desktop widget.
     expect(view).toContain('<PointRouteSheet v-show="mode === \'trips\' && !missionActive" ref="pointSheetRef" :api="journey"');
-    expect(view).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"');
-    expect(view).toContain('<PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen && mode === \'trips\' && !missionActive" :show-search="isPhone"');
+    expect(view).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="false"');
+    expect(view).toContain('<PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen && mode === \'trips\' && !missionActive" :show-search="false"');
     expect(point).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
     expect(choices).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
-    expect(view).toContain('<v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify"');
+    expect(view).toContain('v-if="isPhone" id="map-tool-search" class="user-map-view__search-action"');
+    expect(view).not.toContain('map-navigation-search-toggle');
+    expect(view).not.toContain('user-map-view__mission-search');
     expect(view).toContain('const wasSearching = activeTool.value === "search";'); // Resize reuses the one search surface.
     expect(view).toContain('if (wasSearching) void nextTick(');
     expect(view.match(/<PlaceSearchPanel :api="placeSearch"/g)).toHaveLength(1);
@@ -42,6 +44,11 @@ describe("map place search handoff", () => {
     expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />');
     expect(view).toContain('modelValue: activeTool.value === "history"');
     expect(view).toContain('class="user-map-view__history-dialog"');
+    expect(view).toContain('tool === "search" && restoreFocus && isPhone.value && (mode.value === "history" || mode.value === "sharing")');
+    expect(view).toContain('activeTool.value = returnTool;');
+    expect(body("selectPlace")).toContain('const changeTab = mode.value !== "trips";');
+    expect(body("selectPlace")).toContain('query: workspaceTabQuery(route.query, "trips")');
+    expect(body("selectPlace")).toContain('mode.value === "trips" && journey.sheetOpen.value');
     expect(view).toContain('class="user-map-view__live-dialog"');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-search-test", scoped: true });

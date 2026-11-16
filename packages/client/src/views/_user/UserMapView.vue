@@ -13,7 +13,7 @@
       @coverage-changed="onMapCoverageChanged"
     />
     <nav class="user-map-view__modes" aria-label="بخش‌های نقشه" dir="rtl">
-      <button v-for="item in workspaceModes" :key="item.id" type="button"
+      <button v-for="item in workspaceModes" :key="item.id" :id="`map-mode-${item.id}`" type="button"
         :class="{ 'user-map-view__mode--active': mode === item.id }"
         :aria-label="modeReason(item.id)" :title="modeReason(item.id)" :aria-current="mode === item.id ? 'page' : undefined"
         :disabled="!modeAvailability[item.id] || (item.id === 'missions' && auth.user?.role !== 'user')"
@@ -24,9 +24,6 @@
     <v-alert v-if="shareSuccess && !shareOpen" id="map-share-success" class="user-map-view__share-success" type="success"
       variant="tonal" rounded="lg" role="status" aria-live="polite" tabindex="-1" closable
       @click:close="shareSuccess = null">{{ shareSuccess }}</v-alert>
-    <v-btn v-if="isPhone && mode === 'missions'" class="user-map-view__mission-search" icon="mdi-magnify"
-      variant="flat" color="primary" aria-label="جست‌وجوی ایستگاه میانی" title="جست‌وجوی ایستگاه میانی"
-      @click="selectTool('search')" />
     <UserMissionView v-if="auth.user?.role === 'user' && (mode === 'missions' || missionActive)"
       v-show="mode === 'missions'" ref="missionWorkspace"
       embedded :visible="mode === 'missions'" :external-map="map" :external-marker="workspaceMarker"
@@ -77,40 +74,12 @@
       </ul>
     </section>
 
-    <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
-    <div v-if="isPhone && !journey.navigating.value && mode !== 'missions'" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
-      <v-layout class="user-map-view__dock-layout">
-        <v-bottom-navigation
-          class="user-map-view__dock"
-          name="map-tools"
-          tag="nav"
-          aria-label="ابزارهای نقشه"
-          :model-value="activeTool"
-          :height="64"
-          :mandatory="false"
-          grow
-          absolute
-          @update:model-value="selectTool"
-        >
-          <v-btn
-            v-for="tool in mapTools"
-            :id="`map-tool-${tool.id}`"
-            :key="tool.id"
-            :value="tool.id"
-            :disabled="tool.id === 'history' && !modeAvailability.history"
-            :color="activeTool === tool.id ? 'primary' : undefined"
-            variant="text"
-            :aria-label="tool.label"
-            :title="tool.label"
-            :aria-expanded="activeTool === tool.id"
-            :aria-controls="`map-${tool.id}-panel`"
-          >
-            <v-icon :icon="tool.icon" size="20" aria-hidden="true" />
-            <span class="user-map-view__dock-label">{{ tool.shortLabel }}</span>
-          </v-btn>
-        </v-bottom-navigation>
-      </v-layout>
-    </div>
+    <!-- One phone Search action in every workspace tab. SOS is an App sibling;
+         its offset is paired with this button's offset in the map shell styles. -->
+    <v-btn v-if="isPhone" id="map-tool-search" class="user-map-view__search-action"
+      icon="mdi-magnify" variant="flat" color="primary" aria-label="جست‌وجوی مکان"
+      title="جست‌وجوی مکان" aria-controls="map-search-panel"
+      :aria-expanded="activeTool === 'search'" @click="selectTool('search')" />
 
     <!-- SOS is an App.vue sibling, outside this map's isolated stacking context.
          Teleport the launcher into that same viewport context so both buttons
@@ -164,7 +133,7 @@
     <div v-if="journey.point.value && journey.navigating.value && !journey.sheetOpen.value"
       class="user-map-view__journey-stack" aria-label="راهبری فعال">
       <v-card id="map-navigation-sheet" class="user-map-view__journey-content bb-floating-card bb-map-navigation-card"
-        elevation="3" rounded="xl" dir="rtl">
+        elevation="3" rounded="xl" dir="rtl" tabindex="-1">
         <div class="user-map-view__journey-bar">
           <span class="user-map-view__journey-emblem" aria-hidden="true"><v-icon icon="mdi-navigation-variant" size="21" /></span>
           <div class="user-map-view__journey-heading">
@@ -172,9 +141,6 @@
             <span class="user-map-view__journey-label" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
           </div>
           <span class="sr-only" role="status" aria-live="polite">{{ journeyAnnouncement }}</span>
-          <v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify" variant="text"
-            aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان" aria-controls="map-search-panel"
-            :aria-expanded="activeTool === 'search'" @click="selectTool('search')" />
           <dl class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
             <div class="user-map-view__telemetry-item user-map-view__telemetry-item--eta">
               <dt><v-icon icon="mdi-timer-outline" size="18" aria-hidden="true" />تا مقصد</dt>
@@ -216,13 +182,13 @@
       </v-card>
     </div>
     <PointRouteSheet v-show="mode === 'trips' && !missionActive" ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
-      :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"
+      :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="false"
       :search-place="isSelectedSearchDestination ? journey.knownPlace.value : null" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices" @choose-transport="openTransportChoices"
       @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
-    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen && mode === 'trips' && !missionActive" :show-search="isPhone"
+    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen && mode === 'trips' && !missionActive" :show-search="false"
       @choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices" @search="openRouteSearch" />
-    <PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen && mode === 'trips' && !missionActive" :show-search="isPhone"
+    <PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen && mode === 'trips' && !missionActive" :show-search="false"
       @confirm="confirmTransportChoice" @close="closeTransportChoices" @search="openRouteSearch" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
@@ -480,14 +446,11 @@ watch(mode, (next) => {
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
-// Phones put search and companions in separate fullscreen dialogs, with a small
-// history sheet. The view owns the sockets so closing a tool does not stop sharing.
+// Phone search, history and companions keep their full-screen dialogs. The
+// workspace tabs launch history/companions; Search has one shared map action.
 type MapTool = "search" | "history" | "live";
-const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
-  { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
-  { id: "history", label: "تاریخچهٔ مسیر", shortLabel: "تاریخچه", icon: "mdi-map-clock-outline" },
-  { id: "live", label: "همراهان", shortLabel: "همراهان", icon: "mdi-account-group-outline" }
-];
+const toolLauncherId = (tool: MapTool): string =>
+  tool === "search" ? "map-tool-search" : `map-mode-${tool === "live" ? "sharing" : "history"}`;
 const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
@@ -565,10 +528,8 @@ const phoneHistoryDialogProps = computed(() => ({
   "aria-label": "تاریخچهٔ مسیر"
 }));
 
-// Vuetify's non-mandatory group emits undefined when the selected button is tapped
-// again. Normalize it to null: otherwise the sheet's `activeTool !== null` stays
-// true while its panels are hidden, leaving an empty interactive overlay.
-// Keep selection and panel visibility on the same state, then move keyboard focus.
+// Search and workspace tabs share the same dialog state. Normalize an omitted
+// selection to null and return focus to the launcher after dismissing a dialog.
 async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
   if (selected === "history" && !modeAvailability.value.history) return;
@@ -583,7 +544,7 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   if (selected === "history") { historySuppressedAfterRouteClear.value = false; paintPlayback(); }
   await nextTick();
   if (selected) document.getElementById(`map-${selected}-panel`)?.focus();
-  else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
+  else if (previous) document.getElementById(toolLauncherId(previous))?.focus();
 }
 
 const phoneSearchDialogProps = computed(() => ({
@@ -607,7 +568,7 @@ const phoneLiveDialogProps = computed(() => ({
   "aria-label": "همراهان"
 }));
 
-// Keep Vuetify's models and the dock selection in sync on other close paths.
+// Keep Vuetify's dialog models in sync on other close paths.
 function onHistoryDialogVisibilityChange(visible: boolean): void {
   if (!visible && activeTool.value === "history") closeTool();
 }
@@ -621,10 +582,18 @@ function onLiveDialogVisibilityChange(visible: boolean): void {
 function closeTool(restoreFocus = true): void {
   const tool = activeTool.value;
   if (!tool) return;
+  // Search is temporary within History/Sharing. Reopen that tab's phone panel
+  // on dismissal, but not when a result is selected or a mode switch closes it.
+  if (tool === "search" && restoreFocus && isPhone.value && (mode.value === "history" || mode.value === "sharing")) {
+    const returnTool = mode.value === "history" ? "history" : "live";
+    activeTool.value = returnTool;
+    void nextTick(() => document.getElementById(`map-${returnTool}-panel`)?.focus());
+    return;
+  }
   activeTool.value = null;
   // A search selection may open the route planner immediately afterwards.
   // Avoid moving focus back into the just-closed search dialog in that case.
-  if (restoreFocus) void nextTick(() => document.getElementById(`map-tool-${tool}`)?.focus());
+  if (restoreFocus) void nextTick(() => document.getElementById(toolLauncherId(tool))?.focus());
 }
 
 function onPanelEscape(event: KeyboardEvent): void {
@@ -1457,14 +1426,20 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
     return;
   }
   journey.select({ lat: place.lat, lon: place.lon }, place);
+  // History and Sharing have no trip planner. A non-mission place result opens
+  // Trips explicitly rather than leaving a selected destination behind a hidden sheet.
+  const changeTab = mode.value !== "trips";
+  const tripReady = changeTab
+    ? router.push({ path: "/_user/map", query: workspaceTabQuery(route.query, "trips") })
+    : Promise.resolve();
   // The source marker or cluster dialog disappears as soon as this result is
   // selected. Do not strand keyboard focus on body, and never steal it if a
   // different destination or map replaces this one before the sheet renders.
-  if (fromMap) void nextTick(() => {
-    if (map.value === instance && journey.sheetOpen.value &&
+  if (fromMap || changeTab) void tripReady.then(() => nextTick(() => {
+    if (map.value === instance && mode.value === "trips" && journey.sheetOpen.value &&
         matchesSelectedSearchDestination(place, journey.knownPlace.value, journey.point.value))
       document.getElementById("map-point-route-sheet")?.focus({ preventScroll: true });
-  });
+  }));
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
@@ -1985,7 +1960,7 @@ function startPointNavigation(): void {
     navigationAlert.arm();
     userControlledCamera.value = true;
     syncOwnMarker();
-    void nextTick(() => (document.querySelector('.user-map-view__journey-bar .v-btn') as HTMLElement | null)?.focus());
+    void nextTick(() => (document.getElementById('map-tool-search') ?? document.getElementById('map-navigation-sheet'))?.focus());
   }
 }
 watch(() => journey.point.value, (next, previous) => {
@@ -2249,8 +2224,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__share-success :deep(.v-alert__underlay) { display: none; }
 .user-map-view__share-success :deep(.v-alert__prepend) { color: rgb(var(--v-theme-success)); }
 .user-map-view__share-success:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.user-map-view__mission-search { position: absolute; z-index: 8; top: calc(4.85rem + env(safe-area-inset-top, 0px));
-  left: calc(.75rem + env(safe-area-inset-left, 0px)); width: 48px; height: 48px; }
 @media (max-width: 700px) {
   .user-map-view__modes { max-width: calc(100% - 7.8rem); gap: 0; padding: .15rem; }
   .user-map-view__modes button { padding: 0; }
@@ -2410,15 +2383,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); width: min(36rem, calc(100vw - 1.5rem)); pointer-events: none; }
 .user-map-view__journey-content { display: flex; flex-direction: column; gap: .4rem; max-height: min(72dvh, 36rem);
   overflow-y: auto; overscroll-behavior: contain; padding: .7rem .75rem; pointer-events: auto; }
-.user-map-view__journey-bar { display: grid; grid-template-columns: 38px minmax(0, 1fr) 44px;
+.user-map-view__journey-bar { display: grid; grid-template-columns: 38px minmax(0, 1fr);
   align-items: center; column-gap: .65rem; row-gap: .55rem; color: rgb(var(--v-theme-on-surface)); }
 .user-map-view__journey-emblem { display: grid; place-items: center; width: 38px; height: 38px;
   border-radius: 12px; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
 .user-map-view__journey-heading { display: grid; min-width: 0; gap: .05rem; }
 .user-map-view__journey-heading small { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: .8rem; font-weight: 800; color: rgb(var(--v-theme-primary)); }
-.user-map-view__journey-bar > .v-btn { min-width: 44px; height: 44px; }
-.user-map-view__journey-bar > .v-btn:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
 .user-map-view__navigation-status { display: grid; gap: .35rem; pointer-events: none; }
 .user-map-view__gps-warning, .user-map-view__reroute-status { margin: 0; padding: .55rem .85rem;
   border: 1px solid rgba(var(--v-theme-on-warning), .2); border-radius: var(--bb-radius-nested, 16px);
@@ -2456,11 +2427,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__journey-actions :deep(.v-btn__content) { white-space: nowrap; text-align: center; }
 .user-map-view__journey-actions :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: 2px; }
-@media (min-width: 600px) {
-  /* The desktop/tablet search widget is already on the map. Do not reserve a
-     blank icon column after hiding the redundant header launcher. */
-  .user-map-view__journey-bar { grid-template-columns: 38px minmax(0, 1fr); }
-}
 @media (min-width: 600px) and (max-width: 1023px) {
   /* The same card, parked beside rather than over the SOS/route action rail. */
   .user-map-view__journey-stack { left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;
@@ -2794,15 +2760,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: 0;
   }
 
-  /* On phones the compass clears the SOS/share/recenter stack and the dock. */
+  /* On phones the compass clears the SOS/share/recenter and Search stack. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
   }
-  /* Preserve MapLibre's attribution above the bottom tools and below the menu
+  /* Preserve MapLibre's attribution above the lower map edge and below the menu
    * launcher, never buried beneath an open tool or the SOS pill. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
   /* With an active mission the always-visible legend occupies the map's lower
      left. Keep the actual scale above it, below the mission progress surface. */
@@ -2836,46 +2802,21 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__recenter { inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px)); }
   .user-map-view__share { inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px)); }
 
-  /* A nested Vuetify layout keeps bottom-navigation from reserving space in
-   * the app shell. The frame positions the dock; Vuetify owns its selection. */
-  .user-map-view__dock-frame {
-    position: absolute;
-    z-index: 5;
-    inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-    left: calc(0.75rem + env(safe-area-inset-left, 0px));
-    right: calc(0.75rem + env(safe-area-inset-right, 0px));
-    width: auto;
-    max-width: 19rem;
-    height: 4rem;
-    flex: none;
-    margin-inline: auto; /* Center within the safe region, even if only one side has a cutout. */
-  }
-  .user-map-view__dock-layout { width: 100%; height: 100%; }
-  .user-map-view__dock {
-    border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
-    border-radius: 1.25rem;
-    background: rgba(var(--v-theme-surface), 0.97);
+  /* One 48px Search action below SOS; keep map and tab controls unobscured. */
+  .user-map-view__search-action {
+    position: fixed; z-index: 8;
+    inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px));
+    width: 48px; min-width: 48px; height: 48px; border-radius: 50%;
     box-shadow: var(--bb-shadow-overlay);
-    backdrop-filter: blur(12px);
   }
-  .user-map-view__dock :deep(.v-bottom-navigation__content) {
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem;
+  .user-map-view__search-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
+  .user-map-view--route-preview .user-map-view__search-action {
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px));
   }
-  /* Keep three 44px launchers reachable on a 320px-wide phone. */
-  .user-map-view__dock :deep(.v-bottom-navigation__content > .v-btn) {
-    flex: 1 1 0;
-    min-width: 44px;
-    max-width: none;
-    height: 56px;
-    border-radius: 1rem;
+  .user-map-view--navigating .user-map-view__search-action {
+    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
   }
-  .user-map-view__dock :deep(.v-bottom-navigation__content > .v-btn.v-btn--selected) {
-    background: rgba(var(--v-theme-primary), 0.14);
-  }
-  .user-map-view__dock-label { font-size: 0.82rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
-  .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
 
   .user-map-view__panel {
     position: static;
@@ -2963,7 +2904,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* Mission controls own this map only in Missions mode. Do not leave hidden
    personal route/companion/history controls keyboard-accessible behind them. */
 .user-map-view--mission .user-map-view__journey-stack,
-.user-map-view--mission .user-map-view__dock-frame,
 .user-map-view--mission .user-map-view__playback,
 .user-map-view--mission .user-map-view__live { display: none !important; }
 .user-map-view--mission .user-map-view__search { z-index: 7; }

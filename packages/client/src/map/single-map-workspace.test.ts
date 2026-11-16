@@ -85,7 +85,7 @@ describe("one persistent user map workspace", () => {
   });
   it("leaves offers accessible while trip navigation locks Missions/History", () => {
     expect(map).toContain(':disabled="!modeAvailability[item.id]');
-    expect(map).toContain(':disabled="tool.id === \'history\' && !modeAvailability.history"');
+    expect(map).not.toContain('v-bottom-navigation'); // Only workspace tabs launch History.
     expect(map).toContain('if (selected === "history" && !modeAvailability.value.history) return;');
     expect(map).toContain('if (journey.point.value || journey.navigating.value || journey.navigationPending.value) clearPointRoute();');
     expect(offers).toContain('mapTripSession.endForMission()');

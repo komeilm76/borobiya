@@ -560,32 +560,31 @@ a {
 @media (max-width: 599px) {
   .app-shell--map { height: 100dvh; overflow: hidden; }
   .app-shell--map .app-main { min-height: 0; }
-  /* Outrank the trigger's scoped position so the same 48px SOS control clears
-   * the dock; do not enlarge or hide it on the map. */
+  /* Keep the 48px SOS one row above the shared Search action. */
   .app-shell--map .sos-fab.sos-fab {
-    inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
   .app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-    inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
     inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
   }
   /* The planner and route-choice sheets cover the lower map. Keep both App-level
    * actions visible and adjacent above the currently measured sheet. */
   .app-shell--map:has(.user-map-view--route-preview) .sos-fab.sos-fab {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem + env(safe-area-inset-bottom, 0px));
   }
   .app-shell--map:has(.user-map-view--route-preview) .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 9.5rem + env(safe-area-inset-bottom, 0px));
     inset-inline-start: calc(0.75rem + 3.25rem + env(safe-area-inset-right, 0px));
   }
-  /* SOS is an App.vue sibling of the map. During guidance it leads the action
-   * row just above the measured navigation sheet, not behind its overlay. */
+  /* During guidance Search joins the action row above the measured sheet;
+   * SOS and route choice sit one row higher, never behind the card. */
   .app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {
-    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 0.5rem);
+    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
   }
   .app-shell--map:has(.user-map-view--navigating) .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
-    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 0.5rem);
+    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
   }
 }
 

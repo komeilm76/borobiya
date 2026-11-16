@@ -49,7 +49,7 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(point).toContain('.point-route.bb-map-navigation-card {\n    max-height: max(7rem');
     expect(transport).toContain('.point-transport-choices.bb-map-navigation-card { max-height: max(7rem');
     // One search surface is shared by guidance and the normal map; phones use the same modal.
-    expect(map).toContain('id="map-navigation-search-toggle"');
+    expect(map).toContain('id="map-tool-search" class="user-map-view__search-action"');
     expect(map).toContain('class="user-map-view__search-dialog"');
     expect(map).toContain('PlaceSearchPanel :api="placeSearch"');
     expect(map).not.toContain('id="map-navigation-search"');
