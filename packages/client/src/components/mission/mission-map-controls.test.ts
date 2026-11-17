@@ -94,19 +94,22 @@ describe("mission map controls", () => {
     const phone = viewStyle.split('@media (max-width: 599px) {')[1]!;
     expect(phone).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
     expect(phone).toContain('bottom: calc(16rem + env(safe-area-inset-bottom, 0px));');
-    expect(phone).toContain('bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));');
-    expect(phone).toContain('bottom: calc(9rem + env(safe-area-inset-bottom, 0px));');
+    expect(phone).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('.mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }');
     expect(viewStyle).not.toContain('.mission-desk__dock {');
     expect(viewStyle).toContain('.mission-desk__route-action:focus-visible');
     expect(phone).toContain('.mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right)');
     expect(phone).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('.mission-desk--active .mission-desk__map-focus');
-    expect(phone).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
+    expect(phone).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
+    expect(phone).toContain('position: absolute; right: 7rem; bottom: 5rem;');
     expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 560px)');
     expect(viewStyle).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
+    const desktopRail = viewStyle.slice(viewStyle.indexOf('@media (min-width: 1024px) {'));
+    expect(desktopRail).toContain('left: calc(50% - 18rem - 4rem);');
+    expect(desktopRail).toContain('bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));');
   });
   it("keeps the idle phone compass out of centered welcome/empty cards and clear of the top network control", () => {
     const css = parse(missionMap).descriptor.styles[0]!.content;

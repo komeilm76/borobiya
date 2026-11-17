@@ -49,7 +49,6 @@ describe("mission steps beside Navigate's bottom dock", () => {
     expect(mission).toContain('hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value)');
     expect(mission).toContain("'mission-desk--steps-guidance': !!desk.activeMission.value");
     expect(map).toContain("'user-map-view--mission-steps': mode === 'missions' && !!missionWorkspace?.hasStepsSheet");
-    expect(map).toContain("'user-map-view--mission-route-camera': mode === 'missions' && !!missionWorkspace?.hasRouteCamera");
     expect(shell).toContain(':root { --bb-map-mission-sheet-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem');
     expect(shell).toContain(':root:has(.user-map-view--mission-steps .mission-desk--steps-guidance) {');
     expect(steps).toContain('.mission-desk--steps-visible.mission-desk--steps-guidance #mission-steps-stack {');
@@ -62,9 +61,12 @@ describe("mission steps beside Navigate's bottom dock", () => {
     expect(rule(steps, '.mission-desk--steps-visible .mission-desk__info-action'))
       .toContain('var(--bb-map-mission-sheet-height, 15rem) + .5rem');
     expect(steps).toContain('.mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus,');
-    expect(steps).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px)); flex-direction: row;');
-    expect(steps).toContain('.mission-desk--active.mission-desk--steps-visible:has(.mission-desk__map-focus--pair)');
-    expect(map).toContain('right: calc(11.25rem + env(safe-area-inset-right, 0px));');
+    expect(steps).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px)); flex-direction: row;');
+    expect(rule(steps, '.mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus--pair :deep(.v-btn:last-child)'))
+      .toContain('bottom: 3.5rem;');
+    expect(rule(map, '.user-map-view--mission-active.user-map-view--mission-steps\n    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right)'))
+      .toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
+    expect(shell).toContain('.app-shell--map:has(.user-map-view--mission) .sos-fab.sos-fab');
     expect(compileStyle({ filename: "UserMissionView.vue", id: "steps-dock", scoped: true, source: steps }).errors).toEqual([]);
     expect(compileStyle({ filename: "UserMapView.vue", id: "steps-dock", scoped: true, source: navigation }).errors).toEqual([]);
     // A 320px phone keeps 112px for idle stages; with guidance it reserves

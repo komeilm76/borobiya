@@ -544,7 +544,6 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
   hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value),
-  hasRouteCamera: computed(() => routing.visible.value && !!routing.target.value),
   hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value &&
     (!activeTool.value || activeTool.value === 'status')) });
 function addTypedWaypoint(): void {
@@ -1178,6 +1177,20 @@ onBeforeUnmount(() => {
 .mission-desk--steps-visible .mission-desk__legend-action {
   bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
 }
+@media (min-width: 1024px) {
+  /* The centered 36rem steps card owns its own left-hand icon rail; don't
+     strand Information/Legend at the far viewport edge on large displays. */
+  .mission-desk--steps-visible .mission-desk__info-action,
+  .mission-desk--steps-visible .mission-desk__legend-action {
+    left: calc(50% - 18rem - 4rem);
+  }
+  .mission-desk--steps-visible .mission-desk__info-action {
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  }
+  .mission-desk--steps-visible .mission-desk__legend-action {
+    bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
 .mission-desk--active .mission-desk__bottom-stack #mission-status-panel {
   position: relative; inset: auto; flex: 1 1 auto; min-height: 0;
   width: 100%; max-height: none; margin: 0;
@@ -1296,12 +1309,10 @@ onBeforeUnmount(() => {
 .mission-desk__info-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__map-focus {
   position: absolute; z-index: 9; right: 1.25rem;
-  bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);
-  display: flex; flex-direction: column; gap: .5rem;
+  bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: row; gap: .5rem;
 }
-.mission-desk__map-focus--pair {
-  bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
-}
+
 .mission-desk__map-focus :deep(.v-btn) {
   width: 48px; min-width: 48px; height: 48px;
   border: 1px solid var(--bb-color-outline); border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
@@ -1366,20 +1377,24 @@ onBeforeUnmount(() => {
   }
   .mission-desk__map-focus {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
-    bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
-  .mission-desk__map-focus--pair { bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
-  /* Legacy tool sheets retain the lower map-action rail. The steps dock
-     overrides it below with a measured row above its surface. */
+  /* Tool sheets keep the compass to the left of SOS. With steps visible it
+     moves above the dock, while Location remains in the bottom-right slot. */
   .mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
-    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    right: calc(4.25rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
   .mission-desk--active .mission-desk__map-focus,
   .mission-desk--active .mission-desk__map-focus--pair {
-    right: calc(4.25rem + env(safe-area-inset-right, 0px));
-    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
+  }
+  /* Route framing is optional and belongs in the upper row, not in the
+     Location/Search row at the bottom of the usable map. */
+  .mission-desk--active .mission-desk__map-focus--pair :deep(.v-btn:last-child) {
+    position: absolute; right: 7rem; bottom: 5rem;
   }
 }
 @media (max-width: 599px) and (max-height: 700px) {
@@ -1418,7 +1433,7 @@ onBeforeUnmount(() => {
   }
   .mission-desk:not(.mission-desk--tool-open) .mission-desk__map-focus {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
-    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
   }
   .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
@@ -1488,22 +1503,20 @@ onBeforeUnmount(() => {
     top: calc(5.25rem + env(safe-area-inset-top, 0px)); max-height: 5rem;
     overflow-y: auto; overscroll-behavior: contain;
   }
-  /* Higher specificity than the old camera rail at short phone heights.
-     SOS and the legend keep their upper row, Search and Info the lower row. */
+  /* The location action owns the lowest usable right slot above the dock.
+     Its optional route-frame button stays in the upper row with the compass. */
   .mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus,
   .mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus--pair {
-    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
-    right: calc(4.25rem + env(safe-area-inset-right, 0px)); flex-direction: row;
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); flex-direction: row;
   }
-  /* The standalone mission bookmark has its own canvas; the shared map uses
-     UserMapView's matching compass rule instead. */
+  .mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus--pair :deep(.v-btn:last-child) {
+    bottom: 3.5rem;
+  }
+  /* Standalone bookmark canvas; embedded missions use the shared map rule. */
   .mission-desk--active.mission-desk--steps-visible :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
-    right: calc(7.75rem + env(safe-area-inset-right, 0px));
-  }
-  .mission-desk--active.mission-desk--steps-visible:has(.mission-desk__map-focus--pair)
-    :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
-    right: calc(11.25rem + env(safe-area-inset-right, 0px));
+    right: calc(4.25rem + env(safe-area-inset-right, 0px));
   }
 }
 @media (max-width: 599px) and (max-height: 400px) {

@@ -26,14 +26,21 @@ describe("shared map icon clearance", () => {
     expect(map).toContain('@choose-route="openRouteChoices"');
   });
 
-  it("centers idle mission offers beneath a dedicated icon row, clear of SOS", () => {
+  it("centers idle mission offers while keeping Location at the lower right", () => {
     expect(map).toContain("'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission");
     const mapCss = parse(map).descriptor.styles[0]!.content;
     for (const action of ["recenter", "share"]) {
       expect(mapCss).toContain(`.user-map-view--mission-idle .user-map-view__${action}`);
     }
     const compass = mapCss.slice(mapCss.indexOf('.user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
-    expect(compass).toContain('top: calc(4.85rem + env(safe-area-inset-top, 0px))');
+    const location = mapCss.slice(mapCss.indexOf('.user-map-view--mission-idle .user-map-view__recenter {'));
+    expect(location).toContain('top: auto;');
+    expect(location).toContain('inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));');
+    expect(location).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(compass).toContain('top: auto;');
+    expect(compass).toContain('bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));');
+    expect(mapCss).toContain('.user-map-view--mission .user-map-view__search-action {');
+    expect(mapCss).toContain('inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));');
     expect(compass).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;');
     const missionCss = parse(mission).descriptor.styles[0]!.content;
     const phone = missionCss.slice(missionCss.indexOf('@media (max-width: 599px) {'));
@@ -56,6 +63,7 @@ describe("shared map icon clearance", () => {
     expect(css).toContain(".user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right)");
     const active = css.slice(css.indexOf('.user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
     expect(active).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(active).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
     expect(css).toContain(".user-map-view--mission-active:not(.user-map-view--mission-tool-open)");
     const missionCss = parse(mission).descriptor.styles[0]!.content;
     expect(missionCss).toContain(".mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty");

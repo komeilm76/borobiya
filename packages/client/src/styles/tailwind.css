@@ -538,6 +538,14 @@ a {
   .app-shell--map .app-main { overflow: visible; }
 }
 
+/* On a desktop mission map Location, not SOS, owns the bottom-right slot.
+   Shift SOS one 48px row upward without changing other map tabs. */
+@media (min-width: 600px) {
+  .app-shell--map:has(.user-map-view--mission) .sos-fab.sos-fab {
+    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
+  }
+}
+
 @media (max-width: 599px) {
   /* Until ResizeObserver measures the current Trips card, cap the fallback to
      the same clearance as the card. The measured root inline value takes over

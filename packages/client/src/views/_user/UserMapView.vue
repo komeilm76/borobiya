@@ -5,7 +5,6 @@
     'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission,
     'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool,
     'user-map-view--mission-steps': mode === 'missions' && !!missionWorkspace?.hasStepsSheet,
-    'user-map-view--mission-route-camera': mode === 'missions' && !!missionWorkspace?.hasRouteCamera,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
     'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
@@ -2577,12 +2576,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   box-shadow: var(--bb-shadow-overlay);
 }
 .user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem); }
-/* Before accepting a mission, the same private recenter control remains
-   available beside Search, above the idle offer panel rather than over it. */
-.user-map-view--mission .user-map-view__recenter {
-  top: calc(4.85rem + env(safe-area-inset-top, 0px));
-  inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
-  inset-block-end: auto;
+/* Keep the private location action in the bottom-right slot before assignment;
+   the accepted-mission view takes over with its own guidance-aware button. */
+.user-map-view--mission-idle .user-map-view__recenter {
+  top: auto; inset-inline-start: calc(1.25rem + env(safe-area-inset-right, 0px));
+  inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 /* Off is neutral rather than another green/teal fill; the outline remains
  * visible over both pale map tiles and the dark raised surface. */
@@ -2799,28 +2797,24 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     left: auto;
     inset-block-end: calc(14.75rem + env(safe-area-inset-bottom, 0px));
   }
-  /* With no active mission, park the three map actions in the open band under
-   * the tabs. The centered offer list starts below them, so none of its
-   * content has to be squeezed sideways to make room for a vertical rail. */
-  .user-map-view--mission-idle .user-map-view__recenter,
-  .user-map-view--mission-idle .user-map-view__share,
-  .user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: calc(4.85rem + env(safe-area-inset-top, 0px));
-    bottom: auto;
-  }
+  /* Idle Missions uses two bottom-right rows. The centered offers stop above
+     them; Location occupies the lowest right slot beside Search. */
   .user-map-view--mission-idle .user-map-view__recenter {
-    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    top: auto; right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view--mission-idle .user-map-view__share {
-    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+    top: auto; right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    top: auto; right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   }
   /* The mission overlay is a sibling of MapCanvas: its scoped compass rules
    * cannot reach this shared canvas. Match its focus-button rail here. */
   .user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    right: calc(4.25rem + env(safe-area-inset-right, 0px));
     left: auto; top: auto;
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   }
@@ -2880,8 +2874,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
   }
 
-  /* The steps dock has the same measured clearance as Navigate. On narrow
-     screens Search is below SOS; the two rows remain outside the sheet. */
+  /* Search sits beside Location, below SOS, in either mission state. */
+  .user-map-view--mission .user-map-view__search-action {
+    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
+  }
   .user-map-view--mission-steps .user-map-view__search-action {
     inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
   }
@@ -2959,17 +2955,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 @media (max-width: 599px) {
-  /* A shared canvas cannot be styled through the mission child's scoped CSS.
-     SOS, camera, optional route frame, compass and the legend occupy the
-     upper row; Search and Mission Information occupy the lower row. */
+  /* The shared compass takes the upper row beside SOS; optional route
+     framing sits farther left, while Location stays at the bottom-right. */
   .user-map-view--mission-active.user-map-view--mission-steps
     .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
-    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
-  }
-  .user-map-view--mission-steps.user-map-view--mission-route-camera
-    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(11.25rem + env(safe-area-inset-right, 0px));
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
   }
 }
 
