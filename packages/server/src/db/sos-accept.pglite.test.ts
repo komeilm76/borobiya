@@ -73,6 +73,18 @@ describe("atomic proposal acceptance (migrated PGlite)", () => {
     expect(await store.listPendingProposals(REQUESTER, 1, 20)).toEqual({ items: [], total: 0 });
   });
 
+  it("does not advertise pending offers for closed SOS requests or let a promoted admin accept one", async () => {
+    await pg.query(`UPDATE sos_requests SET status = 'completed' WHERE id = $1`, [SOS[0]]);
+    await pg.query(`UPDATE sos_requests SET status = 'cancelled_by_requester' WHERE id = $1`, [SOS[1]]);
+    expect(await store.listPendingProposals(RESCUER, 1, 20)).toEqual({ items: [], total: 0 });
+    expect(await store.acceptProposal(PROPOSAL[0]!, RESCUER)).toEqual({ status: "sos_closed" });
+    await pg.query(`UPDATE sos_requests SET status = 'dispatched' WHERE id = ANY($1::uuid[])`, [SOS]);
+    await pg.query(`UPDATE users SET role = 'admin' WHERE id = $1`, [RESCUER]);
+    expect(await store.acceptProposal(PROPOSAL[0]!, RESCUER)).toEqual({ status: "not_found" });
+    await pg.query(`UPDATE users SET role = 'user' WHERE id = $1`, [RESCUER]);
+    expect((await store.listPendingProposals(RESCUER, 1, 20)).total).toBe(2);
+  });
+
   it("rolls back all acceptance writes if the history insert fails", async () => {
     await pg.exec(`CREATE FUNCTION reject_accept_history() RETURNS trigger LANGUAGE plpgsql AS $$
       BEGIN RAISE EXCEPTION 'history unavailable'; END $$;

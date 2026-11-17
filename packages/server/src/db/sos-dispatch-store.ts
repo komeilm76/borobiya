@@ -186,6 +186,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       .from(users)
       .where(
         and(
+          eq(users.role, "user"),
           eq(users.isActive, true),
           eq(users.isSuspended, false),
           eq(users.isOnMission, false),
@@ -273,6 +274,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       const candidateUsers = await tx
         .select({
           id: users.id,
+          role: users.role,
           isActive: users.isActive,
           isSuspended: users.isSuspended,
           isOnMission: users.isOnMission
@@ -305,7 +307,8 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
           invalidIssues.push({ code: "self_dispatch_not_allowed", rescuerId, path: ["rescuerIds", idx] });
           return;
         }
-        if (!candidate.isActive || candidate.isSuspended) {
+        if (candidate.role !== "user" || !candidate.isActive || candidate.isSuspended) {
+          // A privileged admin account cannot open the user mission inbox or rescue room.
           invalidIssues.push({ code: "rescuer_unavailable", rescuerId, path: ["rescuerIds", idx] });
           return;
         }
@@ -455,9 +458,9 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       const [request] = await tx.select({ id: sosRequests.id, requesterId: sosRequests.requesterId, status: sosRequests.status })
         .from(sosRequests).where(eq(sosRequests.id, candidate.sosRequestId)).for("update");
       if (!request) return { status: "not_found" };
-      const [rescuer] = await tx.select({ id: users.id, isOnMission: users.isOnMission })
+      const [rescuer] = await tx.select({ id: users.id, role: users.role, isOnMission: users.isOnMission })
         .from(users).where(eq(users.id, rescuerId)).for("update");
-      if (!rescuer) return { status: "not_found" };
+      if (!rescuer || rescuer.role !== "user") return { status: "not_found" };
       const [proposal] = await tx.select({
         id: missionProposals.id,
         sosRequestId: missionProposals.sosRequestId,
@@ -537,7 +540,10 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
   }
 
   public async listPendingProposals(rescuerId: string, page: number, limit: number): Promise<{ items: PendingProposalRecord[]; total: number }> {
-    const where = and(eq(missionProposals.rescuerId, rescuerId), eq(missionProposals.status, "pending"));
+    // A pending proposal on a completed/cancelled SOS cannot be accepted. Keep
+    // both page rows and total consistent instead of advertising orphaned offers.
+    const where = and(eq(missionProposals.rescuerId, rescuerId), eq(missionProposals.status, "pending"),
+      inArray(sosRequests.status, ["dispatched", "accepted"]));
     const [rows, totals] = await Promise.all([
       this.db.select({
         id: missionProposals.id,
@@ -562,7 +568,8 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         .where(where)
         .orderBy(desc(missionProposals.createdAt), asc(missionProposals.id))
         .limit(limit).offset((page - 1) * limit),
-      this.db.select({ total: count() }).from(missionProposals).where(where)
+      this.db.select({ total: count() }).from(missionProposals)
+        .innerJoin(sosRequests, eq(sosRequests.id, missionProposals.sosRequestId)).where(where)
     ]);
     // The WHERE is scoped to the verified rescuer before any joined incident, photo or
     // requester details can enter the response. Coordinates are returned only for that offer.

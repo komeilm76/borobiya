@@ -342,6 +342,9 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     const noLocation = "78000000-0000-4000-8000-000000000002";
     const noCategory = "78000000-0000-4000-8000-000000000003";
     const busy = "78000000-0000-4000-8000-000000000004";
+    const adminCandidate = "78000000-0000-4000-8000-000000000008";
+    await seedUser({ id: adminCandidate, username: "manual_admin", role: "admin", lat: 35.7, lon: 51.4 });
+    await pg.query(`INSERT INTO category_users (category_id,user_id) VALUES ($1,$2)`, [CAT_MEDICAL_ALPHA_ID, adminCandidate]);
     await seedUser({ id: noLocation, username: "manual_no_gps" });
     await pg.query(`INSERT INTO category_users (category_id,user_id) VALUES ($1,$2)`, [CAT_MEDICAL_ALPHA_ID, noLocation]);
     await seedUser({ id: noCategory, username: "manual_no_category", lat: 35.7, lon: 51.401 });
@@ -360,6 +363,8 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       { username: "manual_no_gps", distance: null, categoryName: "امداد شهری" }
     ]);
     expect((await read("mode=manual")).statusCode).toBe(400); // never enumerate arbitrary accounts
+    expect(nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual_admin")).json()).responders).toEqual([]);
+    expect(nearestRespondersResponseSchema.parse((await read("search=manual_admin")).json()).responders).toEqual([]);
     expect(nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual_busy")).json()).responders).toEqual([]);
     expect(nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual_no_gps")).json()).responders[0]?.userId).toBe(noLocation);
     // The manual route cannot suggest the requester, even if they match the query.
@@ -370,6 +375,12 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     const exact = nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual")).json()).responders;
     expect(exact[0]?.userId).toBe(exactId);
     expect(exact.every((item) => item.distance === null)).toBe(true);
+    const invalidAssignment = await app.inject({ method: "POST", url: `/_admin/sos/requests/${sosId}/dispatch`, headers,
+      payload: { rescuerIds: [noLocation, adminCandidate] } });
+    expect(invalidAssignment.statusCode).toBe(400);
+    expect(invalidAssignment.json()).toMatchObject({ code: "VALIDATION_ERROR",
+      issues: [{ code: "rescuer_unavailable", rescuerId: adminCandidate }] });
+    expect((await pg.query(`SELECT id FROM mission_proposals WHERE sos_request_id = $1`, [sosId])).rows).toEqual([]);
     const dispatch = await app.inject({ method: "POST", url: `/_admin/sos/requests/${sosId}/dispatch`, headers,
       payload: { rescuerIds: [noLocation, noCategory] } });
     expect(dispatch.statusCode).toBe(201);
