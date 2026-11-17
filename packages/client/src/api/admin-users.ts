@@ -14,7 +14,18 @@ import { requestJson } from "./http";
 const adminUserListResponseSchema = paginatedResponseSchema(userProfileSchema);
 
 export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>;
+export type AdminUserDetail = z.infer<typeof apiRoutes.admin.getUser.schema.responses[200]>;
 export type AdminUserListOptions = Partial<AdminUserListQuery>;
+
+/** Admin-only, exact-ID lookup; never infer a sender from a fuzzy username search. */
+export async function getAdminUser(userId: string, accessToken: string, signal?: AbortSignal): Promise<AdminUserDetail> {
+  const params = idParamsSchema.parse({ id: userId });
+  const path = apiRoutes.admin.getUser.url.replace(":id", encodeURIComponent(params.id));
+  const response = await requestJson<unknown>(path, { accessToken, signal, cache: "no-store" });
+  const profile = apiRoutes.admin.getUser.schema.responses[200].parse(response);
+  if (profile.id !== params.id) throw new Error("User profile does not match the requested account.");
+  return profile;
+}
 
 export async function listAdminUsers(
   input: AdminUserListOptions,

@@ -1,8 +1,9 @@
 <template>
   <v-container class="admin-dispatch py-6" fluid>
-    <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-4">
-      <div>
-        <div class="d-flex align-center ga-2">
+    <header class="admin-dispatch__header d-flex flex-wrap align-center justify-space-between ga-3 mb-4">
+      <div class="admin-dispatch__intro">
+        <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
+        <div class="admin-dispatch__heading d-flex flex-wrap align-center ga-2">
           <v-icon color="error" icon="mdi-radar" size="28" />
           <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
           <v-chip
@@ -18,7 +19,7 @@
         </p>
       </div>
 
-      <div class="d-flex flex-wrap align-center ga-2">
+      <div class="admin-dispatch__toolbar d-flex flex-wrap align-center ga-2">
         <v-select
           :model-value="adminSos.filterStatus"
           :items="dispatchFilters"
@@ -79,7 +80,7 @@
           @click="adminSos.refreshRequests()"
         />
       </div>
-    </div>
+    </header>
 
     <v-alert
       v-if="adminSos.errorMessage"
@@ -167,7 +168,7 @@
               <v-divider v-if="index > 0" />
               <v-list-item
                 :active="item.id === adminSos.selectedId"
-                class="py-3"
+                class="dispatch-request-row py-3"
                 @click="focusRequest(item)"
               >
                 <template #prepend>
@@ -201,7 +202,7 @@
                   </div>
                 </v-list-item-title>
 
-                <v-list-item-subtitle class="mt-1">
+                <v-list-item-subtitle class="dispatch-request-row__summary mt-1">
                   {{ item.description }}
                 </v-list-item-subtitle>
 
@@ -232,6 +233,15 @@
             </v-chip>
           </v-card-title>
           <v-divider />
+          <div class="admin-dispatch__sender" role="group" aria-label="ارسال‌کنندهٔ درخواست">
+            <span class="admin-dispatch__sender-icon" aria-hidden="true"><v-icon icon="mdi-account-circle-outline" size="23" /></span>
+            <div class="admin-dispatch__sender-copy">
+              <strong>ارسال‌کنندهٔ درخواست</strong>
+              <small>شناسهٔ ثبت‌شده: <bdi dir="ltr">{{ adminSos.selectedRequest.requesterId }}</bdi></small>
+            </div>
+            <v-btn color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-account-details-outline"
+              class="admin-dispatch__sender-action" @click="senderProfileOpen = true">مشاهدهٔ پروفایل</v-btn>
+          </div>
           <v-alert
             v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer'"
             class="ma-4 mb-0 replacement-flash"
@@ -595,6 +605,8 @@
       </v-col>
 
     </v-row>
+    <AdminUserProfileDialog v-model="senderProfileOpen" :user-id="adminSos.selectedRequest?.requesterId ?? null"
+      title="پروفایل ارسال‌کننده" />
   </v-container>
 </template>
 
@@ -622,6 +634,7 @@ import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
+import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
 
 const SOS_SOURCE_ID = "admin-sos-requests";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
@@ -635,6 +648,8 @@ const dispatchFilters = [
   { title: "همه", value: "all" }
 ];
 const auth = useAuthStore(pinia);
+const senderProfileOpen = ref(false);
+watch(() => adminSos.selectedRequest?.id, () => { senderProfileOpen.value = false; }, { flush: "sync" });
 const { requestMissions, activeMissions, timelineMissionId, selectedTimelineMission,
   missionLoading, missionLoaded, missionError, loadActiveMissions } = useAdminRequestMissions(
   computed(() => adminSos.selectedRequest?.id ?? null),
@@ -950,8 +965,16 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .admin-dispatch {
+  max-width: 100rem;
+  margin-inline: auto;
+  padding-inline: clamp(.75rem, 2vw, 2rem);
   font-family: var(--bb-font-family);
 }
+.admin-dispatch__intro { min-width: 0; flex: 1 1 22rem; }
+.admin-dispatch__eyebrow { display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .35rem;
+  color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
+.admin-dispatch__heading h1 { min-width: 0; font-size: clamp(1.1rem, 2vw, 1.5rem) !important; overflow-wrap: anywhere; }
+.admin-dispatch__header p { max-width: 56ch; line-height: 1.65; }
 
 /* Vuetify's text utilities force Roboto even when the page inherits Persian-first type. */
 .admin-dispatch :deep(.text-h5),
@@ -984,6 +1007,21 @@ onBeforeUnmount(() => {
   line-height: 1.55;
   white-space: normal;
 }
+.admin-dispatch__toolbar { max-width: 100%; }
+.admin-dispatch__toolbar :deep(.v-btn) { min-height: 44px; }
+.dispatch-request-row { border-inline-start: 3px solid transparent; }
+.dispatch-request-row.v-list-item--active { border-inline-start-color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), .09); }
+.dispatch-request-row__summary { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.admin-dispatch__sender { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem;
+  margin: .85rem 1rem 0; padding: .75rem; border: 1px solid var(--bb-color-outline);
+  border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.admin-dispatch__sender-icon { display: grid; flex: none; place-items: center; width: 42px; height: 42px;
+  border-radius: 50%; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
+.admin-dispatch__sender-copy { display: grid; flex: 1 1 10rem; min-width: 0; gap: .12rem; }
+.admin-dispatch__sender-copy strong { font-size: .9rem; }
+.admin-dispatch__sender-copy small { color: var(--bb-color-muted); font-size: .78rem; overflow-wrap: anywhere; }
+.admin-dispatch__sender-action { flex: none; min-height: 44px; }
 
 /* The timeline sits between other cards; give it a boundary, not another shadow. */
 .dispatch-mission-timeline {
@@ -1090,6 +1128,8 @@ onBeforeUnmount(() => {
 
 @media (max-width: 599px) {
   .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
+  .admin-dispatch__toolbar { width: 100%; }
+  .admin-dispatch__sender-action { width: 100%; }
   .admin-dispatch__responder-search { flex-wrap: wrap; }
   .admin-dispatch__responder-search :deep(.v-input) { flex: 1 1 100%; min-width: 0; }
 }

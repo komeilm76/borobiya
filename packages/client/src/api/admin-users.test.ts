@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminUserListQuerySchema } from "@shared/index";
 import { ApiError } from "./http";
-import { listAdminUsers, updateAdminUserStatus } from "./admin-users";
+import { getAdminUser, listAdminUsers, updateAdminUserStatus } from "./admin-users";
 
 const user = {
   id: "00000000-0000-4000-8000-000000000099",
@@ -27,6 +27,28 @@ afterEach(() => {
 });
 
 describe("admin user API", () => {
+  it("loads the exact sender profile through the admin-only detail route, without caching", async () => {
+    const detail = { ...user, devices: [], missions: [] };
+    const fetchMock = vi.fn(async () => jsonResponse(detail));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    await expect(getAdminUser(user.id, "admin-token", controller.signal)).resolves.toEqual(detail);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`/api/_admin/users/${user.id}`);
+    expect(init.method).toBe("GET");
+    expect(init.signal).toBe(controller.signal);
+    expect(init.cache).toBe("no-store");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer admin-token");
+  });
+
+  it("rejects invalid sender IDs and malformed profiles instead of displaying another account", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ ...user, id: "00000000-0000-4000-8000-000000000098", devices: [], missions: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(getAdminUser("not-a-uuid", "admin-token")).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(getAdminUser(user.id, "admin-token")).rejects.toThrow();
+  });
+
   it("serializes normalized search, status, and pagination filters and validates the page", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({
       items: [user],

@@ -126,6 +126,8 @@
                         <small>
                           {{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}
                         </small>
+                        <v-btn class="admin-users-profile-link" size="small" variant="text" color="primary"
+                          :aria-label="`مشاهدهٔ پروفایل ${user.username}`" @click="profileUserId = user.id">پروفایل</v-btn>
                       </span>
                     </div>
                   </th>
@@ -206,6 +208,8 @@
                   <span class="admin-status-dot" />
                   {{ user.isActive ? "فعال" : "غیرفعال" }}
                 </span>
+                <v-btn class="admin-users-profile-link" size="small" variant="tonal" color="primary"
+                  :aria-label="`مشاهدهٔ پروفایل ${user.username}`" @click="profileUserId = user.id">پروفایل</v-btn>
                 <div class="admin-mobile-action">
                   <v-switch
                     :model-value="user.isActive"
@@ -240,6 +244,9 @@
         </footer>
       </div>
     </v-card>
+
+    <AdminUserProfileDialog :model-value="profileUserId !== null" :user-id="profileUserId"
+      @update:model-value="(open: boolean) => { if (!open) profileUserId = null; }" />
 
     <v-dialog
       :model-value="statusChange !== null"
@@ -301,6 +308,7 @@ import { listAdminUsers, updateAdminUserStatus } from "../../api/admin-users";
 import { accountSessionKey } from "../../composables/device-identity";
 import { useAdminUserStatusChange } from "../../admin/user-status-change";
 import { useAuthStore } from "../../stores/auth";
+import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
 
 const PAGE_SIZE = 20;
 const numberFormatter = new Intl.NumberFormat("fa-IR");
@@ -322,6 +330,7 @@ const categoryFilterOptions: Array<{ title: string; value: CategoryFilter }> = [
 
 const auth = useAuthStore();
 const users = ref<UserProfile[]>([]);
+const profileUserId = ref<string | null>(null);
 const search = ref("");
 const statusFilter = ref<StatusFilter>("all");
 const categoryFilter = ref<CategoryFilter>("all");
@@ -712,6 +721,8 @@ onUnmounted(() => {
   font-size: 0.82rem;
   font-weight: 500;
 }
+.admin-users-profile-link { justify-self: start; min-height: 44px; margin-inline-start: -.5rem; }
+.admin-mobile-footer .admin-users-profile-link { margin-inline-start: 0; }
 
 .admin-role-pill,
 .admin-account-status {
