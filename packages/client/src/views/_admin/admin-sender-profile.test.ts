@@ -13,7 +13,7 @@ describe("admin sender identity and profile access", () => {
     expect(dispatch).toContain('adminSos.selectedRequest.requesterId');
     expect(dispatch).toContain('@click="senderProfileOpen = true"');
     expect(dispatch).toContain(':user-id="adminSos.selectedRequest?.requesterId ?? null"');
-    expect(dispatch).toContain('watch(() => adminSos.selectedRequest?.id, () => { senderProfileOpen.value = false; }, { flush: "sync" });');
+    expect(dispatch).toMatch(/watch\(\(\) => adminSos\.selectedRequest\?\.id, \(\) => \{\s*senderProfileOpen\.value = false;\s*photoDialogOpen\.value = false;\s*\}, \{ flush: "sync" \}\);/);
     expect(dispatch).toContain('title="پروفایل ارسال‌کننده"');
     expect(dispatch).toContain('@click="requestDispatch"');
     expect(dispatch).toContain('class="admin-dispatch__map-and-actions"');

@@ -14,7 +14,7 @@ describe("admin SOS triage flow", () => {
     const map = template.indexOf('<MapCanvas');
     const responders = template.indexOf('id="dispatch-responders"');
     const timeline = template.indexOf('class="mb-3 pa-3 dispatch-mission-timeline"');
-    const live = template.indexOf('<MissionLivePanel v-for="mission in activeMissions"');
+    const live = template.indexOf('<MissionLivePanel v-for="mission in (showLivePanel ? activeMissions : [])"');
     expect(queue).toBeGreaterThan(0);
     expect(queue).toBeLessThan(detail);
     expect(detail).toBeLessThan(map);
@@ -42,6 +42,34 @@ describe("admin SOS triage flow", () => {
     expect(source).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
     expect(source).toContain('target.scrollIntoView({');
     expect(source).toContain('if (!adminSos.canDispatchSelected) return;');
+  });
+
+  it("scans verified workload honestly and keeps complete incident evidence available on demand", () => {
+    expect(template).toContain('class="admin-dispatch__overview"');
+    expect(template).toContain("adminSos.queueVerified && adminSos.filterStatus !== 'dispatched'");
+    expect(template).toContain("adminSos.queueVerified && adminSos.filterStatus !== 'pending'");
+    expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
+    const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-incident"'));
+    expect(queue).toContain('item.location.isManual');
+    expect(queue).toContain('item.photoUrl');
+    expect(queue).not.toContain('item.location.lat.toFixed'); // Coordinates live in incident facts and on the map.
+    expect(template).toContain('adminSos.selectedRequest.location.lat.toFixed(6)');
+    expect(template).toContain('class="admin-dispatch__sender-id"');
+    expect(template).toContain('class="admin-dispatch__photo-open"');
+    expect(template).toContain('v-model="photoDialogOpen"');
+    expect(source).toContain('photoDialogOpen.value = false;');
+  });
+
+  it("keeps dispatch safety visible while putting optional history and live maps behind disclosure", () => {
+    expect(template).toContain('class="admin-dispatch__manual-warning" role="note"');
+    expect(template).toContain('جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند');
+    expect(template).toContain('class="admin-dispatch__search-help"');
+    expect(template).toContain('v-else-if="adminSos.nearestError"');
+    expect(template).toContain('class="admin-dispatch__submit');
+    expect(template).toContain('v-else-if="requestMissions.length" class="mb-3 pa-3 dispatch-mission-timeline"');
+    expect(template).toContain('class="admin-dispatch__followup mb-3"');
+    expect(template).toContain('v-for="mission in (showLivePanel ? activeMissions : [])"');
+    expect(source).toContain('if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;');
   });
 
   it("preserves a readable mobile map and full-width actions without an overlapping floating card", () => {

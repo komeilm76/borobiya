@@ -25,7 +25,7 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(desktop).toMatch(/\.severity-legend \{\s*position: absolute;/);
     const stacked = source.split("@media (max-width: 1279px) {")[1]!.split("@media (max-width: 599px)")[0]!;
     expect(stacked).toMatch(/\.dispatch-map-wrapper \{[^}]*display: flex;[^}]*height: auto;/);
-    expect(stacked).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(20rem, 48dvh, 30rem\);[^}]*min-height: 20rem;/);
+    expect(stacked).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(17rem, 40dvh, 22rem\);[^}]*min-height: 17rem;/);
     for (const element of ["map-selected-alert-card", "severity-legend"]) {
       expect(stacked).toMatch(new RegExp(`\\.${element} \\{[^}]*position: static;`));
     }
@@ -46,15 +46,19 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(toolbar.match(/size="small"/g)).toHaveLength(3);
     expect(toolbar).toContain('aria-label="بازخوانی فهرست درخواست‌های اضطراری"');
     expect(source).toContain('min-width: 44px; min-height: 44px; height: 44px;');
+    expect(source).toContain('.dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }');
+    expect(source).toContain('d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold');
+    expect(source).toContain('.admin-dispatch__overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }');
     expect(source).toContain('@media (max-width: 699px) {');
   });
 
-  it("marks distinct triage sections with wider gutters and separate queue/responder emphasis", () => {
+  it("uses aligned surfaces and inset selected rows instead of unrelated side/top accents", () => {
     expect(source).toContain('<v-row class="admin-dispatch__workspace">');
     expect(source.indexOf('۰۱ / بررسی درخواست‌ها')).toBeLessThan(source.indexOf('۰۲ / موقعیت حادثه و اعزام'));
     expect(source).toContain('.admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(');
-    expect(source).toContain('.admin-dispatch__surface--queue { border-top: 3px solid');
-    expect(source).toContain('.admin-dispatch__responders { border-top: 3px solid');
+    expect(source).toContain('.dispatch-request-row.v-list-item--active, .dispatch-responder-row.v-list-item--active {');
+    expect(source).not.toContain('border-inline-start-color:');
+    expect(source).not.toContain('border-top: 3px solid');
   });
 
   it("still reserves the compact filter and responder search wrap for phones", () => {

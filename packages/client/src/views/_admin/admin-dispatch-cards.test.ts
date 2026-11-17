@@ -29,7 +29,9 @@ describe("dispatch surface and type hierarchy", () => {
 
   it("retains floating-only map details, inset timeline and readable Persian typography", () => {
     expect(template).toContain('class="map-selected-alert-card bb-floating-card"');
-    expect(cssRule(".map-selected-alert-card")).toContain("background: rgba(var(--v-theme-surface), 0.96);");
+    expect(cssRule(".map-selected-alert-card")).toContain("background: rgb(var(--v-theme-surface));");
+    expect(cssRule(".map-selected-alert-card")).toContain("left: .75rem; right: auto;");
+    expect(cssRule(".dispatch-map-wrapper")).toContain("height: clamp(18rem, 37dvh, 23rem);");
     expect(cssRule(".dispatch-mission-timeline")).toContain("border-radius: var(--bb-radius-nested, 16px);");
     expect(cssRule(".admin-dispatch")).toContain("font-family: var(--bb-font-family);");
     expect(styles.content).toMatch(/\.admin-dispatch :deep\(\.text-h5\),[\s\S]*?font-family: var\(--bb-font-family\) !important;/);

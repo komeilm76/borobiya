@@ -28,7 +28,8 @@ describe("mission timeline UI (T3.5.8)", () => {
     expect(adminRead).toContain('read: typeof listActiveSosMissions = listActiveSosMissions');
     expect(adminRead).toContain('read(bearer, id, true)');
     expect(requester).toContain('<MissionLivePanel v-if="selectedMission"');
-    expect(admin).toContain('v-for="mission in activeMissions"');
+    expect(admin).toContain('v-for="mission in (showLivePanel ? activeMissions : [])"');
+    expect(admin).toContain('class="admin-dispatch__followup mb-3"');
     expect(panel).toContain('<time :datetime="step.createdAt"');
     expect(panel).toContain('@click="timeline.load()"');
   });

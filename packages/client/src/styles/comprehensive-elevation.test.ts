@@ -50,7 +50,8 @@ describe("all page and component elevation roles", () => {
     expect(source("../components/map/OwnPositionBar.vue")).toContain('class="own-position bb-floating-card" :class="`own-position--${tone}`" elevation="2"');
     const dispatch = source("../views/_admin/AdminDispatchView.vue");
     expect(dispatch).toContain('class="map-selected-alert-card bb-floating-card"');
-    expect(dispatch).toMatch(/@media \(max-width: 1279px\)[\s\S]*?\.map-selected-alert-card\.bb-floating-card\s*\{\s*box-shadow: var\(--bb-shadow-surface\) !important;/);
+    expect(dispatch).toMatch(/@media \(max-width: 1279px\)[\s\S]*?\.map-selected-alert-card\.bb-floating-card\s*\{[^}]*box-shadow: none !important;/);
+    expect(dispatch).toContain('border: 0; background: var(--bb-color-inset);');
     expect(source("../components/sharing/LiveBroadcastBar.vue"))
       .toContain("'bb-floating-card': compact");
     expect(source("../components/map/MapCanvas.vue")).not.toContain("bb-floating-card");
