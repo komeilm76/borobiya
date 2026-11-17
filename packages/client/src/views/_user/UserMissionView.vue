@@ -1165,8 +1165,24 @@ onBeforeUnmount(() => {
   width: 100%; max-height: min(65dvh, 32rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   display: flex; flex-direction: column; gap: .5rem; min-height: 0; pointer-events: auto; }
 .mission-desk__bottom-stack--information { max-height: min(75dvh, 40rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+@media (min-width: 600px) and (max-width: 1023px) {
+  /* Align with the tablet steps column and leave the SOS/location rail clear. */
+  .mission-desk--active .mission-desk__bottom-stack--information {
+    left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
+    width: min(30rem, calc(100% - 7.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
+}
+@media (min-width: 1024px) {
+  /* Search occupies the left 25rem. Keep Information beside it, capped to a
+     readable measure and outside the right-hand SOS/map-action rail. */
+  .mission-desk--active .mission-desk__bottom-stack--information {
+    left: max(calc(27rem + env(safe-area-inset-left, 0px)), calc(50% - 20rem));
+    right: auto;
+    width: min(40rem, calc(100% - 34rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
+}
 /* Same centered bottom card as Navigate; only the steps variant docks here.
-   Mission Information remains a separate full-width panel above map controls. */
+   Mission Information is a separate, bounded panel above map controls on wide maps. */
 .mission-desk--steps-visible .mission-desk__bottom-stack {
   left: 50%; right: auto; transform: translateX(-50%);
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px));

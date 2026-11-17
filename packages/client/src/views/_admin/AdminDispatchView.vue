@@ -1,6 +1,6 @@
 <template>
   <v-container class="admin-dispatch py-6" fluid>
-    <header class="admin-dispatch__header d-flex flex-wrap align-center justify-space-between ga-3 mb-4">
+    <header class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
         <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
         <div class="admin-dispatch__heading d-flex flex-wrap align-center ga-2">
@@ -19,66 +19,78 @@
         </p>
       </div>
 
-      <div class="admin-dispatch__toolbar d-flex flex-wrap align-center ga-2">
-        <v-select
-          :model-value="adminSos.filterStatus"
-          :items="dispatchFilters"
-          class="admin-dispatch__filter-select d-sm-none"
-          label="وضعیت درخواست‌های اضطراری"
-          item-title="title"
-          item-value="value"
-          density="compact"
-          variant="outlined"
-          hide-details
-          @update:model-value="onFilterChange"
-        />
-        <v-btn-toggle
-          class="d-none d-sm-inline-flex"
-          :model-value="adminSos.filterStatus"
-          density="compact"
-          mandatory
-          rounded="lg"
-          variant="outlined"
-          @update:model-value="onFilterChange"
-        >
-          <v-btn value="pending">
-            در انتظار رسیدگی
-          </v-btn>
-          <v-btn value="dispatched">
-            اعزام‌شده
-          </v-btn>
-          <v-btn value="all">
-            همه
-          </v-btn>
-        </v-btn-toggle>
+      <div class="admin-dispatch__toolbar">
+        <div class="admin-dispatch__filter-group" role="group" aria-label="فیلتر وضعیت درخواست‌ها">
+          <span class="admin-dispatch__toolbar-label d-none d-md-inline">نمایش</span>
+          <v-select
+            :model-value="adminSos.filterStatus"
+            :items="dispatchFilters"
+            class="admin-dispatch__filter-select d-md-none"
+            label="وضعیت درخواست‌های اضطراری"
+            item-title="title"
+            item-value="value"
+            density="compact"
+            variant="outlined"
+            hide-details
+            @update:model-value="onFilterChange"
+          />
+          <v-btn-toggle
+            class="admin-dispatch__filter-toggle d-none d-md-inline-flex"
+            :model-value="adminSos.filterStatus"
+            aria-label="وضعیت درخواست‌های اضطراری"
+            density="compact"
+            mandatory
+            rounded="lg"
+            variant="outlined"
+            @update:model-value="onFilterChange"
+          >
+            <v-btn value="pending">
+              در انتظار رسیدگی
+            </v-btn>
+            <v-btn value="dispatched">
+              اعزام‌شده
+            </v-btn>
+            <v-btn value="all">
+              همه
+            </v-btn>
+          </v-btn-toggle>
+        </div>
 
-        <v-btn
-          :aria-label="adminSos.soundMuted ? 'فعال‌سازی صدای هشدار' : 'بی‌صدا کردن هشدار'"
-          :color="adminSos.soundMuted ? 'warning' : 'primary'"
-          :prepend-icon="adminSos.soundMuted ? 'mdi-volume-off' : 'mdi-volume-high'"
-          rounded="lg"
-          variant="tonal"
-          @click="adminSos.toggleSoundMuted()"
-        >
-          {{ adminSos.soundMuted ? "بی‌صدا" : "صدای فعال" }}
-        </v-btn>
+        <div class="admin-dispatch__toolbar-actions" role="group" aria-label="کنترل‌های هشدار و بازخوانی">
+          <v-btn
+            density="compact"
+            size="small"
+            :aria-label="adminSos.soundMuted ? 'فعال‌سازی صدای هشدار' : 'بی‌صدا کردن هشدار'"
+            :color="adminSos.soundMuted ? 'warning' : 'primary'"
+            :prepend-icon="adminSos.soundMuted ? 'mdi-volume-off' : 'mdi-volume-high'"
+            rounded="lg"
+            variant="tonal"
+            @click="adminSos.toggleSoundMuted()"
+          >
+            {{ adminSos.soundMuted ? "بی‌صدا" : "صدای فعال" }}
+          </v-btn>
 
-        <v-btn
-          prepend-icon="mdi-bell-ring-outline"
-          rounded="lg"
-          variant="outlined"
-          @click="adminSos.testAlertSound()"
-        >
-          تست صدا
-        </v-btn>
+          <v-btn
+            density="compact"
+            size="small"
+            prepend-icon="mdi-bell-ring-outline"
+            rounded="lg"
+            variant="outlined"
+            @click="adminSos.testAlertSound()"
+          >
+            تست صدا
+          </v-btn>
 
-        <v-btn
-          :loading="adminSos.loading"
-          aria-label="بازخوانی فهرست درخواست‌های اضطراری"
-          icon="mdi-refresh"
-          variant="text"
-          @click="adminSos.refreshRequests()"
-        />
+          <v-btn
+            :loading="adminSos.loading"
+            aria-label="بازخوانی فهرست درخواست‌های اضطراری"
+            density="compact"
+            size="small"
+            icon="mdi-refresh"
+            variant="text"
+            @click="adminSos.refreshRequests()"
+          />
+        </div>
       </div>
     </header>
 
@@ -132,9 +144,10 @@
     </v-alert>
 
     <!-- Triage queue is first in DOM and visual order, including when the columns stack. -->
-    <v-row>
+    <v-row class="admin-dispatch__workspace">
       <v-col cols="12" lg="5" class="admin-dispatch__queue">
-        <v-card class="admin-dispatch__surface bb-surface-card mb-4" elevation="0" rounded="xl">
+        <p class="admin-dispatch__section-label">۰۱ / بررسی درخواست‌ها</p>
+        <v-card class="admin-dispatch__surface admin-dispatch__surface--queue bb-surface-card mb-5" elevation="0" rounded="xl">
           <v-card-title class="d-flex align-center justify-space-between text-subtitle-1 font-weight-bold">
             <span>صف درخواست‌های اضطراری</span>
             <v-chip v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
@@ -304,11 +317,12 @@
         </v-card>
       </v-col>
       <v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">
+        <p class="admin-dispatch__section-label">۰۲ / موقعیت حادثه و اعزام</p>
         <p v-if="adminSos.visibleRequests.length && !adminSos.selectedRequest" class="admin-dispatch__selection-hint" role="status">
           <v-icon icon="mdi-cursor-default-click-outline" size="20" aria-hidden="true" />
           برای بررسی حادثه و انتخاب امدادگر، یکی از درخواست‌های صف را انتخاب کنید.
         </p>
-        <v-card class="admin-dispatch__surface bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
+        <v-card class="admin-dispatch__surface bb-surface-card overflow-hidden mb-5" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
             <MapCanvas
               aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
@@ -977,6 +991,29 @@ onBeforeUnmount(() => {
   color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
 .admin-dispatch__heading h1 { min-width: 0; font-size: clamp(1.1rem, 2vw, 1.5rem) !important; overflow-wrap: anywhere; }
 .admin-dispatch__header p { max-width: 56ch; line-height: 1.65; }
+.admin-dispatch__toolbar {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+  gap: .75rem 1.25rem; max-width: 100%; margin-top: 1.1rem; padding-top: .85rem;
+  border-top: 1px solid var(--bb-color-outline);
+}
+.admin-dispatch__filter-group, .admin-dispatch__toolbar-actions {
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
+}
+.admin-dispatch__toolbar-actions { justify-content: flex-end; flex-wrap: wrap; }
+.admin-dispatch__toolbar-label { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; }
+.admin-dispatch__filter-select { max-width: 15rem; min-width: 0; }
+.admin-dispatch__toolbar :deep(.v-btn) {
+  min-width: 44px; min-height: 44px; height: 44px; padding-inline: .7rem;
+  font-size: .8rem; letter-spacing: normal;
+}
+.admin-dispatch__filter-toggle :deep(.v-btn) { padding-inline: .65rem; }
+.admin-dispatch__toolbar :deep(.v-btn--icon) { width: 44px; padding: 0; }
+.admin-dispatch__workspace { margin-inline: -clamp(.75rem, 1.25vw, 1.25rem); }
+.admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(.75rem, 1.25vw, 1.25rem); }
+.admin-dispatch__section-label {
+  margin: 0 0 .65rem; color: rgb(var(--v-theme-primary)); font-size: .8rem;
+  font-weight: 800; line-height: 1.5;
+}
 
 /* Vuetify's text utilities force Roboto even when the page inherits Persian-first type. */
 .admin-dispatch :deep(.text-h5),
@@ -1009,8 +1046,9 @@ onBeforeUnmount(() => {
   line-height: 1.55;
   white-space: normal;
 }
-.admin-dispatch__toolbar { max-width: 100%; }
-.admin-dispatch__toolbar :deep(.v-btn) { min-height: 44px; }
+/* Accent the first triage step without promoting every adjacent card equally. */
+.admin-dispatch__surface--queue { border-top: 3px solid rgb(var(--v-theme-error)); }
+.admin-dispatch__responders { border-top: 3px solid rgb(var(--v-theme-primary)); }
 .dispatch-request-row { border-inline-start: 3px solid transparent; }
 .dispatch-request-row.v-list-item--active { border-inline-start-color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), .09); }
@@ -1160,6 +1198,14 @@ onBeforeUnmount(() => {
   }
 }
 
+@media (max-width: 959px) {
+  .admin-dispatch__filter-select { width: 15rem; }
+}
+@media (max-width: 699px) {
+  .admin-dispatch__toolbar { grid-template-columns: minmax(0, 1fr); }
+  .admin-dispatch__filter-select { width: 100%; max-width: none; }
+  .admin-dispatch__toolbar-actions { justify-content: flex-start; }
+}
 @media (max-width: 599px) {
   .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
   .admin-dispatch__toolbar { width: 100%; }
@@ -1229,5 +1275,7 @@ onBeforeUnmount(() => {
 :global(:root.dark .mission-timeline-select) {
   border-color: var(--bb-color-outline);
 }
+:global(:root.dark .admin-dispatch__surface--queue) { border-top-color: rgb(var(--v-theme-error)); }
+:global(:root.dark .admin-dispatch__responders) { border-top-color: rgb(var(--v-theme-primary)); }
 :global(:root.dark .mission-timeline-select) { background: var(--bb-color-inset); }
 </style>

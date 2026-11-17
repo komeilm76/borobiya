@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
 
 describe("dispatch console responsive triage (source-pinned; no Vue mount)", () => {
-  it("keeps one filter state while showing an accessible compact phone control", () => {
-    expect(source).toMatch(/<v-select\s+:model-value="adminSos\.filterStatus"[\s\S]*?class="admin-dispatch__filter-select d-sm-none"[\s\S]*?label="وضعیت درخواست‌های اضطراری"[\s\S]*?@update:model-value="onFilterChange"/);
-    expect(source).toMatch(/<v-btn-toggle\s+class="d-none d-sm-inline-flex"\s+:model-value="adminSos\.filterStatus"/);
+  it("keeps one filter state with a labeled compact select below md and a toggle above", () => {
+    expect(source).toMatch(/<v-select\s+:model-value="adminSos\.filterStatus"[\s\S]*?class="admin-dispatch__filter-select d-md-none"[\s\S]*?label="وضعیت درخواست‌های اضطراری"[\s\S]*?@update:model-value="onFilterChange"/);
+    expect(source).toMatch(/<v-btn-toggle\s+class="admin-dispatch__filter-toggle d-none d-md-inline-flex"\s+:model-value="adminSos\.filterStatus"/);
     expect(source).toContain("adminSos.setFilterStatus(value)");
     // The filter remains usable even while the server snapshot/counts are unverified.
     expect(source).toContain('title: "در انتظار رسیدگی", value: "pending"');
@@ -32,6 +32,29 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source.indexOf('class="map-selected-alert-card bb-floating-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
     expect(source).toContain('@click="focusRequest(adminSos.selectedRequest)"');
     expect(source).toContain('@click="focusRequest(item)"');
+  });
+
+  it("groups compact alarm actions away from filters without shrinking touch targets", () => {
+    const filter = source.indexOf('class="admin-dispatch__filter-group" role="group"');
+    const actions = source.indexOf('class="admin-dispatch__toolbar-actions" role="group"');
+    expect(filter).toBeGreaterThan(0);
+    expect(actions).toBeGreaterThan(filter);
+    const toolbar = source.slice(filter, source.indexOf('</header>'));
+    for (const action of ['adminSos.toggleSoundMuted()', 'adminSos.testAlertSound()', 'adminSos.refreshRequests()']) {
+      expect(toolbar).toContain(action);
+    }
+    expect(toolbar.match(/size="small"/g)).toHaveLength(3);
+    expect(toolbar).toContain('aria-label="بازخوانی فهرست درخواست‌های اضطراری"');
+    expect(source).toContain('min-width: 44px; min-height: 44px; height: 44px;');
+    expect(source).toContain('@media (max-width: 699px) {');
+  });
+
+  it("marks distinct triage sections with wider gutters and separate queue/responder emphasis", () => {
+    expect(source).toContain('<v-row class="admin-dispatch__workspace">');
+    expect(source.indexOf('۰۱ / بررسی درخواست‌ها')).toBeLessThan(source.indexOf('۰۲ / موقعیت حادثه و اعزام'));
+    expect(source).toContain('.admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(');
+    expect(source).toContain('.admin-dispatch__surface--queue { border-top: 3px solid');
+    expect(source).toContain('.admin-dispatch__responders { border-top: 3px solid');
   });
 
   it("still reserves the compact filter and responder search wrap for phones", () => {
