@@ -5,12 +5,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "./auth";
 import { useBroadcastStore } from "./broadcast";
 
-const { start, refresh } = vi.hoisted(() => ({ start: vi.fn(async () => {}), refresh: vi.fn(async () => {}) }));
+const { start, refresh, stopLive, liveState } = vi.hoisted(() => ({
+  start: vi.fn(async () => {}), refresh: vi.fn(async () => {}), stopLive: vi.fn(),
+  liveState: { status: null as { value: string } | null }
+}));
 vi.mock("@/composables/useLiveLocationBroadcast", () => ({
-  useLiveLocationBroadcast: () => ({
-    status: ref("idle"), lastErrorCode: ref(null), lastSentAt: ref(null), peerCount: ref(0),
-    isSupported: ref(true), start, stop: vi.fn()
-  })
+  useLiveLocationBroadcast: () => {
+    const status = ref<"idle" | "connecting" | "broadcasting" | "stopped" | "rejected">("idle");
+    liveState.status = status;
+    return {
+      status, lastErrorCode: ref(null), lastSentAt: ref(null), peerCount: ref(0),
+      isSupported: ref(true), start, stop: stopLive
+    };
+  }
 }));
 vi.mock("@/composables/use-priority-device", () => ({
   usePriorityDevice: () => ({
@@ -26,7 +33,7 @@ function jwt(owner: string, sessionId: string, nonce = 0): string {
   return `e30.${Buffer.from(JSON.stringify({ sub: owner, sessionId, nonce })).toString("base64url")}.sig`;
 }
 
-beforeEach(() => { setActivePinia(createPinia()); start.mockClear(); refresh.mockReset(); });
+beforeEach(() => { setActivePinia(createPinia()); start.mockClear(); stopLive.mockClear(); refresh.mockReset(); });
 
 describe("broadcast start consent across the priority-device read", () => {
   it("wires the owner into the real broadcaster without mounting a Vue component", () => {
@@ -142,5 +149,98 @@ describe("broadcast start consent across the priority-device read", () => {
     finish();
     await starting;
     expect(start).toHaveBeenCalledOnce();
+  });
+});
+
+function signedIn() {
+  const auth = useAuthStore();
+  auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
+  auth.accessToken = jwt(A, session);
+  return auth;
+}
+
+describe("activity-owned general broadcast", () => {
+  it("starts on a confirmed activity, hides manual toggles and stops only after both reasons end", async () => {
+    signedIn();
+    const broadcast = useBroadcastStore();
+    broadcast.setAutomatic("mission", true);
+    expect(broadcast.automaticActive).toBe(true);
+    await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
+    broadcast.setAutomatic("navigation", true);
+    broadcast.setAutomatic("mission", false);
+    expect(stopLive).not.toHaveBeenCalled();
+    await broadcast.toggle();
+    expect(stopLive).not.toHaveBeenCalled();
+    broadcast.setAutomatic("navigation", false);
+    expect(broadcast.automaticActive).toBe(false);
+    expect(stopLive).toHaveBeenCalledOnce();
+  });
+
+  it("does not let a slow priority read start GPS after guidance ends", async () => {
+    let finish!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    signedIn();
+    const broadcast = useBroadcastStore();
+    broadcast.setAutomatic("navigation", true);
+    expect(broadcast.view.isActive).toBe(true);
+    broadcast.setAutomatic("navigation", false);
+    finish();
+    await nextTick();
+    expect(start).not.toHaveBeenCalled();
+    expect(stopLive).toHaveBeenCalledOnce();
+  });
+
+  it("preserves a broadcast already manually started before the mission or trip", async () => {
+    signedIn();
+    const broadcast = useBroadcastStore();
+    await broadcast.start();
+    liveState.status!.value = "broadcasting";
+    broadcast.setAutomatic("mission", true);
+    broadcast.setAutomatic("navigation", true);
+    broadcast.setAutomatic("mission", false);
+    broadcast.setAutomatic("navigation", false);
+    expect(start).toHaveBeenCalledOnce();
+    expect(stopLive).not.toHaveBeenCalled();
+  });
+
+  it("does not cancel a manual priority read when an overlapping activity ends", async () => {
+    let finish!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    signedIn();
+    const broadcast = useBroadcastStore();
+    const manual = broadcast.start();
+    broadcast.setAutomatic("mission", true);
+    broadcast.setAutomatic("mission", false);
+    finish();
+    await manual;
+    expect(start).toHaveBeenCalledOnce();
+    expect(stopLive).not.toHaveBeenCalled();
+  });
+
+  it("revokes an automatic pending start on logout even if the priority read resolves later", async () => {
+    let finish!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const auth = signedIn();
+    const broadcast = useBroadcastStore();
+    broadcast.setAutomatic("mission", true);
+    auth.accessToken = null;
+    auth.user = null;
+    finish();
+    await nextTick();
+    expect(broadcast.automaticActive).toBe(false);
+    expect(start).not.toHaveBeenCalled();
+    expect(stopLive).toHaveBeenCalled();
+  });
+
+  it("allows a retry after a permission or socket rejection while an activity remains active", async () => {
+    signedIn();
+    const broadcast = useBroadcastStore();
+    broadcast.setAutomatic("navigation", true);
+    await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
+    liveState.status!.value = "rejected";
+    await broadcast.retryAutomatic();
+    expect(start).toHaveBeenCalledTimes(2);
+    broadcast.setAutomatic("navigation", false);
+    expect(stopLive).toHaveBeenCalledOnce();
   });
 });

@@ -14,7 +14,7 @@ function styleBlock(source: string, selector: string): string {
 }
 
 describe("map sharing quick action", () => {
-  it("is icon-only and toggles the existing consentful broadcast store, not private own GPS", () => {
+  it("is icon-only outside active assignments and guidance, not private own GPS", () => {
     expect(view).toContain('import { useBroadcastStore } from "@/stores/broadcast"');
     expect(view).toContain('const broadcast = useBroadcastStore()');
     const start = view.indexOf('class="user-map-view__share"');
@@ -42,8 +42,7 @@ describe("map sharing quick action", () => {
     expect(base).toContain('width: 48px;');
     expect(base).toContain('height: 48px;');
     expect(base).toContain('border-radius: 50%;');
-    expect(view).toContain('v-show="!(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
-    expect(view).toContain(':aria-describedby="missionActive ? \'map-mission-broadcast-note\' : undefined"');
+    expect(view).toContain('v-show="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value && !(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
     const phone = view.split('@media (max-width: 599px) {')[1]!;
     const normalRail = phone.slice(phone.indexOf('/* Search/Location are the lower row;'));
     const recenter = styleBlock(normalRail, '.user-map-view__recenter');

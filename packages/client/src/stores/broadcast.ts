@@ -32,6 +32,12 @@ export const useBroadcastStore = defineStore("broadcast", () => {
   // the same button offers Stop, and fence it before the GPS composable can be started.
   const waitingForPriority = ref(false);
   let startAttempt = 0;
+  // The confirmed mission and active guidance may overlap during handoff.
+  // A release must not stop a manually started broadcast or the other activity.
+  type AutomaticReason = "mission" | "navigation";
+  const automaticReasons = ref<Set<AutomaticReason>>(new Set());
+  const automaticActive = computed(() => automaticReasons.value.size > 0);
+  let automaticOwner = false;
   const status = computed(() => waitingForPriority.value ? "connecting" : live.status.value);
   const view = computed(() =>
     describeBroadcastState({
@@ -58,6 +64,30 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     live.stop();
   }
 
+  /** Activity owns only a broadcast it started; a prior manual broadcast survives its end. */
+  function setAutomatic(reason: AutomaticReason, active: boolean): void {
+    if (automaticReasons.value.has(reason) === active) return;
+    const next = new Set(automaticReasons.value);
+    if (active) next.add(reason);
+    else next.delete(reason);
+    automaticReasons.value = next;
+    if (active && next.size === 1 && !waitingForPriority.value &&
+      live.status.value !== "connecting" && live.status.value !== "broadcasting") {
+      automaticOwner = true;
+      void start().catch(() => { /* The broadcast status is reported by the live controller. */ });
+    } else if (!active && next.size === 0 && automaticOwner) {
+      automaticOwner = false;
+      stop(); // Also fences an outstanding priority read before GPS can wake.
+    }
+  }
+
+  async function retryAutomatic(): Promise<void> {
+    if (!automaticActive.value || waitingForPriority.value ||
+      live.status.value === "connecting" || live.status.value === "broadcasting") return;
+    automaticOwner = true;
+    await start();
+  }
+
   async function start(): Promise<void> {
     if (waitingForPriority.value || live.status.value === "connecting" || live.status.value === "broadcasting") return;
     const owner = auth.user?.id;
@@ -80,6 +110,7 @@ export const useBroadcastStore = defineStore("broadcast", () => {
   }
 
   async function toggle(): Promise<void> {
+    if (automaticActive.value) return; // Activity controls its own lifetime, including the priority read.
     if (waitingForPriority.value || live.status.value === "connecting" || live.status.value === "broadcasting") {
       stop();
       return;
@@ -100,6 +131,8 @@ export const useBroadcastStore = defineStore("broadcast", () => {
       if (!next || onboardingIncomplete || (previous !== null && next !== previous)) {
         // A→null→A in one tick must cancel a pending tap, not resurrect its consent.
         stop();
+        automaticOwner = false;
+        automaticReasons.value = new Set();
         priority.clear();
         if (next && !onboardingIncomplete) void priority.refresh();
         return;
@@ -118,6 +151,9 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     isSupported: live.isSupported,
     priority,
     view,
+    automaticActive,
+    setAutomatic,
+    retryAutomatic,
     start,
     stop,
     toggle,

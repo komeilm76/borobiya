@@ -98,23 +98,21 @@
       variant="flat"
       @click="centerOnOwnLocation"
     />
-    <!-- Sharing is opt-in, independent of the private map GPS watcher. The same
-         broadcast store powers the full companion dialog and dashboard. -->
+    <!-- Manual Broadcast is available outside active assignments and guidance;
+         App owns the automatic broadcast lifecycle in those two states. -->
     <v-btn
       class="user-map-view__share"
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!(isPhone && (activeTool || (mode === 'missions' && missionWorkspace?.hasOpenMapTool)))"
+      v-show="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value && !(isPhone && (activeTool || (mode === 'missions' && missionWorkspace?.hasOpenMapTool)))"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
       :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
-      :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}${missionActive ? '؛ پخش عمومی جدا از اشتراک خودکار مأموریت است' : ''}`"
-      :aria-describedby="missionActive ? 'map-mission-broadcast-note' : undefined"
+      :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
       :aria-pressed="broadcast.view.isActive"
       :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
       variant="flat"
       @click="broadcast.toggle()"
     />
-    <span v-if="missionActive" id="map-mission-broadcast-note" class="sr-only">پخش عمومی جدا از اشتراک خودکار مأموریت است؛ خاموش کردن آن اشتراک مأموریت را متوقف نمی‌کند.</span>
     <span v-if="isPhone && activeTool !== 'live' && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
       class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <span v-if="own.error.value || recenterError" class="sr-only" role="status" aria-live="polite">
@@ -254,10 +252,10 @@
           <h2>همراهان</h2>
           <div class="user-map-view__dialog-actions">
             <v-btn
+              v-if="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value"
               :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
               :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : undefined"
               :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
-              :aria-describedby="missionActive ? 'map-mission-broadcast-note' : undefined"
               :aria-pressed="broadcast.view.isActive"
               :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
               variant="text" @click="broadcast.toggle()" />

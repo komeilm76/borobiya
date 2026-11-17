@@ -278,7 +278,7 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain('ownMarker?.remove();');
     expect(view).toContain('own.stop();');
     const automaticGps = view.slice(view.indexOf('watch([map, () => auth.user?.id'), view.indexOf('const reverse ='));
-    expect(automaticGps).not.toContain('broadcast.toggle()'); // Only the explicit share button can publish.
+    expect(automaticGps).not.toContain('broadcast.toggle()'); // Private foreground GPS is not a general broadcast.
   });
 
   it("paints a peer change once, not again via a redundant peer-count watcher", () => {
@@ -291,7 +291,7 @@ describe("UserMapView live overlay", () => {
     expect(view).not.toContain("هنوز روی این نقشه نمی‌آید");
   });
 
-  it("keeps map sharing opt-in without mounting the standalone sharing bar", () => {
+  it("keeps manual map sharing outside active navigation without mounting the standalone sharing bar", () => {
     expect(view).toMatch(/ownUserId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
     expect(view).toContain("ensureSession: () => auth.ensureSession()");
     expect(view).toContain('class="user-map-view__share"');

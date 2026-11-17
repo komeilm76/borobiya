@@ -19,9 +19,7 @@ describe("all map tabs share an accessible action rail", () => {
     expect(rule(css, ".user-map-view__recenter, .user-map-view__share"))
       .toContain("inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));");
     expect(css).toContain(".user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem); }");
-    expect(map).toContain('v-show="!(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
-    expect(map).toContain('id="map-mission-broadcast-note"');
-    expect(map).toContain('پخش عمومی جدا از اشتراک خودکار مأموریت است');
+    expect(map).toContain("!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value");
     expect(rule(css, ".user-map-view__canvas :deep(.maplibregl-ctrl-top-right)"))
       .toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);");
     expect(rule(shell, ".app-shell--map:has(.user-map-view) .sos-fab.sos-fab"))

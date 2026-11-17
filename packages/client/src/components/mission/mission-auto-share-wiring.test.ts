@@ -19,10 +19,17 @@ describe("assigned rescuer automatic share and other roles' general share button
     expect(mission).toContain('@sharing-change="teamSharing = $event"');
     expect(mission).not.toContain("@click=\"live.stopSharing()\"");
   });
-  it("shares the companion map's opt-in general broadcast control above SOS, including the requester/admin mission map", () => {
+  it("keeps the manual general broadcast control above SOS for requester/admin", () => {
     expect(app).toContain("const broadcast = useBroadcastStore(pinia);");
     expect(app).toContain('v-if="showGeneralShareButton" class="app-general-share"');
     expect(app).toContain('route.name !== "user-map" &&');
+    expect(app).toContain('showSosButton.value && auth.user?.role === "user" && !!missionShare.mission');
+    expect(app).toContain('showSosButton.value && !!auth.user && mapTripSession.navigating.value');
+    expect(app).toContain('broadcast.setAutomatic("mission", active)');
+    expect(app).toContain('broadcast.setAutomatic("navigation", active)');
+    expect(app).toContain('broadcast.retryAutomatic()');
+    expect(app).toContain('accountSessionKey(auth.user?.id ?? null, auth.accessToken)');
+    expect(app).toContain('mapTripSession.endForMission()');
     expect(app).toContain(':aria-pressed="broadcast.view.isActive" :disabled="!broadcast.isSupported"');
     expect(app).toContain('@click="broadcast.toggle()"');
     expect(app.indexOf('class="app-general-share"')).toBeLessThan(app.indexOf('<SosTriggerButton'));

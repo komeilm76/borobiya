@@ -35,15 +35,14 @@ describe("map companions tool", () => {
     expect(view).toContain('env(safe-area-inset-bottom, 0px)');
   });
 
-  it("keeps consentful broadcast accessible on the map and in the full-screen Sharing dialog", () => {
+  it("keeps manual broadcast outside active mission/guidance on map and in Sharing", () => {
     const start = view.indexOf('class="user-map-view__live-dialog"');
     const dialog = view.slice(start, view.indexOf('\n    </component>', start));
     expect(dialog).toContain('<LiveCompanionPanel :api="live"');
     expect(dialog).toContain(':broadcast-status="broadcast.view.tone ==='); // Failures stay visible in the card.
     expect(panel).toContain('{{ broadcastStatus.headline }}');
     expect(dialog).not.toContain('<LiveBroadcastBar');
-    expect(dialog).toContain(':aria-describedby="missionActive ? \'map-mission-broadcast-note\' : undefined"');
-    expect(view).toContain('خاموش کردن آن اشتراک مأموریت را متوقف نمی‌کند.'); // Separate optional broadcast.
+    expect(dialog).toContain('v-if="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value"');
     expect(dialog).toContain(':aria-pressed="broadcast.view.isActive"');
     expect(dialog).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
     expect(dialog).toContain('@click="broadcast.toggle()"');

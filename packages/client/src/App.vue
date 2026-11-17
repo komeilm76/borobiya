@@ -200,6 +200,12 @@
       variant="flat" @click="broadcast.toggle()" />
     <span v-if="showGeneralShareButton && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
       class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
+    <v-snackbar :model-value="broadcast.automaticActive && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
+      color="warning" location="bottom" multi-line :timeout="-1" role="alert">
+      {{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}
+      <template #actions><v-btn v-if="broadcast.isSupported && !broadcast.view.isActive" variant="text"
+        @click="broadcast.retryAutomatic()">تلاش دوباره</v-btn></template>
+    </v-snackbar>
     <SosTriggerButton v-if="showSosButton" @trigger="sosSheet.openSheet()" />
     <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
     <v-snackbar :model-value="Boolean(missionShare.statusError || missionShare.gpsError) && (missionShare.hadActiveMission || !!proposalInbox.acceptedMissionId || route.name === 'user-mission')"
@@ -283,6 +289,7 @@ import MapProposalSidebar from "./components/shell/MapProposalSidebar.vue";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
+import { accountSessionKey } from "./composables/device-identity";
 import { pinia } from "./stores";
 import { useAdminSosStore } from "./stores/admin-sos";
 import { useProposalInboxStore } from "./stores/proposal-inbox";
@@ -317,6 +324,18 @@ const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
   () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
 );
+// The mission-room publisher is separate. General Broadcast follows only a
+// server-confirmed assignment or a started (including pending) travel guidance,
+// regardless of which workspace tab is currently visible.
+watch(() => showSosButton.value && auth.user?.role === "user" && !!missionShare.mission,
+  (active) => broadcast.setAutomatic("mission", active), { immediate: true, flush: "sync" });
+watch(() => showSosButton.value && !!auth.user && mapTripSession.navigating.value,
+  (active) => broadcast.setAutomatic("navigation", active), { immediate: true, flush: "sync" });
+// A trip started in another login must not silently inherit that session's GPS
+// or leave the Broadcast button hidden with no active publisher.
+watch(() => accountSessionKey(auth.user?.id ?? null, auth.accessToken), (next, previous) => {
+  if (previous && next !== previous && mapTripSession.navigating.value) mapTripSession.endForMission();
+}, { flush: "sync" });
 
 watch(showSosButton, (visible) => {
   if (!visible) sosSheet.closeSheet();
