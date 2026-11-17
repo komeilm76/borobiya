@@ -1203,6 +1203,17 @@ onBeforeUnmount(() => {
   border-radius: var(--bb-radius-nested, 16px);
   background: rgb(var(--v-theme-surface));
 }
+/* Timeline already lives in the bordered disclosure; do not nest a second
+   rounded, shadowed card inside it when the operator opens the history. */
+.dispatch-mission-timeline :deep(.timeline) {
+  margin-block: .75rem 0;
+  padding: .75rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--bb-color-outline);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
 
 .dispatch-map-wrapper {
   position: relative;
