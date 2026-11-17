@@ -222,15 +222,19 @@
         </v-card>
 
         <v-card v-if="adminSos.selectedRequest" class="admin-dispatch__surface bb-surface-card" elevation="0" rounded="xl">
-          <v-card-title class="d-flex align-center justify-space-between text-subtitle-1 font-weight-bold">
-            <span>جزئیات درخواست انتخاب‌شده</span>
-            <v-chip
-              :color="severityMeta(adminSos.selectedRequest.severity).badgeColor"
-              size="small"
-              variant="flat"
-            >
-              {{ severityMeta(adminSos.selectedRequest.severity).label }}
-            </v-chip>
+          <v-card-title class="admin-dispatch__detail-heading">
+            <div class="admin-dispatch__detail-title">
+              <small>درخواست انتخاب‌شده</small>
+              <h2>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</h2>
+            </div>
+            <div class="admin-dispatch__detail-badges">
+              <v-chip :color="statusMeta(adminSos.selectedRequest.status).badgeColor" size="small" variant="tonal">
+                {{ statusMeta(adminSos.selectedRequest.status).label }}
+              </v-chip>
+              <v-chip :color="severityMeta(adminSos.selectedRequest.severity).badgeColor" size="small" variant="flat">
+                {{ severityMeta(adminSos.selectedRequest.severity).label }}
+              </v-chip>
+            </div>
           </v-card-title>
           <v-divider />
           <div class="admin-dispatch__sender" role="group" aria-label="ارسال‌کنندهٔ درخواست">
@@ -259,66 +263,51 @@
               </p>
             </template>
           </v-alert>
-          <v-card-text class="d-flex flex-column ga-2 text-body-2">
-            <div>
-              <strong>نوع حادثه:</strong>
-              {{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}
+          <v-card-text class="admin-dispatch__detail-body">
+            <div class="admin-dispatch__description">
+              <h3>شرح حادثه</h3>
+              <p>{{ adminSos.selectedRequest.description }}</p>
             </div>
-            <div>
-              <strong>وضعیت فعلی:</strong>
-              <v-chip
-                :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
-                class="ms-1"
-                size="x-small"
-                variant="tonal"
-              >
-                {{ statusMeta(adminSos.selectedRequest.status).label }}
-              </v-chip>
+            <dl class="admin-dispatch__facts">
+              <div>
+                <dt>زمان ثبت</dt>
+                <dd>{{ formatTimestamp(adminSos.selectedRequest.createdAt) }}</dd>
+              </div>
+              <div>
+                <dt>روش ثبت موقعیت</dt>
+                <dd>{{ adminSos.selectedRequest.location.isManual ? "انتخاب دستی روی نقشه" : "GPS دستگاه" }}</dd>
+              </div>
+              <div class="admin-dispatch__fact-location">
+                <dt>مختصات ثبت‌شدهٔ حادثه</dt>
+                <dd><bdi dir="ltr">{{ adminSos.selectedRequest.location.lat.toFixed(6) }}, {{ adminSos.selectedRequest.location.lon.toFixed(6) }}</bdi></dd>
+              </div>
+              <div v-if="adminSos.selectedRequest.location.accuracy !== undefined">
+                <dt>دقت گزارش‌شده</dt>
+                <dd>±{{ Math.round(adminSos.selectedRequest.location.accuracy) }} متر</dd>
+              </div>
+            </dl>
+            <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
+              <h3>تصویر پیوست حادثه</h3>
+              <img v-if="photoSrc" :src="photoSrc" alt="تصویر پیوست درخواست امداد"
+                class="admin-dispatch__photo-image" referrerpolicy="no-referrer">
+              <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
             </div>
-            <div>
-              <strong>موقعیت جغرافیایی:</strong>
-              <span dir="ltr" class="ms-1">
-                {{ adminSos.selectedRequest.location.lat.toFixed(6) }},
-                {{ adminSos.selectedRequest.location.lon.toFixed(6) }}
-              </span>
-              <span class="ms-2 text-caption text-medium-emphasis">
-                ({{ adminSos.selectedRequest.location.isManual ? "انتخاب دستی روی نقشه" : "GPS دستگاه" }})
-              </span>
-            </div>
-            <div v-if="adminSos.selectedRequest.location.accuracy !== undefined">
-              <strong>دقت گزارش‌شده:</strong>
-              ±{{ Math.round(adminSos.selectedRequest.location.accuracy) }} متر
-            </div>
-            <div>
-              <strong>زمان ثبت:</strong>
-              {{ formatTimestamp(adminSos.selectedRequest.createdAt) }}
-            </div>
-            <div>
-              <strong>توضیحات امدادخواه:</strong>
-              <p class="mt-1 mb-0">{{ adminSos.selectedRequest.description }}</p>
-            </div>
-            <div v-if="adminSos.selectedRequest.photoUrl" class="text-caption text-medium-emphasis">
-              <strong>تصویر پیوست حادثه:</strong>
-              <img
-                v-if="photoSrc"
-                :src="photoSrc"
-                alt="تصویر پیوست درخواست امداد"
-                class="d-block mt-2 rounded-lg"
-                style="max-width: 100%; max-height: 360px; object-fit: contain"
-                referrerpolicy="no-referrer"
-              >
-              <span v-else class="ms-1">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
-            </div>
-            <div v-if="adminSos.selectedRequestProposals.length > 0" class="pt-2">
-              <strong>پیشنهادهای ارسال‌شده در این نشست:</strong>
-              <span class="ms-1 text-caption text-medium-emphasis">
-                ({{ adminSos.selectedRequestProposals.length }} پیشنهاد در وضعیت انتظار)
-              </span>
+            <p v-if="adminSos.selectedRequestProposals.length > 0" class="admin-dispatch__proposal-note">
+              {{ adminSos.selectedRequestProposals.length.toLocaleString('fa-IR') }} پیشنهاد در انتظار برای این درخواست ثبت شده است.
+            </p>
+            <div class="admin-dispatch__next">
+              <span>گام بعدی: بررسی امدادگران واجد شرایط</span>
+              <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-search-outline"
+                aria-controls="dispatch-responders" @click="focusResponders">انتخاب امدادگر و اعزام</v-btn>
             </div>
           </v-card-text>
         </v-card>
       </v-col>
       <v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">
+        <p v-if="adminSos.visibleRequests.length && !adminSos.selectedRequest" class="admin-dispatch__selection-hint" role="status">
+          <v-icon icon="mdi-cursor-default-click-outline" size="20" aria-hidden="true" />
+          برای بررسی حادثه و انتخاب امدادگر، یکی از درخواست‌های صف را انتخاب کنید.
+        </p>
         <v-card class="admin-dispatch__surface bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
             <MapCanvas
@@ -393,33 +382,14 @@
           </div>
         </v-card>
 
-        <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
-          {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
-        </v-alert>
-        <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading" type="article" class="mb-3"
-          role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
-        <div v-else-if="requestMissions.length" class="mb-3 pa-3 dispatch-mission-timeline">
-          <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
-          <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
-            <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
-              {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
-            </option>
-          </select>
-          <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
-            :mission="selectedTimelineMission" audience="admin" />
-        </div>
-        <p v-else-if="adminSos.selectedRequest && missionLoaded" class="mb-3 text-body-2 text-medium-emphasis" role="status">
-          برای این درخواست هنوز مأموریتی ثبت نشده است.
-        </p>
         <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer'"
           color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
           :disabled="adminSos.dispatchSubmitting"
           @click="quickRedispatch(adminSos.selectedRequest.id)">
           اعزام فوری به امدادگران جدید
         </v-btn>
-        <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
-          :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
-        <v-card v-if="adminSos.selectedRequest" class="admin-dispatch__surface bb-surface-card" elevation="0" rounded="xl">
+        <v-card v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"
+          class="admin-dispatch__surface admin-dispatch__responders bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <div class="d-flex align-center ga-2">
               <v-icon color="primary" icon="mdi-account-group-outline" />
@@ -567,7 +537,7 @@
           </v-card-text>
 
           <v-divider />
-          <v-card-actions class="pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
+          <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
             <span class="text-caption text-medium-emphasis">
               {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
             </span>
@@ -584,6 +554,27 @@
             </v-btn>
           </v-card-actions>
         </v-card>
+
+        <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
+          {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
+        </v-alert>
+        <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading" type="article" class="mb-3"
+          role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
+        <div v-else-if="requestMissions.length" class="mb-3 pa-3 dispatch-mission-timeline">
+          <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
+          <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
+            <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
+              {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
+            </option>
+          </select>
+          <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
+            :mission="selectedTimelineMission" audience="admin" />
+        </div>
+        <p v-else-if="adminSos.selectedRequest && missionLoaded" class="mb-3 text-body-2 text-medium-emphasis" role="status">
+          برای این درخواست هنوز مأموریتی ثبت نشده است.
+        </p>
+        <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
+          :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
         <v-dialog v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
           <v-card title="تأیید اعزام دستی" rounded="xl">
             <v-card-text>
@@ -865,6 +856,17 @@ function focusRequest(item: SosRequestRecord): void {
   });
 }
 
+function focusResponders(): void {
+  if (!adminSos.selectedRequest) return;
+  const target = document.getElementById("dispatch-responders");
+  if (!target) return;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start"
+  });
+}
+
 function onMapReady(map: MapLibreMap): void {
   detachMapEvents?.();
   mapInstance = map;
@@ -1012,7 +1014,39 @@ onBeforeUnmount(() => {
 .dispatch-request-row { border-inline-start: 3px solid transparent; }
 .dispatch-request-row.v-list-item--active { border-inline-start-color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), .09); }
-.dispatch-request-row__summary { white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.dispatch-request-row__summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  white-space: normal; overflow: hidden; overflow-wrap: anywhere; line-height: 1.5; }
+.admin-dispatch__detail-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
+.admin-dispatch__detail-title { min-width: 0; }
+.admin-dispatch__detail-title small { display: block; color: var(--bb-color-muted); font-size: .8rem; }
+.admin-dispatch__detail-title h2 { margin: 0; font-size: 1.05rem; font-weight: 800; overflow-wrap: anywhere; }
+.admin-dispatch__detail-badges { display: flex; flex-wrap: wrap; gap: .35rem; }
+.admin-dispatch__detail-body { display: grid; gap: .75rem; font-size: .87rem; line-height: 1.6; }
+.admin-dispatch__detail-body h3 { margin: 0 0 .25rem; font-size: .88rem; }
+.admin-dispatch__description { padding: .8rem; border-radius: var(--bb-radius-nested, 16px);
+  border: 1px solid var(--bb-color-outline); background: var(--bb-color-inset); }
+.admin-dispatch__description p, .admin-dispatch__proposal-note { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.admin-dispatch__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+.admin-dispatch__facts > div { min-width: 0; padding: .4rem .6rem; border-inline-start: 2px solid var(--bb-color-outline); }
+.admin-dispatch__facts dt { color: var(--bb-color-muted); font-size: .8rem; }
+.admin-dispatch__facts dd { margin: .1rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
+.admin-dispatch__fact-location { grid-column: 1 / -1; }
+.admin-dispatch__facts bdi { unicode-bidi: isolate; }
+.admin-dispatch__photo { min-width: 0; }
+.admin-dispatch__photo-image { display: block; max-width: 100%; max-height: 20rem; margin-top: .5rem;
+  border-radius: var(--bb-radius-nested, 16px); object-fit: contain; }
+.admin-dispatch__proposal-note { color: var(--bb-color-muted); }
+.admin-dispatch__next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem;
+  padding: .65rem .75rem; border-radius: var(--bb-radius-nested, 16px);
+  border: 1px solid rgba(var(--v-theme-primary), .3); background: rgba(var(--v-theme-primary), .08); }
+.admin-dispatch__next span { font-weight: 700; }
+.admin-dispatch__next :deep(.v-btn) { min-height: 44px; max-width: 100%; height: auto; white-space: normal; }
+.admin-dispatch__next :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.admin-dispatch__selection-hint { display: flex; align-items: center; gap: .5rem; margin: 0 0 .75rem;
+  padding: .7rem .9rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); }
+.admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
+.admin-dispatch__responders:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 .admin-dispatch__sender { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem;
   margin: .85rem 1rem 0; padding: .75rem; border: 1px solid var(--bb-color-outline);
   border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
@@ -1032,8 +1066,8 @@ onBeforeUnmount(() => {
 
 .dispatch-map-wrapper {
   position: relative;
-  height: min(68vh, 560px);
-  min-height: 360px;
+  height: clamp(22rem, 56dvh, 30rem);
+  min-height: 22rem;
 }
 
 .map-selected-alert-card {
@@ -1130,6 +1164,10 @@ onBeforeUnmount(() => {
   .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
   .admin-dispatch__toolbar { width: 100%; }
   .admin-dispatch__sender-action { width: 100%; }
+  .admin-dispatch__facts { grid-template-columns: minmax(0, 1fr); }
+  .admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }
+  .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; }
+  .admin-dispatch__submit :deep(.v-btn__content) { white-space: normal; text-align: center; }
   .admin-dispatch__responder-search { flex-wrap: wrap; }
   .admin-dispatch__responder-search :deep(.v-input) { flex: 1 1 100%; min-width: 0; }
 }
