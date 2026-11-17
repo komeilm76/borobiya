@@ -35,9 +35,11 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('<summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)');
     expect(view).toContain('if (!(event.target as HTMLDetailsElement).open) pickingWaypoint.value = false;');
     const stopsStart = view.indexOf('<details v-if="routeSection === \'plan\'" class="mission-route__stops"');
-    const editor = view.slice(stopsStart, view.indexOf('</details>', stopsStart));
+    const editor = view.slice(stopsStart, view.indexOf('class="mission-route__step-control"', stopsStart));
+    expect(editor).toContain('class="mission-route__manual"');
     expect(editor).toContain('@click="addTypedWaypoint"');
     expect(editor).toContain('@click="routing.removeWaypoint(index)"');
+    expect(editor).toContain('v-if="routing.via.value.length" class="mission-route__stop-list"');
     expect(editor).not.toContain('class="mission-route__step-control"');
     expect(view.indexOf('class="mission-route__step-control"')).toBeGreaterThan(stopsStart);
     expect(view).toContain('.mission-route__stops-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
