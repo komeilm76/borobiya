@@ -15,7 +15,7 @@ describe("mission guidance over the full-screen map", () => {
     expect(page).not.toContain('mission-desk__map-heading');
     expect(compiled.code).toContain('.mission-desk__guidance[data-v-guidance]');
   });
-  it("gives short-phone banners a scrollable corridor above the map actions and the dock", () => {
+  it("gives short-phone banners a scrollable corridor above the map actions and SOS", () => {
     expect(css).toContain('@media (max-width: 599px) and (max-height: 560px)');
     expect(css).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('top: calc(5.25rem + env(safe-area-inset-top, 0px));');
@@ -57,6 +57,6 @@ describe("mission guidance over the full-screen map", () => {
     expect(page).toContain('role="alert"');
     expect(page).toContain('@click="stopGuidance"');
     expect(page).toContain('id="mission-tool-team"');
-    expect(page).toContain('class="mission-desk__dock"');
+    expect(page).toContain('class="mission-desk__header-actions"');
   });
 });

@@ -19,10 +19,10 @@ describe("at-a-glance mission progress and information", () => {
     expect(page).not.toContain('mission-desk__stage-track');
     expect(page).toContain('class="mission-desk__bottom-panel"');
     expect(page).toContain('id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline"');
-    const dock = page.slice(page.indexOf('<nav class="mission-desk__dock"'), page.indexOf('</nav>', page.indexOf('<nav class="mission-desk__dock"')));
-    expect(dock.match(/<button\b/g)).toHaveLength(1);
-    expect(dock).toContain('mission-tool-route');
-    expect(dock).not.toContain('mission-tool-status');
+    const actions = page.slice(page.indexOf('<div class="mission-desk__header-actions">'), page.indexOf('</div>', page.indexOf('<div class="mission-desk__header-actions">')));
+    expect(actions.match(/<button\b/g)).toHaveLength(1);
+    expect(actions).toContain('mission-tool-route');
+    expect(actions).toContain('mission-tool-team');
   });
 
   it("keeps the current stage and guarded action visible, with the only full step list on demand", () => {
@@ -84,11 +84,17 @@ describe("at-a-glance mission progress and information", () => {
     expect(viewStyle).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
     expect(viewStyle).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('.mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;');
+    expect(viewStyle).toContain('@media (min-width: 600px) {');
+    expect(viewStyle).toContain('.mission-desk__bottom-stack:not(.mission-desk__bottom-stack--information) .mission-desk__bottom-panel {');
+    expect(viewStyle).toContain('width: min(30rem, calc(100% - 2rem - env(safe-area-inset-right, 0px)));');
+    expect(viewStyle).toContain('align-self: flex-end;');
     expect(viewStyle).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
     expect(viewStyle).toContain('.mission-desk--active .mission-desk__bottom-stack #mission-status-panel {');
     expect(viewStyle).toContain('width: 100%; max-height: none; margin: 0;');
     expect(viewStyle).toContain('@media (max-width: 599px) and (max-height: 560px) {');
+    expect(cardStyle).toContain('@media (max-width: 420px) {');
+    expect(cardStyle).toContain('.mission-desk__phase-copy { flex-basis: calc(100% - 3.5rem); }');
     expect(cardStyle).toContain('.mission-desk__phase-steps');
     expect(cardStyle).toContain('.mission-desk__phase-step--current');
     expect(infoStyle).toContain('.mission-brief__body');

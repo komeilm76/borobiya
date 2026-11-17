@@ -90,6 +90,12 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
 .mission-desk__phase-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
 .mission-desk__phase-heading strong { font-size: .9rem; }
 .mission-desk__phase-heading span { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; overflow-wrap: anywhere; }
+/* At phone widths keep stage/status legible instead of squeezing it between
+   four touch targets; team and route stay adjacent on the second row. */
+@media (max-width: 420px) {
+  .mission-desk__phase-heading { flex-wrap: wrap; }
+  .mission-desk__phase-copy { flex-basis: calc(100% - 3.5rem); }
+}
 .mission-map-cards__expand { flex: none; min-width: 44px; min-height: 44px; }
 .mission-map-cards__track { display: block; height: 4px; margin: .3rem 0 .15rem; border-radius: 999px;
   background: linear-gradient(to left, rgb(var(--v-theme-primary)) var(--mission-progress), var(--bb-color-inset) var(--mission-progress)); }

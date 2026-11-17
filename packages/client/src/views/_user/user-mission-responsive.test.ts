@@ -106,7 +106,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\' && routeSection !== \'transport\'" id="mission-route-panel"');
     expect(view).toContain(':room-open="activeTool === \'team\'"');
     expect(view).toContain('const activeTool = ref<"status" | "route" | "team" | null>(null);');
-    expect(view).toContain('aria-label="ابزارهای مسیر مأموریت"');
+    expect(view).toContain('class="mission-desk__header-actions"');
     expect(view).toContain('id="mission-tool-status" class="mission-desk__info-action"');
     expect(view).toContain('function dismissTool(): void {');
     expect(view).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
@@ -140,9 +140,11 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('<template #team>');
     expect(view).not.toContain('mission-desk__dock-sharing');
     expect(view).not.toContain('اشتراک روشن');
-    const dock = view.slice(view.indexOf('<nav class="mission-desk__dock"'), view.indexOf('</nav>', view.indexOf('<nav class="mission-desk__dock"')));
-    expect(dock.match(/<button\b/g)).toHaveLength(1);
-    expect(dock).not.toContain('mission-tool-team');
+    const actions = view.slice(view.indexOf('<div class="mission-desk__header-actions">'), view.indexOf('</div>', view.indexOf('<div class="mission-desk__header-actions">')));
+    expect(actions).toContain('mission-tool-route');
+    expect(actions).toContain('mission-tool-team');
+    expect(actions.indexOf('mission-tool-route')).toBeGreaterThan(actions.indexOf('mission-tool-team'));
+    expect(view).not.toContain('mission-desk__dock');
     expect(panel).toContain('watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)');
     expect(panel).toContain(': live.sharing.value, (sharing) => emit("sharing-change", sharing)');
     expect(panel).toContain('<template v-else-if="canPublish">');

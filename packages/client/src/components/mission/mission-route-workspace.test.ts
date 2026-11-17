@@ -30,7 +30,7 @@ describe("mission route workspace on a map", () => {
     expect(css).toContain('.mission-route__header { position: sticky; z-index: 1;');
     expect(css).toContain('.mission-route__header :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }');
   });
-  it("gives only the open route sheet usable height on short phones without changing map, dock or SOS", () => {
+  it("gives only the open route sheet usable height on short phones without changing map or SOS", () => {
     expect(page).toContain("'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport'");
     expect(css).toContain('@media (max-width: 599px) and (max-height: 560px)');
     expect(css).toContain('.mission-desk--route-open .mission-route {');
@@ -41,7 +41,7 @@ describe("mission route workspace on a map", () => {
     expect(css).toContain('.mission-desk--route-open .mission-desk__guidance { visibility: hidden; }');
     expect(css).toContain('.mission-desk--route-open .mission-route__emblem { display: none; }');
     expect(css).toContain('.mission-desk--route-open .mission-route__heading small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }');
-    expect(page).toContain('class="mission-desk__dock"');
+    expect(page).toContain('class="mission-desk__header-actions"');
     expect(page).toContain('<MissionLivePanel :mission="desk.activeMission.value" fullscreen');
     expect(compileStyle({ filename: "UserMissionView.vue", id: "route-workspace", scoped: true, source: css }).errors).toEqual([]);
     // At 320px with no cutouts, the sheet has 156px rather than a 5rem (80px) sliver.

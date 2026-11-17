@@ -89,7 +89,7 @@ describe("mission map controls", () => {
     expect(viewStyle).toContain('inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;');
     expect(liveStyle).toContain('inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;');
   });
-  it("keeps the phone rail clear of panels, SOS and the dock, including short screens", () => {
+  it("keeps the phone rail clear of panels and SOS, including short screens", () => {
     const viewStyle = parse(missionMap).descriptor.styles[0]!.content;
     const phone = viewStyle.split('@media (max-width: 599px) {')[1]!;
     expect(phone).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
@@ -97,8 +97,8 @@ describe("mission map controls", () => {
     expect(phone).toContain('bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('bottom: calc(9rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('.mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }');
-    expect(viewStyle).toContain('.mission-desk__dock { position: absolute; z-index: 10;');
-    expect(viewStyle).toContain('left: 50%; transform: translateX(-50%);');
+    expect(viewStyle).not.toContain('.mission-desk__dock {');
+    expect(viewStyle).toContain('.mission-desk__route-action:focus-visible');
     expect(phone).toContain('.mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right)');
     expect(phone).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('.mission-desk--active .mission-desk__map-focus');
@@ -129,14 +129,14 @@ describe("mission map controls", () => {
     // The 48px compass finishes 12px before the first card starts at 4.5rem.
     expect((.75 * 16 + 48) + 12).toBe(4.5 * 16);
   });
-  it("keeps members accessible without making automatic rescuer sharing look like a switch in the dock", () => {
-    const start = missionMap.indexOf('<nav class="mission-desk__dock"');
-    const dock = missionMap.slice(start, missionMap.indexOf('</nav>', start));
-    expect(dock.match(/<button\b/g)).toHaveLength(1);
-    expect(dock).not.toContain('mission-tool-status');
+  it("keeps members accessible without making automatic rescuer sharing look like a switch", () => {
+    const start = missionMap.indexOf('<div class="mission-desk__header-actions">');
+    const actions = missionMap.slice(start, missionMap.indexOf('</div>', start));
+    expect(actions.match(/<button\b/g)).toHaveLength(1);
+    expect(actions).not.toContain('mission-tool-status');
     expect(missionMap).toContain('id="mission-tool-status" class="mission-desk__info-action"');
-    expect(dock).toContain('mission-tool-route');
-    expect(dock).not.toContain('mission-tool-team');
+    expect(actions).toContain('mission-tool-route');
+    expect(actions).toContain('mission-tool-team');
     expect(missionMap).toContain('id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline"');
     expect(missionMap).toContain('aria-label="نمایش اعضای مأموریت"');
     expect(missionMap).toContain('aria-controls="mission-team-panel" :aria-expanded="false"');

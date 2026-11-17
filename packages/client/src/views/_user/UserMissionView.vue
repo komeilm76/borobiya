@@ -281,9 +281,19 @@
               <MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep" :team-sharing="teamSharing"
                 :current-status-label="currentStatusLabel" :next-status-label="nextStatusLabel">
                 <template #team>
-                  <v-btn id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline" variant="tonal" size="small"
-                    aria-label="نمایش اعضای مأموریت" title="نمایش اعضای مأموریت"
-                    aria-controls="mission-team-panel" :aria-expanded="false" @click="toggleTool('team')" />
+                  <div class="mission-desk__header-actions">
+                    <v-btn id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline" variant="tonal" size="small"
+                      aria-label="نمایش اعضای مأموریت" title="نمایش اعضای مأموریت"
+                      aria-controls="mission-team-panel" :aria-expanded="false" @click="toggleTool('team')" />
+                    <button id="mission-tool-route" type="button" class="mission-desk__route-action"
+                      :class="{ 'mission-desk__route-action--warning': routeCue.tone === 'warning', 'mission-desk__route-action--ready': routeCue.tone === 'ready' }"
+                      :aria-label="`مسیر مأموریت: ${routeCue.label}؛ باز کردن پنل مسیر`"
+                      :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
+                      :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
+                      @click="toggleTool('route')">
+                      <v-icon icon="mdi-routes" size="20" aria-hidden="true" /><strong>مسیر</strong>
+                    </button>
+                  </div>
                 </template>
               </MissionMapCards>
             </div>
@@ -301,16 +311,6 @@
           :title="activeTool === 'status' ? 'بستن اطلاعات مأموریت' : 'اطلاعات مأموریت'"
           :aria-expanded="activeTool === 'status'" aria-controls="mission-status-panel"
           @click="toggleTool('status')" />
-        <nav class="mission-desk__dock" aria-label="ابزارهای مسیر مأموریت">
-          <button id="mission-tool-route" type="button"
-            :class="{ 'mission-desk__dock-active': activeTool === 'route', 'mission-desk__dock-warning': routeCue.tone === 'warning', 'mission-desk__dock-ready': routeCue.tone === 'ready' }"
-            :aria-label="`مسیر مأموریت: ${routeCue.label}؛ ${activeTool === 'route' ? 'بستن' : 'باز کردن'} پنل مسیر`"
-            :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
-            :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
-            @click="toggleTool('route')">
-            <v-icon icon="mdi-routes" size="22" aria-hidden="true" /><strong>مسیر</strong>
-          </button>
-        </nav>
       </div>
     </div>
 
@@ -1092,7 +1092,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk--embedded .mission-desk__bottom-stack,
 .mission-desk--embedded .mission-desk__info-action,
 .mission-desk--embedded .mission-desk__map-hint,
-.mission-desk--embedded .mission-desk__dock,
 .mission-desk--embedded .mission-desk__guidance,
 .mission-desk--embedded .mission-desk__card,
 .mission-desk--embedded .mission-route { pointer-events: auto; }
@@ -1190,6 +1189,15 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
   background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+/* The progress card should be readable on wide maps, not a viewport-wide strip.
+   Information and its legend keep the full-width sheet independently. */
+@media (min-width: 600px) {
+  .mission-desk__bottom-stack:not(.mission-desk__bottom-stack--information) .mission-desk__bottom-panel {
+    width: min(30rem, calc(100% - 2rem - env(safe-area-inset-right, 0px)));
+    align-self: flex-end;
+    margin-right: calc(1rem + env(safe-area-inset-right, 0px));
+  }
+}
 .mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;
   display: flex; flex-direction: column; overflow: hidden;
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
@@ -1217,7 +1225,19 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__map-cards :deep(.mission-map-cards) {
   border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none;
 }
+.mission-desk__header-actions { display: flex; align-items: center; gap: .3rem; flex: none; }
 .mission-desk__team-action { flex: none; min-width: 44px; min-height: 44px; }
+.mission-desk__route-action { display: inline-flex; align-items: center; justify-content: center; gap: .2rem;
+  min-width: 64px; min-height: 44px; padding: 0 .4rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .12); border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-primary), .1); color: rgb(var(--v-theme-primary));
+  cursor: pointer; font: inherit; }
+.mission-desk__route-action strong { font-size: .8rem; }
+.mission-desk__route-action--warning { box-shadow: inset 3px 0 rgb(var(--v-theme-warning)); }
+.mission-desk__route-action--ready { box-shadow: inset 3px 0 rgb(var(--v-theme-primary)); }
+.mission-desk__route-action:disabled { opacity: .48; cursor: not-allowed; }
+.mission-desk__route-action:focus-visible, .mission-desk__map-hint button:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__legend-action { position: absolute; z-index: 10;
   left: calc(1rem + env(safe-area-inset-left, 0px));
   bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
@@ -1245,22 +1265,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   border: 1px solid var(--bb-color-outline); border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.mission-desk__dock { position: absolute; z-index: 10;
-  bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
-  width: 5.75rem; padding: 3px; border: 1px solid rgba(var(--v-theme-on-surface), .1);
-  border-radius: var(--bb-radius-card, 24px); background: rgba(var(--v-theme-surface), .95);
-  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
-.mission-desk__dock button { display: grid; place-items: center; gap: 1px;
-  width: 100%; min-width: 0; min-height: 56px; padding: 3px 5px;
-  border: 0; border-radius: var(--bb-radius-nested, 16px); background: transparent;
-  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font: inherit; line-height: 1.2; }
-.mission-desk__dock button strong { font-size: .82rem; }
-.mission-desk__dock .mission-desk__dock-warning { box-shadow: inset 3px 0 rgb(var(--v-theme-warning)); }
-.mission-desk__dock .mission-desk__dock-ready { box-shadow: inset 3px 0 rgb(var(--v-theme-primary)); }
-.mission-desk__dock .mission-desk__dock-active { background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); }
-.mission-desk__dock button:disabled { opacity: .48; cursor: not-allowed; }
-.mission-desk__dock button:focus-visible, .mission-desk__map-hint button:focus-visible {
-  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk--active .mission-desk__map-hint {
   bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   inset-inline: 50% auto; transform: translateX(50%);
@@ -1287,8 +1291,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     z-index: 11;
   }
-  /* Bottom sheet fills the map width; the essential camera, route, info and
-     SOS controls retain the same clear row below it as the route planner. */
+  /* Bottom sheet fills the map width; camera, info and SOS retain the
+     clear row below it while route stays in the steps header. */
   .mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
   .mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: min(60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
@@ -1313,8 +1317,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
   }
   .mission-desk__map-focus--pair { bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
-  /* The progress sheet is also full-width: keep the compass and camera
-     actions in the clear row below it even when no tool is open. */
+  /* Keep the compass and camera actions in the clear row below the
+     progress sheet even when no tool is open. */
   .mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
@@ -1355,7 +1359,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk__map-legend small { position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0, 0, 0, 0); white-space: nowrap; }
   /* A short phone cannot fit guidance and a vertical camera rail.
-     Put map controls in the open band above the dock/SOS. */
+     Put map controls in the open band above SOS. */
   .mission-desk:not(.mission-desk--tool-open) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(7.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
@@ -1417,7 +1421,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk--route-open .mission-route__emblem { display: none; }
   .mission-desk--route-open .mission-route__heading small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-:global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active)) { background: var(--bb-color-inset); }
+:global(:root.dark .mission-desk__route-action) { background: var(--bb-color-inset); }
 
 :global(:root.dark .mission-route__stops),
 :global(:root.dark .mission-route__step-control),

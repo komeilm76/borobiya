@@ -7,22 +7,23 @@ const descriptor = parse(page).descriptor;
 
 // Source/compiled SFC only; docs/TASKS.md disallows Vue mounting in unit tests.
 describe("default mission map brief", () => {
-  it("makes the one-button dock communicate route readiness, with mission status in the bottom panel", () => {
-    const dock = page.slice(page.indexOf('<nav class="mission-desk__dock"'), page.indexOf('</nav>', page.indexOf('<nav class="mission-desk__dock"')));
-    expect(dock.match(/<button\b/g)).toHaveLength(1);
+  it("shows route readiness beside the team action in the progress header", () => {
+    const actions = page.slice(page.indexOf('<div class="mission-desk__header-actions">'), page.indexOf('</div>', page.indexOf('<div class="mission-desk__header-actions">')));
+    expect(actions.match(/<button\b/g)).toHaveLength(1);
+    expect(actions.indexOf('mission-tool-team')).toBeLessThan(actions.indexOf('mission-tool-route'));
+    expect(page).not.toContain('mission-desk__dock');
     expect(page).not.toContain('mission-desk__status-brief');
     expect(page).toContain(':current-status-label="currentStatusLabel"');
-    expect(dock).toContain('${routeCue.label}');
-    expect(dock).toContain('mission-desk__dock-warning');
+    expect(actions).toContain('${routeCue.label}');
+    expect(actions).toContain('mission-desk__route-action--warning');
     expect(page).toContain('missionRouteCue({');
     expect(page).toContain('freshFix: !!navigation.fix.value');
     expect(page).toContain('hasRoute: !!routing.selectedRoute.value');
     expect(page).toContain('blocked: !!desk.terminalHold.value || !!desk.error.value');
     expect(page).toContain('aria-controls="mission-route-panel"');
     expect(page).toContain('aria-controls="mission-status-panel"');
-    expect(descriptor.styles[0]!.content).toContain('min-height: 56px; padding: 3px 5px;');
-    // 56px route button + 6px padding + 2px border clears the 5.75rem camera-action row.
-    expect(5.75 * 16 - (.75 * 16 + 56 + 6 + 2)).toBeGreaterThanOrEqual(6);
+    expect(descriptor.styles[0]!.content).toContain('.mission-desk__route-action--warning');
+    expect(descriptor.styles[0]!.content).toContain('min-width: 64px; min-height: 44px;');
     expect(compileTemplate({ filename: "UserMissionView.vue", id: "mission-map-brief", source: descriptor.template!.content }).errors).toEqual([]);
   });
   it("opens the existing workspace from the incident marker without requesting GPS or adding a waypoint", () => {
