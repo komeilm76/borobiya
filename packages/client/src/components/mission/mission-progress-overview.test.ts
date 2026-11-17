@@ -48,7 +48,8 @@ describe("at-a-glance mission progress and information", () => {
     expect(panel).not.toContain('v-chip');
     expect(panel).not.toContain('desk.showCancellation()');
     expect(panel).toContain('<MissionBriefDetails :mission-id="desk.activeMission.value?.id ?? \'\'" :visible="visible" />');
-    expect(info).not.toContain('<details');
+    expect(info).toContain('<details class="mission-brief__details">');
+    expect(info).toContain("brief.hasPhoto ? 'شرح کامل، مختصات و تصویر بزرگ‌تر' : 'شرح کامل و مختصات'");
     expect(info).toContain('مختصات ثبت‌شدهٔ حادثه');
     expect(info).toContain('getMissionBrief(token, id, controller.signal)');
     expect(info).toContain('getSosPhotoSrc(id, token)');

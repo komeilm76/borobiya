@@ -42,7 +42,8 @@ describe("map companions tool", () => {
     expect(dialog).toContain(':broadcast-status="broadcast.view.tone ==='); // Failures stay visible in the card.
     expect(panel).toContain('{{ broadcastStatus.headline }}');
     expect(dialog).not.toContain('<LiveBroadcastBar');
-    expect(dialog).toContain('<v-btn v-if="!missionActive"'); // Mission sharing cannot be switched off here.
+    expect(dialog).toContain(':aria-describedby="missionActive ? \'map-mission-broadcast-note\' : undefined"');
+    expect(view).toContain('خاموش کردن آن اشتراک مأموریت را متوقف نمی‌کند.'); // Separate optional broadcast.
     expect(dialog).toContain(':aria-pressed="broadcast.view.isActive"');
     expect(dialog).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
     expect(dialog).toContain('@click="broadcast.toggle()"');

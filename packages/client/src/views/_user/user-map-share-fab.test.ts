@@ -42,7 +42,8 @@ describe("map sharing quick action", () => {
     expect(base).toContain('width: 48px;');
     expect(base).toContain('height: 48px;');
     expect(base).toContain('border-radius: 50%;');
-    expect(view).toContain('v-show="!missionActive && !(isPhone && activeTool)"');
+    expect(view).toContain('v-show="!(isPhone && activeTool)"');
+    expect(view).toContain(':aria-describedby="missionActive ? \'map-mission-broadcast-note\' : undefined"');
     const phone = view.split('@media (max-width: 599px) {')[1]!;
     const normalRail = phone.slice(phone.indexOf('/* Search/Location are the lower row;'));
     const recenter = styleBlock(normalRail, '.user-map-view__recenter');
@@ -50,11 +51,13 @@ describe("map sharing quick action", () => {
     const compass = styleBlock(phone.slice(phone.indexOf('/* On phones the compass')), '.user-map-view__canvas :deep(.maplibregl-ctrl-top-right)');
     const sos = styleBlock(shell, '.app-shell--map .sos-fab.sos-fab');
     expect(recenter).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(share).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
+    expect(share).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(share).toContain('inset-inline-start: calc(7.75rem + env(safe-area-inset-right, 0px))');
     expect(compass).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     expect(sos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     // 48px controls keep an 8px gap in either direction and fit at 320px.
     expect(4.25 - (.75 + 3)).toBe(.5);
+    expect(7.75 - (4.25 + 3)).toBe(.5); // Broadcast clears the phone compass vertically.
     expect(320 - (7.75 * 16 + 12 + 48)).toBeGreaterThan(12);
     expect(view).toContain('class="user-map-view__history-dialog"');
     expect(view).toContain('class="user-map-view__history-body"');

@@ -103,16 +103,18 @@
     <v-btn
       class="user-map-view__share"
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!missionActive && !(isPhone && activeTool)"
+      v-show="!(isPhone && activeTool)"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
       :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
-      :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
+      :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}${missionActive ? '؛ پخش عمومی جدا از اشتراک خودکار مأموریت است' : ''}`"
+      :aria-describedby="missionActive ? 'map-mission-broadcast-note' : undefined"
       :aria-pressed="broadcast.view.isActive"
       :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
       variant="flat"
       @click="broadcast.toggle()"
     />
+    <span v-if="missionActive" id="map-mission-broadcast-note" class="sr-only">پخش عمومی جدا از اشتراک خودکار مأموریت است؛ خاموش کردن آن اشتراک مأموریت را متوقف نمی‌کند.</span>
     <span v-if="isPhone && activeTool !== 'live' && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
       class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <span v-if="own.error.value || recenterError" class="sr-only" role="status" aria-live="polite">
@@ -251,10 +253,11 @@
         <v-card-title v-if="isPhone" class="user-map-view__live-title">
           <h2>همراهان</h2>
           <div class="user-map-view__dialog-actions">
-            <v-btn v-if="!missionActive"
+            <v-btn
               :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
               :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : undefined"
               :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
+              :aria-describedby="missionActive ? 'map-mission-broadcast-note' : undefined"
               :aria-pressed="broadcast.view.isActive"
               :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
               variant="text" @click="broadcast.toggle()" />
@@ -2581,15 +2584,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
   inset-inline-start: 1rem;
   width: min(24rem, calc(100% - 2rem));
-  /* Reserve the bottom-right 48px rail instead of allowing the History card
-     to run under its clickable controls on short wide-screen viewports. */
-  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);
+  /* Leave the entire right rail, including topmost Broadcast, clear. */
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 17.5rem);
   overflow-y: auto;
   pointer-events: none;
 }
 
-/* One consistent right-hand rail in every tab: Location at the lower edge,
- * then SOS, opt-in sharing and the native compass above it. */
+/* One consistent right-hand rail in every tab: Location, SOS, compass, then
+ * optional general Broadcast at the top. */
 .user-map-view__recenter, .user-map-view__share {
   position: fixed;
   z-index: 6;
@@ -2602,7 +2604,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border-radius: 50%;
   box-shadow: var(--bb-shadow-overlay);
 }
-.user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem); }
+.user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14rem); }
 /* Off is neutral rather than another green/teal fill; the outline remains
  * visible over both pale map tiles and the dark raised surface. */
 .user-map-view__share--idle { border-color: var(--bb-color-outline); }
@@ -2694,7 +2696,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view__playback {
     inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
-    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);
+    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 17.5rem);
     inset-inline-start: 1rem;
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
@@ -2886,15 +2888,25 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__recenter, .user-map-view__share {
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
-  /* Search/Location are the lower row; SOS/Share/Compass are the upper row.
-     The same physical slots apply in all four tabs when no sheet is open. */
+  /* Search/Location are the lower row; SOS and compass sit above them.
+     General Broadcast gets a dedicated row above every other icon. */
   .user-map-view__recenter { inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px)); }
   .user-map-view__share {
-    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    inset-inline-start: calc(7.75rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(7.75rem + env(safe-area-inset-right, 0px));
+  }
+  /* Idle mission offers occupy the lower map. Use the free band below tabs
+     instead of painting Broadcast over a scrollable offer card. */
+  .user-map-view--mission-idle .user-map-view__share {
+    top: calc(4.75rem + env(safe-area-inset-top, 0px)); bottom: auto;
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-active .user-map-view__share {
+    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(9.25rem + env(safe-area-inset-bottom, 0px));
   }
 
   /* One 48px Search action below SOS; keep map and tab controls unobscured. */
@@ -2935,11 +2947,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view--route-preview { --bb-map-action-sheet-height: var(--bb-map-point-sheet-height, 48dvh); }
   .user-map-view--navigating { --bb-map-action-sheet-height: var(--bb-map-navigation-sheet-height, 15rem); }
-  .user-map-view--route-preview .user-map-view__share,
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right),
-  .user-map-view--navigating .user-map-view__share,
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     top: auto; bottom: calc(var(--bb-map-action-sheet-height) + 4rem);
+  }
+  .user-map-view--route-preview .user-map-view__share,
+  .user-map-view--navigating .user-map-view__share {
+    top: auto; bottom: calc(var(--bb-map-action-sheet-height) + 7.5rem);
   }
   .user-map-view--route-preview .user-map-view__recenter,
   .user-map-view--navigating .user-map-view__recenter {
@@ -2947,7 +2961,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view--route-preview .user-map-view__share,
   .user-map-view--navigating .user-map-view__share {
-    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right),
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
@@ -2962,6 +2976,31 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
     right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-active.user-map-view--mission-steps .user-map-view__share {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 7.5rem);
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+}
+@media (max-width: 599px) and (max-height: 420px) {
+  /* A trip dock plus three vertical rows cannot fit below the tabs in
+     landscape. Keep Broadcast slightly above and beside the compass. */
+  .user-map-view--route-preview .user-map-view__share,
+  .user-map-view--navigating .user-map-view__share {
+    bottom: calc(var(--bb-map-action-sheet-height) + 4.5rem);
+    right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+}
+@media (max-width: 599px) and (max-height: 560px) {
+  /* Leave the mode tabs free when a tall steps dock meets a short screen.
+     Spread the upper actions horizontally rather than stacking over the tabs. */
+  .user-map-view--mission-steps .user-map-view__share {
+    bottom: min(calc(var(--bb-map-mission-sheet-height, 15rem) + 7.5rem),
+      calc(100dvh - 7.5rem - env(safe-area-inset-top, 0px)));
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-steps:has(.mission-desk__map-focus--pair) .user-map-view__share {
+    right: calc(11.25rem + env(safe-area-inset-right, 0px));
   }
 }
 

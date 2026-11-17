@@ -45,10 +45,13 @@ describe("shared map icon clearance", () => {
   it("centers idle mission offers while keeping Location at the lower right", () => {
     expect(map).toContain("'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission");
     const mapCss = parse(map).descriptor.styles[0]!.content;
-    // Idle Missions now shares the default two-row rail with Trips, Sharing
-    // and History instead of pinning its own stale, top-aligned controls.
+    // Idle Missions keeps Location in the shared lower rail but lifts optional
+    // Broadcast clear of its lower-map offers and the network indicator.
     expect(mapCss).not.toContain('.user-map-view--mission-idle .user-map-view__recenter');
-    expect(mapCss).not.toContain('.user-map-view--mission-idle .user-map-view__share');
+    expect(mapCss).toContain('.user-map-view--mission-idle .user-map-view__share {\n    top: calc(4.75rem + env(safe-area-inset-top, 0px)); bottom: auto;');
+    // Idle offers start below the tabs; the upper slot clears both the offers
+    // and the separate top-right network indicator.
+    expect(4.75 * 16 + 48).toBeLessThan(8.5 * 16);
     expect(mapCss).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px));');
     expect(mapCss).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));');
     expect(mapCss).toContain('inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));');

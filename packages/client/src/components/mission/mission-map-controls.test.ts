@@ -83,6 +83,11 @@ describe("mission map controls", () => {
     expect(mapPage).toContain('inset-inline-start: 1.25rem;');
     expect(mapPage).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);');
     expect(viewStyle).toContain('.mission-desk__map-focus--pair');
+    expect(missionMap).toContain('class="mission-desk__frame-action"');
+    expect(viewStyle).toContain('.mission-desk__map-focus--pair :deep(.mission-desk__frame-action) {\n    position: absolute; right: 3.5rem; bottom: 10.5rem;');
+    expect(viewStyle).toContain('.mission-desk--steps-visible:has(.mission-desk__map-focus--pair) .mission-desk__bottom-stack {');
+    // At a 600px tablet width, the steps dock ends before the frame control.
+    expect(12 + (600 - 9 * 16) + 8).toBeLessThanOrEqual(600 - (1.25 + 3.5) * 16 - 48);
     expect(viewStyle).toContain('flex-direction: column;');
     expect(viewStyle).toContain('right: 1.25rem;');
     expect(viewStyle).toContain('width: 48px; min-width: 48px; height: 48px;');

@@ -8,41 +8,58 @@
           <v-btn icon="mdi-content-copy" size="small" variant="tonal" color="primary"
             aria-label="کپی شناسهٔ کامل مأموریت" :disabled="!missionId" @click="copyMissionId" />
         </div>
-        <small v-if="copyStatus === 'copied'" role="status">شناسهٔ کامل کپی شد.</small>
-        <label v-else-if="copyStatus === 'failed'" class="mission-brief__copy-fallback">
-          کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
-          <input :value="missionId" readonly dir="ltr" aria-label="شناسهٔ کامل مأموریت برای کپی دستی" @focus="($event.target as HTMLInputElement).select()" />
-        </label>
       </div>
+      <small v-if="copyStatus === 'copied'" role="status">شناسهٔ کامل کپی شد.</small>
+      <label v-else-if="copyStatus === 'failed'" class="mission-brief__copy-fallback">
+        کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
+        <input :value="missionId" readonly dir="ltr" aria-label="شناسهٔ کامل مأموریت برای کپی دستی" @focus="($event.target as HTMLInputElement).select()" />
+      </label>
       <p v-if="loading || (!brief && !error)" role="status">در حال دریافت اطلاعات حادثه…</p>
       <p v-else-if="error" role="alert">{{ error }}
         <v-btn size="small" variant="text" color="primary" @click="load">تلاش دوباره</v-btn>
       </p>
       <template v-else-if="brief">
-        <p><span>درخواست‌کننده</span> <strong dir="auto">{{ brief.requesterName }}</strong></p>
-        <p><span>نوع حادثه</span> <strong>{{ brief.incidentTypeName }}</strong></p>
-        <p class="mission-brief__description"><span>شرح نیاز</span> <strong>{{ brief.description }}</strong></p>
+        <div class="mission-brief__facts">
+          <div><span>نوع حادثه</span><strong dir="auto">{{ brief.incidentTypeName }}</strong></div>
+          <div><span>درخواست‌کننده</span><strong dir="auto">{{ brief.requesterName }}</strong></div>
+        </div>
         <div class="mission-brief__address">
           <span>نشانی تقریبی محل حادثه · از مختصات ثبت‌شده</span>
           <p v-if="addressLoading" role="status">در حال یافتن نشانی…</p>
-          <strong v-else-if="address" dir="auto">{{ address }}</strong>
+          <strong v-else-if="address" dir="auto" class="mission-brief__address-preview">{{ address }}</strong>
           <p v-else role="status">نشانی در دسترس نیست؛ برای راهبری از مختصات ثبت‌شدهٔ حادثه استفاده کنید.
             <v-btn v-if="addressFailed" size="small" variant="text" color="primary" @click="loadAddress(brief)">تلاش دوباره</v-btn>
           </p>
         </div>
-        <p><span>مختصات ثبت‌شدهٔ حادثه</span>
-          <bdi dir="ltr">{{ brief.incident.lat.toFixed(5) }}, {{ brief.incident.lon.toFixed(5) }}</bdi>
-        </p>
-        <div v-if="brief.hasPhoto" class="mission-brief__photo">
-          <span>تصویر حادثه</span>
-          <img v-if="photoSrc" :src="photoSrc" alt="تصویر ثبت‌شدهٔ حادثه" referrerpolicy="no-referrer"
-            @error="photoSrc = null; photoError = 'دسترسی به تصویر پایان یافت؛ دوباره دریافت کنید.'" />
-          <p v-else-if="photoLoading" role="status">در حال دریافت تصویر…</p>
-          <p v-if="photoError" role="alert">{{ photoError }}
-            <v-btn size="small" variant="text" color="primary" @click="loadPhoto">تلاش دوباره</v-btn>
-          </p>
+        <div class="mission-brief__snapshot">
+          <div class="mission-brief__need">
+            <span>شرح نیاز</span>
+            <strong dir="auto" class="mission-brief__need-preview">{{ brief.description }}</strong>
+          </div>
+          <div v-if="brief.hasPhoto" class="mission-brief__photo">
+            <span>تصویر حادثه</span>
+            <img v-if="photoSrc" :src="photoSrc" alt="پیش‌نمایش تصویر حادثه؛ تصویر بزرگ‌تر در جزئیات" referrerpolicy="no-referrer"
+              @error="photoSrc = null; photoError = 'دسترسی به تصویر پایان یافت؛ دوباره دریافت کنید.'" />
+            <small v-else-if="photoLoading" role="status">در حال دریافت تصویر…</small>
+            <small v-if="photoError" role="alert">{{ photoError }}
+              <v-btn size="small" variant="text" color="primary" @click="loadPhoto">تلاش دوباره</v-btn>
+            </small>
+          </div>
         </div>
-        <p v-else><span>تصویر حادثه</span> ثبت نشده است</p>
+        <details class="mission-brief__details">
+          <summary>{{ brief.hasPhoto ? 'شرح کامل، مختصات و تصویر بزرگ‌تر' : 'شرح کامل و مختصات' }}</summary>
+          <div class="mission-brief__details-body">
+            <div><span>نوع حادثه و درخواست‌کننده</span><p dir="auto">{{ brief.incidentTypeName }} · {{ brief.requesterName }}</p></div>
+            <div><span>شرح کامل نیاز</span><p dir="auto" class="mission-brief__description">{{ brief.description }}</p></div>
+            <div><span>نشانی تقریبی محل حادثه</span><p dir="auto">{{ address || 'نشانی در دسترس نیست؛ برای راهبری از مختصات ثبت‌شدهٔ حادثه استفاده کنید.' }}</p></div>
+            <div><span>مختصات ثبت‌شدهٔ حادثه</span><bdi dir="ltr">{{ brief.incident.lat.toFixed(5) }}, {{ brief.incident.lon.toFixed(5) }}</bdi></div>
+            <div v-if="photoSrc" class="mission-brief__photo-full">
+              <span>تصویر کامل حادثه</span>
+              <img :src="photoSrc" alt="تصویر ثبت‌شدهٔ حادثه" referrerpolicy="no-referrer" />
+            </div>
+            <p v-else-if="!brief.hasPhoto">تصویر حادثه ثبت نشده است.</p>
+          </div>
+        </details>
       </template>
     </div>
   </div>
@@ -152,25 +169,44 @@ onBeforeUnmount(clear);
 
 <style scoped>
 .mission-brief { min-width: 0; }
-.mission-brief__body { display: grid; gap: 0; min-width: 0; }
-.mission-brief__body > p, .mission-brief__id, .mission-brief__address, .mission-brief__photo {
-  display: grid; gap: 2px; min-width: 0; margin: 0; padding: .4rem .15rem;
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), .1);
-  font-size: .85rem; line-height: 1.6; overflow-wrap: anywhere; }
-.mission-brief__body > :last-child { border-bottom: 0; }
+.mission-brief__body { display: grid; gap: .45rem; min-width: 0; font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
 .mission-brief__body span { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; }
 .mission-brief__body strong { font-weight: 750; }
-.mission-brief__body > p bdi { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
-.mission-brief__id-actions { display: flex; align-items: center; gap: .5rem; min-width: 0; }
-.mission-brief__id-actions bdi { font: 700 .9rem/1.5 monospace; direction: ltr; }
+.mission-brief__id { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-width: 0; }
+.mission-brief__id-actions { display: flex; align-items: center; gap: .3rem; min-width: 0; }
+.mission-brief__id-actions bdi { font: 700 .82rem/1.5 monospace; direction: ltr; }
 .mission-brief__id-actions :deep(.v-btn) { min-width: 44px; min-height: 44px; }
 .mission-brief__copy-fallback { display: grid; gap: .25rem; min-width: 0; }
 .mission-brief__copy-fallback input { width: 100%; min-height: 44px; padding: .4rem;
   border: 1px solid var(--bb-color-outline); border-radius: 8px; background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface)); }
-.mission-brief__address p, .mission-brief__photo p { margin: 0; }
-.mission-brief__description strong { white-space: pre-wrap; }
-.mission-brief__photo { justify-items: start; }
-.mission-brief__photo img { display: block; max-width: 100%; max-height: 11rem; object-fit: contain; border-radius: 8px; }
+.mission-brief__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem;
+  padding: .45rem .65rem; border-radius: 12px; background: var(--bb-color-inset); }
+.mission-brief__facts > div, .mission-brief__address, .mission-brief__need { display: grid; gap: .1rem; min-width: 0; }
+.mission-brief__facts strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; }
+.mission-brief__address-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; overflow-wrap: anywhere; }
+.mission-brief__address p, .mission-brief__details p { margin: 0; }
 .mission-brief__address :deep(.v-btn), .mission-brief__photo :deep(.v-btn) { min-height: 44px; }
+.mission-brief__snapshot { display: flex; align-items: flex-start; gap: .75rem; min-width: 0; }
+.mission-brief__need { flex: 1 1 0; }
+.mission-brief__need-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  white-space: pre-line; overflow: hidden; overflow-wrap: anywhere; }
+.mission-brief__photo { flex: 0 0 5.5rem; display: grid; gap: .2rem; min-width: 0; }
+.mission-brief__photo img { display: block; width: 5.5rem; height: 4rem; object-fit: contain;
+  border: 1px solid var(--bb-color-outline); border-radius: 10px; background: var(--bb-color-inset); }
+.mission-brief__details { min-width: 0; border-top: 1px solid var(--bb-color-outline); }
+.mission-brief__details summary { cursor: pointer; padding: .6rem .15rem; min-height: 44px;
+  color: rgb(var(--v-theme-primary)); font-weight: 800; }
+.mission-brief__details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
+.mission-brief__details-body { display: grid; gap: .6rem; padding: .4rem .15rem .6rem; }
+.mission-brief__details-body > div { display: grid; gap: .15rem; min-width: 0; }
+.mission-brief__details-body p, .mission-brief__details-body bdi { overflow-wrap: anywhere; }
+.mission-brief__description { white-space: pre-wrap; }
+.mission-brief__photo-full img { display: block; max-width: 100%; max-height: 18rem;
+  object-fit: contain; border-radius: 10px; }
+@media (max-width: 380px) {
+  .mission-brief__facts { grid-template-columns: minmax(0, 1fr); }
+}
 </style>

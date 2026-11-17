@@ -20,7 +20,7 @@ const emit = defineEmits<{ close: [] }>();
 <style scoped>
 .mission-desk__card-header { position: sticky; top: -1rem; z-index: 1;
   display: flex; align-items: center; justify-content: space-between; gap: .5rem;
-  margin: -1rem -1rem .65rem; padding: .5rem 1rem;
+  margin: -1rem -1rem .45rem; padding: .25rem .8rem;
   border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); background: rgb(var(--v-theme-surface)); }
 .mission-desk__card-header h2 { margin: 0; font-size: 1rem; line-height: 1.5; font-weight: 800; }
 .mission-desk__card-header :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }

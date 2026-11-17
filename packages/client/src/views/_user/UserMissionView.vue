@@ -258,7 +258,8 @@
             :aria-label="ownFocus.label" :title="ownFocus.label"
             :aria-pressed="navigation.active.value ? followingGps : undefined" :disabled="!mapReady"
             @click="navigation.active.value ? resumeGuidanceFollow() : emit('focus-own')" />
-          <v-btn v-if="routing.visible.value && routing.target.value" icon="mdi-fit-to-screen" color="primary" variant="flat"
+          <v-btn v-if="routing.visible.value && routing.target.value" class="mission-desk__frame-action"
+            icon="mdi-fit-to-screen" color="primary" variant="flat"
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
@@ -1164,21 +1165,26 @@ onBeforeUnmount(() => {
   left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
   width: 100%; max-height: min(65dvh, 32rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   display: flex; flex-direction: column; gap: .5rem; min-height: 0; pointer-events: auto; }
-.mission-desk__bottom-stack--information { max-height: min(75dvh, 40rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+/* The default briefing is a compact snapshot; only explicit detail expansion
+   grows the scroll surface. The height cap still protects short viewports. */
+.mission-desk__bottom-stack--information { max-height: min(24rem, 60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+.mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
+  max-height: min(70dvh, 34rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+}
 @media (min-width: 600px) and (max-width: 1023px) {
-  /* Align with the tablet steps column and leave the SOS/location rail clear. */
+  /* Keep the briefing readable without filling the tablet map. */
   .mission-desk--active .mission-desk__bottom-stack--information {
     left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
-    width: min(30rem, calc(100% - 7.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    width: min(26rem, calc(100% - 7.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
 }
 @media (min-width: 1024px) {
-  /* Search occupies the left 25rem. Keep Information beside it, capped to a
-     readable measure and outside the right-hand SOS/map-action rail. */
+  /* Search occupies the left 25rem. Center a smaller briefing in the
+     remaining map, clear of Search and the right-hand action rail. */
   .mission-desk--active .mission-desk__bottom-stack--information {
-    left: max(calc(27rem + env(safe-area-inset-left, 0px)), calc(50% - 20rem));
+    left: max(calc(27rem + env(safe-area-inset-left, 0px)), calc(50% - 13rem));
     right: auto;
-    width: min(40rem, calc(100% - 34rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    width: min(26rem, calc(100% - 34rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
 }
 /* Same centered bottom card as Navigate; only the steps variant docks here.
@@ -1344,6 +1350,19 @@ onBeforeUnmount(() => {
   border: 1px solid var(--bb-color-outline); border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+@media (min-width: 600px) {
+  /* Frame route beside the compass, not beside Location at the map's edge.
+     The frame and compass share a row; Broadcast remains the topmost action. */
+  .mission-desk__map-focus--pair :deep(.mission-desk__frame-action) {
+    position: absolute; right: 3.5rem; bottom: 10.5rem;
+  }
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  /* At 600px the optional frame button needs another 1.5rem beside steps. */
+  .mission-desk--steps-visible:has(.mission-desk__map-focus--pair) .mission-desk__bottom-stack {
+    width: min(30rem, calc(100% - 9rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
+}
 .mission-desk--active .mission-desk__map-hint {
   bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   inset-inline: 50% auto; transform: translateX(50%);
@@ -1386,7 +1405,10 @@ onBeforeUnmount(() => {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .mission-desk__bottom-stack--information {
-    max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+    max-height: min(24rem, 75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
+    max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
@@ -1430,7 +1452,7 @@ onBeforeUnmount(() => {
     max-height: min(60dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
   .mission-desk__bottom-stack--information {
-    max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(24rem, 75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
   /* Match the embedded selector's specificity: otherwise its 9rem top wins
      even though the short-phone rules appear later in the stylesheet. */
@@ -1445,7 +1467,10 @@ onBeforeUnmount(() => {
      At 480px+ the sheet starts at least 11.25rem from the top, leaving a
      1rem gap after guidance; its own scroller keeps the guarded action usable. */
   .mission-desk__bottom-stack { max-height: max(7rem, min(48dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
-  .mission-desk__bottom-stack--information { max-height: calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+  .mission-desk__bottom-stack--information { max-height: min(24rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
+    max-height: calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
   .mission-desk__map-legend { padding: .2rem .6rem; max-height: 4rem; }
   .mission-desk__map-legend h2 { position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0, 0, 0, 0); white-space: nowrap; }
