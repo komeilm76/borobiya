@@ -20,7 +20,7 @@ describe("at-a-glance mission progress and information", () => {
     expect(page).toContain('class="mission-desk__bottom-panel"');
     expect(page).toContain('id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline"');
     const actions = page.slice(page.indexOf('<div class="mission-desk__header-actions">'), page.indexOf('</div>', page.indexOf('<div class="mission-desk__header-actions">')));
-    expect(actions.match(/<button\b/g)).toHaveLength(1);
+    expect(actions.match(/<v-btn\b/g)).toHaveLength(2);
     expect(actions).toContain('mission-tool-route');
     expect(actions).toContain('mission-tool-team');
   });
@@ -84,10 +84,9 @@ describe("at-a-glance mission progress and information", () => {
     expect(viewStyle).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
     expect(viewStyle).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('.mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;');
-    expect(viewStyle).toContain('@media (min-width: 600px) {');
-    expect(viewStyle).toContain('.mission-desk__bottom-stack:not(.mission-desk__bottom-stack--information) .mission-desk__bottom-panel {');
-    expect(viewStyle).toContain('width: min(30rem, calc(100% - 2rem - env(safe-area-inset-right, 0px)));');
-    expect(viewStyle).toContain('align-self: flex-end;');
+    expect(viewStyle).toContain('width: min(36rem, calc(100% - 1.5rem));');
+    expect(viewStyle).toContain('@media (min-width: 600px) and (max-width: 1023px) {');
+    expect(viewStyle).toContain('width: min(30rem, calc(100% - 7.5rem');
     expect(viewStyle).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
     expect(viewStyle).toContain('.mission-desk--active .mission-desk__bottom-stack #mission-status-panel {');

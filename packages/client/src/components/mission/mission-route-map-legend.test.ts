@@ -57,7 +57,9 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(css).toContain('bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
     expect(4.25 * 16 - .75 * 16 - 48).toBe(8); // 8px gap between 48px targets.
-    expect(8.5 * 16 - 4.25 * 16 - 48).toBe(20); // Key launcher clears the docked panel.
+    expect(8.5 * 16 - 4.25 * 16 - 48).toBe(20); // Information retains its separate panel.
+    expect(css).toContain('.mission-desk--steps-visible .mission-desk__legend-action {');
+    expect(css).toContain('bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);');
     expect(css).toContain('.mission-desk__map-legend { flex: none; min-width: 0;');
     expect(css).toContain('border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);');
     expect(css).toContain('background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));');

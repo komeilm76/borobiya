@@ -51,16 +51,20 @@ describe("Missions search, short phones and shared-map tab boundaries", () => {
     expect(short).toContain('.mission-desk__bottom-stack { max-height: max(7rem, min(48dvh, calc(100dvh - 20.75rem');
     expect(css).toContain('.mission-desk__guidance.mission-desk__guidance--active {\n    top: calc(5.25rem');
     expect(css).toContain('max-height: 5rem;\n    overflow-y: auto; overscroll-behavior: contain;');
-    // With both overlays open on a 480px short phone, their bounds do not intersect.
-    expect(480 - 9.5 * 16 - (480 - 20.75 * 16)).toBeGreaterThan(5.25 * 16 + 5 * 16);
+    // The steps sheet reaches the phone edge, leaving the guidance lane and
+    // two rows of icon buttons above it even at 480px high.
+    const sheetCap = Math.min(480 * .65, 32 * 16, Math.max(4.75 * 16, 480 - 17.5 * 16));
+    expect(480 - sheetCap - 4 * 16 - 48).toBeGreaterThan(5.25 * 16 + 5 * 16);
     expect(short).toContain('.mission-desk__bottom-stack--information { max-height: calc(100dvh - 10.25rem');
     expect(css).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
     expect(short).toContain('.mission-desk__map-legend small { position: absolute;');
-    // The sheet stays above the 9.5rem control band, rather than covering SOS or camera actions.
+    // Legacy tool panels still clear their 9.5rem control band; only steps
+    // become an edge-docked sheet with the icon rail measured above it.
     expect(short).toContain('.mission-desk__bottom-stack { max-height: max(7rem');
-    expect(css).toContain('.mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('.mission-desk--steps-visible #mission-steps-stack {');
+    expect(css).toContain('left: 0; right: 0; transform: none; bottom: 0; width: 100%;');
     expect(cards.indexOf('class="mission-desk__phase-summary"')).toBeLessThan(cards.indexOf('class="mission-desk__next-step"'));
     const cardCss = parse(cards).descriptor.styles[0]!.content;
     expect(cardCss).toContain('.mission-desk__next-step { position: sticky; bottom: 0;');

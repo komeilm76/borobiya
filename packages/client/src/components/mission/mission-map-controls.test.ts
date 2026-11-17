@@ -132,7 +132,8 @@ describe("mission map controls", () => {
   it("keeps members accessible without making automatic rescuer sharing look like a switch", () => {
     const start = missionMap.indexOf('<div class="mission-desk__header-actions">');
     const actions = missionMap.slice(start, missionMap.indexOf('</div>', start));
-    expect(actions.match(/<button\b/g)).toHaveLength(1);
+    expect(actions.match(/<v-btn\b/g)).toHaveLength(2);
+    expect(actions).toContain('icon="mdi-routes"');
     expect(actions).not.toContain('mission-tool-status');
     expect(missionMap).toContain('id="mission-tool-status" class="mission-desk__info-action"');
     expect(actions).toContain('mission-tool-route');

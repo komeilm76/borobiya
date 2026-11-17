@@ -29,26 +29,16 @@ describe("mission guidance over the full-screen map", () => {
     expect(css).toContain('.mission-desk__guidance--active .mission-desk__planned-distance');
     expect(css).toContain('.mission-desk__direct-distance { line-height: 1.25; }');
     expect(css).toContain('clip: rect(0, 0, 0, 0);'); // Still available to assistive tech.
-    // Guidance clears the bottom action row; at usable short-phone heights
-    // the progress sheet also starts at least 16px below the banner.
-    for (const height of [480, 560]) {
-      const bannerBottom = (5.25 + 5) * 16;
-      const controlsTop = height - 5.75 * 16 - 48;
-      const sheetTop = height - 9.5 * 16 - Math.max(7 * 16, Math.min(height * .48, height - 20.75 * 16));
-      expect(controlsTop - bannerBottom).toBeGreaterThanOrEqual(12);
-      expect(sheetTop - bannerBottom).toBeGreaterThanOrEqual(16);
+    // The dock reserves the upper guidance lane and two 48px icon rows;
+    // the next-action button remains in its own scrollable card.
+    for (const height of [320, 360, 400, 480, 560, 700]) {
+      const cap = Math.min(height * .65, 32 * 16, Math.max(4.75 * 16, height - 17.5 * 16));
+      const upperRowTop = height - cap - 4 * 16 - 48;
+      const bannerBottom = (5.25 + (height <= 400 ? 3 : 5)) * 16;
+      expect(upperRowTop - bannerBottom).toBeGreaterThanOrEqual(0);
+      expect(height - cap - (upperRowTop + 48)).toBe(4 * 16);
     }
-    for (const height of [360, 400]) {
-      const bannerBottom = (5.25 + 3) * 16;
-      const sheetTop = height - 9.5 * 16 - Math.max(4.5 * 16, Math.min(height * .48, height - 20.75 * 16));
-      expect(sheetTop - bannerBottom).toBeGreaterThanOrEqual(4);
-    }
-    // Medium-height phones use the vertical rail; expanded stages cannot cover guidance.
-    for (const height of [561, 600, 700]) {
-      const bannerBottom = (5.25 + 5) * 16;
-      const sheetTop = height - 9.5 * 16 - Math.min(height * .6, height - 20.75 * 16);
-      expect(sheetTop - bannerBottom).toBeGreaterThanOrEqual(16);
-    }
+    expect(css).toContain('.mission-desk--steps-visible #mission-steps-stack {');
   });
   it("does not claim a GPS fix proves the rescuer is on route or replace the emergency controls", () => {
     expect(page).not.toContain('در مسیر محل حادثه');

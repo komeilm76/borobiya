@@ -4,6 +4,8 @@
     'user-map-view--mission-active': mode === 'missions' && !!missionWorkspace?.hasActiveMission,
     'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission,
     'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool,
+    'user-map-view--mission-steps': mode === 'missions' && !!missionWorkspace?.hasStepsSheet,
+    'user-map-view--mission-route-camera': mode === 'missions' && !!missionWorkspace?.hasRouteCamera,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
     'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
@@ -2878,6 +2880,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
   }
 
+  /* The steps dock has the same measured clearance as Navigate. On narrow
+     screens Search is below SOS; the two rows remain outside the sheet. */
+  .user-map-view--mission-steps .user-map-view__search-action {
+    inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
+  }
+
   .user-map-view__panel {
     position: static;
     width: 100%;
@@ -2947,6 +2955,21 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view--navigating .user-map-view__share,
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
+  }
+}
+
+@media (max-width: 599px) {
+  /* A shared canvas cannot be styled through the mission child's scoped CSS.
+     SOS, camera, optional route frame, compass and the legend occupy the
+     upper row; Search and Mission Information occupy the lower row. */
+  .user-map-view--mission-active.user-map-view--mission-steps
+    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-steps.user-map-view--mission-route-camera
+    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(11.25rem + env(safe-area-inset-right, 0px));
   }
 }
 

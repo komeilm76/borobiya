@@ -543,6 +543,12 @@ a {
      the same clearance as the card. The measured root inline value takes over
      immediately; a short phone never briefly loses SOS behind the top tabs. */
   :root { --bb-map-point-sheet-height: min(48dvh, max(7rem, calc(100dvh - 12.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+  /* The fallback is bounded by the steps sheet's own phone-height cap until
+     ResizeObserver supplies its actual height, including the home inset. */
+  :root { --bb-map-mission-sheet-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
+  :root:has(.user-map-view--mission-steps .mission-desk--steps-guidance) {
+    --bb-map-mission-sheet-height: min(65dvh, 32rem, max(4.75rem, calc(100dvh - 17.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
   .app-shell--map { height: 100dvh; overflow: hidden; }
   .app-shell--map .app-main { min-height: 0; }
   /* Keep the 48px SOS one row above the shared Search action. */
@@ -558,6 +564,9 @@ a {
   }
   .app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {
     inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
+  }
+  .app-shell--map:has(.user-map-view--mission-steps) .sos-fab.sos-fab {
+    inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
   }
 }
 

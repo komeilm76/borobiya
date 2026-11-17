@@ -9,7 +9,9 @@ const descriptor = parse(page).descriptor;
 describe("default mission map brief", () => {
   it("shows route readiness beside the team action in the progress header", () => {
     const actions = page.slice(page.indexOf('<div class="mission-desk__header-actions">'), page.indexOf('</div>', page.indexOf('<div class="mission-desk__header-actions">')));
-    expect(actions.match(/<button\b/g)).toHaveLength(1);
+    expect(actions.match(/<v-btn\b/g)).toHaveLength(2);
+    expect(actions).toContain('icon="mdi-routes"');
+    expect(actions).not.toContain('<strong>مسیر</strong>');
     expect(actions.indexOf('mission-tool-team')).toBeLessThan(actions.indexOf('mission-tool-route'));
     expect(page).not.toContain('mission-desk__dock');
     expect(page).not.toContain('mission-desk__status-brief');
@@ -23,7 +25,7 @@ describe("default mission map brief", () => {
     expect(page).toContain('aria-controls="mission-route-panel"');
     expect(page).toContain('aria-controls="mission-status-panel"');
     expect(descriptor.styles[0]!.content).toContain('.mission-desk__route-action--warning');
-    expect(descriptor.styles[0]!.content).toContain('min-width: 64px; min-height: 44px;');
+    expect(descriptor.styles[0]!.content).toContain('min-width: 44px; min-height: 44px;');
     expect(compileTemplate({ filename: "UserMissionView.vue", id: "mission-map-brief", source: descriptor.template!.content }).errors).toEqual([]);
   });
   it("opens the existing workspace from the incident marker without requesting GPS or adding a waypoint", () => {

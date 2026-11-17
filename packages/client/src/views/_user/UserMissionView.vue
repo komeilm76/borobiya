@@ -2,6 +2,9 @@
   <main class="mission-desk" :class="{ 'mission-desk--embedded': embedded, 'mission-desk--active': desk.activeMission.value,
     'mission-desk--terminal-hold': !!desk.terminalHold.value,
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
+    'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool,
+    'mission-desk--steps-guidance': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool &&
+      (navigation.active.value || !!routing.error.value || !!navigation.error.value),
     'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
     <!-- The map workspace owns the persistent public canvas even while idle. -->
     <div class="mission-desk__shell">
@@ -260,7 +263,7 @@
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
         <div v-if="!desk.terminalHold.value && (!activeTool || activeTool === 'status')"
-          class="mission-desk__bottom-stack" :class="{ 'mission-desk__bottom-stack--information': activeTool === 'status' }">
+          id="mission-steps-stack" class="mission-desk__bottom-stack" :class="{ 'mission-desk__bottom-stack--information': activeTool === 'status' }">
           <section v-if="legendOpen" id="mission-map-legend" class="mission-desk__map-legend bb-floating-card"
             aria-labelledby="mission-map-legend-title" dir="rtl" tabindex="-1">
             <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
@@ -285,14 +288,14 @@
                     <v-btn id="mission-tool-team" class="mission-desk__team-action" icon="mdi-account-group-outline" variant="tonal" size="small"
                       aria-label="نمایش اعضای مأموریت" title="نمایش اعضای مأموریت"
                       aria-controls="mission-team-panel" :aria-expanded="false" @click="toggleTool('team')" />
-                    <button id="mission-tool-route" type="button" class="mission-desk__route-action"
+                    <v-btn id="mission-tool-route" class="mission-desk__route-action" icon="mdi-routes" variant="tonal" size="small"
+                      :color="routeCue.tone === 'warning' ? 'warning' : 'primary'"
                       :class="{ 'mission-desk__route-action--warning': routeCue.tone === 'warning', 'mission-desk__route-action--ready': routeCue.tone === 'ready' }"
                       :aria-label="`مسیر مأموریت: ${routeCue.label}؛ باز کردن پنل مسیر`"
+                      :title="`مسیر مأموریت: ${routeCue.label}`"
                       :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
                       :disabled="!!desk.terminalHold.value || !!desk.error.value || desk.loading.value"
-                      @click="toggleTool('route')">
-                      <v-icon icon="mdi-routes" size="20" aria-hidden="true" /><strong>مسیر</strong>
-                    </button>
+                      @click="toggleTool('route')" />
                   </div>
                 </template>
               </MissionMapCards>
@@ -443,6 +446,33 @@ function toggleLegend(): void {
 }
 watch(activeTool, (tool) => { if (tool === "route" || tool === "team") legendOpen.value = false; });
 watch(() => desk.terminalHold.value, (held) => { if (held) legendOpen.value = false; });
+// Match the Navigate tab's bottom sheet. Its content and legend can grow, so
+// measure their actual viewport height before positioning the external SOS,
+// Search and in-map icon rails. Clear the shared variable on every exit path.
+watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
+  () => desk.terminalHold.value, legendOpen], async (_values, _previous, onCleanup) => {
+  let disposed = false;
+  let observer: ResizeObserver | undefined;
+  let onResize: (() => void) | undefined;
+  onCleanup(() => {
+    disposed = true;
+    observer?.disconnect();
+    if (onResize) window.removeEventListener("resize", onResize);
+    document.documentElement.style.removeProperty("--bb-map-mission-sheet-height");
+  });
+  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || activeTool.value) return;
+  await nextTick();
+  if (disposed) return;
+  const element = document.getElementById("mission-steps-stack");
+  if (!element) return;
+  const update = () => document.documentElement.style.setProperty("--bb-map-mission-sheet-height",
+    `${Math.ceil(window.innerHeight - element.getBoundingClientRect().top)}px`);
+  update();
+  observer = new ResizeObserver(update);
+  observer.observe(element);
+  onResize = update;
+  window.addEventListener("resize", onResize);
+}, { flush: "post" });
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
 const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
@@ -513,6 +543,8 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 }
 defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
+  hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value),
+  hasRouteCamera: computed(() => routing.visible.value && !!routing.target.value),
   hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value &&
     (!activeTool.value || activeTool.value === 'status')) });
 function addTypedWaypoint(): void {
@@ -886,7 +918,10 @@ watch(missionSession, (next) => {
   desk.reset();
   if (next) void desk.load();
 }, { flush: "sync" });
-onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
+onBeforeUnmount(() => {
+  document.documentElement.style.removeProperty("--bb-map-mission-sheet-height");
+  releaseRouteMap(); desk.reset();
+});
 </script>
 
 <style scoped>
@@ -1121,6 +1156,28 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   width: 100%; max-height: min(65dvh, 32rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   display: flex; flex-direction: column; gap: .5rem; min-height: 0; pointer-events: auto; }
 .mission-desk__bottom-stack--information { max-height: min(75dvh, 40rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+/* Same centered bottom card as Navigate; only the steps variant docks here.
+   Mission Information remains a separate full-width panel above map controls. */
+.mission-desk--steps-visible .mission-desk__bottom-stack {
+  left: 50%; right: auto; transform: translateX(-50%);
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  width: min(36rem, calc(100% - 1.5rem));
+  max-height: min(65dvh, 32rem, calc(100dvh - 18rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+}
+@media (min-width: 600px) and (max-width: 1023px) {
+  /* Match Navigate's tablet clearance beside the fixed SOS/map rail. */
+  .mission-desk--steps-visible .mission-desk__bottom-stack {
+    left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;
+    width: min(30rem, calc(100% - 7.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  }
+}
+.mission-desk--steps-visible .mission-desk__bottom-panel { flex: 0 1 auto; }
+.mission-desk--steps-visible .mission-desk__info-action {
+  bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
+}
+.mission-desk--steps-visible .mission-desk__legend-action {
+  bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
+}
 .mission-desk--active .mission-desk__bottom-stack #mission-status-panel {
   position: relative; inset: auto; flex: 1 1 auto; min-height: 0;
   width: 100%; max-height: none; margin: 0;
@@ -1189,15 +1246,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
   background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
-/* The progress card should be readable on wide maps, not a viewport-wide strip.
-   Information and its legend keep the full-width sheet independently. */
-@media (min-width: 600px) {
-  .mission-desk__bottom-stack:not(.mission-desk__bottom-stack--information) .mission-desk__bottom-panel {
-    width: min(30rem, calc(100% - 2rem - env(safe-area-inset-right, 0px)));
-    align-self: flex-end;
-    margin-right: calc(1rem + env(safe-area-inset-right, 0px));
-  }
-}
 .mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;
   display: flex; flex-direction: column; overflow: hidden;
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
@@ -1218,8 +1266,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__legend-symbol--requester { background: #dc593b; }
 .mission-desk__legend-symbol--rescuer { background: #16826c; }
 .mission-desk__legend-symbol--admin { background: #5555ae; }
-/* One scroll surface for the steps and guarded action, full width with the
-   guide above it. No individual stage has a nested scroller. */
+/* One scroll surface for the steps and guarded action within the docked card.
+   No individual stage has a nested scroller. */
 .mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;
   overflow-y: auto; overscroll-behavior: contain; pointer-events: auto; }
 .mission-desk__map-cards :deep(.mission-map-cards) {
@@ -1227,15 +1275,9 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 }
 .mission-desk__header-actions { display: flex; align-items: center; gap: .3rem; flex: none; }
 .mission-desk__team-action { flex: none; min-width: 44px; min-height: 44px; }
-.mission-desk__route-action { display: inline-flex; align-items: center; justify-content: center; gap: .2rem;
-  min-width: 64px; min-height: 44px; padding: 0 .4rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), .12); border-radius: var(--bb-radius-nested, 16px);
-  background: rgba(var(--v-theme-primary), .1); color: rgb(var(--v-theme-primary));
-  cursor: pointer; font: inherit; }
-.mission-desk__route-action strong { font-size: .8rem; }
+.mission-desk__route-action { flex: none; min-width: 44px; min-height: 44px; }
 .mission-desk__route-action--warning { box-shadow: inset 3px 0 rgb(var(--v-theme-warning)); }
 .mission-desk__route-action--ready { box-shadow: inset 3px 0 rgb(var(--v-theme-primary)); }
-.mission-desk__route-action:disabled { opacity: .48; cursor: not-allowed; }
 .mission-desk__route-action:focus-visible, .mission-desk__map-hint button:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__legend-action { position: absolute; z-index: 10;
@@ -1296,6 +1338,16 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
   .mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: min(60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  /* Like Navigate, the steps surface meets the phone edge; its safe-area
+     padding is inside the scrollable card, never an empty map strip. */
+  .mission-desk--steps-visible .mission-desk__bottom-stack {
+    left: 0; right: 0; transform: none; bottom: 0; width: 100%;
+    max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk--steps-visible .mission-desk__bottom-panel {
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
   .mission-desk__bottom-stack--information {
     max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
@@ -1317,8 +1369,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));
   }
   .mission-desk__map-focus--pair { bottom: calc(9rem + env(safe-area-inset-bottom, 0px)); }
-  /* Keep the compass and camera actions in the clear row below the
-     progress sheet even when no tool is open. */
+  /* Legacy tool sheets retain the lower map-action rail. The steps dock
+     overrides it below with a measured row above its surface. */
   .mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
@@ -1421,8 +1473,43 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk--route-open .mission-route__emblem { display: none; }
   .mission-desk--route-open .mission-route__heading small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 }
-:global(:root.dark .mission-desk__route-action) { background: var(--bb-color-inset); }
 
+@media (max-width: 599px) {
+  .mission-desk--steps-visible #mission-steps-stack {
+    max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  /* Only an actual guidance banner needs a taller clearance lane. Otherwise
+     a short phone retains Navigate's 7rem minimum for the actionable steps. */
+  .mission-desk--steps-visible.mission-desk--steps-guidance #mission-steps-stack {
+    max-height: min(65dvh, 32rem, max(4.75rem, calc(100dvh - 17.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk--steps-guidance .mission-desk__guidance.mission-desk__guidance--warning,
+  .mission-desk--steps-guidance .mission-desk__guidance.mission-desk__guidance--active {
+    top: calc(5.25rem + env(safe-area-inset-top, 0px)); max-height: 5rem;
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  /* Higher specificity than the old camera rail at short phone heights.
+     SOS and the legend keep their upper row, Search and Info the lower row. */
+  .mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus,
+  .mission-desk--active.mission-desk--steps-visible .mission-desk__map-focus--pair {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); flex-direction: row;
+  }
+  /* The standalone mission bookmark has its own canvas; the shared map uses
+     UserMapView's matching compass rule instead. */
+  .mission-desk--active.mission-desk--steps-visible :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
+    right: calc(7.75rem + env(safe-area-inset-right, 0px));
+  }
+  .mission-desk--active.mission-desk--steps-visible:has(.mission-desk__map-focus--pair)
+    :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
+    right: calc(11.25rem + env(safe-area-inset-right, 0px));
+  }
+}
+@media (max-width: 599px) and (max-height: 400px) {
+  .mission-desk--steps-guidance .mission-desk__guidance.mission-desk__guidance--warning,
+  .mission-desk--steps-guidance .mission-desk__guidance.mission-desk__guidance--active { max-height: 3rem; }
+}
 :global(:root.dark .mission-route__stops),
 :global(:root.dark .mission-route__step-control),
 :global(:root.dark .mission-route__choice:not(.mission-route__choice--selected)) {
