@@ -40,7 +40,7 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(filter).toBeGreaterThan(0);
     expect(actions).toBeGreaterThan(filter);
     const toolbar = source.slice(filter, source.indexOf('</header>'));
-    for (const action of ['adminSos.toggleSoundMuted()', 'adminSos.testAlertSound()', 'adminSos.refreshRequests()']) {
+    for (const action of ['adminSos.toggleSoundMuted()', 'testSound', 'adminSos.refreshRequests()']) {
       expect(toolbar).toContain(action);
     }
     expect(toolbar.match(/size="small"/g)).toHaveLength(3);
@@ -48,7 +48,8 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).toContain('min-width: 44px; min-height: 44px; height: 44px;');
     expect(source).toContain('.dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }');
     expect(source).toContain('d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold');
-    expect(source).toContain('.admin-dispatch__overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }');
+    expect(source).toContain('.admin-dispatch__overview button[aria-pressed="true"]');
+    expect(source).toContain('.admin-dispatch__overview button:focus-visible');
     expect(source).toContain('@media (max-width: 699px) {');
   });
 

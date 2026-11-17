@@ -74,7 +74,7 @@
             prepend-icon="mdi-bell-ring-outline"
             rounded="lg"
             variant="outlined"
-            @click="adminSos.testAlertSound()"
+            @click="testSound"
           >
             تست صدا
           </v-btn>
@@ -91,6 +91,11 @@
         </div>
       </div>
     </header>
+
+    <v-alert v-if="soundTestError" type="warning" variant="tonal" role="alert" closable class="mb-4"
+      @click:close="soundTestError = null">
+      {{ soundTestError }}
+    </v-alert>
 
     <v-alert
       v-if="adminSos.errorMessage"
@@ -141,14 +146,16 @@
       </div>
     </v-alert>
 
-    <div class="admin-dispatch__overview" role="status" aria-live="polite" aria-label="نمای کلی عملیات">
-      <div><v-icon icon="mdi-alert-circle-outline" size="20" aria-hidden="true" />
-        <span>در انتظار رسیدگی</span><strong>{{ adminSos.queueVerified && adminSos.filterStatus !== 'dispatched' ? adminSos.pendingCount.toLocaleString('fa-IR') : 'نامشخص' }}</strong></div>
-      <div><v-icon icon="mdi-send-check-outline" size="20" aria-hidden="true" />
-        <span>اعزام‌شده</span><strong>{{ adminSos.queueVerified && adminSos.filterStatus !== 'pending' ? adminSos.dispatchedCount.toLocaleString('fa-IR') : 'نامشخص' }}</strong></div>
-      <div><v-icon icon="mdi-crosshairs-gps" size="20" aria-hidden="true" />
-        <span>در حال بررسی</span><strong>{{ adminSos.selectedRequest ? incidentLabel(adminSos.selectedRequest.incidentTypeId) : 'درخواستی انتخاب نشده' }}</strong></div>
-    </div>
+    <nav class="admin-dispatch__overview" aria-label="دسترسی سریع به صف‌ها">
+      <button type="button" :aria-pressed="adminSos.filterStatus === 'pending'" @click="onFilterChange('pending')">
+        <v-icon icon="mdi-alert-circle-outline" size="20" aria-hidden="true" />
+        <span>در انتظار رسیدگی</span><strong>{{ adminSos.queueVerified && adminSos.filterStatus !== 'dispatched' ? adminSos.pendingCount.toLocaleString('fa-IR') : 'نامشخص' }}</strong>
+      </button>
+      <button type="button" :aria-pressed="adminSos.filterStatus === 'dispatched'" @click="onFilterChange('dispatched')">
+        <v-icon icon="mdi-send-check-outline" size="20" aria-hidden="true" />
+        <span>اعزام‌شده</span><strong>{{ adminSos.queueVerified && adminSos.filterStatus !== 'pending' ? adminSos.dispatchedCount.toLocaleString('fa-IR') : 'نامشخص' }}</strong>
+      </button>
+    </nav>
 
     <!-- Triage queue stays first in DOM and visual order when the columns stack. -->
     <v-row class="admin-dispatch__workspace">
@@ -306,15 +313,18 @@
             <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
               <h3>تصویر پیوست حادثه</h3>
               <button v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
-                aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="photoDialogOpen = true">
+                :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
                 <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
-                  class="admin-dispatch__photo-image" referrerpolicy="no-referrer">
+                  class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
                 <span>نمایش تصویر کامل <v-icon icon="mdi-open-in-new" size="17" aria-hidden="true" /></span>
               </button>
               <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
+              <v-btn v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
+                color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
+              <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
             </div>
             <p v-if="adminSos.selectedRequestProposals.length > 0" class="admin-dispatch__proposal-note">
-              {{ adminSos.selectedRequestProposals.length.toLocaleString('fa-IR') }} پیشنهاد در انتظار برای این درخواست ثبت شده است.
+              {{ adminSos.selectedRequestProposals.length.toLocaleString('fa-IR') }} پیشنهاد در این نشست ارسال شد؛ وضعیت پذیرش آن‌ها در این بخش تأیید نمی‌شود.
             </p>
             <div class="admin-dispatch__next">
               <span>گام بعدی: بررسی امدادگران واجد شرایط</span>
@@ -328,7 +338,8 @@
                 تصویر پیوست حادثه
                 <v-btn icon="mdi-close" variant="text" aria-label="بستن تصویر" @click="photoDialogOpen = false" />
               </v-card-title>
-              <v-card-text><img v-if="photoSrc" :src="photoSrc" alt="تصویر کامل پیوست درخواست امداد" referrerpolicy="no-referrer"></v-card-text>
+              <v-card-text><img v-if="photoSrc" :src="photoSrc" alt="تصویر کامل پیوست درخواست امداد"
+                referrerpolicy="no-referrer" @error="photoSrc = null"></v-card-text>
             </v-card>
           </v-dialog>
         </v-card>
@@ -379,7 +390,8 @@
           </div>
         </v-card>
 
-        <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer'"
+        <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer' &&
+          adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
           color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
           :disabled="adminSos.dispatchSubmitting"
           @click="quickRedispatch(adminSos.selectedRequest.id)">
@@ -555,13 +567,19 @@
           </v-card-actions>
         </v-card>
 
+        <div v-if="adminSos.selectedRequest" class="admin-dispatch__mission-header">
+          <h2>پیگیری مأموریت</h2>
+          <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-refresh"
+            :loading="missionLoading" :disabled="missionLoading"
+            @click="loadActiveMissions()">بازخوانی مأموریت‌ها</v-btn>
+        </div>
         <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
-          {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
+          {{ missionError }}
         </v-alert>
-        <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading" type="article" class="mb-3"
+        <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading && !requestMissions.length" type="article" class="mb-3"
           role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
-        <details v-else-if="requestMissions.length" class="mb-3 pa-3 dispatch-mission-timeline">
-          <summary>پیگیری مأموریت‌ها و خط زمانی <span>{{ requestMissions.length.toLocaleString('fa-IR') }} مأموریت</span></summary>
+        <details v-else-if="requestMissions.length" :key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline">
+          <summary>خط زمانی <span>{{ requestMissions.length.toLocaleString('fa-IR') }} مأموریت</span></summary>
           <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">انتخاب مأموریت</label>
           <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
             <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
@@ -574,12 +592,17 @@
         <p v-else-if="adminSos.selectedRequest && missionLoaded" class="mb-3 text-body-2 text-medium-emphasis" role="status">
           برای این درخواست هنوز مأموریتی ثبت نشده است.
         </p>
-        <details v-if="activeMissions.length" :key="adminSos.selectedRequest?.id" class="admin-dispatch__followup mb-3"
-          @toggle="onLiveDetailsToggle">
-          <summary>موقعیت زنده و اعضای مأموریت <span>{{ activeMissions.length.toLocaleString('fa-IR') }} مأموریت فعال</span></summary>
-          <MissionLivePanel v-for="mission in (showLivePanel ? activeMissions : [])" :key="mission.id" :mission="mission"
-            :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
-        </details>
+        <section v-if="activeMissions.length" class="admin-dispatch__followup mb-3">
+          <button type="button" class="admin-dispatch__followup-toggle" :aria-expanded="showLivePanel"
+            @click="showLivePanel = !showLivePanel">
+            موقعیت زنده و اعضای مأموریت <span>{{ activeMissions.length.toLocaleString('fa-IR') }} مأموریت فعال</span>
+            <v-icon :icon="showLivePanel ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
+          </button>
+          <template v-if="showLivePanel">
+            <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
+              :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
+          </template>
+        </section>
         <v-dialog v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
           <v-card title="تأیید اعزام دستی" rounded="xl">
             <v-card-text>
@@ -646,9 +669,20 @@ const dispatchFilters = [
 const auth = useAuthStore(pinia);
 const senderProfileOpen = ref(false);
 const photoDialogOpen = ref(false);
+const photoOpenLoading = ref(false);
+const photoOpenError = ref<string | null>(null);
+let photoOpenGeneration = 0;
 watch(() => adminSos.selectedRequest?.id, () => {
   senderProfileOpen.value = false;
   photoDialogOpen.value = false;
+  photoOpenError.value = null;
+  photoOpenLoading.value = false;
+  photoOpenGeneration++;
+}, { flush: "sync" });
+watch(() => auth.accessToken, () => {
+  photoOpenGeneration++;
+  photoOpenLoading.value = false;
+  photoOpenError.value = null;
 }, { flush: "sync" });
 const { requestMissions, activeMissions, timelineMissionId, selectedTimelineMission,
   missionLoading, missionLoaded, missionError, loadActiveMissions } = useAdminRequestMissions(
@@ -660,9 +694,10 @@ const { requestMissions, activeMissions, timelineMissionId, selectedTimelineMiss
 const themeStore = useThemeStore(pinia);
 const photoSrc = ref<string | null>(null);
 const photoLoading = ref(false);
+const photoRetryNonce = ref(0);
 watch(photoSrc, (src) => { if (!src) photoDialogOpen.value = false; }, { flush: "sync" });
 watch(
-  () => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.photoUrl, auth.accessToken] as const,
+  () => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.photoUrl, auth.accessToken, photoRetryNonce.value] as const,
   ([requestId, photoUrl, token], _previous, onCleanup) => {
     let active = true;
     onCleanup(() => { active = false; });
@@ -677,6 +712,26 @@ watch(
   { immediate: true }
 );
 
+async function openPhoto(): Promise<void> {
+  const requestId = adminSos.selectedRequest?.id;
+  const token = auth.accessToken;
+  if (!requestId || !token || photoOpenLoading.value) return;
+  const generation = ++photoOpenGeneration;
+  photoOpenLoading.value = true;
+  photoOpenError.value = null;
+  try {
+    // Photo access URLs expire after 60 seconds. Issue a fresh URL for the full image.
+    const src = await getSosPhotoSrc(requestId, token);
+    if (generation !== photoOpenGeneration || adminSos.selectedRequest?.id !== requestId || auth.accessToken !== token) return;
+    photoSrc.value = src;
+    photoDialogOpen.value = true;
+  } catch {
+    if (generation === photoOpenGeneration) photoOpenError.value = "تصویر کامل بارگذاری نشد؛ دوباره تلاش کنید.";
+  } finally {
+    if (generation === photoOpenGeneration) photoOpenLoading.value = false;
+  }
+}
+
 const incidentTypes = ref<IncidentType[]>([]);
 const mapStyleUrl = computed(() =>
   themeStore.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE
@@ -688,10 +743,14 @@ const proposedRescuerIdSet = computed(
   () => new Set(adminSos.selectedRequestProposals.map((proposal) => proposal.rescuerId))
 );
 const responderSearchInput = ref("");
-const showLivePanel = ref(false);
-function onLiveDetailsToggle(event: Event): void {
-  showLivePanel.value = (event.currentTarget as HTMLDetailsElement).open;
+const soundTestError = ref<string | null>(null);
+async function testSound(): Promise<void> {
+  soundTestError.value = null;
+  if (!await adminSos.testAlertSound()) {
+    soundTestError.value = "پخش صدای آزمایشی ممکن نشد؛ صدای دستگاه و مجوز پخش مرورگر را بررسی کنید. هشدار دیداری همچنان فعال است.";
+  }
 }
+const showLivePanel = ref(false);
 const manualDispatchConfirmation = ref(false);
 const selectedDispatchWarnings = computed(() => adminSos.selectedResponderIds
   .filter((id) => !!adminSos.selectedResponderWarnings[id])
@@ -701,7 +760,7 @@ watch(() => adminSos.selectedId, () => {
   responderSearchInput.value = "";
   manualDispatchConfirmation.value = false;
   showLivePanel.value = false;
-});
+}, { flush: "sync" });
 function requestDispatch(): void {
   if (!adminSos.canDispatchSelected) return;
   if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;
@@ -989,11 +1048,16 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: .75rem 1.5rem; }
 .admin-dispatch__intro-note { margin: .35rem 0 0; color: var(--bb-color-muted); font-size: .85rem; }
-.admin-dispatch__overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+.admin-dispatch__overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: .5rem; margin-bottom: 1rem; }
-.admin-dispatch__overview > div { display: flex; align-items: center; gap: .45rem; min-width: 0;
+.admin-dispatch__overview button { display: flex; align-items: center; gap: .45rem; min-width: 0;
   padding: .65rem .9rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
-  background: rgb(var(--v-theme-surface)); }
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  font: inherit; cursor: pointer; text-align: start; }
+.admin-dispatch__overview button[aria-pressed="true"] { border-color: rgb(var(--v-theme-primary));
+  background: var(--bb-color-inset); }
+.admin-dispatch__overview button:focus-visible, .admin-dispatch__followup-toggle:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__overview .v-icon { flex: none; color: rgb(var(--v-theme-primary)); }
 .admin-dispatch__overview span { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-dispatch__overview strong { margin-inline-start: auto; font-size: .9rem;
@@ -1098,9 +1162,11 @@ onBeforeUnmount(() => {
 .admin-dispatch__photo-open { display: inline-grid; gap: .35rem; margin-top: .4rem; padding: .35rem;
   color: rgb(var(--v-theme-primary)); background: var(--bb-color-inset); border: 0;
   border-radius: var(--bb-radius-nested, 16px); cursor: pointer; text-align: start; }
+.admin-dispatch__photo-open:disabled { opacity: .65; cursor: progress; }
+.admin-dispatch__photo-error { margin: .4rem 0 0; color: rgb(var(--v-theme-error)); font-size: .82rem; }
 .admin-dispatch__photo-open:focus-visible, .admin-dispatch__sender-id summary:focus-visible,
-.admin-dispatch__search-help summary:focus-visible, .dispatch-mission-timeline summary:focus-visible,
-.admin-dispatch__followup summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.admin-dispatch__search-help summary:focus-visible, .dispatch-mission-timeline summary:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__photo-open span { display: flex; align-items: center; gap: .3rem; font-size: .8rem; font-weight: 700; }
 .admin-dispatch__photo-image { display: block; max-width: 100%; max-height: 9rem;
   border-radius: .75rem; object-fit: contain; }
@@ -1174,15 +1240,21 @@ onBeforeUnmount(() => {
 .admin-dispatch__search-help p { margin: .3rem 0; line-height: 1.65; }
 .admin-dispatch__submit { position: sticky; bottom: 0; z-index: 1;
   background: rgb(var(--v-theme-surface)); border-top: 1px solid var(--bb-color-outline); }
+.admin-dispatch__mission-header { display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: .5rem; margin-bottom: .65rem; }
+.admin-dispatch__mission-header h2 { margin: 0; font-size: .95rem; font-weight: 800; }
 .admin-dispatch__followup { border: 1px solid var(--bb-color-outline);
   border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); padding: .75rem; }
-.admin-dispatch__followup summary, .dispatch-mission-timeline summary { cursor: pointer; min-height: 44px;
-  font-weight: 800; }
-.admin-dispatch__followup summary span, .dispatch-mission-timeline summary span {
+.admin-dispatch__followup-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem;
+  width: 100%; min-height: 44px; border: 0; background: transparent;
+  color: rgb(var(--v-theme-on-surface)); font: inherit; font-weight: 800; cursor: pointer; text-align: start; }
+.admin-dispatch__followup-toggle .v-icon { margin-inline-start: auto; }
+.dispatch-mission-timeline summary { cursor: pointer; min-height: 44px; font-weight: 800; }
+.admin-dispatch__followup-toggle span, .dispatch-mission-timeline summary span {
   color: var(--bb-color-muted); font-size: .8rem; font-weight: 500; margin-inline-start: .5rem;
 }
 .dispatch-mission-timeline[open] summary { margin-bottom: .5rem; }
-.admin-dispatch__followup[open] summary { margin-bottom: .75rem; }
+.admin-dispatch__followup-toggle[aria-expanded="true"] { margin-bottom: .75rem; }
 
 .severity-legend {
   position: absolute;
@@ -1259,8 +1331,6 @@ onBeforeUnmount(() => {
   .admin-dispatch__filter-select { width: 15rem; }
 }
 @media (max-width: 699px) {
-  .admin-dispatch__overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .admin-dispatch__overview > :last-child { grid-column: 1 / -1; }
   .admin-dispatch__toolbar { grid-template-columns: minmax(0, 1fr); }
   .admin-dispatch__filter-select { width: 100%; max-width: none; }
   .admin-dispatch__toolbar-actions { justify-content: flex-start; }

@@ -58,6 +58,33 @@ it("distinguishes pending, verified empty, failed and retried admin mission read
   } finally { scope.stop(); }
 });
 
+it("refreshes mission history without losing the chosen timeline or showing a verified empty state on failure", async () => {
+  const otherMission: Mission = { ...mission, id: "70000000-0000-4000-8000-000000000006", status: "arrived" };
+  const refresh = deferred<Mission[]>();
+  const read = vi.fn().mockResolvedValueOnce([mission, otherMission])
+    .mockReturnValueOnce(refresh.promise)
+    .mockRejectedValueOnce(new Error("offline"));
+  const scope = effectScope();
+  const state = scope.run(() => useAdminRequestMissions(ref(sosId), ref<SosRequestStatus>("dispatched"),
+    ref("admin-bearer"), read))!;
+  try {
+    await Promise.resolve();
+    state.timelineMissionId.value = otherMission.id;
+    const loading = state.loadActiveMissions();
+    expect(state.missionLoading.value).toBe(true);
+    expect(state.requestMissions.value).toHaveLength(2);
+    expect(state.timelineMissionId.value).toBe(otherMission.id);
+    refresh.resolve([mission, otherMission]);
+    await loading;
+    expect(state.timelineMissionId.value).toBe(otherMission.id);
+    await state.loadActiveMissions();
+    expect(state.missionError.value).toContain("قدیمی");
+    expect(state.missionLoaded.value).toBe(false);
+    expect(state.requestMissions.value).toHaveLength(2);
+    expect(state.timelineMissionId.value).toBe(otherMission.id);
+  } finally { refresh.resolve([]); scope.stop(); }
+});
+
 it("clears the previous request synchronously and discards a late reply on account loss", async () => {
   const next = deferred<Mission[]>();
   const other = deferred<Mission[]>();

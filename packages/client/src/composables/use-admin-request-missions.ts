@@ -17,9 +17,13 @@ export function useAdminRequestMissions(
   const selectedTimelineMission = computed(() =>
     requestMissions.value.find((mission) => mission.id === timelineMissionId.value) ?? null);
   let generation = 0;
+  let currentId: string | null = null;
+  let currentBearer: string | null = null;
 
   function clear(): void {
     generation++;
+    currentId = null;
+    currentBearer = null;
     requestMissions.value = [];
     timelineMissionId.value = null;
     missionLoading.value = false;
@@ -28,21 +32,31 @@ export function useAdminRequestMissions(
   }
 
   async function loadActiveMissions(): Promise<void> {
-    clear(); // A previous selection's private rows and any pending reply are invalid now.
     const id = requestId.value;
     const bearer = token.value;
-    const current = generation;
-    if (!id || !bearer) return;
+    const sameScope = id !== null && bearer !== null && id === currentId && bearer === currentBearer;
+    const current = ++generation; // Discard any late reply from a previous read or account.
+    if (!sameScope) {
+      requestMissions.value = [];
+      timelineMissionId.value = null;
+    }
+    currentId = id;
+    currentBearer = bearer;
+    missionLoaded.value = false;
+    missionError.value = null;
+    if (!id || !bearer) { missionLoading.value = false; return; }
     missionLoading.value = true;
     try {
       const missions = await read(bearer, id, true);
       if (current !== generation || requestId.value !== id || token.value !== bearer) return;
       requestMissions.value = missions;
-      timelineMissionId.value = missions[0]?.id ?? null;
+      // Refreshing the same SOS must not jump away from the operator's chosen mission.
+      timelineMissionId.value = missions.some((mission) => mission.id === timelineMissionId.value)
+        ? timelineMissionId.value : missions[0]?.id ?? null;
       missionLoaded.value = true;
     } catch {
       if (current === generation && requestId.value === id && token.value === bearer)
-        missionError.value = "سابقهٔ مأموریت‌ها بارگذاری نشد.";
+        missionError.value = "سابقهٔ مأموریت‌ها بارگذاری نشد؛ داده‌های قبلی ممکن است قدیمی باشند.";
     } finally {
       if (current === generation) missionLoading.value = false;
     }

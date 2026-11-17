@@ -14,7 +14,7 @@ describe("admin SOS triage flow", () => {
     const map = template.indexOf('<MapCanvas');
     const responders = template.indexOf('id="dispatch-responders"');
     const timeline = template.indexOf('class="mb-3 pa-3 dispatch-mission-timeline"');
-    const live = template.indexOf('<MissionLivePanel v-for="mission in (showLivePanel ? activeMissions : [])"');
+    const live = template.indexOf('<MissionLivePanel v-for="mission in activeMissions"');
     expect(queue).toBeGreaterThan(0);
     expect(queue).toBeLessThan(detail);
     expect(detail).toBeLessThan(map);
@@ -45,7 +45,10 @@ describe("admin SOS triage flow", () => {
   });
 
   it("scans verified workload honestly and keeps complete incident evidence available on demand", () => {
-    expect(template).toContain('class="admin-dispatch__overview"');
+    expect(template).toContain('<nav class="admin-dispatch__overview" aria-label="دسترسی سریع به صف‌ها">');
+    expect(template).toContain(':aria-pressed="adminSos.filterStatus === \'pending\'" @click="onFilterChange(\'pending\')"');
+    expect(template).toContain(':aria-pressed="adminSos.filterStatus === \'dispatched\'" @click="onFilterChange(\'dispatched\')"');
+    expect(template).not.toContain('در حال بررسی</span><strong>');
     expect(template).toContain("adminSos.queueVerified && adminSos.filterStatus !== 'dispatched'");
     expect(template).toContain("adminSos.queueVerified && adminSos.filterStatus !== 'pending'");
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
@@ -57,7 +60,11 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('class="admin-dispatch__sender-id"');
     expect(template).toContain('class="admin-dispatch__photo-open"');
     expect(template).toContain('v-model="photoDialogOpen"');
+    expect(template).toContain('@click="openPhoto"');
+    expect(template).toContain('@click="photoRetryNonce++"');
     expect(source).toContain('photoDialogOpen.value = false;');
+    expect(source).toContain('const src = await getSosPhotoSrc(requestId, token);');
+    expect(source).toContain('generation !== photoOpenGeneration');
   });
 
   it("keeps dispatch safety visible while putting optional history and live maps behind disclosure", () => {
@@ -66,10 +73,19 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('class="admin-dispatch__search-help"');
     expect(template).toContain('v-else-if="adminSos.nearestError"');
     expect(template).toContain('class="admin-dispatch__submit');
-    expect(template).toContain('v-else-if="requestMissions.length" class="mb-3 pa-3 dispatch-mission-timeline"');
+    expect(template).toContain('v-else-if="requestMissions.length" :key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline"');
     expect(template).toContain('class="admin-dispatch__followup mb-3"');
-    expect(template).toContain('v-for="mission in (showLivePanel ? activeMissions : [])"');
+    expect(template).toContain(':aria-expanded="showLivePanel"');
+    expect(template).toContain('@click="showLivePanel = !showLivePanel"');
+    expect(template).toContain('<template v-if="showLivePanel">');
+    expect(template).toContain('v-for="mission in activeMissions"');
+    expect(template).toContain('@click="loadActiveMissions()"');
+    expect(template).toContain('adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id');
+    expect(source).toContain('showLivePanel.value = false;');
     expect(source).toContain('if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;');
+    expect(template).toContain('@click="testSound"');
+    expect(template).toContain('v-if="soundTestError" type="warning"');
+    expect(source).toContain('if (!await adminSos.testAlertSound())');
   });
 
   it("preserves a readable mobile map and full-width actions without an overlapping floating card", () => {
