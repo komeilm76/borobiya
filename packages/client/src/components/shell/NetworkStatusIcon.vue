@@ -34,7 +34,7 @@ onBeforeUnmount(monitor.stop);
   right: calc(0.75rem + env(safe-area-inset-right, 0px));
 }
 .network-status-icon__button {
-  width: 44px; height: 44px; min-width: 44px;
+  width: 48px; height: 48px; min-width: 48px; padding: 0;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
   border-radius: 1rem;
   color: rgb(var(--v-theme-on-surface));

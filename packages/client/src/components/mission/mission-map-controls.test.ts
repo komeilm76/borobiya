@@ -123,16 +123,16 @@ describe("mission map controls", () => {
     expect(missionMap).not.toContain('<MapCanvas');
     expect(css).toContain('margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;');
     expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
-    expect(network).toContain('width: 44px; height: 44px;');
+    expect(network).toContain('width: 48px; height: 48px;');
     const idle = css.lastIndexOf('.mission-desk:not(.mission-desk--active) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {');
     expect(idle).toBeGreaterThan(css.indexOf('@media (max-width: 599px) and (max-height: 560px)'));
     const rule = css.slice(idle, css.indexOf('}', idle));
     expect(rule).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
-    expect(rule).toContain('right: calc(4rem + env(safe-area-inset-right, 0px));');
+    expect(rule).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
     expect(rule).toContain('bottom: auto;');
     expect(compiled.code).toContain('.mission-desk[data-v-idle-compass]:not(.mission-desk--active) .map-canvas--action-compass .maplibregl-ctrl-top-right');
-    // 44px network + 12px right inset + 8px gap => compass begins at 64px.
-    expect(0.75 * 16 + 44 + 8).toBe(4 * 16);
+    // Two matching 48px buttons have an 8px gap at the screen edge.
+    expect(0.75 * 16 + 48 + 8).toBe(4.25 * 16);
     // The 48px compass finishes 12px before the first card starts at 4.5rem.
     expect((.75 * 16 + 48) + 12).toBe(4.5 * 16);
   });

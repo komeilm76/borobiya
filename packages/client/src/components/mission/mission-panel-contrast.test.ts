@@ -7,6 +7,7 @@ const live = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "u
 const rating = readFileSync(new URL("./MissionRatingPanel.vue", import.meta.url), "utf8");
 const timeline = readFileSync(new URL("./MissionTimelinePanel.vue", import.meta.url), "utf8");
 const missionView = readFileSync(new URL("./MissionMapCards.vue", import.meta.url), "utf8");
+const missionPage = readFileSync(new URL("../../views/_user/UserMissionView.vue", import.meta.url), "utf8");
 
 function luminance(hex: string): number {
   const channel = (i: number) => {
@@ -55,6 +56,19 @@ describe("mission member and rating controls contrast", () => {
     expect(missionView).not.toMatch(/\.mission-desk__phase-step \{[^}]*opacity: \.6;/);
     expect(missionView).toContain(".mission-desk__phase-step--current { color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset);");
     expect(missionView).toContain(".mission-desk__phase-step--passed { color: rgb(var(--v-theme-primary));");
+  });
+
+  it("makes the failed mission-status alert opaque and readable against either map theme", () => {
+    for (const theme of ["light", "dark"] as const) {
+      expect(contrast(palettes[theme].text, palettes[theme].surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(palettes[theme].error, palettes[theme].surface)).toBeGreaterThanOrEqual(3);
+    }
+    expect(missionPage).toContain('class="mission-desk__load-alert mt-6" role="alert"');
+    expect(missionPage).toContain('background: rgb(var(--v-theme-surface)) !important;');
+    expect(missionPage).toContain('color: rgb(var(--v-theme-on-surface)) !important;');
+    expect(missionPage).toContain('border: 2px solid rgb(var(--v-theme-error));');
+    expect(missionPage).toContain('.mission-desk__load-alert :deep(.v-alert__underlay) { display: none; }');
+    expect(missionPage).toContain('min-height: 44px; color: rgb(var(--v-theme-on-surface));');
   });
 
   it("keeps star controls, saved stars and their borders distinguishable in both themes", () => {

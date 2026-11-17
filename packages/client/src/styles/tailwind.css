@@ -544,6 +544,12 @@ a {
     top: calc(4.25rem + env(safe-area-inset-top, 0px));
     right: calc(.75rem + env(safe-area-inset-right, 0px));
   }
+  /* Idle Missions has a top briefing and alert. Put Network beside Broadcast
+     in the spare lower rail instead of covering either card or the tab bar. */
+  .app-shell--map:has(.user-map-view--mission-idle) .network-status-icon--floating {
+    top: auto; bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));
+    right: calc(7.75rem + env(safe-area-inset-right, 0px));
+  }
 }
 
 @media (min-width: 600px) and (max-width: 700px) {

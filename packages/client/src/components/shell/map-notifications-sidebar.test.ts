@@ -78,8 +78,12 @@ describe("map-only proposal notifications", () => {
     expect(shell).toContain('top: calc(4.25rem + env(safe-area-inset-top, 0px));');
     expect(shell).toContain('.app-shell--map:has(.map-proposal__launcher) .user-map-view__playback {');
     expect(shell).toContain('inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));');
-    // 48px bell and 44px network button have 8px clearance in either layout.
+    // Bell and Network use matching 48px targets with an 8px gap.
+    expect(network).toContain('width: 48px; height: 48px;');
     expect((4.25 - .75) * 16 - 48).toBe(8);
+    expect(shell).toContain('.app-shell--map:has(.user-map-view--mission-idle) .network-status-icon--floating {');
+    expect(shell).toContain('top: auto; bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(shell).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px));');
     const phone = map.split("@media (max-width: 599px) {")[1]!;
     // Two-row rail: compass is to the left of SOS, below the notification bell.
     expect(phone).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*inset-block-end: calc\(4\.25rem/);

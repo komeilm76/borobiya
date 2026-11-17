@@ -412,19 +412,18 @@ watch(() => missionShare.mission?.id, (id) => {
 // confirmed mission ends, an old inbox success banner cannot lock Trips forever.
 const missionActive = computed(() => !!missionShare.mission ||
   (!!proposals.acceptedMissionId && confirmedAcceptance.value !== proposals.acceptedMissionId));
-const modeAvailability = computed(() => {
-  const allowed = mapModeAvailability(mapTripSession.navigating.value, missionActive.value);
-  // A failed/unfinished assignment read cannot prove it is safe to plan a new
-  // personal trip. Do not confuse this uncertainty with a confirmed mission.
-  if (auth.user?.role === "user" && !missionActive.value && !missionShare.verified) {
-    allowed.trips = mapTripSession.navigating.value; // Never strand guidance already in progress.
-    allowed.history = false;
-  }
-  return allowed;
-});
+// A failed/unfinished assignment read cannot prove it is safe to create a
+// trip, but it is not evidence of an active mission either. Keep Trips open;
+// selectPlace/hold-to-select still block new routes until verification.
+const modeAvailability = computed(() => mapModeAvailability(
+  mapTripSession.navigating.value, missionActive.value,
+  auth.user?.role !== "user" || missionShare.verified
+));
 function modeReason(id: MapMode): string {
   const label = workspaceModes.find((item) => item.id === id)?.label ?? id;
   if (id === "missions" && auth.user?.role !== "user") return `${label}؛ فقط برای امدادگر`;
+  if (id === "trips" && modeAvailability.value.trips && auth.user?.role === "user" && !missionShare.verified)
+    return `${label}؛ مرور آزاد است، ایجاد مسیر پس از تأیید وضعیت مأموریت`;
   if (modeAvailability.value[id]) return label;
   if (mapTripSession.navigating.value) return `${label}؛ در سفر فعال نیست. پیشنهاد مأموریت از زنگ اعلان قابل بررسی است.`;
   if (missionActive.value) return `${label}؛ در مأموریت فعال نیست`;
@@ -2903,11 +2902,17 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(7.75rem + env(safe-area-inset-right, 0px));
   }
-  /* Idle mission offers occupy the lower map. Use the free band below tabs
-     instead of painting Broadcast over a scrollable offer card. */
+  /* In idle Missions the hero/error card occupies the top of the map. Keep
+     Broadcast in the bottom-right rail above SOS, never over the briefing. */
   .user-map-view--mission-idle .user-map-view__share {
-    top: calc(4.75rem + env(safe-area-inset-top, 0px)); bottom: auto;
-    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    top: auto; bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  /* Attribution remains reachable, but its collapsed info button must not
+     protrude from behind the idle briefing's physical-left edge. */
+  .user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
+    top: auto; bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
   }
   .user-map-view--mission-active .user-map-view__share {
     inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));

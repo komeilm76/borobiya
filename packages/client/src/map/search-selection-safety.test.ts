@@ -29,6 +29,14 @@ describe("safe search result selection on the shared map", () => {
     expect(hold.indexOf('!missionShare.verified')).toBeLessThan(hold.indexOf('journey.select({ lat: location.lat, lon: location.lng })'));
   });
 
+  it("keeps the Trips tab open for an unverified mission without starting an unsafe route", () => {
+    expect(view).toContain('auth.user?.role !== "user" || missionShare.verified');
+    expect(view).toContain('mapTripSession.navigating.value, missionActive.value,');
+    expect(view).toContain('مرور آزاد است، ایجاد مسیر پس از تأیید وضعیت مأموریت');
+    expect(select).toContain('blockedSearchReason.value = "وضعیت مأموریت هنوز از سرور تأیید نشده است.');
+    expect(select).toContain('if (!placeSearch.select(place)) return;');
+  });
+
   it("does not advertise an unavailable stop or trip planner on idle Missions pins", () => {
     expect(marker).toContain('const station = !!missionShare.mission;');
     expect(marker).toContain('const exploring = mode.value === "missions" && !missionActive.value;');

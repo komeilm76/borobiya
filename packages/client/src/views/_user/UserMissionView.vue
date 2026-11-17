@@ -1127,7 +1127,21 @@ onBeforeUnmount(() => {
   }
 }
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }
-.mission-desk--embedded .mission-desk__load-alert { pointer-events: auto; }
+/* A tonal error is translucent over green map tiles and its red copy loses
+   contrast. Use an opaque theme surface and normal readable foreground. */
+.mission-desk__load-alert {
+  pointer-events: auto;
+  background: rgb(var(--v-theme-surface)) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+  border: 2px solid rgb(var(--v-theme-error));
+  box-shadow: var(--bb-shadow-overlay);
+}
+.mission-desk__load-alert :deep(.v-alert__underlay) { display: none; }
+.mission-desk__load-alert :deep(.v-alert__prepend) { color: rgb(var(--v-theme-error)); }
+.mission-desk__load-alert :deep(.v-btn) {
+  min-height: 44px; color: rgb(var(--v-theme-on-surface));
+  background: var(--bb-color-inset);
+}
 .mission-desk--embedded :deep(.live-panel--fullscreen) { background: transparent; pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__map) { pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__members),
@@ -1502,10 +1516,10 @@ onBeforeUnmount(() => {
 @media (max-width: 599px) {
   /* No mission: the centered welcome and empty-state cards occupy the lower
      map, so the normal action rail (and the short-phone row) can cover them.
-     Use the 48px gap beside the 44px network button, before the cards start. */
+     Keep an 8px gap beside the 48px network button, before the cards start. */
   .mission-desk:not(.mission-desk--active) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {
     top: calc(.75rem + env(safe-area-inset-top, 0px));
-    right: calc(4rem + env(safe-area-inset-right, 0px));
+    right: calc(4.25rem + env(safe-area-inset-right, 0px));
     bottom: auto;
   }
 }
