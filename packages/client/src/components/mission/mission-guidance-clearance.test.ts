@@ -19,24 +19,35 @@ describe("mission guidance over the full-screen map", () => {
     expect(css).toContain('@media (max-width: 599px) and (max-height: 560px)');
     expect(css).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('top: calc(5.25rem + env(safe-area-inset-top, 0px));');
-    expect(css).toContain('max-height: max(4.75rem, min(14rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));');
+    expect(css).toContain('@media (max-width: 599px) and (max-height: 700px)');
+    expect(css).toContain('.mission-desk__guidance.mission-desk__guidance--warning,\n  .mission-desk__guidance.mission-desk__guidance--active {');
+    expect(css).toContain('top: calc(5.25rem + env(safe-area-inset-top, 0px)); max-height: 5rem;');
+    expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(css).toContain('.mission-desk__guidance--warning span { flex: 1 1 100%; max-height: none; overflow: visible; }');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(css).toContain('.mission-desk__guidance--warning :deep(.v-btn) { position: sticky; bottom: 0; min-height: 44px; height: auto;');
     expect(css).toContain('.mission-desk__guidance--active .mission-desk__planned-distance');
     expect(css).toContain('.mission-desk__direct-distance { line-height: 1.25; }');
     expect(css).toContain('clip: rect(0, 0, 0, 0);'); // Still available to assistive tech.
-    // Height 320 and 560: banner ends before the 48px bottom-row controls, with a 12px gap.
-    for (const height of [320, 360, 560]) {
-      const bannerBottom = 5.25 * 16 + Math.max(4.75 * 16, Math.min(14 * 16, height - 15 * 16));
+    // Guidance clears the bottom action row; at usable short-phone heights
+    // the progress sheet also starts at least 16px below the banner.
+    for (const height of [480, 560]) {
+      const bannerBottom = (5.25 + 5) * 16;
       const controlsTop = height - 5.75 * 16 - 48;
+      const sheetTop = height - 9.5 * 16 - Math.max(7 * 16, Math.min(height * .48, height - 20.75 * 16));
       expect(controlsTop - bannerBottom).toBeGreaterThanOrEqual(12);
+      expect(sheetTop - bannerBottom).toBeGreaterThanOrEqual(16);
     }
-    // Tall phones use the vertical rail; its first button starts at H - 19rem.
-    for (const height of [561, 600]) {
-      const bannerBottom = 5.75 * 16 + Math.max(4.75 * 16, Math.min(16 * 16, height - 25.5 * 16));
-      const compassTop = height - 19 * 16;
-      expect(compassTop - bannerBottom).toBeGreaterThanOrEqual(12);
+    for (const height of [360, 400]) {
+      const bannerBottom = (5.25 + 3) * 16;
+      const sheetTop = height - 9.5 * 16 - Math.max(4.5 * 16, Math.min(height * .48, height - 20.75 * 16));
+      expect(sheetTop - bannerBottom).toBeGreaterThanOrEqual(4);
+    }
+    // Medium-height phones use the vertical rail; expanded stages cannot cover guidance.
+    for (const height of [561, 600, 700]) {
+      const bannerBottom = (5.25 + 5) * 16;
+      const sheetTop = height - 9.5 * 16 - Math.min(height * .6, height - 20.75 * 16);
+      expect(sheetTop - bannerBottom).toBeGreaterThanOrEqual(16);
     }
   });
   it("does not claim a GPS fix proves the rescuer is on route or replace the emergency controls", () => {

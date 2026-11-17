@@ -1326,10 +1326,28 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     flex-direction: row;
   }
 }
+@media (max-width: 599px) and (max-height: 700px) {
+  /* Between 561px and 700px the default 60dvh sheet could also rise into
+     guidance (especially with the legend or expanded stages). */
+  .mission-desk__bottom-stack {
+    max-height: min(60dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
+  .mission-desk__bottom-stack--information {
+    max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
+  /* Match the embedded selector's specificity: otherwise its 9rem top wins
+     even though the short-phone rules appear later in the stylesheet. */
+  .mission-desk__guidance.mission-desk__guidance--warning,
+  .mission-desk__guidance.mission-desk__guidance--active {
+    top: calc(5.25rem + env(safe-area-inset-top, 0px)); max-height: 5rem;
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+}
 @media (max-width: 599px) and (max-height: 560px) {
-  /* Short phones keep the one bottom-docked progress surface scrollable. No
-     duplicate heading competes with guidance or the top tab controls. */
-  .mission-desk__bottom-stack { max-height: min(48dvh, calc(100dvh - 13.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  /* Reserve an upper lane for the 5rem guidance banner below the tabs.
+     At 480px+ the sheet starts at least 11.25rem from the top, leaving a
+     1rem gap after guidance; its own scroller keeps the guarded action usable. */
+  .mission-desk__bottom-stack { max-height: max(7rem, min(48dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
   .mission-desk__bottom-stack--information { max-height: calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
   .mission-desk__map-legend { padding: .2rem .6rem; max-height: 4rem; }
   .mission-desk__map-legend h2 { position: absolute; width: 1px; height: 1px; overflow: hidden;
@@ -1347,11 +1365,6 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
   }
-  .mission-desk__guidance--warning {
-    top: calc(5.25rem + env(safe-area-inset-top, 0px));
-    max-height: max(4.75rem, min(14rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
-  }
-  .mission-desk__guidance--active { top: calc(5.25rem + env(safe-area-inset-top, 0px)); }
   .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
   /* A fresh direct-distance cue remains visible beside Stop. Keep the longer
      planned-route disclaimer available to screen readers without crowding this row. */
@@ -1360,6 +1373,15 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
     overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
   .mission-desk__direct-distance { line-height: 1.25; }
+}
+@media (max-width: 599px) and (max-height: 400px) {
+  /* Zoomed/landscape viewports cannot fit two full cards. Keep both safety
+     controls at least 44px high and let their surrounding text scroll. */
+  .mission-desk__bottom-stack:not(.mission-desk__bottom-stack--information) {
+    max-height: max(4.5rem, min(48dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk__guidance.mission-desk__guidance--warning,
+  .mission-desk__guidance.mission-desk__guidance--active { max-height: 3rem; }
 }
 @media (max-width: 599px) {
   /* No mission: the centered welcome and empty-state cards occupy the lower

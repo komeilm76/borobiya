@@ -15,6 +15,11 @@
           <strong>مراحل مأموریت</strong>
           <span role="status" aria-live="polite">{{ activeStep >= 0 ? `مرحلهٔ ${(activeStep + 1).toLocaleString('fa-IR')} از ${steps.length.toLocaleString('fa-IR')}` : 'در حال بررسی' }} · {{ currentStatusLabel }}</span>
         </div>
+        <v-btn class="mission-map-cards__expand" variant="tonal" color="primary" size="small"
+          :icon="expanded ? 'mdi-chevron-down' : 'mdi-chevron-up'"
+          :aria-label="expanded ? 'جمع‌کردن فهرست مراحل' : 'نمایش همهٔ مراحل'"
+          :title="expanded ? 'جمع‌کردن مراحل' : 'همهٔ مراحل'"
+          aria-controls="mission-progress-steps" :aria-expanded="expanded" @click="expanded = !expanded" />
         <slot name="team" />
         <v-menu location="top end">
           <template #activator="{ props }">
@@ -29,7 +34,9 @@
           </v-list>
         </v-menu>
       </div>
-      <ol class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">
+      <span v-if="!expanded" class="mission-map-cards__track" aria-hidden="true"
+        :style="{ '--mission-progress': `${steps.length ? (Math.max(0, activeStep + 1) / steps.length) * 100 : 0}%` }" />
+      <ol v-show="expanded" id="mission-progress-steps" class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">
         <li v-for="(step, index) in steps" :key="step.status" class="mission-desk__phase-step"
           :class="{ 'mission-desk__phase-step--passed': index < activeStep, 'mission-desk__phase-step--current': index === activeStep }"
           :aria-current="index === activeStep ? 'step' : undefined">
@@ -51,9 +58,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from "vue";
 import type { useMissionDesk } from "@/composables/use-mission-desk";
 
-defineProps<{
+const props = defineProps<{
   desk: ReturnType<typeof useMissionDesk>;
   teamSharing: boolean;
   nextStatusLabel: string;
@@ -61,6 +69,8 @@ defineProps<{
   activeStep: number;
   steps: { status: string; label: string }[];
 }>();
+const expanded = ref(false);
+watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; });
 </script>
 
 <style scoped>
@@ -75,11 +85,14 @@ defineProps<{
 .mission-desk__next-step :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
 .mission-desk__next-step :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-map-cards__notice { margin: 0; font-size: .8rem; line-height: 1.5; color: rgb(var(--v-theme-warning)); }
-.mission-desk__phase-summary { min-width: 0; border-top: 1px solid rgba(var(--v-theme-on-surface), .12); padding-top: .35rem; }
-.mission-desk__phase-heading { display: flex; align-items: center; justify-content: space-between; gap: .3rem; }
-.mission-desk__phase-copy { display: grid; min-width: 0; gap: 1px; }
+.mission-desk__phase-summary { min-width: 0; }
+.mission-desk__phase-heading { display: flex; align-items: center; gap: .3rem; }
+.mission-desk__phase-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
 .mission-desk__phase-heading strong { font-size: .9rem; }
 .mission-desk__phase-heading span { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; overflow-wrap: anywhere; }
+.mission-map-cards__expand { flex: none; min-width: 44px; min-height: 44px; }
+.mission-map-cards__track { display: block; height: 4px; margin: .3rem 0 .15rem; border-radius: 999px;
+  background: linear-gradient(to left, rgb(var(--v-theme-primary)) var(--mission-progress), var(--bb-color-inset) var(--mission-progress)); }
 .mission-desk__phase-steps { display: grid; gap: 1px; min-width: 0; margin: .35rem 0 0; padding: 0; list-style: none; }
 .mission-desk__phase-step { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center; gap: .35rem; min-width: 0; min-height: 29px; padding: 2px 4px;

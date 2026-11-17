@@ -25,10 +25,15 @@ describe("at-a-glance mission progress and information", () => {
     expect(dock).not.toContain('mission-tool-status');
   });
 
-  it("shows the only step list and guarded action without a disclosure, while preserving safety warnings", () => {
+  it("keeps the current stage and guarded action visible, with the only full step list on demand", () => {
     expect(page).toContain('class="mission-desk__map-cards"');
     expect(page).toContain('<MissionMapCards :desk="desk" :steps="steps" :active-step="activeStep"');
-    expect(cards).toContain('<ol class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">');
+    expect(cards).toContain('const expanded = ref(false);');
+    expect(cards).toContain('watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; });');
+    expect(cards).toContain('aria-controls="mission-progress-steps" :aria-expanded="expanded"');
+    expect(cards).toContain('v-if="!expanded" class="mission-map-cards__track" aria-hidden="true"');
+    expect(cards).toContain('<ol v-show="expanded" id="mission-progress-steps" class="mission-desk__phase-steps" aria-label="پیشرفت مأموریت">');
+    expect(cards).toContain('{{ currentStatusLabel }}');
     expect(cards).not.toContain('<details');
     expect(cards.match(/v-for="\(step, index\) in steps"/g)).toHaveLength(1);
     expect(cards).toContain(':aria-current="index === activeStep ? \'step\' : undefined"');
