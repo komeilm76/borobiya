@@ -6,6 +6,18 @@ const map = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const mission = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
 
 describe("shared map icon clearance", () => {
+  it("keeps Location usable in Sharing, including during a mission and inside the phone dialog", () => {
+    const shared = map.slice(map.indexOf('class="user-map-view__recenter"'), map.indexOf('class="user-map-view__share"'));
+    expect(shared).toContain('v-show="(mode !== \'missions\' || !missionWorkspace?.hasActiveMission) && !(isPhone && activeTool)"');
+    expect(shared).toContain('@click="centerOnOwnLocation"');
+    expect(shared).not.toContain('v-show="!missionActive');
+    const live = map.slice(map.indexOf('class="user-map-view__live-title"'), map.indexOf('class="user-map-view__live-body"'));
+    expect(live).toContain(':aria-label="recenterLabel"');
+    expect(live).toContain(':disabled="!map || !auth.user"');
+    expect(live).toContain('@click="centerOnOwnLocation()"');
+    expect(map).toContain('if (initiatedByUser && isPhone.value && activeTool.value) closeTool(false);');
+  });
+
   it("keeps navigation controls above the guidance card after changing to Sharing", () => {
     expect(map).toContain("'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value");
     expect(map).toContain("if (next === \"sharing\") void selectTool(\"live\")");

@@ -42,7 +42,7 @@ describe("map sharing quick action", () => {
     expect(base).toContain('width: 48px;');
     expect(base).toContain('height: 48px;');
     expect(base).toContain('border-radius: 50%;');
-    expect(view).toContain('v-show="!missionActive && !(isShortPhone && activeTool)"');
+    expect(view).toContain('v-show="!missionActive && !(isPhone && activeTool)"');
     const phone = view.split('@media (max-width: 599px) {')[1]!;
     const normalRail = phone.slice(phone.indexOf('  /* Search → SOS → broadcast → recenter → compass:'));
     const recenter = styleBlock(normalRail, '.user-map-view__recenter');

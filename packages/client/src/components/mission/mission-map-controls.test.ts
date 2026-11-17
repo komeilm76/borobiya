@@ -43,7 +43,7 @@ describe("mission map controls", () => {
   it("offers one own-position button before guidance and reuses mission following during guidance", () => {
     expect(companionMap).toContain(':own-recenter-label="recenterLabel" :own-location-error="!!(own.error.value || recenterError)"');
     expect(companionMap).toContain('@focus-own="centerOnOwnLocation"');
-    expect(companionMap).toContain("!missionActive && (mode !== 'missions' || !missionWorkspace?.hasActiveMission)");
+    expect(companionMap).toContain("(mode !== 'missions' || !missionWorkspace?.hasActiveMission) && !(isPhone && activeTool)");
     expect(companionMap).toContain('if (!instance || !fix || !markerConstructor) {');
     expect(companionMap).toContain('user-map-view__own-marker--mission');
     expect(missionMap).toContain('hasActiveMission: computed(() => !!desk.activeMission.value)');

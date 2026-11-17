@@ -89,7 +89,7 @@
          watcher; opening the map never starts outgoing location sharing. -->
     <v-btn
       class="user-map-view__recenter"
-      v-show="!missionActive && (mode !== 'missions' || !missionWorkspace?.hasActiveMission) && !(isShortPhone && activeTool)"
+      v-show="(mode !== 'missions' || !missionWorkspace?.hasActiveMission) && !(isPhone && activeTool)"
       :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : journey.navigating.value && !navigationFollowEnabled ? 'mdi-navigation-variant' : 'mdi-crosshairs-gps'"
       :color="own.error.value || recenterError ? 'warning' : 'primary'"
       :aria-label="journey.navigating.value && !navigationFollowEnabled ? 'بازگشت به دنبال‌کردن مسیر' : recenterLabel"
@@ -103,7 +103,7 @@
     <v-btn
       class="user-map-view__share"
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!missionActive && !(isShortPhone && activeTool)"
+      v-show="!missionActive && !(isPhone && activeTool)"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
       :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
@@ -244,7 +244,13 @@
       <v-card class="user-map-view__live-surface" rounded="xl">
         <v-card-title v-if="isPhone" class="user-map-view__live-title">
           <h2>همراهان</h2>
-          <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
+          <div class="user-map-view__dialog-actions">
+            <v-btn :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : 'mdi-crosshairs-gps'"
+              :color="own.error.value || recenterError ? 'warning' : 'primary'" variant="text"
+              :aria-label="recenterLabel" :title="recenterLabel" :disabled="!map || !auth.user"
+              @click="centerOnOwnLocation()" />
+            <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
+          </div>
         </v-card-title>
         <v-card-text class="user-map-view__live-body">
           <aside id="map-live-panel" v-show="mode === 'sharing'" class="user-map-view__live user-map-view__panel"
@@ -448,7 +454,6 @@ type MapTool = "search" | "history" | "live";
 const toolLauncherId = (tool: MapTool): string =>
   tool === "search" ? "map-tool-search" : `map-mode-${tool === "live" ? "sharing" : "history"}`;
 const isPhone = useMediaQuery("(max-width: 599px)");
-const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 const activeTool = ref<MapTool | null>(null);
 const routeDeleteConfirmOpen = ref(false);
@@ -2730,6 +2735,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   :global(:is(.user-map-view__search-title h2, .user-map-view__history-title h2, .user-map-view__live-title h2)) {
     min-width: 0; margin: 0; font-size: 1rem; font-weight: 800; line-height: 1.4;
   }
+  .user-map-view__dialog-actions { display: flex; align-items: center; gap: .25rem; flex: none; }
   :global(:is(.user-map-view__search-title .v-btn, .user-map-view__history-title .v-btn,
     .user-map-view__live-title .v-btn)) { min-width: 44px; min-height: 44px; }
   :global(:is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content > .v-card > .v-card-text) {

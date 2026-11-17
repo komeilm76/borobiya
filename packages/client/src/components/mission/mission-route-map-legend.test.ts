@@ -51,6 +51,10 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(mapPage).toContain('user-map-view--mission-legend');
     expect(mapPage).toContain('.user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {');
     expect(css).toContain('.mission-desk--embedded .mission-desk__bottom-stack,');
+    // The embedded workspace disables map-sized hitboxes; its launcher must opt
+    // back into pointer input just like the adjacent Information button.
+    expect(css).toContain('.mission-desk--embedded .mission-desk__legend-action,');
+    expect(css).toMatch(/\.mission-desk--embedded \.mission-desk__legend-action,[\s\S]*?\{ pointer-events: auto; \}/);
     expect(css).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
     expect(css).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('.mission-desk__legend-action { position: absolute; z-index: 10;');

@@ -1124,6 +1124,7 @@ onBeforeUnmount(() => {
 .mission-desk--embedded :deep(.live-panel__map-actions),
 .mission-desk--embedded .mission-desk__map-focus,
 .mission-desk--embedded .mission-desk__bottom-stack,
+.mission-desk--embedded .mission-desk__legend-action,
 .mission-desk--embedded .mission-desk__info-action,
 .mission-desk--embedded .mission-desk__map-hint,
 .mission-desk--embedded .mission-desk__guidance,
