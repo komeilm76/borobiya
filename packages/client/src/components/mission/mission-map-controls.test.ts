@@ -81,13 +81,12 @@ describe("mission map controls", () => {
     expect(control).toContain('bottom: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);');
     const mapPage = parse(companionMap).descriptor.styles[0]!.content;
     expect(mapPage).toContain('inset-inline-start: 1.25rem;');
-    expect(mapPage).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);');
+    expect(mapPage).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);');
     expect(viewStyle).toContain('.mission-desk__map-focus--pair');
     expect(missionMap).toContain('class="mission-desk__frame-action"');
-    expect(viewStyle).toContain('.mission-desk__map-focus--pair :deep(.mission-desk__frame-action) {\n    position: absolute; right: 3.5rem; bottom: 10.5rem;');
-    expect(viewStyle).toContain('.mission-desk--steps-visible:has(.mission-desk__map-focus--pair) .mission-desk__bottom-stack {');
-    // At a 600px tablet width, the steps dock ends before the frame control.
-    expect(12 + (600 - 9 * 16) + 8).toBeLessThanOrEqual(600 - (1.25 + 3.5) * 16 - 48);
+    expect(viewStyle).toContain('.mission-desk__map-focus--pair :deep(.mission-desk__frame-action) {\n    position: absolute; right: 0; bottom: 10.5rem;');
+    // At 600px the unshrunk tablet steps dock ends before the same-column frame action.
+    expect(12 + (600 - 7.5 * 16) + 8).toBeLessThanOrEqual(600 - 1.25 * 16 - 48);
     expect(viewStyle).toContain('flex-direction: column;');
     expect(viewStyle).toContain('right: 1.25rem;');
     expect(viewStyle).toContain('width: 48px; min-width: 48px; height: 48px;');

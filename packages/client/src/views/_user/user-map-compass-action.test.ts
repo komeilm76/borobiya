@@ -32,7 +32,7 @@ describe("map-only compass action", () => {
     expect(control).toContain("right: 1.25rem;");
     expect(control).toContain("left: auto;");
     expect(control).not.toContain("inset-inline-start:");
-    expect(control).toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);");
+    expect(control).toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);");
     expect(control).toContain("z-index: 6;");
     expect(view).toContain(':show-zoom="false" compass-action');
     const group = canvasStyles.slice(canvasStyles.indexOf(".map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group:not(:empty)) {"));

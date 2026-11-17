@@ -18,18 +18,19 @@ describe("all map tabs share an accessible action rail", () => {
   it("reserves Location, SOS, compass and topmost Broadcast in distinct wide-map slots", () => {
     expect(rule(css, ".user-map-view__recenter, .user-map-view__share"))
       .toContain("inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));");
-    expect(css).toContain(".user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14rem); }");
-    expect(map).toContain('v-show="!(isPhone && activeTool)"');
+    expect(css).toContain(".user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem); }");
+    expect(map).toContain('v-show="!(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
     expect(map).toContain('id="map-mission-broadcast-note"');
     expect(map).toContain('پخش عمومی جدا از اشتراک خودکار مأموریت است');
     expect(rule(css, ".user-map-view__canvas :deep(.maplibregl-ctrl-top-right)"))
-      .toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);");
+      .toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);");
     expect(rule(shell, ".app-shell--map:has(.user-map-view) .sos-fab.sos-fab"))
       .toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);");
     expect(css).not.toContain(".user-map-view--mission-idle .user-map-view__recenter");
     // A 48px target (3rem) gets 8px of clearance to the next row.
     expect(3.5 - 3).toBe(.5);
-    expect(14 - (10.5 + 3)).toBe(.5); // Broadcast above the native compass.
+    expect(10.5 - (7 + 3)).toBe(.5); // Broadcast above the native compass.
+    expect(css).toContain(".user-map-view--mission-steps:has(.mission-desk__map-focus--pair) .user-map-view__share {");
   });
 
   it("uses two non-overlapping 48px rows at phone widths, including short landscape", () => {
@@ -77,8 +78,8 @@ describe("all map tabs share an accessible action rail", () => {
     expect(missionTablet).toContain("width: min(30rem, calc(50vw - 1.5rem - env(safe-area-inset-left, 0px)));");
     expect(missionTablet).toContain("margin: calc(50dvh + 1.75rem + env(safe-area-inset-top, 0px)) 0 0 calc(1rem + env(safe-area-inset-left, 0px));");
     expect(rule(css, ".user-map-view__playback"))
-      .toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 17.5rem);");
-    expect(17.5 - 14 - 3).toBeGreaterThanOrEqual(.5);
+      .toContain("inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);");
+    expect(14.5 - 10.5 - 3).toBeGreaterThanOrEqual(.5);
     const descriptor = parse(map).descriptor;
     expect(compileTemplate({ filename: "UserMapView.vue", id: "map-rail", source: descriptor.template!.content }).errors).toEqual([]);
     expect(compileStyle({ filename: "UserMapView.vue", id: "map-rail", scoped: true, source: css }).errors).toEqual([]);

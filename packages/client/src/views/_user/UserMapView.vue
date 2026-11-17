@@ -103,7 +103,7 @@
     <v-btn
       class="user-map-view__share"
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!(isPhone && activeTool)"
+      v-show="!(isPhone && (activeTool || (mode === 'missions' && missionWorkspace?.hasOpenMapTool)))"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
       :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
@@ -2549,7 +2549,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   /* MapLibre may use a different text direction than the surrounding RTL UI.
      Anchor its control to a physical edge, not an inherited inline-start. */
   right: 1.25rem;
-  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem);
   width: 48px;
 }
 /* Keep MapLibre's scale visible beside, rather than underneath, the bottom-left
@@ -2584,14 +2584,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
   inset-inline-start: 1rem;
   width: min(24rem, calc(100% - 2rem));
-  /* Leave the entire right rail, including topmost Broadcast, clear. */
-  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 17.5rem);
+  /* Keep History clear of the compact Location/SOS/compass/Broadcast rail. */
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);
   overflow-y: auto;
   pointer-events: none;
 }
 
-/* One consistent right-hand rail in every tab: Location, SOS, compass, then
- * optional general Broadcast at the top. */
+/* A compact 48px-step right rail: Location, SOS, compass, then optional
+ * Broadcast. Mission frame inserts one more step below Broadcast. */
 .user-map-view__recenter, .user-map-view__share {
   position: fixed;
   z-index: 6;
@@ -2604,7 +2604,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border-radius: 50%;
   box-shadow: var(--bb-shadow-overlay);
 }
-.user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14rem); }
+.user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem); }
+@media (min-width: 600px) {
+  /* Framing an active mission gets its own slot above the compass. Only then
+     lift Broadcast another step; the remaining tabs keep an even four-button rail. */
+  .user-map-view--mission-steps:has(.mission-desk__map-focus--pair) .user-map-view__share {
+    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14rem);
+  }
+}
 /* Off is neutral rather than another green/teal fill; the outline remains
  * visible over both pale map tiles and the dark raised surface. */
 .user-map-view__share--idle { border-color: var(--bb-color-outline); }
@@ -2696,7 +2703,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view__playback {
     inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
-    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 17.5rem);
+    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);
     inset-inline-start: 1rem;
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
@@ -2892,7 +2899,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
      General Broadcast gets a dedicated row above every other icon. */
   .user-map-view__recenter { inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px)); }
   .user-map-view__share {
-    inset-inline-start: calc(7.75rem + env(safe-area-inset-right, 0px));
+    inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
@@ -2905,7 +2912,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--mission-active .user-map-view__share {
-    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
+    inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(9.25rem + env(safe-area-inset-bottom, 0px));
   }
 
@@ -2961,7 +2968,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view--route-preview .user-map-view__share,
   .user-map-view--navigating .user-map-view__share {
-    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right),
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
@@ -2979,7 +2986,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view--mission-active.user-map-view--mission-steps .user-map-view__share {
     top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 7.5rem);
-    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
 }
 @media (max-width: 599px) and (max-height: 420px) {

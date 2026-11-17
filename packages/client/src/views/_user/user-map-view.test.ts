@@ -252,7 +252,7 @@ describe("UserMapView live overlay", () => {
     expect(tablet).toContain('position: absolute; inset: 0; width: 100%; height: 100%;');
     expect(tablet).toContain('width: min(25rem, calc(50vw - 1.5rem));');
     expect(tablet).toContain('overflow-y: auto; overscroll-behavior: contain;');
-    expect(tablet).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 17.5rem);');
+    expect(tablet).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);');
   });
 
   it("starts private foreground GPS once when map and owner are ready, and keeps a recenter/retry action", () => {

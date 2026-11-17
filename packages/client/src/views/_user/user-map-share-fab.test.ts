@@ -42,7 +42,7 @@ describe("map sharing quick action", () => {
     expect(base).toContain('width: 48px;');
     expect(base).toContain('height: 48px;');
     expect(base).toContain('border-radius: 50%;');
-    expect(view).toContain('v-show="!(isPhone && activeTool)"');
+    expect(view).toContain('v-show="!(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
     expect(view).toContain(':aria-describedby="missionActive ? \'map-mission-broadcast-note\' : undefined"');
     const phone = view.split('@media (max-width: 599px) {')[1]!;
     const normalRail = phone.slice(phone.indexOf('/* Search/Location are the lower row;'));
@@ -52,7 +52,7 @@ describe("map sharing quick action", () => {
     const sos = styleBlock(shell, '.app-shell--map .sos-fab.sos-fab');
     expect(recenter).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
     expect(share).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(share).toContain('inset-inline-start: calc(7.75rem + env(safe-area-inset-right, 0px))');
+    expect(share).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px))');
     expect(compass).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     expect(sos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     // 48px controls keep an 8px gap in either direction and fit at 320px.

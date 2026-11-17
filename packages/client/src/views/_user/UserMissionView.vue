@@ -1351,16 +1351,10 @@ onBeforeUnmount(() => {
 }
 .mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 @media (min-width: 600px) {
-  /* Frame route beside the compass, not beside Location at the map's edge.
-     The frame and compass share a row; Broadcast remains the topmost action. */
+  /* Keep the frame action in the same right-hand column, between the compass
+     and Broadcast. The 48px slots remain separate at desktop/tablet widths. */
   .mission-desk__map-focus--pair :deep(.mission-desk__frame-action) {
-    position: absolute; right: 3.5rem; bottom: 10.5rem;
-  }
-}
-@media (min-width: 600px) and (max-width: 1023px) {
-  /* At 600px the optional frame button needs another 1.5rem beside steps. */
-  .mission-desk--steps-visible:has(.mission-desk__map-focus--pair) .mission-desk__bottom-stack {
-    width: min(30rem, calc(100% - 9rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    position: absolute; right: 0; bottom: 10.5rem;
   }
 }
 .mission-desk--active .mission-desk__map-hint {
