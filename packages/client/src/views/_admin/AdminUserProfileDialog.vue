@@ -106,7 +106,7 @@ watch(() => [props.modelValue, props.userId, session.value, attempt.value] as co
 .admin-profile__header { display: flex; align-items: center; justify-content: space-between; gap: .5rem;
   padding: .7rem 1rem; border-bottom: 1px solid var(--bb-color-outline); }
 .admin-profile__heading { display: flex; align-items: center; min-width: 0; gap: .7rem; }
-.admin-profile__heading small { color: var(--bb-color-muted); font-size: .78rem; }
+.admin-profile__heading small { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-profile__heading h2 { margin: 0; font-size: 1.06rem; line-height: 1.5; }
 .admin-profile__icon, .admin-profile__avatar { display: grid; flex: none; place-items: center;
   color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); border-radius: var(--bb-radius-nested, 16px); }
@@ -122,7 +122,7 @@ watch(() => [props.modelValue, props.userId, session.value, attempt.value] as co
 .admin-profile__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; }
 .admin-profile__facts > div { min-width: 0; padding: .65rem .75rem; background: var(--bb-color-inset);
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
-.admin-profile__facts dt { color: var(--bb-color-muted); font-size: .78rem; }
+.admin-profile__facts dt { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-profile__facts dd { margin: .2rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
 .admin-profile__categories { grid-column: 1 / -1; }
 .admin-profile__categories dd { display: flex; flex-wrap: wrap; gap: .35rem; }

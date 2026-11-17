@@ -1020,7 +1020,7 @@ onBeforeUnmount(() => {
   border-radius: 50%; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
 .admin-dispatch__sender-copy { display: grid; flex: 1 1 10rem; min-width: 0; gap: .12rem; }
 .admin-dispatch__sender-copy strong { font-size: .9rem; }
-.admin-dispatch__sender-copy small { color: var(--bb-color-muted); font-size: .78rem; overflow-wrap: anywhere; }
+.admin-dispatch__sender-copy small { color: var(--bb-color-muted); font-size: .8rem; overflow-wrap: anywhere; }
 .admin-dispatch__sender-action { flex: none; min-height: 44px; }
 
 /* The timeline sits between other cards; give it a boundary, not another shadow. */
