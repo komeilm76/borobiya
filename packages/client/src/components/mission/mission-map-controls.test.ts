@@ -96,7 +96,7 @@ describe("mission map controls", () => {
     expect(phone).toContain('bottom: calc(16rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('bottom: calc(12.5rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('bottom: calc(9rem + env(safe-area-inset-bottom, 0px));');
-    expect(phone).toContain('.mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }');
+    expect(phone).toContain('.mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }');
     expect(viewStyle).toContain('.mission-desk__dock { position: absolute; z-index: 10;');
     expect(viewStyle).toContain('left: 50%; transform: translateX(-50%);');
     expect(phone).toContain('.mission-desk--active :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right)');

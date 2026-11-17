@@ -77,7 +77,7 @@ describe("at-a-glance mission progress and information", () => {
       ["MissionMapCards.vue", cardStyle], ["MissionBriefDetails.vue", infoStyle]] as const)
       expect(compileStyle({ filename, id: "data-v-mission-brief", scoped: true, source: css }).errors).toEqual([]);
     expect(viewStyle).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
-    expect(viewStyle).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(viewStyle).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(viewStyle).toContain('.mission-desk__bottom-panel { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(viewStyle).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');

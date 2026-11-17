@@ -25,8 +25,8 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(css).toContain('grid-template-columns: 22px minmax(0, 1fr)');
   });
 
-  it("displays the marker key on the map without a toggle or misplaced incident coordinates", () => {
-    const start = page.indexOf('<section v-if="routing.target.value || activeTool === \'status\'"');
+  it("opens the marker key above Mission Information from an icon above its launcher", () => {
+    const start = page.indexOf('<section v-if="legendOpen" id="mission-map-legend"');
     const mapLegend = page.slice(start, page.indexOf('</section>', start));
     expect(start).toBeGreaterThan(0);
     expect(mapLegend).toContain('class="mission-desk__map-legend bb-floating-card"');
@@ -41,11 +41,23 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(mapLegend).not.toContain('<details');
     expect(page).not.toContain('class="mission-route__legend"');
     expect(page).toContain('class="mission-desk__map-cards"');
-    expect(page).toContain("hasMapLegend: computed(() => !desk.terminalHold.value &&\n    (activeTool.value === 'status' || (!activeTool.value && !!routing.target.value)))");
+    expect(page).toContain("hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value &&\n    (!activeTool.value || activeTool.value === 'status'))");
+    expect(page).toContain('id="mission-tool-legend" class="mission-desk__legend-action" icon="mdi-map-outline"');
+    expect(page).toContain(':aria-expanded="legendOpen" aria-controls="mission-map-legend" @click="toggleLegend"');
+    expect(page.indexOf('id="mission-tool-legend"')).toBeLessThan(page.indexOf('id="mission-tool-status"'));
+    expect(page).toContain('if (legendOpen.value) { toggleLegend(); return; }');
+    expect(page).toContain('if (!visible) legendOpen.value = false;');
+    expect(page).toContain('watch(() => desk.terminalHold.value, (held) => { if (held) legendOpen.value = false; });');
     expect(mapPage).toContain('user-map-view--mission-legend');
+    expect(mapPage).toContain('.user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {');
     expect(css).toContain('.mission-desk--embedded .mission-desk__bottom-stack,');
     expect(css).toContain('.mission-desk__bottom-stack { position: absolute; z-index: 9;');
-    expect(css).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('.mission-desk__legend-action { position: absolute; z-index: 10;');
+    expect(css).toContain('bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(4.25 * 16 - .75 * 16 - 48).toBe(8); // 8px gap between 48px targets.
+    expect(8.5 * 16 - 4.25 * 16 - 48).toBe(20); // Key launcher clears the docked panel.
     expect(css).toContain('.mission-desk__map-legend { flex: none; min-width: 0;');
     expect(css).toContain('border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);');
     expect(css).toContain('background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));');

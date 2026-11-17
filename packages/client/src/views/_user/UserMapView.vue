@@ -2827,9 +2827,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
-  /* The mission key now lives in the full-width bottom progress sheet. Keep
-     scale on exposed map instead of letting the sheet obscure it. */
-  .user-map-view--mission-legend .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+  /* Whether the key is open or closed, mission progress and the two lower-left
+     launchers occupy the map bottom. Keep scale on exposed map above them. */
+  .user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: auto; top: calc(8.5rem + env(safe-area-inset-top, 0px));
     left: calc(.75rem + env(safe-area-inset-left, 0px));
   }

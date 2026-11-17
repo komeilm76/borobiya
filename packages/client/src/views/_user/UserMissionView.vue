@@ -261,8 +261,8 @@
         </div>
         <div v-if="!desk.terminalHold.value && (!activeTool || activeTool === 'status')"
           class="mission-desk__bottom-stack" :class="{ 'mission-desk__bottom-stack--information': activeTool === 'status' }">
-          <section v-if="routing.target.value || activeTool === 'status'" class="mission-desk__map-legend bb-floating-card"
-            aria-labelledby="mission-map-legend-title" dir="rtl">
+          <section v-if="legendOpen" id="mission-map-legend" class="mission-desk__map-legend bb-floating-card"
+            aria-labelledby="mission-map-legend-title" dir="rtl" tabindex="-1">
             <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
             <ul class="mission-desk__map-legend-body" aria-label="راهنمای نشانگرها">
               <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> حادثه</li>
@@ -289,6 +289,12 @@
             </div>
           </div>
         </div>
+        <v-btn v-show="!desk.terminalHold.value && (!activeTool || activeTool === 'status')"
+          id="mission-tool-legend" class="mission-desk__legend-action" icon="mdi-map-outline"
+          :color="legendOpen ? 'primary' : 'surface'" variant="flat"
+          :aria-label="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
+          :title="legendOpen ? 'بستن راهنمای نقشه' : 'راهنمای نقشه'"
+          :aria-expanded="legendOpen" aria-controls="mission-map-legend" @click="toggleLegend" />
         <v-btn id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"
           :color="activeTool === 'status' ? 'primary' : 'surface'" variant="flat"
           :aria-label="activeTool === 'status' ? 'بستن اطلاعات مأموریت' : 'نمایش اطلاعات مأموریت'"
@@ -429,6 +435,14 @@ const mapReady = ref(false);
 const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
+const legendOpen = ref(false);
+function toggleLegend(): void {
+  legendOpen.value = !legendOpen.value;
+  const target = legendOpen.value ? "mission-map-legend" : "mission-tool-legend";
+  void nextTick(() => document.getElementById(target)?.focus({ preventScroll: true }));
+}
+watch(activeTool, (tool) => { if (tool === "route" || tool === "team") legendOpen.value = false; });
+watch(() => desk.terminalHold.value, (held) => { if (held) legendOpen.value = false; });
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
 const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
@@ -499,8 +513,8 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 }
 defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
-  hasMapLegend: computed(() => !desk.terminalHold.value &&
-    (activeTool.value === 'status' || (!activeTool.value && !!routing.target.value))) });
+  hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value &&
+    (!activeTool.value || activeTool.value === 'status')) });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
   const lon = Number(waypointLon.value);
@@ -543,6 +557,7 @@ function dismissTool(): void {
   if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return; }
   if (pickingWaypoint.value) { cancelWaypointPick(); return; }
   if (activeTool.value === "route" && routeSection.value !== "plan") { closeRouteSection(); return; }
+  if (legendOpen.value) { toggleLegend(); return; }
   if (activeTool.value) closeTool(activeTool.value);
 }
 function resetRoutePlan(): void {
@@ -590,6 +605,7 @@ function onWaypointDrop(index: number): void {
   draggingWaypoint = null;
 }
 watch(() => props.visible, (visible) => {
+  if (!visible) legendOpen.value = false;
   if (!visible && pickingWaypoint.value) {
     pickingWaypoint.value = false;
     activeTool.value = "route"; // Hidden map taps cannot add a private stop.
@@ -831,7 +847,7 @@ watch(() => routing.error.value, (routeError) => {
   }
 });
 watch(() => desk.activeMission.value?.id, (next, previous) => {
-  if (next !== previous) teamSharing.value = false;
+  if (next !== previous) { teamSharing.value = false; legendOpen.value = false; }
   if (previous && next !== previous) {
     if (next) closeRoutes(); // Same mounted canvas, new private incident.
     else releaseRouteMap(); // The mission panel is about to unmount.
@@ -865,6 +881,7 @@ const missionSession = computed(() => {
 onMounted(() => { if (missionSession.value) void desk.load(); });
 watch(missionSession, (next) => {
   teamSharing.value = false;
+  legendOpen.value = false;
   closeRoutes();
   desk.reset();
   if (next) void desk.load();
@@ -1098,14 +1115,13 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
-/* The key is a separate, full-width surface directly above either the
-   progress sheet or Mission Information. Flex sizing keeps it above the real
-   height of the information card, even after its address/photo loads. */
+/* The key opens above the progress or information sheet; the clear lower-left
+   rail holds its launcher directly above the Mission Information launcher. */
 .mission-desk__bottom-stack { position: absolute; z-index: 9;
-  left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  width: 100%; max-height: min(65dvh, 32rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));
+  width: 100%; max-height: min(65dvh, 32rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   display: flex; flex-direction: column; gap: .5rem; min-height: 0; pointer-events: auto; }
-.mission-desk__bottom-stack--information { max-height: min(75dvh, 40rem, calc(100dvh - 12rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+.mission-desk__bottom-stack--information { max-height: min(75dvh, 40rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
 .mission-desk--active .mission-desk__bottom-stack #mission-status-panel {
   position: relative; inset: auto; flex: 1 1 auto; min-height: 0;
   width: 100%; max-height: none; margin: 0;
@@ -1202,6 +1218,13 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none;
 }
 .mission-desk__team-action { flex: none; min-width: 44px; min-height: 44px; }
+.mission-desk__legend-action { position: absolute; z-index: 10;
+  left: calc(1rem + env(safe-area-inset-left, 0px));
+  bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  width: 48px; min-width: 48px; height: 48px;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: 50%;
+  box-shadow: var(--bb-shadow-overlay); }
+.mission-desk__legend-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__info-action { position: absolute; z-index: 10;
   left: calc(1rem + env(safe-area-inset-left, 0px));
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
@@ -1266,7 +1289,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   }
   /* Bottom sheet fills the map width; the essential camera, route, info and
      SOS controls retain the same clear row below it as the route planner. */
-  .mission-desk__info-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
+  .mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
   .mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: min(60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   .mission-desk__bottom-stack--information {

@@ -50,7 +50,7 @@ describe("Missions search, short phones and shared-map tab boundaries", () => {
     const short = css.slice(css.indexOf('@media (max-width: 599px) and (max-height: 560px) {'));
     expect(short).toContain('.mission-desk__bottom-stack { max-height: min(48dvh, calc(100dvh - 13.5rem');
     expect(short).toContain('.mission-desk__bottom-stack--information { max-height: calc(100dvh - 10.25rem');
-    expect(css).toContain('left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
     expect(short).toContain('.mission-desk__map-legend small { position: absolute;');
