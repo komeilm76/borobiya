@@ -6,6 +6,8 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 const sidebar = readFileSync(new URL("./MapProposalSidebar.vue", import.meta.url), "utf8");
 const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
 const map = readFileSync(new URL("../../views/_user/UserMapView.vue", import.meta.url), "utf8");
+const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
+const network = readFileSync(new URL("./NetworkStatusIcon.vue", import.meta.url), "utf8");
 
 function styles(): string {
   const { descriptor } = parse(sidebar, { filename: "MapProposalSidebar.vue" });
@@ -69,9 +71,19 @@ describe("map-only proposal notifications", () => {
     expect(css).toContain('forced-colors: active');
     expect(map).toContain('inset-block-start: calc(5rem + env(safe-area-inset-top, 0px))'); // Left search.
     expect(map).toMatch(/\.user-map-view__playback\s*\{[^}]*inset-block-start: calc\(5rem/); // Right history.
+    expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
+    expect(sidebar).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
+    expect(shell).toContain('.app-shell--map:has(.map-proposal__launcher) .network-status-icon--floating {');
+    expect(shell).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
+    expect(shell).toContain('top: calc(4.25rem + env(safe-area-inset-top, 0px));');
+    expect(shell).toContain('.app-shell--map:has(.map-proposal__launcher) .user-map-view__playback {');
+    expect(shell).toContain('inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));');
+    // 48px bell and 44px network button have 8px clearance in either layout.
+    expect((4.25 - .75) * 16 - 48).toBe(8);
     const phone = map.split("@media (max-width: 599px) {")[1]!;
-    // The compass is now below the bell in the right-hand action rail, not a top zoom strip.
-    expect(phone).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*right: calc\(0\.75rem[^}]*left: auto;[^}]*inset-block-end: calc\(14\.75rem/);
+    // Two-row rail: compass is to the left of SOS, below the notification bell.
+    expect(phone).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*inset-block-end: calc\(4\.25rem/);
+    expect(phone).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px));');
     expect(phone).toContain('.user-map-view__search-action');
     expect(phone).toContain('.maplibregl-ctrl-bottom-right');
   });

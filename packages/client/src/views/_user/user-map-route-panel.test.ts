@@ -179,10 +179,11 @@ describe("progressive trip planning and editing", () => {
       'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 4rem)');
     const rail = css(map, "UserMapView.vue");
     expect(rail).toContain('.user-map-view--route-preview');
-    expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + .5rem');
-    expect(rail).toContain('11.25rem + env(safe-area-inset-right, 0px)');
+    expect(rail).toContain('--bb-map-action-sheet-height: var(--bb-map-point-sheet-height, 48dvh);');
+    expect(rail).toContain('bottom: calc(var(--bb-map-action-sheet-height) + .5rem);');
+    expect(rail).toContain('7.75rem + env(safe-area-inset-right, 0px)');
     // Search, share, recenter and compass each remain reachable on a 320px phone.
-    const lastActionLeft = 320 - (11.25 * 16 + 12) - 48;
+    const lastActionLeft = 320 - (7.75 * 16 + 12) - 48;
     expect(lastActionLeft).toBeGreaterThanOrEqual(12);
     expect(sheet).toContain('role="region"'); // No overlay focus trap: the map and actions remain reachable.
   });
@@ -205,8 +206,9 @@ describe("progressive trip planning and editing", () => {
     expect(transport).toContain("'point-transport-choices-shell--mission': !!missionId");
     const search = css(map, "UserMapView.vue");
     expect(search).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(search).toContain('inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem)');
-    expect(search).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem)');
+    expect(search).toContain('--bb-map-action-sheet-height: var(--bb-map-point-sheet-height, 48dvh);');
+    expect(search).toContain('--bb-map-action-sheet-height: var(--bb-map-navigation-sheet-height, 15rem);');
+    expect(search).toContain('bottom: calc(var(--bb-map-action-sheet-height) + .5rem);');
     // A 48px Search target sits below SOS with an 8px gap in all three states.
     expect(4.25 - (.75 + 3)).toBe(.5);
     expect(4 - (.5 + 3)).toBe(.5);

@@ -1116,6 +1116,15 @@ onBeforeUnmount(() => {
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__empty) {
   margin-top: .75rem; padding: 1rem;
 }
+@media (min-width: 600px) and (max-width: 1023px) {
+  /* On the tablet's viewport map Search owns the upper-left half. Keep the
+     scrollable idle inbox below it, away from the right-hand map/SOS rail. */
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
+    width: min(30rem, calc(50vw - 1.5rem - env(safe-area-inset-left, 0px)));
+    margin: calc(50dvh + 1.75rem + env(safe-area-inset-top, 0px)) 0 0 calc(1rem + env(safe-area-inset-left, 0px));
+    max-height: max(4rem, calc(50dvh - 2.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
+}
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }
 .mission-desk--embedded .mission-desk__load-alert { pointer-events: auto; }
 .mission-desk--embedded :deep(.live-panel--fullscreen) { background: transparent; pointer-events: none; }

@@ -14,7 +14,11 @@ describe("shared map icon clearance", () => {
     const live = map.slice(map.indexOf('class="user-map-view__live-title"'), map.indexOf('class="user-map-view__live-body"'));
     expect(live).toContain(':aria-label="recenterLabel"');
     expect(live).toContain(':disabled="!map || !auth.user"');
-    expect(live).toContain('@click="centerOnOwnLocation()"');
+    expect(live).toContain('@click="focusOwnFromDialog"');
+    const history = map.slice(map.indexOf('class="user-map-view__history-title"'), map.indexOf('class="user-map-view__history-body"'));
+    expect(history).toContain(':aria-label="recenterLabel"');
+    expect(history).toContain('@click="focusOwnFromDialog"');
+    expect(map).toContain('document.getElementById("map-recenter")?.focus({ preventScroll: true })');
     expect(map).toContain('if (initiatedByUser && isPhone.value && activeTool.value) closeTool(false);');
   });
 
@@ -32,7 +36,7 @@ describe("shared map icon clearance", () => {
     const compass = css.slice(css.indexOf('.user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
     expect(compass).toContain('right: 1.25rem;');
     expect(compass.slice(0, compass.indexOf('}'))).not.toContain('inset-inline-start:');
-    expect(css).toContain('right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;');
+    expect(css).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;');
     // Editing the trip route stays in the planner, not a floating action on Sharing.
     expect(map).not.toContain('id="map-route-choices-toggle"');
     expect(map).toContain('@choose-route="openRouteChoices"');
@@ -41,19 +45,14 @@ describe("shared map icon clearance", () => {
   it("centers idle mission offers while keeping Location at the lower right", () => {
     expect(map).toContain("'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission");
     const mapCss = parse(map).descriptor.styles[0]!.content;
-    for (const action of ["recenter", "share"]) {
-      expect(mapCss).toContain(`.user-map-view--mission-idle .user-map-view__${action}`);
-    }
-    const compass = mapCss.slice(mapCss.indexOf('.user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
-    const location = mapCss.slice(mapCss.indexOf('.user-map-view--mission-idle .user-map-view__recenter {'));
-    expect(location).toContain('top: auto;');
-    expect(location).toContain('inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));');
-    expect(location).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(compass).toContain('top: auto;');
-    expect(compass).toContain('bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));');
-    expect(mapCss).toContain('.user-map-view--mission .user-map-view__search-action {');
+    // Idle Missions now shares the default two-row rail with Trips, Sharing
+    // and History instead of pinning its own stale, top-aligned controls.
+    expect(mapCss).not.toContain('.user-map-view--mission-idle .user-map-view__recenter');
+    expect(mapCss).not.toContain('.user-map-view--mission-idle .user-map-view__share');
+    expect(mapCss).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(mapCss).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));');
     expect(mapCss).toContain('inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));');
-    expect(compass).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;');
+    expect(mapCss).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px));');
     const missionCss = parse(mission).descriptor.styles[0]!.content;
     const phone = missionCss.slice(missionCss.indexOf('@media (max-width: 599px) {'));
     const panel = phone.slice(phone.indexOf('.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {'));
@@ -76,7 +75,7 @@ describe("shared map icon clearance", () => {
     const active = css.slice(css.indexOf('.user-map-view--mission-active .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {'));
     expect(active).toContain('bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));');
     expect(active).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
-    expect(css).toContain(".user-map-view--mission-active:not(.user-map-view--mission-tool-open)");
+    expect(css).toContain(".user-map-view--mission-active.user-map-view--mission-steps");
     const missionCss = parse(mission).descriptor.styles[0]!.content;
     expect(missionCss).toContain(".mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty");
     for (const [file, source] of [["UserMapView.vue", map], ["UserMissionView.vue", mission]] as const) {

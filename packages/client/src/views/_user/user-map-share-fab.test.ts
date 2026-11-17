@@ -44,25 +44,21 @@ describe("map sharing quick action", () => {
     expect(base).toContain('border-radius: 50%;');
     expect(view).toContain('v-show="!missionActive && !(isPhone && activeTool)"');
     const phone = view.split('@media (max-width: 599px) {')[1]!;
-    const normalRail = phone.slice(phone.indexOf('  /* Search → SOS → broadcast → recenter → compass:'));
+    const normalRail = phone.slice(phone.indexOf('/* Search/Location are the lower row;'));
     const recenter = styleBlock(normalRail, '.user-map-view__recenter');
     const share = styleBlock(normalRail, '.user-map-view__share');
     const compass = styleBlock(phone.slice(phone.indexOf('/* On phones the compass')), '.user-map-view__canvas :deep(.maplibregl-ctrl-top-right)');
     const sos = styleBlock(shell, '.app-shell--map .sos-fab.sos-fab');
-    expect(recenter).toContain('inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px))');
-    expect(share).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(compass).toContain('inset-block-end: calc(14.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(recenter).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(share).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
+    expect(compass).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     expect(sos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
-    // Adjacent 48px targets have an 8px gap, including broadcast above SOS.
-    for (const [lower, upper] of [[4.25, 7.75], [7.75, 11.25], [11.25, 14.75]]) {
-      expect(upper - lower - 3).toBe(.5);
-    }
-    const landscape = view.split('@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {')[1]!;
-    expect(styleBlock(landscape, '.user-map-view__recenter')).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
+    // 48px controls keep an 8px gap in either direction and fit at 320px.
+    expect(4.25 - (.75 + 3)).toBe(.5);
+    expect(320 - (7.75 * 16 + 12 + 48)).toBeGreaterThan(12);
     expect(view).toContain('class="user-map-view__history-dialog"');
     expect(view).toContain('class="user-map-view__history-body"');
     expect(view).toContain('overflow-y: auto; overscroll-behavior: contain;');
-    expect(view).toContain('inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px))'); // Short phones keep the bell clear.
     expect(shell).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     expect(view).toContain('id="map-tool-search" class="user-map-view__search-action"');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });

@@ -241,25 +241,18 @@ describe("UserMapView live overlay", () => {
     expect(compass).not.toContain('transform: translateX(-50%)');
   });
 
-  it("moves narrow map controls into a scrollable, non-occluding flow", () => {
-    // 25rem search + 24rem history + two 1rem edges = 816px at the default root size.
-    // Panels are stacked before their top corners can overlap.
+  it("keeps tablet controls on the map instead of over the scrolling side panels", () => {
     expect(view).toContain('width: min(25rem, calc(100% - 2rem));');
     expect(view).toContain('width: min(24rem, calc(100% - 2rem));');
-    expect(25 * 16 + 24 * 16 + 2 * 16).toBe(816);
-    const start = view.indexOf("@media (max-width: 1023px)");
+    const start = view.indexOf('/* Tablet map controls must stay on their map');
+    const end = view.indexOf('/* Phone map: edge-to-edge', start);
     expect(start).toBeGreaterThan(-1);
-    // The tablet band retains flow; phones have a separate immersive override below it.
-    const phone = view.slice(start, view.indexOf("@media (max-width: 599px)", start));
-    expect(phone).toContain("height: auto;");
-    expect(phone).toContain("overflow: visible;");
-    expect(phone).toContain("height: clamp(20rem, 55dvh, 32rem);");
-    expect(phone).toContain(".user-map-view__search { order: 1; }");
-    expect(phone).toContain(".user-map-view__playback { order: 3; }");
-    expect(phone).toContain(".user-map-view__live { order: 4; }");
-    expect(phone).not.toContain(".user-map-view__own { order:");
-    expect(phone).not.toContain("inset-block-");
-    expect(phone).not.toContain("position: absolute;");
+    const tablet = view.slice(start, end);
+    expect(tablet).toContain('position: fixed; inset: 0; z-index: 1; display: block;');
+    expect(tablet).toContain('position: absolute; inset: 0; width: 100%; height: 100%;');
+    expect(tablet).toContain('width: min(25rem, calc(50vw - 1.5rem));');
+    expect(tablet).toContain('overflow-y: auto; overscroll-behavior: contain;');
+    expect(tablet).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);');
   });
 
   it("starts private foreground GPS once when map and owner are ready, and keeps a recenter/retry action", () => {

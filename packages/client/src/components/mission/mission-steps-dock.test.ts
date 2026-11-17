@@ -66,7 +66,7 @@ describe("mission steps beside Navigate's bottom dock", () => {
       .toContain('bottom: 3.5rem;');
     expect(rule(map, '.user-map-view--mission-active.user-map-view--mission-steps\n    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right)'))
       .toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
-    expect(shell).toContain('.app-shell--map:has(.user-map-view--mission) .sos-fab.sos-fab');
+    expect(shell).toContain('.app-shell--map:has(.user-map-view) .sos-fab.sos-fab');
     expect(compileStyle({ filename: "UserMissionView.vue", id: "steps-dock", scoped: true, source: steps }).errors).toEqual([]);
     expect(compileStyle({ filename: "UserMapView.vue", id: "steps-dock", scoped: true, source: navigation }).errors).toEqual([]);
     // A 320px phone keeps 112px for idle stages; with guidance it reserves

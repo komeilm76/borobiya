@@ -35,14 +35,17 @@ describe("map companions tool", () => {
     expect(view).toContain('env(safe-area-inset-bottom, 0px)');
   });
 
-  it("keeps the broadcast toggle on the map, not in the companions dialog", () => {
+  it("keeps consentful broadcast accessible on the map and in the full-screen Sharing dialog", () => {
     const start = view.indexOf('class="user-map-view__live-dialog"');
     const dialog = view.slice(start, view.indexOf('\n    </component>', start));
     expect(dialog).toContain('<LiveCompanionPanel :api="live"');
-    expect(dialog).toContain(':broadcast-status="broadcast.view.tone ==='); // Status stays inside the card if sharing fails.
+    expect(dialog).toContain(':broadcast-status="broadcast.view.tone ==='); // Failures stay visible in the card.
     expect(panel).toContain('{{ broadcastStatus.headline }}');
     expect(dialog).not.toContain('<LiveBroadcastBar');
-    expect(dialog).not.toContain('broadcast.toggle()');
+    expect(dialog).toContain('<v-btn v-if="!missionActive"'); // Mission sharing cannot be switched off here.
+    expect(dialog).toContain(':aria-pressed="broadcast.view.isActive"');
+    expect(dialog).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
+    expect(dialog).toContain('@click="broadcast.toggle()"');
     expect(dialog).not.toContain('to="/_user/devices"');
     const mapActions = view.slice(0, view.indexOf('class="user-map-view__live-dialog"'));
     expect(mapActions).toContain('class="user-map-view__share"');

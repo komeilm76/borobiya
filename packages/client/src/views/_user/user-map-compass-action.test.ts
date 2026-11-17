@@ -46,10 +46,8 @@ describe("map-only compass action", () => {
       .toContain(".maplibregl-ctrl-compass");
     const phone = descriptor.styles[0]!.content.split("@media (max-width: 599px) {")[1]!;
     expect(phone).toContain(".maplibregl-ctrl-top-right");
-    expect(phone).toContain("inset-block-end: calc(14.75rem + env(safe-area-inset-bottom, 0px))");
-    expect(phone).toContain("right: calc(0.75rem + env(safe-area-inset-right, 0px))");
-    const short = descriptor.styles[0]!.content.split("@media (max-width: 599px) and (max-height: 360px) {")[1]!;
-    expect(short).toContain("inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px))");
-    expect(short).toContain("right: calc(0.75rem + env(safe-area-inset-right, 0px))");
+    expect(phone).toContain("inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))");
+    expect(phone).toContain("right: calc(7.75rem + env(safe-area-inset-right, 0px))");
+    expect(view).toContain("bottom: calc(var(--bb-map-action-sheet-height) + 4rem);");
   });
 });

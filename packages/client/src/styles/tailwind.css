@@ -533,15 +533,29 @@ a {
 }
 .app-shell--map .app-footer { display: none; }
 
-/* Tablet panels still scroll in page flow instead of covering the map. */
-@media (min-width: 600px) and (max-width: 1023px) {
-  .app-shell--map .app-main { overflow: visible; }
+/* The network indicator and mission-offer bell are both map-shell controls.
+   Give each its own 48px slot rather than painting one on top of the other. */
+.app-shell--map:has(.map-proposal__launcher) .network-status-icon--floating {
+  right: calc(4.25rem + env(safe-area-inset-right, 0px));
+}
+@media (max-width: 700px) {
+  /* The centered tab bar needs this horizontal space on compact screens. */
+  .app-shell--map:has(.map-proposal__launcher) .network-status-icon--floating {
+    top: calc(4.25rem + env(safe-area-inset-top, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+  }
 }
 
-/* On a desktop mission map Location, not SOS, owns the bottom-right slot.
-   Shift SOS one 48px row upward without changing other map tabs. */
+@media (min-width: 600px) and (max-width: 700px) {
+  .app-shell--map:has(.map-proposal__launcher) .user-map-view__playback {
+    inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+/* On every wide map Location owns the bottom-right slot. SOS is one 48px
+   row above it, regardless of which workspace tab is selected. */
 @media (min-width: 600px) {
-  .app-shell--map:has(.user-map-view--mission) .sos-fab.sos-fab {
+  .app-shell--map:has(.user-map-view) .sos-fab.sos-fab {
     inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
   }
 }

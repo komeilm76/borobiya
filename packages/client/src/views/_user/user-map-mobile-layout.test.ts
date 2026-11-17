@@ -53,8 +53,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(mapCss).toContain('inset-block-start: calc(5rem + env(safe-area-inset-top, 0px))'); // Desktop search clears menu.
     expect(mapCss).toMatch(/@media \(max-width: 1023px\)[\s\S]*?padding: calc\(4\.5rem \+ env\(safe-area-inset-top, 0px\)\) 0\.65rem 0\.65rem;/);
     expect(mapCss).toMatch(/@media \(max-width: 599px\)[\s\S]*?\.user-map-view\[data-v-map-mobile\][^{]*\{[^}]*padding: 0;/); // Phone map stays full-bleed.
-    expect(shell).toContain('@media (min-width: 600px) and (max-width: 1023px) {');
-    expect(shell).toContain('.app-shell--map .app-main { overflow: visible; }');
+    expect(mapCss).toContain('@media (min-width: 600px) and (max-width: 1023px) {');
+    expect(mapCss).toContain('width: min(25rem, calc(50vw - 1.5rem));');
   });
 
   it("keeps the icon-only SOS accessible above Search without enlarging it", () => {
@@ -184,7 +184,7 @@ describe("mobile map viewport and overlay tools", () => {
     const phoneMap = view.split("@media (max-width: 599px) {")[1]!;
     expect(phoneMap).toContain('.user-map-view__search-action {');
     expect(phoneMap).toContain('width: 48px; min-width: 48px; height: 48px;');
-    expect(phoneMap).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px))');
+    expect(phoneMap).toContain('inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px))');
     expect(css(view, "UserMapView.vue")).toContain('.user-map-view__search-action[data-v-map-mobile]');
   });
 
@@ -195,8 +195,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('observer.observe(element)');
     const styles = css(view, "UserMapView.vue");
     expect(styles).toContain('.user-map-view--navigating');
-    expect(styles).toContain('right: calc(11.25rem + env(safe-area-inset-right, 0px))');
-    expect(styles).toContain('bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem)');
+    expect(styles).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px))');
+    expect(styles).toContain('bottom: calc(var(--bb-map-action-sheet-height) + 4rem)');
   });
 
   it("does not let compact navigation, SOS, Search or MapLibre attribution obscure each other", () => {
@@ -205,27 +205,27 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("safe-area-inset-bottom");
     expect(phoneMap).toContain(".maplibregl-ctrl-top-right");
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right");
-    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*right: calc\(0\.75rem[^}]*left: auto;[^}]*inset-block-end: calc\(14\.75rem/);
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*inset-block-end: calc\(4\.25rem/);
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{[^}]*top: calc\(4\.5rem[^}]*bottom: auto;/);
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib");
-    expect(phoneMap).toContain("max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));"); // Real OSM/OpenMapTiles credit must not cover the action rail.
+    expect(phoneMap).toContain("max-width: calc(100vw - 11.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));"); // Real OSM/OpenMapTiles credit must not cover the action rail.
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-left\)\s*\{\s*bottom: calc\(\.75rem/);
     expect(phoneMap).toContain('.user-map-view__search-action {');
-    expect(phoneMap).toContain('.user-map-view--route-preview .user-map-view__search-action {');
-    expect(phoneMap).toContain('.user-map-view--navigating .user-map-view__search-action {');
+    expect(view).toContain('.user-map-view--route-preview .user-map-view__search-action,');
+    expect(view).toContain('.user-map-view--navigating .user-map-view__search-action {');
     expect(phoneMap).not.toContain('.user-map-view__dock-frame');
     expect(phoneMap).toContain(":is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content");
     expect(phoneMap).toContain(".v-dialog > .v-overlay__content > .v-card > .v-card-text");
     expect(phoneMap).toContain("max-height: none !important;"); // Remove the old 56dvh/26rem card cap.
     expect(view).toContain('v-show="!missionActive && !(isPhone && activeTool)"');
     expect(phoneMap).toContain(".user-map-view__recenter");
-    expect(phoneMap).toContain("inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px))");
-    expect(phoneMap).toContain("inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))");
+    expect(phoneMap).toContain("inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))");
+    expect(phoneMap).toContain("inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))");
     expect(phoneMap).toContain("overflow-y: auto;"); // Full-height dialog body scrolls.
     expect(phoneMap).toContain("overscroll-behavior: contain");
     expect(phoneMap).toContain("min-height: 44px");
-    expect(phoneMap).toContain("@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px)");
-    expect(phoneMap).toContain("bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));");
+    expect(phoneMap).not.toContain("@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px)");
+    expect(phoneMap).toContain("bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));");
     expect(phoneMap).not.toContain(".user-map-view__tool-sheet");
     expect(css(view, "UserMapView.vue")).toContain(".user-map-view__panel[data-v-map-mobile]");
     expect(css(view, "UserMapView.vue")).toContain(":is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content");

@@ -88,7 +88,7 @@
     <!-- Keep location a map feature, not a fourth panel. This is a private GPS
          watcher; opening the map never starts outgoing location sharing. -->
     <v-btn
-      class="user-map-view__recenter"
+      id="map-recenter" class="user-map-view__recenter"
       v-show="(mode !== 'missions' || !missionWorkspace?.hasActiveMission) && !(isPhone && activeTool)"
       :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : journey.navigating.value && !navigationFollowEnabled ? 'mdi-navigation-variant' : 'mdi-crosshairs-gps'"
       :color="own.error.value || recenterError ? 'warning' : 'primary'"
@@ -212,7 +212,13 @@
       <v-card class="user-map-view__history-surface" rounded="xl">
         <v-card-title v-if="isPhone" class="user-map-view__history-title">
           <h2>تاریخچهٔ مسیر</h2>
-          <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
+          <div class="user-map-view__dialog-actions">
+            <v-btn :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : 'mdi-crosshairs-gps'"
+              :color="own.error.value || recenterError ? 'warning' : 'primary'" variant="text"
+              :aria-label="recenterLabel" :title="recenterLabel" :disabled="!map || !auth.user"
+              @click="focusOwnFromDialog" />
+            <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
+          </div>
         </v-card-title>
         <v-card-text class="user-map-view__history-body">
           <aside id="map-history-panel" v-show="mode === 'history' && (!isPhone || activeTool === 'history')"
@@ -245,10 +251,17 @@
         <v-card-title v-if="isPhone" class="user-map-view__live-title">
           <h2>همراهان</h2>
           <div class="user-map-view__dialog-actions">
+            <v-btn v-if="!missionActive"
+              :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
+              :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : undefined"
+              :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
+              :aria-pressed="broadcast.view.isActive"
+              :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
+              variant="text" @click="broadcast.toggle()" />
             <v-btn :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : 'mdi-crosshairs-gps'"
               :color="own.error.value || recenterError ? 'warning' : 'primary'" variant="text"
               :aria-label="recenterLabel" :title="recenterLabel" :disabled="!map || !auth.user"
-              @click="centerOnOwnLocation()" />
+              @click="focusOwnFromDialog" />
             <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
           </div>
         </v-card-title>
@@ -747,6 +760,12 @@ function centerOnOwnLocation(initiatedByUser = true): void {
   userControlledCamera.value = true; // A late history fetch must not pan away from the GPS fix.
   if (journey.navigating.value) { resumePointFollowing(); return; }
   instance.flyTo({ center: [fix.lon, fix.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
+}
+// A dialog action closes its full-screen surface before centering the map;
+// return keyboard focus to the now-visible map button, not the removed header.
+function focusOwnFromDialog(): void {
+  centerOnOwnLocation();
+  void nextTick(() => document.getElementById("map-recenter")?.focus({ preventScroll: true }));
 }
 function startOwnLocation(auto: boolean): void {
   focusOnNextFix = true;
@@ -2562,17 +2581,20 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
   inset-inline-start: 1rem;
   width: min(24rem, calc(100% - 2rem));
-  max-height: calc(100% - 2rem);
+  /* Reserve the bottom-right 48px rail instead of allowing the History card
+     to run under its clickable controls on short wide-screen viewports. */
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);
+  overflow-y: auto;
   pointer-events: none;
 }
 
-/* One 48px map-action rail: sharing is opt-in and aligns with recenter,
- * compass and SOS, with safe-area clearance. */
+/* One consistent right-hand rail in every tab: Location at the lower edge,
+ * then SOS, opt-in sharing and the native compass above it. */
 .user-map-view__recenter, .user-map-view__share {
   position: fixed;
   z-index: 6;
   inset-inline-start: 1.25rem;
-  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
+  inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
   width: 48px;
   height: 48px;
   min-width: 48px;
@@ -2581,12 +2603,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   box-shadow: var(--bb-shadow-overlay);
 }
 .user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem); }
-/* Keep the private location action in the bottom-right slot before assignment;
-   the accepted-mission view takes over with its own guidance-aware button. */
-.user-map-view--mission-idle .user-map-view__recenter {
-  top: auto; inset-inline-start: calc(1.25rem + env(safe-area-inset-right, 0px));
-  inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
-}
 /* Off is neutral rather than another green/teal fill; the outline remains
  * visible over both pale map tiles and the dark raised surface. */
 .user-map-view__share--idle { border-color: var(--bb-color-outline); }
@@ -2650,6 +2666,42 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__live { order: 4; }
 }
 
+/* Tablet map controls must stay on their map, not float over cards farther
+ * down the document. Keep the same viewport map as desktop; narrow the two
+ * persistent side panels and give Sharing's upper Search and lower list their
+ * own scroll regions. The right side remains clear for SOS and map actions. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .user-map-view {
+    position: fixed; inset: 0; z-index: 1; display: block;
+    width: 100%; height: 100dvh; min-height: 0; padding: 0; overflow: hidden;
+  }
+  .user-map-view > .user-map-view__canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    min-height: 0; border-radius: 0;
+  }
+  .user-map-view__search, .user-map-view__playback, .user-map-view__live {
+    position: absolute;
+    width: min(25rem, calc(50vw - 1.5rem));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  .user-map-view__search {
+    inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
+    inset-inline-end: 1rem; max-height: calc((100dvh - 8rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2);
+  }
+  .user-map-view__live {
+    inset-block-start: auto; inset-block-end: calc(1rem + env(safe-area-inset-bottom, 0px));
+    inset-inline-end: 1rem; max-height: calc((100dvh - 8rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2);
+  }
+  .user-map-view__playback {
+    inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
+    inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 14.5rem);
+    inset-inline-start: 1rem;
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+    left: calc(50vw + env(safe-area-inset-left, 0px));
+  }
+}
+
 /* Phone map: edge-to-edge behind a single top-left menu launcher, not a bar or
  * stacked cards. Fullscreen tools keep their own scrolling content and close actions. */
 @media (max-width: 599px) {
@@ -2679,18 +2731,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__telemetry-unit { display: block; font-size: .8rem; line-height: 1; opacity: .8; direction: ltr; }
   .user-map-view__telemetry-item--unknown dd { display: grid; place-items: center;
     width: 2rem; height: 2rem; border: 2px solid rgba(var(--v-theme-on-surface), .55); border-radius: 50%; }
-  /* A horizontal 48px action row clears the sheet even on short phones. The
-     shared measured height also moves SOS, which lives outside this view. */
-  .user-map-view--navigating .user-map-view__share,
-  .user-map-view--navigating .user-map-view__recenter,
-  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: auto; bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
-  }
-  .user-map-view--navigating .user-map-view__share { right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto; }
-  .user-map-view--navigating .user-map-view__recenter { right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto; }
-  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;
-  }
+  /* The shared two-row rail below follows the measured trip sheet. Keep
+     MapLibre's scale above guidance, not underneath its bottom dock. */
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
   }
@@ -2797,25 +2839,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: 0;
   }
 
-  /* On phones the compass clears the SOS/share/recenter and Search stack. */
+  /* On phones the compass sits in the upper row beside sharing and SOS. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     right: calc(0.75rem + env(safe-area-inset-right, 0px));
     left: auto;
-    inset-block-end: calc(14.75rem + env(safe-area-inset-bottom, 0px));
-  }
-  /* Idle Missions uses two bottom-right rows. The centered offers stop above
-     them; Location occupies the lowest right slot beside Search. */
-  .user-map-view--mission-idle .user-map-view__recenter {
-    top: auto; right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
-    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
-  }
-  .user-map-view--mission-idle .user-map-view__share {
-    top: auto; right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
-    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-  }
-  .user-map-view--mission-idle .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: auto; right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
-    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   }
   /* The mission overlay is a sibling of MapCanvas: its scoped compass rules
    * cannot reach this shared canvas. Match its focus-button rail here. */
@@ -2851,39 +2879,33 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
    * (not over) the app rail and remains fully readable. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib) {
     box-sizing: border-box;
-    max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+    max-width: calc(100vw - 11.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
     margin: 0;
   }
 
   .user-map-view__recenter, .user-map-view__share {
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
-  /* Search → SOS → broadcast → recenter → compass: each 48px target has
-     the same 8px gap on an ordinary phone map. Mission and trip-sheet rails
-     keep their own panel-aware positions. */
-  .user-map-view__recenter { inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px)); }
-  .user-map-view__share { inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px)); }
+  /* Search/Location are the lower row; SOS/Share/Compass are the upper row.
+     The same physical slots apply in all four tabs when no sheet is open. */
+  .user-map-view__recenter { inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+  .user-map-view__share {
+    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(7.75rem + env(safe-area-inset-right, 0px));
+  }
 
   /* One 48px Search action below SOS; keep map and tab controls unobscured. */
   .user-map-view__search-action {
     position: fixed; z-index: 8;
-    inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
+    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px));
     width: 48px; min-width: 48px; height: 48px; border-radius: 50%;
     box-shadow: var(--bb-shadow-overlay);
   }
   .user-map-view__search-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
-  .user-map-view--route-preview .user-map-view__search-action {
-    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem);
-  }
-  .user-map-view--navigating .user-map-view__search-action {
-    inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
-  }
-
-  /* Search sits beside Location, below SOS, in either mission state. */
-  .user-map-view--mission .user-map-view__search-action {
-    inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
-  }
   .user-map-view--mission-steps .user-map-view__search-action {
     inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
   }
@@ -2902,61 +2924,34 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 }
 
-/* Short mission phones keep the external compass beside the workspace's
- * camera actions; while a tool is open the camera rail shifts left instead. */
-@media (max-width: 599px) and (max-height: 560px) {
-  .user-map-view--mission-active:not(.user-map-view--mission-tool-open)
-    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(7.75rem + env(safe-area-inset-right, 0px));
-  }
-}
-
-/* A short phone cannot fit four stacked 48px targets under the top-right bell.
- * Put recenter beside sharing and bring the compass down one slot. */
-@media (max-width: 599px) and (max-height: 360px) {
-  .user-map-view__recenter {
-    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px));
-  }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(0.75rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(11.25rem + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-/* In short landscape, recenter sits beside sharing at the same height. */
-@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
-  .user-map-view__recenter {
-    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px));
-  }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
-    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-  }
-}
-
 @media (max-width: 599px) {
-  /* Every Trips sheet shares guidance's measured two-row action layout.
-   * Search, sharing, recenter and compass sit 8px above the dock; SOS is one
-   * row higher, without hiding a sheet action or covering the workspace tabs. */
-  .user-map-view--route-preview .user-map-view__share,
+  /* Every trip sheet uses the same two-row rail as active Missions.
+     The measured sheet height includes safe-area padding exactly once. */
   .user-map-view--route-preview .user-map-view__recenter,
-  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: auto; bottom: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem);
-  }
-  .user-map-view--route-preview .user-map-view__share {
-    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
-  }
-  .user-map-view--route-preview .user-map-view__recenter {
-    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
-  }
-  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;
-  }
+  .user-map-view--route-preview .user-map-view__search-action,
   .user-map-view--navigating .user-map-view__recenter,
+  .user-map-view--navigating .user-map-view__search-action {
+    top: auto; bottom: calc(var(--bb-map-action-sheet-height) + .5rem);
+  }
+  .user-map-view--route-preview { --bb-map-action-sheet-height: var(--bb-map-point-sheet-height, 48dvh); }
+  .user-map-view--navigating { --bb-map-action-sheet-height: var(--bb-map-navigation-sheet-height, 15rem); }
+  .user-map-view--route-preview .user-map-view__share,
+  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right),
   .user-map-view--navigating .user-map-view__share,
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
+    top: auto; bottom: calc(var(--bb-map-action-sheet-height) + 4rem);
+  }
+  .user-map-view--route-preview .user-map-view__recenter,
+  .user-map-view--navigating .user-map-view__recenter {
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--route-preview .user-map-view__share,
+  .user-map-view--navigating .user-map-view__share {
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right),
+  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
 }
 
