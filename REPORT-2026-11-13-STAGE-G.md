@@ -800,7 +800,7 @@ acceptance remains the human P5 gate. Row corrections that did land: `navigation
 `history/10`, `history/11`, `companions/09`, `profile/07`, `admin-panel/states/03-error` rows now name
 their capture evidence or the reason none exists (`history/09` — no skeleton exists to screenshot).
 
-**Captures.** The evidence set under `docs/visual-acceptance/screens/` grew from 88 to **97** captures (92 light + five dark-theme aids — map, SOS composer, history, Sharing Center, admin overview — taken with `prefers-color-scheme: dark`; aids only, not acceptance evidence):
+**Captures.** The evidence set under `docs/visual-acceptance/screens/` grew from 88 to **98** captures (92 light + five dark-theme aids — map, SOS composer, history, Sharing Center, admin overview — and one reduced-motion aid; aids only, not acceptance evidence):
 `history-10-history-empty-impl.png` (`?history=empty`), `history-11-history-error-impl.png`
 (`?fail=history`, inline error + retry), `companions-09-companions-empty-impl.png` (`?shares=empty`)
 and `admin-states-03-error-impl.png` (`?fail=admin`, users screen: shared inline error panel with

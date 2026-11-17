@@ -2,7 +2,7 @@
 // Usage: node capture.mjs scenarios.json [only-ref-id]
 // Scenario shape:
 // { ref, route, persona?, anon?, width, height, dsf?,
-//   steps?: [ {click?, clickText?, type?, wait?, scroll?, offline?, dark?, hold?, hover?} ... ],
+//   steps?: [ {click?, clickText?, type?, wait?, scroll?, offline?, dark?, light?, reducedMotion?, hold?, hover?} ... ], darkStart?, reducedMotionStart?,
 //   shots?: [{name, steps?}]   // multiple screenshots from one page session
 // }
 import chromiumPkg from '@sparticuz/chromium';
@@ -54,6 +54,7 @@ async function runStep(page, step) {
   if (step.scrollEl !== undefined) { const { selector, y } = step.scrollEl; await page.evaluate((sel, dy) => { const el = document.querySelector(sel); if (el) el.scrollTop = dy; }, selector, y); return; }
   if (step.offline !== undefined) { await page.setOfflineMode(step.offline); await sleep(400); return; }
   if (step.dark) { await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]); await sleep(300); return; }
+  if (step.reducedMotion) { await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]); await sleep(300); return; }
   if (step.light) { await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]); await sleep(300); return; }
   if (step.hover !== undefined) { await page.hover(step.hover); return; }
   if (step.mouseDown !== undefined) { await page.waitForSelector(step.mouseDown, { timeout: 8000 }); const box = await (await page.$(step.mouseDown)).boundingBox(); await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down(); return; }
@@ -103,6 +104,7 @@ for (const scenario of scenarios) {
     const page = await browser.newPage();
     page.setDefaultTimeout(9000);
     if (scenario.darkStart) await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
+  if (scenario.reducedMotionStart) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     const resp = await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
     const baseStatus = resp?.status() ?? 0;
     const outBase = `${process.env.OUT_DIR ?? 'docs/visual-acceptance/screens'}/${scenario.ref}`;

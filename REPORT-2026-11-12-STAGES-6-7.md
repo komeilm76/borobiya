@@ -1,5 +1,13 @@
 # Borobiya 2.0.0 — Stages 6 & 7 Delivery Report
 
+> **Superseded (2026-11-16).** This is the dated record for `50fcb0b` → `1a0adb1`. Figures below were
+> true on 2026-11-12 and are kept for history; the current verified state of the branch lives in
+> `REPORT-2026-11-13-STAGE-G.md` (§19 addendum) and `docs/STATUS.md` (2026-11-16 evidence pass:
+> 1346/1346 tests, coverage statements 94.38% / branches 87.28% / functions 95.21% / lines 96.51%,
+> matrix tally done 21 / partial 92 / missing 10 / superseded 12 / reference 5 / deviation 1, PR #6
+> open and unmerged, no release). The counts printed below (1156 tests, 24 required documents, the
+> 2026-11-12 matrix tallies) are historical, not current.
+
 | | |
 |---|---|
 | **Date** | 2026-11-12 |

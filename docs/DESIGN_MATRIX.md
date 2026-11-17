@@ -63,7 +63,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). Search works since P1 (offline: saved places + config POIs).  Capture: `screens/navigation-01-map-idle-impl.png`. Dark-theme aid (not acceptance evidence): `screens/dark-map-idle-impl.png`. |
+| navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). Search works since P1 (offline: saved places + config POIs).  Capture: `screens/navigation-01-map-idle-impl.png`. Dark-theme aid (not acceptance evidence): `screens/dark-map-idle-impl.png`. Reduced-motion aid (same surface, `prefers-reduced-motion: reduce`; not acceptance evidence): `screens/reduced-motion-map-impl.png`. |
 | navigation/02-map-press-hold.png | partial | P2/H | The reference shows a press-and-hold point picker; the product implements tap-to-select (no long-press gesture, no callout). Captured 2026-11-16 via `docs/VISUAL_ACCEPTANCE.md` (`screens/navigation-02-map-press-hold-impl.png`, tap on the canvas; destination panel renders with coordinates). SOS dock now bottom-left per approved decision 5 (DEV-04 resolved); quick chips moved above the sheet as a detent-aware sibling; quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
 | navigation/03-bookmark-form.png | partial | P2/M | Save-the-pin form implemented inline in the destination sheet (name, label, address, icon); the dedicated designed bookmark screen is not built.  Capture: `screens/navigation-03-bookmark-form-impl.png`. |
 | navigation/04-bookmark-saved.png | partial | P2/M | Profile screen lists saved places with inline edit (full PATCH payload incl. preserved rank) and delete; reorder UI remains API-only. |
@@ -246,6 +246,8 @@ Product surface renamed in Stage 4: the former companions screen is the **Sharin
 - **DEV-05 — Profile metrics.** The reference shows trip counts/kilometers; P2 replaced them with SOS/mission/sharing counts (see design-flaw register). Stage 5 adds a trips domain, so trip counts are now possible; kilometers still presuppose a routing engine and remain unavailable.
 
 ## Summary tally (canonical 141)
+
+<!-- canonical-tally done=21 partial=92 missing=10 superseded=12 reference=5 deviation=1 total=141 -->
 
 Counts over the 141 canonical rows above: `done` 21, `partial` 92, `missing` 10, `superseded` 12, `reference` 5, intentional `deviation` 1. Reconciled twice on 2026-11-16: first against the table itself (the printed tallies in earlier stage logs had drifted from the rows; the table is authoritative), then after the code-evidence sweep that moved every row whose note documented a shipped implementation from `missing` to `partial` (see the Stage F fifth-pass log). The table is authoritative.
 
@@ -526,8 +528,8 @@ the 14 rows whose notes documented shipped implementations from `missing` to `pa
 moved to `done`; visual acceptance remains the deferred human P5 gate. Earlier logs are kept as
 the historical record of what was claimed at the time; this note is the correction.
 
-Evidence: 97 implementation captures under `docs/visual-acceptance/screens/` (mobile 393 × 852,
-DPR 2; admin captures at desktop widths — the pre-existing set at 1440 × 900, the new `admin-states/03-error` at 1280 × 900) including five dark-theme aid shots (`dark-map-idle`, `dark-sos-compose`, `dark-history`, `dark-sharing`, `dark-admin-overview`) taken with `prefers-color-scheme: dark` — they document that the dark surfaces render, nothing more; they are not acceptance evidence and flip nothing, generated with the harness committed at
+Evidence: 98 implementation captures under `docs/visual-acceptance/screens/` (mobile 393 × 852,
+DPR 2; admin captures at desktop widths — the pre-existing set at 1440 × 900, the new `admin-states/03-error` at 1280 × 900) including five dark-theme aid shots (`dark-map-idle`, `dark-sos-compose`, `dark-history`, `dark-sharing`, `dark-admin-overview`) taken with `prefers-color-scheme: dark` and one reduced-motion aid (`reduced-motion-map`) taken with `prefers-reduced-motion: reduce` — they document that those surfaces render and settle, nothing more; they are not acceptance evidence and flip nothing, generated with the harness committed at
 `scripts/visual-acceptance/` and documented in `docs/VISUAL_ACCEPTANCE.md`. They are byte-stable
 and reproducible from the demo bundle; the tool's `node_modules/` stays gitignored. The five
 references newly exercised in the pass are the empty/error states (`history/10`, `history/11`,
@@ -560,7 +562,8 @@ Capture alignment (two passes): every committed capture under `docs/visual-accep
 is now named by at least one row — all 90 light captures that map to non-superseded rows are wired
 in, the two exceptions are `navigation-19-trip-cancel` and `navigation-20-trip-completed`, which
 map to `superseded` rows and are deliberately not wired in as acceptance evidence, and the five
-`dark-*` aid shots are named as dark-theme aids on their rows (not acceptance evidence). Two stale row notes fixed in the same sweep: `admin-panel/states/02-empty`
+`dark-*` aid shots are named as dark-theme aids on their rows (not acceptance evidence), and the
+reduced-motion aid is named on `navigation/01-map-idle` (not acceptance evidence). Two stale row notes fixed in the same sweep: `admin-panel/states/02-empty`
 (the users screen gained the designed filter-empty composition in Stage G) and
 `admin-panel/states/05-forbidden` (a designed 403 surface replaced the silent redirect in Stage
 G/H; the note still claimed neither existed).
