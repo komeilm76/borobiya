@@ -13,7 +13,7 @@ export async function startServer() {
     const state = await checkSchemaReadiness(async (sql) => await probe.unsafe(sql));
     if (!state.ready) throw new Error(schemaReadinessMessage(state));
   } catch (error) {
-    if (error instanceof Error && /^(Database schema is behind|Database journal claims)/.test(error.message)) throw error;
+    if (error instanceof Error && /^(Database schema is behind|Database migration checkpoint is at or beyond)/.test(error.message)) throw error;
     const details = safeMigrationErrorDetails(error, config.databaseUrl);
     throw new Error(`Database schema preflight failed: ${details.join("; ") || "Check database connectivity."}`);
   } finally {

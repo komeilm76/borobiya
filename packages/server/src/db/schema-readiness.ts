@@ -54,8 +54,8 @@ export function schemaReadinessMessage(state: SchemaReadiness): string {
   const columns = state.missingColumns.length ? ` Missing mission columns: ${state.missingColumns.join(", ")}.` : "";
   const drift = state.latestAppliedAt !== null && state.latestAppliedAt >= REQUIRED_MIGRATION_TIMESTAMP &&
     (state.missingTables.length > 0 || state.missingColumns.length > 0);
-  if (drift) return `Database journal claims ${REQUIRED_MIGRATION} but required schema objects are missing.${missing}${columns} ` +
-    "Stop: back up and reconcile the database with an operator; rerunning migrations cannot repair an already-recorded migration. " +
+  if (drift) return `Database migration checkpoint is at or beyond ${REQUIRED_MIGRATION}, but required schema objects are missing.${missing}${columns} ` +
+    "Stop: back up and reconcile the database with an operator; rerunning migrations cannot repair a checkpoint that is already newer. " +
     "Do not delete the database volume or edit the migration journal.";
   return `Database schema is behind the checked-in ${REQUIRED_MIGRATION} migration.${missing}${columns} ` +
     "Apply the reviewed migrations to the SAME database as the API with " +

@@ -560,4 +560,13 @@ describe("private mission GPS and selected-route migrations", () => {
     expect(sql).toContain('"polyline" text NOT NULL');
     expect(getTableConfig(missionSuggestedRoutes).foreignKeys).toHaveLength(1);
   });
+  it("reconciles only a completely missing private mission schema after a foreign checkpoint", () => {
+    const sql = readFileSync(new URL("../../drizzle/0022_reconcile_private_mission_schema.sql", import.meta.url), "utf8");
+    expect(sql).toContain("present_policy_columns = 4");
+    expect(sql).toContain("present_policy_columns <> 0");
+    expect(sql).toContain("partial private mission schema");
+    expect(sql).toContain('CREATE INDEX "mission_track_points_mission_observed_idx"');
+    expect(sql).toContain('CONSTRAINT "mission_suggested_routes_distance_check"');
+    expect(sql).not.toMatch(/DELETE FROM|DROP TABLE|DROP COLUMN|__drizzle_migrations/i);
+  });
 });

@@ -13,6 +13,10 @@ describe("proposal/mission database readiness", () => {
     expect(server.indexOf("await createFastifyApp(")).toBeGreaterThan(check);
     expect(server).not.toContain("await migrate(");
     expect(server).toContain("schemaReadinessMessage(state)");
+    const runner = readFileSync(new URL("./migrate.ts", import.meta.url), "utf8");
+    expect(runner.indexOf("await checkSchemaReadiness(")).toBeGreaterThan(runner.indexOf("await migrate("));
+    expect(runner.indexOf("Database migrations applied and required schema verified.")).toBeGreaterThan(
+      runner.indexOf("await checkSchemaReadiness("));
   });
 
   it("identifies missing tables and an out-of-date journal without modifying the database", async () => {
@@ -49,7 +53,7 @@ describe("proposal/mission database readiness", () => {
       await pg.query("INSERT INTO drizzle.__drizzle_migrations (created_at) VALUES ($1)", [REQUIRED_MIGRATION_TIMESTAMP]);
       const drift = await check();
       expect(drift.ready).toBe(false); // A forged/partially restored journal must never pass.
-      expect(schemaReadinessMessage(drift)).toContain("rerunning migrations cannot repair");
+      expect(schemaReadinessMessage(drift)).toContain("rerunning migrations cannot repair a checkpoint");
       await pg.exec(`ALTER TABLE public.missions ADD COLUMN rescuer_visible_to_requester boolean DEFAULT true NOT NULL;
         ALTER TABLE public.missions ADD COLUMN requester_visible_to_rescuer boolean DEFAULT true NOT NULL;
         ALTER TABLE public.missions ADD COLUMN admin_visible_to_requester boolean DEFAULT false NOT NULL;

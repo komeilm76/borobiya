@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
 import { safeMigrationErrorDetails } from "./migration-error";
+import { checkSchemaReadiness, schemaReadinessMessage } from "./schema-readiness";
 
 const packageRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
 loadDotEnv({ path: resolve(packageRoot, "../../.env"), quiet: true });
@@ -28,7 +29,12 @@ async function migrateDatabase(): Promise<void> {
     await migrate(drizzle(client), {
       migrationsFolder: resolve(packageRoot, "drizzle")
     });
-    console.info("Database migrations applied.");
+    // Drizzle compares only the latest created_at. A row from a different branch
+    // with a larger timestamp can make migrate() return successfully while it
+    // silently skips required earlier files. Never report success in that state.
+    const state = await checkSchemaReadiness(async (sql) => await client.unsafe(sql));
+    if (!state.ready) throw new Error(schemaReadinessMessage(state));
+    console.info("Database migrations applied and required schema verified.");
   } finally {
     await client.end();
   }

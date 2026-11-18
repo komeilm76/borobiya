@@ -155,6 +155,13 @@
       "when": 1792917527551,
       "tag": "0021_mission_suggested_route",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793612911360,
+      "tag": "0022_reconcile_private_mission_schema",
+      "breakpoints": true
     }
   ]
 }
