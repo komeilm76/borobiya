@@ -4,7 +4,7 @@
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
     'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint,
     'mission-desk--steps-guidance': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint &&
-      (navigation.active.value || !!routing.error.value || !!navigation.error.value),
+      (navigation.active.value || !!routing.error.value || !!navigation.error.value || !!routeSaveWarning),
     'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
     <!-- The map workspace owns the persistent public canvas even while idle. -->
     <div class="mission-desk__shell">
@@ -86,6 +86,8 @@
               </header>
               <div class="mission-route__body" :class="`mission-route__body--${routeSection}`">
               <v-progress-linear v-if="routing.targetLoading.value" indeterminate color="primary" aria-label="دریافت محل حادثه" />
+              <v-alert v-if="routeSection === 'plan' && routeSaveWarning && !desk.terminalHold.value && !routing.error.value && !navigation.error.value"
+                class="mission-route__save-warning" type="warning" variant="tonal" role="alert">{{ routeSaveWarning }}</v-alert>
               <v-alert v-if="routing.error.value" class="my-3" type="warning" variant="tonal" role="alert">
                 {{ routing.error.value }}
                 <v-btn v-if="!routing.target.value" size="small" variant="text" @click="routing.open()">تلاش دوباره</v-btn>
@@ -263,17 +265,14 @@
         <PointTransportChoicesSheet :mission-id="desk.activeMission.value.id" :mission-profile="routing.profile.value"
           :open="activeTool === 'route' && routeSection === 'transport'" :show-search="false"
           @confirm="confirmMissionTransport" @close="closeRouteSection()" />
-        <v-alert v-if="routeSaveWarning && !desk.terminalHold.value" type="warning" variant="tonal" role="alert">
-          {{ routeSaveWarning }}
-        </v-alert>
-        <div v-if="!desk.terminalHold.value && activeTool !== 'route' && (routing.error.value || navigation.error.value)"
+        <div v-if="!desk.terminalHold.value && activeTool !== 'route' && (routing.error.value || navigation.error.value || routeSaveWarning)"
           class="mission-desk__guidance mission-desk__guidance--warning" role="alert">
-          <span>{{ routing.error.value || navigation.error.value }}</span>
+          <span>{{ routing.error.value || navigation.error.value || routeSaveWarning }}</span>
           <v-btn v-if="!desk.terminalHold.value && !desk.error.value && !desk.loading.value" size="small" variant="tonal"
             @click="openRouteWorkspace">بررسی مسیر</v-btn>
           <v-btn v-if="navigation.active.value" size="small" variant="tonal" color="error"
             @click="stopGuidance">توقف</v-btn>
-          <v-btn v-else-if="!routing.error.value" icon="mdi-close" size="small" variant="text"
+          <v-btn v-else-if="!routing.error.value && navigation.error.value" icon="mdi-close" size="small" variant="text"
             aria-label="بستن هشدار راهبری" @click="navigation.dismissError()" />
         </div>
         <div v-else-if="navigation.active.value" class="mission-desk__guidance mission-desk__guidance--active" role="status">
@@ -1043,6 +1042,7 @@ onBeforeUnmount(() => {
 .mission-route__decision-heading { display: flex; align-items: flex-start; gap: .6rem; min-width: 0; }
 .mission-route__decision-heading > :deep(.v-icon) { flex: none; color: rgb(var(--v-theme-primary)); }
 .mission-route__decision-heading > div { display: grid; gap: 2px; min-width: 0; }
+.mission-route__save-warning { flex: none; margin: .35rem 0; font-size: .875rem; line-height: 1.5; }
 .mission-route__decision-heading strong { font-size: 1rem; }
 .mission-route__decision-heading small { font-size: .875rem; line-height: 1.45; }
 .mission-route__decision :deep(.v-btn) { width: 100%; max-width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; text-align: center; }
