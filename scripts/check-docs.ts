@@ -77,6 +77,35 @@ async function checkMatrixTally(fail: (message: string) => void): Promise<void> 
   }
 }
 
+/**
+ * Every committed implementation capture must be reproducible from the capture plan and every
+ * planned scenario must have its capture committed. The two drifted apart once (ten aid/state
+ * captures existed only as ad-hoc runs), which is why this guard exists.
+ */
+async function checkCapturePlan(fail: (message: string) => void): Promise<void> {
+  const planPath = 'scripts/visual-acceptance/scenarios.json';
+  const planText = await read(planPath);
+  if (!planText) return fail(`${planPath} is missing`);
+  let refs: string[];
+  try {
+    const plan = JSON.parse(planText) as Array<{ ref?: unknown }>;
+    refs = plan.map((scenario) => String(scenario.ref ?? ''));
+  } catch {
+    return fail(`${planPath} is not valid JSON`);
+  }
+  if (refs.some((ref) => !ref)) return fail(`${planPath} carries a scenario without a ref`);
+  if (new Set(refs).size !== refs.length) return fail(`${planPath} carries duplicate scenario refs`);
+  const screens: string[] = [];
+  const glob = new Bun.Glob('*.png');
+  for await (const file of glob.scan({ cwd: path.join(ROOT, 'docs/visual-acceptance/screens'), onlyFiles: true })) screens.push(file);
+  for (const ref of refs) {
+    if (!screens.some((file) => file.startsWith(`${ref}-`))) fail(`capture plan scenario ${ref} has no committed capture in docs/visual-acceptance/screens/`);
+  }
+  for (const file of screens) {
+    if (!refs.some((ref) => file.startsWith(`${ref}-`))) fail(`committed capture ${file} has no scenario in ${planPath}`);
+  }
+}
+
 /** Counts legacy Python design tests, which must not return. */
 async function countLegacyDesignTests(directory: string): Promise<number> {
   const glob = new Bun.Glob('**/{test_*,*_test}.py');
@@ -120,6 +149,7 @@ async function checkDocs(): Promise<number> {
   if (!(await Bun.file(path.join(ROOT, 'bun.lock')).exists())) fail('bun.lock is missing');
   if (!(await Bun.file(path.join(ROOT, '.bun-version')).exists())) fail('.bun-version is missing');
   await checkMatrixTally(fail);
+  await checkCapturePlan(fail);
 
   const designImages = await countDesignImages(path.join(ROOT, 'design'));
   if (designImages < 100) fail(`expected at least 100 canonical design images, found ${designImages}`);

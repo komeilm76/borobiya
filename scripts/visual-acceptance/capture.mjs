@@ -7,7 +7,7 @@
 // }
 import chromiumPkg from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
-import { readFileSync } from 'fs';
+import { mkdirSync, readFileSync } from 'fs';
 
 const scenariosFile = process.argv[2];
 const only = process.argv[3];
@@ -88,6 +88,8 @@ async function shoot(page, file) {
 }
 
 let failures = 0;
+const outDir = process.env.OUT_DIR ?? 'docs/visual-acceptance/screens';
+mkdirSync(outDir, { recursive: true });
 for (const scenario of scenarios) {
   if (only && scenario.ref !== only && !scenario.ref.startsWith(only)) continue;
   const glue = scenario.route.includes('?') ? '&' : '?';
@@ -107,7 +109,7 @@ for (const scenario of scenarios) {
   if (scenario.reducedMotionStart) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
     const resp = await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
     const baseStatus = resp?.status() ?? 0;
-    const outBase = `${process.env.OUT_DIR ?? 'docs/visual-acceptance/screens'}/${scenario.ref}`;
+    const outBase = `${outDir}/${scenario.ref}`;
     if (scenario.shots && scenario.shots.length) {
       for (const shot of scenario.shots) {
         for (const step of shot.steps ?? []) {

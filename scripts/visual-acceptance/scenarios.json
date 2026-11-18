@@ -1661,5 +1661,173 @@
     "scrollInto": "[data-testid=\"cancel-request-panel\"]"
    }
   ]
+ },
+ {
+  "ref": "history-10-history-empty",
+  "route": "/_user/history?history=empty",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "history-11-history-error",
+  "route": "/_user/history?fail=history",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "companions-09-companions-empty",
+  "route": "/_user/sharing?shares=empty",
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "admin-states-03-error",
+  "route": "/_admin/users?fail=admin",
+  "persona": "admin",
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-map-idle",
+  "route": "/_user/map",
+  "darkStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "dark-sos-compose",
+  "route": "/_user/sos",
+  "darkStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "dark-history",
+  "route": "/_user/history",
+  "darkStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "dark-sharing",
+  "route": "/_user/sharing",
+  "darkStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "dark-admin-overview",
+  "route": "/_admin/overview",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "reduced-motion-map",
+  "route": "/_user/map",
+  "reducedMotionStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "sos-07-sos-sending",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[data-testid=\"sos-submit\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "sos-15-sos-photo-retry",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "upload": {
+     "selector": "#sos-photo",
+     "path": "scripts/visual-acceptance/fixtures/not-an-image.txt"
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
  }
 ]

@@ -49,7 +49,7 @@ Full-page screenshots are not sufficient for every state. Known cases and how th
 
 ## The 2026-11-16 empty/error evidence pass
 
-Four more captures were added on 2026-11-16, produced against the demo bundle with the knobs above (ad-hoc scenario; not part of `scenarios.json`). The harness itself was fixed so the `persona` query lands correctly when the route already carries query parameters.:
+Four more captures were added on 2026-11-16, produced against the demo bundle with the knobs above. The harness itself was fixed so the `persona` query lands correctly when the route already carries query parameters. Every capture in `screens/` — these four, the five dark aids, the reduced-motion aid, and the transient SOS states (`sos/07` sending dialog, `sos/15` inline photo error, the latter via the committed `fixtures/not-an-image.txt` upload) — now has a matching scenario in `scenarios.json` (98 scenarios for 98 captures), and `scripts/check-docs.ts` fails if the plan and the committed captures drift apart again. The harness also creates a missing `OUT_DIR` instead of failing the run.
 
 - `history/10-history-empty` — the history screen with `?history=empty` (requests sub-tab shows the plain empty copy; all tab counters read zero). Not the designed illustrated empty composition.
 - `history/11-history-error` — the history screen with `?fail=history` (inline red preview-failure notice with a working retry on the requests list). The designed offline cached-snapshot framing is absent; the mock's failure copy stands in for the server's.
