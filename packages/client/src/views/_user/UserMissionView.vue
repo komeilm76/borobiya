@@ -124,44 +124,55 @@
                   <summary>وسیله، مسیر، ایستگاه‌ها و جزئیات <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
                   <div class="mission-route__route-details-body">
                     <div v-if="routeSection === 'plan'" class="mission-route__section-links" role="group" aria-label="تنظیمات مسیر">
-                  <button type="button" :disabled="navigation.active.value" @click="openTransportSection"><v-icon icon="mdi-car-multiple" /><span><strong>وسیله</strong><small>{{ transportProfiles.find(item => item.value === routing.profile.value)?.title }}</small></span><v-icon icon="mdi-chevron-left" /></button>
-                  <button type="button" :disabled="!routing.routes.value.length || navigation.active.value" @click="openAlternativesSection"><v-icon icon="mdi-routes" /><span><strong>مسیرها</strong><small>{{ routing.routes.value.length ? `مسیر ${(routing.selectedIndex.value + 1).toLocaleString('fa-IR')} از ${routing.routes.value.length.toLocaleString('fa-IR')}` : 'پس از دریافت مسیر' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
-                  <button type="button" :disabled="navigation.active.value" @click="openStopsSection"><v-icon icon="mdi-map-marker-plus-outline" /><span><strong>ایستگاه‌ها</strong><small>{{ routing.via.value.length ? `${routing.via.value.length.toLocaleString('fa-IR')} مورد` : 'اختیاری' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
-                </div>
+                      <button type="button" :disabled="navigation.active.value"
+                        :aria-label="`انتخاب وسیله؛ ${transportProfiles.find(item => item.value === routing.profile.value)?.title}`"
+                        @click="openTransportSection"><v-icon icon="mdi-car-multiple" aria-hidden="true" /><strong>وسیله</strong></button>
+                      <button type="button" :disabled="!routing.routes.value.length || navigation.active.value"
+                        :aria-label="`انتخاب مسیر؛ ${routing.routes.value.length ? `مسیر ${(routing.selectedIndex.value + 1).toLocaleString('fa-IR')} از ${routing.routes.value.length.toLocaleString('fa-IR')}` : 'پس از دریافت مسیر'}`"
+                        @click="openAlternativesSection"><v-icon icon="mdi-routes" aria-hidden="true" /><strong>مسیرها</strong></button>
+                      <button type="button" :disabled="navigation.active.value"
+                        :aria-label="`ویرایش ایستگاه‌ها؛ ${routing.via.value.length.toLocaleString('fa-IR')} مورد`"
+                        @click="openStopsSection"><v-icon icon="mdi-map-marker-plus-outline" aria-hidden="true" /><strong>ایستگاه‌ها</strong></button>
+                    </div>
 
-                <div v-if="routeSection === 'plan'" class="mission-route__endpoints" role="group" aria-label="مبدأ و مقصد">
-                  <div class="mission-route__endpoint">
-                    <span class="mission-route__endpoint-mark" aria-hidden="true" />
-                    <div class="mission-route__endpoint-copy">
-                      <span><strong>مبدأ</strong> <small>موقعیت مسیر؛ نه موقعیت زنده</small></span>
-                      <bdi v-if="routing.from.value" dir="ltr">{{ routing.from.value.lat.toFixed(5) }}, {{ routing.from.value.lon.toFixed(5) }}</bdi>
-                      <span v-else class="mission-route__endpoint-pending">پس از دریافت موقعیت مشخص می‌شود</span>
-                    </div>
-                  </div>
-                  <div class="mission-route__endpoint">
-                    <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">!</span>
-                    <div class="mission-route__endpoint-copy">
-                      <span><strong>محل حادثه</strong> <small>مقصد نهایی · ثابت</small></span>
-                      <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="routeSection === 'plan' && routing.from.value && !navigation.active.value" class="mission-route__route-actions">
-                  <v-btn v-if="routing.selectedRoute.value" color="primary" variant="tonal" rounded="lg"
-                    :disabled="routing.loading.value" @click="routing.findRoutes()">محاسبهٔ دوبارهٔ مسیر</v-btn>
-                  <v-btn color="primary" variant="tonal" rounded="lg"
-                    :disabled="routing.loading.value" @click="routing.findRoutes(true)">به‌روزرسانی مبدأ</v-btn>
-                </div>
-                <v-btn v-if="(routing.from.value || routing.via.value.length) && !navigation.active.value"
-                  variant="text" color="error" prepend-icon="mdi-delete-outline"
-                  :disabled="!routing.target.value || routing.targetLoading.value"
-                  @click="routeDeleteConfirmOpen = true">پاک‌کردن برنامهٔ مسیر</v-btn>
-                <div v-if="routeSection === 'plan' && routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
-                  <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
-                    label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
-                    @update:model-value="focusRouteStep(Number($event))" />
-                  <p role="status">{{ currentStopLabel }}</p>
-                </div>
+                    <details class="mission-route__advanced">
+                      <summary>مبدأ، مقصد و ابزارهای مسیر <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
+                      <div class="mission-route__advanced-body">
+                        <div v-if="routeSection === 'plan'" class="mission-route__endpoints" role="group" aria-label="مبدأ و مقصد">
+                          <div class="mission-route__endpoint">
+                            <span class="mission-route__endpoint-mark" aria-hidden="true" />
+                            <div class="mission-route__endpoint-copy">
+                              <span><strong>مبدأ</strong> <small>موقعیت مسیر؛ نه موقعیت زنده</small></span>
+                              <bdi v-if="routing.from.value" dir="ltr">{{ routing.from.value.lat.toFixed(5) }}, {{ routing.from.value.lon.toFixed(5) }}</bdi>
+                              <span v-else class="mission-route__endpoint-pending">پس از دریافت موقعیت مشخص می‌شود</span>
+                            </div>
+                          </div>
+                          <div class="mission-route__endpoint">
+                            <span class="mission-route__endpoint-mark mission-route__endpoint-mark--incident" aria-hidden="true">!</span>
+                            <div class="mission-route__endpoint-copy">
+                              <span><strong>محل حادثه</strong> <small>مقصد نهایی · ثابت</small></span>
+                              <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
+                            </div>
+                          </div>
+                        </div>
+                        <div v-if="routeSection === 'plan' && routing.from.value && !navigation.active.value" class="mission-route__route-actions">
+                          <v-btn v-if="routing.selectedRoute.value" color="primary" variant="tonal" rounded="lg"
+                            :disabled="routing.loading.value" @click="routing.findRoutes()">محاسبهٔ دوبارهٔ مسیر</v-btn>
+                          <v-btn color="primary" variant="tonal" rounded="lg"
+                            :disabled="routing.loading.value" @click="routing.findRoutes(true)">به‌روزرسانی مبدأ</v-btn>
+                        </div>
+                        <v-btn v-if="(routing.from.value || routing.via.value.length) && !navigation.active.value"
+                          variant="text" color="error" prepend-icon="mdi-delete-outline"
+                          :disabled="!routing.target.value || routing.targetLoading.value"
+                          @click="routeDeleteConfirmOpen = true">پاک‌کردن برنامهٔ مسیر</v-btn>
+                        <div v-if="routeSection === 'plan' && routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
+                          <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
+                            label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
+                            @update:model-value="focusRouteStep(Number($event))" />
+                          <p role="status">{{ currentStopLabel }}</p>
+                        </div>
+                      </div>
+                    </details>
                   </div>
                 </details>
                 <section v-if="routeSection === 'stops'" class="mission-route__stops" aria-label="ویرایش ایستگاه‌های میانی">
@@ -980,14 +991,14 @@ onBeforeUnmount(() => {
   gap: .5rem; margin: -.85rem -.85rem .75rem; padding: .5rem .85rem;
   border-bottom: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface)); }
 .mission-route__heading { min-width: 0; flex: 1; }
-.mission-route__heading small { display: block; font-size: .8rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
+.mission-route__heading small { display: block; font-size: .875rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
 .mission-route__emblem { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; background: rgba(var(--v-theme-primary), .12); color: rgb(var(--v-theme-primary)); }
 .mission-route__header :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }
 .mission-route__header h2 { margin: 0; font-size: 1.08rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* One compact itinerary instead of two independently padded cards. Its divider
    separates the route snapshot from the fixed incident, never from live GPS. */
-.mission-route__endpoints { display: grid; gap: 0; margin: .4rem 0 .85rem; padding: .25rem .65rem;
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.mission-route__endpoints { display: grid; gap: 0; margin: .35rem 0; padding: 0 .25rem;
+  border-radius: var(--bb-radius-nested, 16px); background: transparent; }
 .mission-route__endpoint { display: grid; grid-template-columns: 22px minmax(0, 1fr); align-items: center;
   gap: .6rem; min-width: 0; padding: .32rem 0; }
 .mission-route__endpoint + .mission-route__endpoint { border-top: 1px solid var(--bb-color-outline); }
@@ -996,22 +1007,21 @@ onBeforeUnmount(() => {
 .mission-route__endpoint-mark--incident { border-radius: 6px; background: #b91c1c; color: white;
   font: 900 .85rem/1 sans-serif; }
 .mission-route__endpoint-copy { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .55rem; row-gap: 0;
-  min-width: 0; font-size: .82rem; line-height: 1.6; }
+  min-width: 0; font-size: .875rem; line-height: 1.5; }
 .mission-route__endpoint-copy > span:first-child { flex: 1 1 11rem; min-width: 0; }
 .mission-route__endpoint-copy strong { color: rgb(var(--v-theme-on-surface)); font-weight: 800; }
-.mission-route__endpoint-copy small { color: var(--bb-color-muted); font-size: .8rem; }
-.mission-route__endpoint-copy bdi, .mission-route__endpoint-pending { font-size: .8rem; color: var(--bb-color-muted); overflow-wrap: anywhere; }
+.mission-route__endpoint-copy small { color: var(--bb-color-muted); font-size: .875rem; }
+.mission-route__endpoint-copy bdi, .mission-route__endpoint-pending { font-size: .875rem; color: var(--bb-color-muted); overflow-wrap: anywhere; }
 .mission-route__endpoints bdi { overflow-wrap: anywhere; }
 .mission-route__decision {
   display: grid; gap: .55rem; margin: 0 0 .7rem; padding: .7rem;
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
-  background: var(--bb-color-inset);
+  border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-primary), .07);
 }
 .mission-route__decision-heading { display: flex; align-items: flex-start; gap: .6rem; min-width: 0; }
 .mission-route__decision-heading > :deep(.v-icon) { flex: none; color: rgb(var(--v-theme-primary)); }
 .mission-route__decision-heading > div { display: grid; gap: 2px; min-width: 0; }
-.mission-route__decision-heading strong { font-size: .94rem; }
-.mission-route__decision-heading small { font-size: .8rem; line-height: 1.5; }
+.mission-route__decision-heading strong { font-size: 1rem; }
+.mission-route__decision-heading small { font-size: .875rem; line-height: 1.45; }
 .mission-route__decision :deep(.v-btn) { width: 100%; max-width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; text-align: center; }
 .mission-route__decision :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-route__decision .mission-route__metrics { margin: 0; }
@@ -1019,13 +1029,16 @@ onBeforeUnmount(() => {
 .mission-route__decision .mission-route__metrics > div + div { border-inline-start: 1px solid var(--bb-color-outline); }
 .mission-route__decision .mission-route__navigation { display: grid; gap: .4rem; margin: 0; }
 .mission-route__decision .mission-route__navigation p { margin: 0; }
-.mission-route__preview-note { margin: .85rem 0 0; padding: .75rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); font-size: .82rem; line-height: 1.6; }
-.mission-route__section-links { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: .65rem 0; }
-.mission-route__section-links button { display: flex; align-items: center; gap: .4rem; width: 100%; min-width: 0; min-height: 52px; padding: .5rem; text-align: start; font: inherit; cursor: pointer; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); }
+.mission-route__preview-note { margin: .5rem 0 0; padding: .5rem .65rem; border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); font-size: .875rem; line-height: 1.5; }
+.mission-route__section-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: .2rem 0;
+  border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); overflow: hidden; }
+.mission-route__section-links button { display: flex; align-items: center; justify-content: center; gap: .25rem;
+  width: 100%; min-width: 0; min-height: 44px; padding: .35rem .2rem; text-align: center;
+  font: inherit; cursor: pointer; border: 0; background: transparent; color: rgb(var(--v-theme-on-surface)); }
+.mission-route__section-links button + button { border-inline-start: 1px solid var(--bb-color-outline); }
 .mission-route__section-links button > :deep(.v-icon) { flex: none; font-size: 19px; }
-.mission-route__section-links button > span { flex: 1; display: grid; min-width: 0; }
-.mission-route__section-links button strong { font-size: .87rem; }
-.mission-route__section-links button small { font-size: .8rem; opacity: .8; }
+.mission-route__section-links button strong { font-size: .875rem; line-height: 1.3; }
+.mission-route__section-links button:not(:disabled):hover { background: rgba(var(--v-theme-primary), .1); }
 .mission-route__section-links button:disabled { opacity: .5; cursor: not-allowed; }
 .mission-route__section-links button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-route__route-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: .65rem 0; }
@@ -1033,15 +1046,15 @@ onBeforeUnmount(() => {
 .mission-route__route-actions :deep(.v-btn__content) { white-space: normal; text-align: center; line-height: 1.35; }
 .mission-route__route-actions :deep(.v-btn:only-child) { grid-column: 1 / -1; }
 .mission-route__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: 1rem 0; }
-.mission-route__metrics > div { display: grid; gap: .25rem; padding: .75rem; background: var(--bb-color-inset); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
-.mission-route__metrics span { font-size: .8rem; opacity: .8; }
+.mission-route__metrics > div { display: grid; gap: .2rem; padding: .35rem .5rem; background: transparent; }
+.mission-route__metrics span { font-size: .875rem; color: var(--bb-color-muted); }
 .mission-route__metrics strong { font-size: 1.02rem; }
 .mission-route__header p { font-size: 0.9rem; opacity: .78; }
-.mission-route__help { margin: 0 0 .6rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
+.mission-route__help { margin: 0 0 .6rem; color: var(--bb-color-muted); font-size: .875rem; line-height: 1.5; }
 .mission-route__map-stop { max-width: 100%; }
 .mission-route__map-stop :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-route__manual { margin-top: .5rem; }
-.mission-route__manual summary { display: flex; align-items: center; gap: .35rem; width: fit-content; min-height: 44px; color: rgb(var(--v-theme-primary)); cursor: pointer; font-size: .83rem; font-weight: 700; }
+.mission-route__manual summary { display: flex; align-items: center; gap: .35rem; width: fit-content; min-height: 44px; color: rgb(var(--v-theme-primary)); cursor: pointer; font-size: .875rem; font-weight: 700; }
 .mission-route__manual summary::marker { content: ''; }
 .mission-route__manual summary::-webkit-details-marker { display: none; }
 .mission-route__manual[open] summary :deep(.v-icon) { transform: rotate(180deg); }
@@ -1049,14 +1062,15 @@ onBeforeUnmount(() => {
 .mission-route__manual-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: .5rem; padding-top: .5rem; }
 .mission-route__manual-fields :deep(.v-btn) { grid-column: 1 / -1; justify-self: start; min-height: 44px; }
 .mission-route__coordinate { min-width: 0; }
-.mission-route__error { margin: .5rem 0 0; font-size: .83rem; }
+.mission-route__error { margin: .5rem 0 0; font-size: .875rem; }
 .mission-route__stop-list { display: grid; gap: .4rem; list-style: none; margin: .7rem 0 0; padding: 0; }
-.mission-route__stop-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .25rem .5rem; min-width: 0; padding: .35rem .5rem; border: 1px solid var(--bb-color-outline); border-radius: 12px; background: rgb(var(--v-theme-surface)); cursor: grab; }
-.mission-route__stop-list li > span { min-width: 0; overflow-wrap: anywhere; font-size: .8rem; }
+.mission-route__stop-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .25rem .5rem; min-width: 0; padding: .35rem .5rem; cursor: grab; }
+.mission-route__stop-list li + li { border-top: 1px solid var(--bb-color-outline); }
+.mission-route__stop-list li > span { min-width: 0; overflow-wrap: anywhere; font-size: .875rem; }
 .mission-route__stop-list li :deep(.v-btn) { min-width: 44px; min-height: 44px; }
 .mission-route__optimize { margin-top: .5rem; }
-.mission-route__step-control { margin-top: .7rem; padding: .65rem .75rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
-.mission-route__step-control p { margin: 0; font-size: .82rem; }
+.mission-route__step-control { margin-top: .55rem; padding: .55rem .25rem; border-top: 1px solid var(--bb-color-outline); }
+.mission-route__step-control p { margin: 0; font-size: .875rem; }
 .mission-route__choices { margin-top: .65rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: .5rem; }
 .mission-route__choice { display: grid; text-align: start; gap: .4rem; color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); padding: .75rem; cursor: pointer; font: inherit; }
 .mission-route__choice--selected { border-color: rgb(var(--v-theme-primary)); box-shadow: inset 0 0 0 1px rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
@@ -1094,7 +1108,6 @@ onBeforeUnmount(() => {
   .mission-desk__toolbar > div { flex: 1 1 100%; min-width: 0; }
   .mission-desk__toolbar p { max-width: none; }
   .mission-route__section-links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .mission-route__section-links button { min-height: 60px; }
   .mission-cancel-actions { flex-direction: column; align-items: stretch; gap: 8px; }
   .mission-cancel-actions :deep(.v-spacer) { display: none; }
   .mission-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
@@ -1230,32 +1243,34 @@ onBeforeUnmount(() => {
 .mission-desk--active .mission-route { display: flex; flex-direction: column; width: min(25rem, calc(100vw - 1.5rem));
   max-height: min(48dvh, 23rem); padding: .7rem; overflow: hidden; }
 .mission-desk--active .mission-route--editor { max-height: min(56dvh, 29rem); }
-.mission-desk--active .mission-route:has(.mission-route__route-details[open]) { max-height: min(68dvh, 32rem); }
+.mission-desk--active .mission-route:has(.mission-route__route-details[open]) { max-height: min(74dvh, 38rem); }
+.mission-route__body--plan:has(.mission-route__advanced[open]) { overflow-y: auto; overscroll-behavior: contain; }
 .mission-route__body { flex: 1 1 auto; min-height: 0; min-width: 0; }
 .mission-route__body--stops, .mission-route__body--alternatives { display: flex; flex-direction: column; }
 .mission-route__header { flex: none; margin: -.7rem -.7rem .35rem; padding: .35rem .6rem; }
-.mission-route__section-links { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; margin: .4rem 0; }
-.mission-route__section-links button { display: grid; justify-items: center; align-content: center; text-align: center;
-  gap: 1px; padding: .35rem .15rem; min-height: 64px; }
-.mission-route__section-links button > :deep(.v-icon:last-child) { display: none; }
-.mission-route__section-links button > span { justify-items: center; }
-.mission-route__section-links button strong { font-size: .8rem; }
-.mission-route__section-links button small { line-height: 1.25; overflow-wrap: anywhere; }
+.mission-route__section-links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.mission-route__section-links button { min-height: 44px; }
 .mission-route__decision { gap: .35rem; margin: 0 0 .35rem; padding: .5rem .6rem; }
 .mission-route__decision-heading > :deep(.v-icon) { font-size: 18px !important; }
 .mission-route__decision-heading small { line-height: 1.3; }
 .mission-route__decision .mission-route__metrics { gap: 0; }
-.mission-route__decision .mission-route__metrics strong { font-size: .9rem; }
+.mission-route__decision .mission-route__metrics strong { font-size: 1rem; }
 .mission-route__route-details { border-top: 1px solid var(--bb-color-outline); }
 .mission-route__route-details summary { display: flex; align-items: center; min-height: 44px; gap: .25rem;
-  cursor: pointer; font-size: .8rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
+  cursor: pointer; font-size: .9rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
 .mission-route__route-details summary :deep(.v-icon) { margin-inline-start: auto; }
-.mission-route__route-details[open] summary :deep(.v-icon) { transform: rotate(180deg); }
+.mission-route__route-details summary::marker { content: ''; }
+.mission-route__route-details summary::-webkit-details-marker { display: none; }
+.mission-route__route-details[open] > summary :deep(.v-icon),
+.mission-route__advanced[open] > summary :deep(.v-icon) { transform: rotate(180deg); }
 .mission-route__route-details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
-.mission-route__route-details-body { max-height: min(25dvh, 9rem); overflow-y: auto; overscroll-behavior: contain;
-  scrollbar-gutter: stable; padding-inline: .1rem; }
+.mission-route__route-details-body { padding: .1rem 0 .35rem; }
+.mission-route__advanced { margin-top: .25rem; }
+.mission-route__advanced summary { min-height: 44px; font-size: .875rem; color: var(--bb-color-muted); }
+.mission-route__advanced-body { padding: .1rem .1rem .5rem; }
 .mission-route__route-details-body .mission-route__endpoints { margin: .2rem 0; }
-.mission-route__route-details-body > .v-btn { min-height: 44px; }
+.mission-route__advanced-body > .v-btn { min-height: 44px; }
+.mission-route :deep(.text-caption) { font-size: .875rem !important; line-height: 1.45; }
 .mission-route__stops { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; margin: 0; padding: .2rem 0;
   border: 0; background: transparent; }
 .mission-route__stops-body { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; align-items: stretch;
@@ -1278,7 +1293,6 @@ onBeforeUnmount(() => {
   /* Accessibility fallback for a landscape/zoomed phone: keep all actions
      reachable inside the content, never scroll the outer map card. */
   .mission-route__body { overflow-y: auto; overscroll-behavior: contain; }
-  .mission-route__route-details-body { max-height: none; overflow: visible; }
   .mission-route__body--stops .mission-route__stop-list { flex: none; max-height: none; overflow: visible; }
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
@@ -1509,7 +1523,9 @@ onBeforeUnmount(() => {
   .mission-desk--active .mission-route--editor { max-height: min(56dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   .mission-route__emblem { display: none; }
   .mission-desk--active .mission-route:has(.mission-route__route-details[open]) {
-    max-height: min(68dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+    max-height: min(74dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk--active .mission-route:has(.mission-route__advanced[open]) {
+    top: calc(.75rem + env(safe-area-inset-top, 0px)); max-height: none; }
   /* The shared vehicle sheet sits above SOS on the private mission map. */
   .mission-desk__workspace :deep(.point-transport-choices-shell) {
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
@@ -1700,8 +1716,6 @@ onBeforeUnmount(() => {
   .mission-desk--steps-guidance .mission-desk__guidance.mission-desk__guidance--warning,
   .mission-desk--steps-guidance .mission-desk__guidance.mission-desk__guidance--active { max-height: 3rem; }
 }
-:global(:root.dark .mission-route__stops),
-:global(:root.dark .mission-route__step-control),
 :global(:root.dark .mission-route__choice:not(.mission-route__choice--selected)) {
   background: var(--bb-color-inset);
   border-color: var(--bb-color-outline);

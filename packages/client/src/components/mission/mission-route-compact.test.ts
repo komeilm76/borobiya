@@ -48,6 +48,35 @@ describe("compact mission route planner", () => {
     expect(compileTemplate({ source: template!.content, filename: "UserMissionView.vue", id: "compact-route" }).errors).toEqual([]);
   });
 
+  it("keeps configuration buttons concise and expands settings naturally instead of scrolling on every screen", () => {
+    const start = view.indexOf('class="mission-route__section-links"');
+    const controls = view.slice(start, view.indexOf('</div>', start));
+    expect(controls.match(/<button\b/g)).toHaveLength(3);
+    expect(controls).not.toContain('<small>');
+    expect(controls).not.toContain('mdi-chevron-left');
+    expect(controls).toContain('aria-label="`انتخاب وسیله؛');
+    expect(controls).toContain('aria-label="`انتخاب مسیر؛');
+    expect(controls).toContain('aria-label="`ویرایش ایستگاه‌ها؛');
+    expect(view).toContain('<details class="mission-route__advanced">');
+    expect(css).toContain('.mission-route__route-details-body { padding: .1rem 0 .35rem; }');
+    expect(css).not.toMatch(/\.mission-route__route-details-body\s*\{[^}]*max-height/);
+    expect(css).toContain('.mission-desk--active .mission-route:has(.mission-route__route-details[open]) { max-height: min(74dvh, 38rem); }');
+    expect(css).toContain('.mission-route__body--plan:has(.mission-route__advanced[open]) { overflow-y: auto;');
+    expect(css).toContain('.mission-route__section-links button { min-height: 44px; }');
+  });
+
+  it("uses one calm card surface, readable type and touch-sized controls", () => {
+    const decision = css.slice(css.indexOf('.mission-route__decision {'), css.indexOf('}', css.indexOf('.mission-route__decision {')));
+    const endpoints = css.slice(css.indexOf('.mission-route__endpoints {'), css.indexOf('}', css.indexOf('.mission-route__endpoints {')));
+    const tabs = css.slice(css.indexOf('.mission-route__section-links button {'), css.indexOf('}', css.indexOf('.mission-route__section-links button {')));
+    for (const rule of [decision, endpoints, tabs]) expect(rule).not.toContain('border: 1px');
+    expect(css).toContain('.mission-route__decision-heading strong { font-size: 1rem; }');
+    expect(css).toContain('.mission-route__decision-heading small { font-size: .875rem;');
+    expect(css).toContain('.mission-route__heading small { display: block; font-size: .875rem;');
+    expect(css).toContain('.mission-route__section-links button strong { font-size: .875rem;');
+    expect(css).toContain('.mission-route__route-details summary { display: flex; align-items: center; min-height: 44px;');
+  });
+
   it("uses shared inset, radius, focus and elevation tokens", () => {
     expect(css).toContain('.mission-route__section-links { grid-template-columns: repeat(3, minmax(0, 1fr));');
     expect(css).toContain('.mission-route__manual-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));');
