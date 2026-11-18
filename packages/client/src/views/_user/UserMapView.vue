@@ -3,6 +3,7 @@
     'user-map-view--mission-legend': mode === 'missions' && !!missionWorkspace?.hasMapLegend,
     'user-map-view--mission-active': mode === 'missions' && !!missionWorkspace?.hasActiveMission,
     'user-map-view--mission-idle': mode === 'missions' && !missionWorkspace?.hasActiveMission,
+    'user-map-view--mission-offer-preview': mode === 'missions' && !!missionWorkspace?.hasOfferPreview,
     'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool,
     'user-map-view--mission-steps': mode === 'missions' && !!missionWorkspace?.hasStepsSheet,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
@@ -31,6 +32,7 @@
     <UserMissionView v-if="auth.user?.role === 'user' && (mode === 'missions' || missionActive)"
       v-show="mode === 'missions'" ref="missionWorkspace"
       embedded :visible="mode === 'missions'" :external-map="map" :external-marker="workspaceMarker"
+      :own-position="own.position.value"
       :own-recenter-label="recenterLabel" :own-location-error="!!(own.error.value || recenterError)"
       @focus-own="centerOnOwnLocation" />
 
@@ -3051,4 +3053,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view--mission .user-map-view__playback,
 .user-map-view--mission .user-map-view__live { display: none !important; }
 .user-map-view--mission .user-map-view__search { z-index: 7; }
+/* A selected private offer uses the map for its route. Temporarily remove the
+   unused persistent Search panel (including keyboard stops); Back restores it. */
+@media (min-width: 600px) {
+  .user-map-view--mission-offer-preview .user-map-view__search { display: none !important; }
+}
 </style>

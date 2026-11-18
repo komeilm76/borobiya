@@ -95,7 +95,9 @@ describe("mission map controls", () => {
   });
   it("keeps the phone rail clear of panels and SOS, including short screens", () => {
     const viewStyle = parse(missionMap).descriptor.styles[0]!.content;
-    const phone = viewStyle.split('@media (max-width: 599px) {')[1]!;
+    // The first block is the offer-preview sheet; inspect the original phone
+    // rail block that follows it, not a later short-screen override.
+    const phone = viewStyle.split('@media (max-width: 599px) {')[2]!;
     expect(phone).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
     expect(phone).toContain('bottom: calc(16rem + env(safe-area-inset-bottom, 0px));');
     expect(phone).toContain('bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));');

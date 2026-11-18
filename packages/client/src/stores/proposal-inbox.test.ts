@@ -84,7 +84,8 @@ describe("proposal inbox", () => {
     expect(inbox.total).toBe(1); // last-known count, not a verified current count
     const view = readFileSync(new URL("../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8");
     const app = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
-    expect(view).toContain('v-if="inbox.failed && inbox.proposals.length"');
+    expect(view).toContain('v-if="!compactMap && inbox.failed && inbox.proposals.length"');
+    expect(view).toContain('v-if="compactMap && inbox.failed"');
     expect(view).toContain('به‌روزرسانی پیشنهادها انجام نشد');
     expect(view).toContain('variant="text" :loading="inbox.loading" @click="inbox.refresh()"');
     expect(view).toContain("تعداد تأیید نشده");

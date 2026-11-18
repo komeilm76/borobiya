@@ -9,7 +9,9 @@ const offers = readFileSync(new URL("../shell/ProposalInboxContent.vue", import.
 describe("offers inside the idle mission map", () => {
   it("opts the map into one bounded, list-first surface while preserving the full-page inbox", () => {
     expect(mission).toContain('<h3>در حال حاضر مأموریت فعالی ندارید</h3>');
-    expect(mission).toContain('<ProposalInboxContent :selected-offer-id="null" :compact-map="embedded" />');
+    expect(mission).toContain('<ProposalInboxContent :selected-offer-id="null" :compact-map="embedded" :map="externalMap"');
+    expect(mission).toContain(':marker-class="externalMarker" :own-position="ownPosition" :visible="visible"');
+    expect(mission).toContain("@detail-change=\"offerDetailOpen = $event\"");
     expect(offers).toContain("'offers--map': compactMap, 'offers--detail-open': compactMap && detailOpen");
     expect(offers).toContain('.offers--map:not(.offers--detail-open) .offer-detail,');
     expect(offers).toContain('.offers--map.offers--detail-open .offers__list { display: none; }');
@@ -17,7 +19,10 @@ describe("offers inside the idle mission map", () => {
     expect(offers).toContain('.offers__shell { max-width: 1260px; margin-inline: auto; container-type: inline-size; }');
     expect(offers).toContain('@container (max-width: 42rem) {\n  .offers__layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }');
     expect(mission).toContain('.mission-desk__empty :deep(.offers__items) {\n  max-height: none; overflow: visible; padding: 0;');
-    expect(mission).toContain('overflow-y: auto; overscroll-behavior: contain;');
+    expect(mission).toContain('.mission-desk__empty--offers {\n  height:');
+    expect(mission).toContain('display: flex; flex-direction: column; overflow: hidden;');
+    expect(mission).toContain('overflow-y: auto; overscroll-behavior: contain;\n  background: rgba(var(--v-theme-surface), .95);');
+    expect(offers).toContain('.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }');
   });
 
   it("keeps compact severity, title, summary and time legible, with full detail and decisions on demand", () => {
@@ -28,7 +33,7 @@ describe("offers inside the idle mission map", () => {
     expect(offers).toContain('.offers--map .offer-detail__buttons > * { flex: 1 1 8rem; min-width: 0; min-height: 44px;');
     expect(offers).toContain('aria-label="بازگشت به فهرست پیشنهادها"');
     expect(offers).toContain('aria-label="به‌روزرسانی پیشنهادها"');
-    expect(offers).toContain('if (props.compactMap) panel?.scrollTo({ top: 0, behavior: "auto" });');
+    expect(offers).toContain('if (props.compactMap) detail.scrollTo({ top: 0, behavior: "auto" });');
     expect(offers).toContain('card.dataset.offerId === selectedId.value');
     expect(offers).toContain('?.focus({ preventScroll: true });');
     expect(offers).toContain('watch(() => inbox.page, () => { selectedId.value = null; detailOpen.value = false; });');

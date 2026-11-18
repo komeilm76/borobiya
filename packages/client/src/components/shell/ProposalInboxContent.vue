@@ -25,7 +25,7 @@
         <bdi dir="ltr">{{ inbox.acceptedMissionId }}</bdi>
         <v-btn class="ms-3" to="/_user/map?tab=missions" color="primary" variant="tonal" size="small">مشاهدهٔ مأموریت</v-btn>
       </v-alert>
-      <v-alert v-if="inbox.failed && inbox.proposals.length" class="mb-5" type="warning" variant="tonal" role="alert">
+      <v-alert v-if="!compactMap && inbox.failed && inbox.proposals.length" class="mb-5" type="warning" variant="tonal" role="alert">
         به‌روزرسانی پیشنهادها انجام نشد؛ موارد زیر آخرین فهرست شناخته‌شده‌اند و ممکن است تغییر کرده باشند.
         <v-btn size="small" variant="text" :loading="inbox.loading" @click="inbox.refresh()">تلاش دوباره</v-btn>
       </v-alert>
@@ -70,6 +70,10 @@
       </div>
       <div v-else-if="inbox.proposals.length" class="offers__layout">
         <section ref="listRef" class="offers__list" aria-label="فهرست پیشنهادهای مأموریت">
+          <v-alert v-if="compactMap && inbox.failed" type="warning" variant="tonal" role="alert" density="compact">
+            به‌روزرسانی ناموفق بود؛ فهرست ممکن است قدیمی باشد.
+            <v-btn variant="text" color="primary" :loading="inbox.loading" @click="inbox.refresh()">تلاش دوباره</v-btn>
+          </v-alert>
           <div class="offers__items" role="region" :aria-label="compactMap ? 'پیشنهادهای مأموریت' : 'پیشنهادها؛ برای موارد بیشتر پیمایش کنید'"
             :tabindex="!compactMap && inbox.proposals.length > 1 ? 0 : -1">
             <button v-for="offer in inbox.proposals" :key="offer.id" class="offer-card" type="button"
@@ -105,6 +109,10 @@
         <section v-if="selected" ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده" tabindex="-1">
           <v-btn v-if="compactMap" class="offer-detail__back" icon="mdi-arrow-right" variant="text" color="primary"
             aria-label="بازگشت به فهرست پیشنهادها" title="بازگشت به پیشنهادها" @click="closeMapDetail" />
+          <v-alert v-if="compactMap && inbox.failed" type="warning" variant="tonal" role="alert" density="compact">
+            به‌روزرسانی ناموفق بود؛ این پیشنهاد ممکن است تغییر کرده باشد.
+            <v-btn variant="text" color="primary" :loading="inbox.loading" @click="inbox.refresh()">تلاش دوباره</v-btn>
+          </v-alert>
           <div class="offer-detail__top">
             <span class="offer-detail__kicker">پروندهٔ امداد · {{ proposalTime(selected.createdAt) }}</span>
             <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
@@ -116,9 +124,24 @@
           <template v-if="selected.details">
             <div class="offer-detail__facts">
               <div><span>درخواست‌دهنده</span><strong>{{ selected.details.requesterName }}</strong></div>
-              <div><span>فاصلهٔ تقریبی</span><strong>{{ proposalDistance(myPosition, selected.details) }}</strong></div>
+              <div v-if="!compactMap"><span>فاصلهٔ تقریبی</span><strong>{{ proposalDistance(myPosition, selected.details) }}</strong></div>
             </div>
-            <v-btn v-if="!myPosition" size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
+            <div v-if="compactMap" class="offer-detail__route" role="status" aria-live="polite">
+              <div class="offer-detail__route-heading"><v-icon icon="mdi-map-marker-path" size="19" aria-hidden="true" /> پیش‌نمایش مسیر روی نقشه · خودرو</div>
+              <div class="offer-detail__metrics">
+                <div><span>زمان رسیدن · برآورد اولیه</span><strong>{{ previewRoute ? new Date(previewCalculatedAt + previewRoute.duration_s * 1000).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) : '—' }}</strong></div>
+                <div><span>مسافت مسیر</span><strong>{{ previewRoute ? formatRouteDistance(previewRoute.distance_m) : '—' }}</strong></div>
+              </div>
+              <p v-if="previewRoute">{{ formatRouteDuration(previewRoute.duration_s) }} از مبدأ GPS هنگام محاسبه؛ زمان تقریبی و بدون ترافیک است.</p>
+              <p v-else-if="previewLoading">در حال محاسبهٔ مسیر از موقعیت فعلی شما…</p>
+              <p v-else-if="previewError" role="alert">{{ previewError }}</p>
+              <template v-else>
+                <p>برای پیش‌نمایش مسیر و زمان رسیدن، موقعیت GPS تازه روی نقشه لازم است. محل حادثه روی نقشه مشخص است.</p>
+                <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
+                  @click="emit('request-location')">دریافت موقعیت من</v-btn>
+              </template>
+            </div>
+            <v-btn v-if="!compactMap && !myPosition" size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
               :loading="locating" class="offer-detail__locate mt-2" @click="locateMe">محاسبهٔ فاصله با اجازهٔ شما</v-btn>
             <p v-if="locationError" class="offer-detail__hint" role="status">{{ locationError }}</p>
             <div class="offer-detail__section">
@@ -128,6 +151,7 @@
             <div class="offer-detail__section">
               <h3><v-icon icon="mdi-map-marker-outline" size="19" /> محل حادثه</h3>
               <p v-if="!compactMap" class="offer-detail__map">پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود. جزئیات و مختصات را پیش از تصمیم بررسی کنید.</p>
+              <p v-if="compactMap" class="offer-detail__address" role="status"><v-icon icon="mdi-map-marker-outline" size="18" aria-hidden="true" /> نشانی نزدیک (تقریبی): <bdi dir="auto">{{ addressStatus === 'loading' ? 'در حال دریافت…' : addressStatus === 'ready' ? address : addressStatus === 'error' ? 'دریافت نشانی ممکن نشد.' : 'نشانی مشخصی برای این نقطه پیدا نشد.' }}</bdi></p>
               <p class="offer-detail__coords">مختصات: <bdi dir="ltr">{{ selected.details.sosRequest.location.lat.toFixed(5) }}, {{ selected.details.sosRequest.location.lon.toFixed(5) }}</bdi>
                 <span v-if="selected.details.sosRequest.location.isManual"> · انتخاب دستی</span></p>
             </div>
@@ -187,6 +211,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
+import { getMissionRouteChoices, type RouteChoice, type RoutePoint } from "@/api/mission-routing";
+import { reversePlace } from "@/api/geocoding";
+import { missionMapCamera } from "@/sos/mission-map";
+import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
+import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 import type { ProposalInboxItem } from "@shared/index";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { mapTripSession } from "@/map/trip-session";
@@ -194,8 +224,11 @@ import { proposalDistance, proposalSeverity, proposalTime } from "@/sos/proposal
 import { useAuthStore } from "@/stores/auth";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
 
-const props = withDefaults(defineProps<{ selectedOfferId: string | null; compactMap?: boolean }>(), { compactMap: false });
-const emit = defineEmits<{ close: [] }>();
+const props = withDefaults(defineProps<{
+  selectedOfferId: string | null; compactMap?: boolean; visible?: boolean;
+  map?: MapLibreMap | null; markerClass?: typeof Marker | null; ownPosition?: RoutePoint | null;
+}>(), { compactMap: false, visible: true });
+const emit = defineEmits<{ close: []; 'detail-change': [open: boolean]; 'request-location': [] }>();
 const inbox = useProposalInboxStore();
 const auth = useAuthStore();
 const selectedId = ref<string | null>(props.selectedOfferId);
@@ -205,6 +238,105 @@ const selected = computed(() => selectedId.value
   ? inbox.proposals.find((item) => item.id === selectedId.value) ?? null
   : inbox.proposals[0] ?? null);
 const detailRef = ref<HTMLElement | null>(null);
+watch(detailOpen, (open) => emit('detail-change', open), { flush: 'sync' });
+
+// This is only an offer preview. It never starts guidance, saves a route or
+// creates another canvas/GPS watcher. Use the map's short-lived private fix.
+const previewRoute = ref<RouteChoice | null>(null);
+const previewOrigin = ref<RoutePoint | null>(null);
+const previewLoading = ref(false);
+const previewError = ref<string | null>(null);
+const address = ref<string | null>(null);
+const addressStatus = ref<'loading' | 'missing' | 'error' | 'ready'>('missing');
+const previewCalculatedAt = ref(0);
+const previewGeometry = useMissionRouteGeometry(previewRoute);
+const offerForPreview = computed(() => props.compactMap && props.visible && detailOpen.value ? selected.value : null);
+const incident = computed(() => offerForPreview.value?.details?.sosRequest.location ?? null);
+// An offer switch, page change, tab change or logout invalidates BOTH requests.
+watch([() => offerForPreview.value?.id, () => incident.value?.lat, () => incident.value?.lon,
+  () => Boolean(props.ownPosition), () => auth.user?.id], (_values, _previous, onCleanup) => {
+  const target = incident.value;
+  const origin = props.ownPosition;
+  previewRoute.value = null;
+  previewOrigin.value = null;
+  previewLoading.value = false;
+  previewError.value = null;
+  address.value = null;
+  addressStatus.value = target ? 'loading' : 'missing';
+  if (!target || !offerForPreview.value || !auth.user?.id) return;
+  const controller = new AbortController();
+  onCleanup(() => controller.abort());
+  const requestId = offerForPreview.value.id;
+  void reversePlace({ lat: target.lat, lon: target.lon }, controller.signal).then((result) => {
+    if (controller.signal.aborted || offerForPreview.value?.id !== requestId) return;
+    address.value = result?.formattedAddress ?? null;
+    addressStatus.value = result ? 'ready' : 'missing';
+  }).catch(() => { if (!controller.signal.aborted) addressStatus.value = 'error'; });
+  if (!origin) return;
+  previewLoading.value = true;
+  previewOrigin.value = { lat: origin.lat, lon: origin.lon };
+  void getMissionRouteChoices(previewOrigin.value, target, 'car', controller.signal).then((choices) => {
+    if (controller.signal.aborted || offerForPreview.value?.id !== requestId) return;
+    const route = choices[0];
+    if (!route) throw new Error('NO_ROUTE');
+    previewRoute.value = route;
+    // Validate geometry before it can reach the shared map. No straight-line
+    // distance or arrival estimate should masquerade as a road route.
+    void previewGeometry.value.data;
+    previewCalculatedAt.value = Date.now();
+  }).catch(() => {
+    if (!controller.signal.aborted) { previewRoute.value = null; previewError.value = 'مسیر خودرو در دسترس نیست؛ فاصله و زمان قابل برآورد نیست.'; }
+  }).finally(() => { if (!controller.signal.aborted) previewLoading.value = false; });
+}, { immediate: true });
+
+const OFFER_SOURCE = 'mission-offer-route-preview';
+const OFFER_LAYER = 'mission-offer-route-preview-line';
+watch([() => props.map, () => props.markerClass, incident, previewRoute, () => props.visible], (_values, _previous, onCleanup) => {
+  const map = props.map, MarkerClass = props.markerClass, target = incident.value;
+  if (!map || !MarkerClass || !target || !props.visible) return;
+  let marker: Marker | null = null;
+  try {
+    marker = new MarkerClass({ color: '#cc623f' }).setLngLat([target.lon, target.lat]).addTo(map);
+    marker.getElement().setAttribute('aria-label', 'محل حادثهٔ پیشنهاد انتخاب‌شده');
+  } catch { /* The map may be changing styles or unmounting. */ }
+  const paint = () => {
+    if (!map.isStyleLoaded()) return;
+    try {
+      if (!previewRoute.value) {
+        if (map.getLayer(OFFER_LAYER)) map.removeLayer(OFFER_LAYER);
+        if (map.getSource(OFFER_SOURCE)) map.removeSource(OFFER_SOURCE);
+        return;
+      }
+      if (map.getLayer(OFFER_LAYER) && map.getSource(OFFER_SOURCE)) return;
+      const source = map.getSource(OFFER_SOURCE) as GeoJSONSource | undefined;
+      if (source) source.setData(previewGeometry.value.data);
+      else map.addSource(OFFER_SOURCE, { type: 'geojson', data: previewGeometry.value.data });
+      if (!map.getLayer(OFFER_LAYER)) map.addLayer({ id: OFFER_LAYER, type: 'line', source: OFFER_SOURCE,
+        paint: { 'line-color': '#147e72', 'line-width': 5, 'line-opacity': .95 } });
+    } catch { /* An in-flight style swap will be repaired at idle. */ }
+  };
+  map.on('idle', paint);
+  paint();
+  try {
+    const camera = missionMapCamera(target, previewOrigin.value, [], previewGeometry.value.bounds);
+    if (camera.kind === 'both') map.fitBounds(camera.bounds, { maxZoom: camera.maxZoom, duration: 400,
+      padding: { top: window.innerWidth < 600 && window.innerHeight < 500 ? 85 : 105,
+        bottom: window.innerWidth < 600 ? Math.round(window.innerHeight * (window.innerHeight < 500 ? .56 : .62)) : 96,
+        left: window.innerWidth >= 600 && window.innerWidth < 1024 ? Math.min(440, Math.round(window.innerWidth * .52)) : 25,
+        right: window.innerWidth >= 1024 ? Math.min(470, Math.round(window.innerWidth * .34)) : window.innerWidth >= 600 ? 80 : 25 } });
+    else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 400,
+      offset: [0, window.innerWidth < 600 ? -Math.min(130, Math.round(window.innerHeight * .2)) : 0] });
+  } catch { /* A zero-sized map can recover when MapCanvas becomes ready. */ }
+  onCleanup(() => {
+    map.off('idle', paint);
+    marker?.remove();
+    try {
+      if (map.getLayer(OFFER_LAYER)) map.removeLayer(OFFER_LAYER);
+      if (map.getSource(OFFER_SOURCE)) map.removeSource(OFFER_SOURCE);
+    } catch { /* MapLibre already replaced the style. */ }
+  });
+}, { flush: 'post' });
+
 async function selectOffer(id: string): Promise<void> {
   selectedId.value = id;
   if (props.compactMap) detailOpen.value = true;
@@ -214,7 +346,7 @@ async function selectOffer(id: string): Promise<void> {
   // In the mission map the list and details are two states of ONE bounded
   // surface. Return to its top instead of jumping the entire map or app shell.
   const panel = detail.closest<HTMLElement>(".mission-desk__empty, .map-proposal__details-scroll");
-  if (props.compactMap) panel?.scrollTo({ top: 0, behavior: "auto" });
+  if (props.compactMap) detail.scrollTo({ top: 0, behavior: "auto" });
   else if (panel) {
     // Elsewhere the existing full inbox retains its stacked master/detail view.
     const top = detail.getBoundingClientRect().top - panel.getBoundingClientRect().top;
@@ -226,7 +358,8 @@ async function selectOffer(id: string): Promise<void> {
 async function closeMapDetail(): Promise<void> {
   detailOpen.value = false;
   await nextTick();
-  listRef.value?.closest<HTMLElement>(".mission-desk__empty")?.scrollTo({ top: 0, behavior: "auto" });
+  // Keep the list's own scroll position so declining or reviewing an offer
+  // returns to the same neighborhood; never scroll the whole map panel.
   const cards = listRef.value?.querySelectorAll<HTMLButtonElement>(".offer-card");
   (Array.from(cards ?? []).find((card) => card.dataset.offerId === selectedId.value) ?? cards?.[0])
     ?.focus({ preventScroll: true });
@@ -424,8 +557,11 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 }
 /* Mission map: a compact inbox, then an explicit detail step inside the same
    bounded surface. The full-page inbox above keeps its own generous layout. */
+.offers--map { height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.offers--map .offers__shell { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; }
 .offers--map:not(.offers--detail-open) .offer-detail,
 .offers--map.offers--detail-open .offers__list { display: none; }
+.offers--map.offers--detail-open .offers__hero { display: none; }
 .offers--map .offers__hero { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .4rem; align-items: center; }
 .offers--map .offers__eyebrow, .offers--map .offers__hero p,
 .offers--map .offers__stat > :deep(.v-icon), .offers--map .offers__stat > span:last-child { display: none; }
@@ -433,7 +569,13 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offers--map .offers__stat { min-width: 44px; min-height: 44px; padding: .25rem .4rem; }
 .offers--map .offers__stat-number { font-size: 1rem; }
 .offers--map .offers__map-refresh { min-width: 44px; min-height: 44px; }
-.offers--map .offers__layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.offers--map .offers__layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 0; flex: 1; min-height: 0; }
+.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.offers--map .offers__list { align-content: start; padding: .25rem .15rem .25rem .1rem; }
+.offers--map .offers__list :deep(.v-alert), .offers--map .offer-detail > :deep(.v-alert) { margin: .35rem; }
+.offers--map .offers__list :deep(.v-alert .v-btn), .offers--map .offer-detail > :deep(.v-alert .v-btn) { min-height: 44px; height: auto; }
+.offers--map .offers__hero { flex: none; }
+.offers--map .offers__shell > :deep(.v-alert) { flex: none; margin: .3rem 0 !important; }
 .offers--map .offers__grid { grid-template-columns: 1fr; gap: .35rem; }
 .offers--map .offers__list, .offers--map .offers__items { gap: .35rem; }
 .offers--map .offers__items { max-height: none; overflow: visible; padding: 0; }
@@ -451,7 +593,17 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offers--map .offer-card__foot span:last-child { display: none; }
 .offers--map .offers__pages { margin-top: .2rem; }
 .offers--map .offers__pages :deep(.v-btn) { min-width: 44px; min-height: 44px; }
-.offers--map .offer-detail { overflow: visible; }
+.offers--map .offer-detail { border-radius: 0; }
+.offers--map .offer-detail__route { padding: .6rem .65rem; margin: .5rem .65rem 0; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.offers--map .offer-detail__route-heading { display: flex; align-items: center; gap: .3rem; font-size: .875rem; font-weight: 800; color: rgb(var(--v-theme-primary)); }
+.offers--map .offer-detail__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin-top: .4rem; }
+.offers--map .offer-detail__metrics > div { min-width: 0; display: grid; gap: .1rem; }
+.offers--map .offer-detail__metrics span { font-size: .8rem; color: var(--bb-color-muted); }
+.offers--map .offer-detail__metrics strong { font-size: 1.05rem; }
+.offers--map .offer-detail__route p { margin: .4rem 0 0; font-size: .8rem; line-height: 1.5; }
+.offers--map .offer-detail__route :deep(.v-btn) { min-height: 44px; height: auto; }
+.offers--map .offer-detail__address { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin: .2rem 0; line-height: 1.6; overflow-wrap: anywhere; }
+.offers--map .offer-detail__address bdi { min-width: 0; }
 .offers--map .offer-detail__back { position: sticky; top: 0; z-index: 2; min-width: 44px; min-height: 44px;
   background: rgb(var(--v-theme-surface)); }
 .offers--map .offer-detail__top { padding: .25rem .65rem .5rem; background: transparent; }

@@ -41,7 +41,9 @@
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
-      <section v-else-if="!desk.activeMission.value && !desk.error.value" class="mission-desk__empty">
+      <section v-else-if="!desk.activeMission.value && !desk.error.value" class="mission-desk__empty"
+        :class="{ 'mission-desk__empty--offers': inbox.proposals.length > 0, 'mission-desk__empty--preview': offerDetailOpen }"
+        :style="embedded && inbox.proposals.length ? { '--offer-list-height': `${96 + Math.min(inbox.proposals.length, 10) * 78 + (inbox.totalPages > 1 ? 44 : 0)}px` } : undefined">
         <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
           class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
         <v-alert v-else-if="embedded && desk.completedMissionId.value" type="success" variant="tonal" rounded="lg"
@@ -52,7 +54,9 @@
           <h3>در حال حاضر مأموریت فعالی ندارید</h3>
           <p>پیشنهادهای دریافتی و جزئیات پذیرش در همین زبانه در دسترس‌اند.</p>
         </template>
-        <ProposalInboxContent :selected-offer-id="null" :compact-map="embedded" />
+        <ProposalInboxContent :selected-offer-id="null" :compact-map="embedded" :map="externalMap"
+          :marker-class="externalMarker" :own-position="ownPosition" :visible="visible"
+          @detail-change="offerDetailOpen = $event" @request-location="emit('focus-own')" />
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
@@ -443,11 +447,12 @@ import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 // workspace passes its existing MapCanvas and Marker constructor here.
 const props = withDefaults(defineProps<{
   embedded?: boolean; visible?: boolean; externalMap?: MapLibreMap | null; externalMarker?: typeof Marker | null;
-  ownRecenterLabel?: string; ownLocationError?: boolean;
+  ownRecenterLabel?: string; ownLocationError?: boolean; ownPosition?: { lat: number; lon: number } | null;
 }>(), { embedded: false, visible: true, ownRecenterLabel: "نمایش موقعیت من روی نقشه", ownLocationError: false });
 const emit = defineEmits<{ "focus-own": [] }>();
 const auth = useAuthStore();
 const inbox = useProposalInboxStore();
+const offerDetailOpen = ref(false);
 const assignment = useRescuerMissionShareStore();
 watch(() => assignment.mission?.id, (id) => { if (id) void desk.load(); }, { flush: "post" });
 // The workspace remains mounted through offer acceptance; the desk no longer
@@ -455,6 +460,7 @@ watch(() => assignment.mission?.id, (id) => { if (id) void desk.load(); }, { flu
 watch(() => inbox.acceptedMissionId, (id) => { if (id) void desk.load(); }, { flush: "post" });
 const desk = useMissionDesk(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   () => auth.ensureSession());
+watch(() => desk.activeMission.value?.id, (id) => { if (id) offerDetailOpen.value = false; });
 const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), () => auth.ensureSession());
 const transportProfiles = [
@@ -595,7 +601,8 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
   if (added) openRouteWorkspace();
   return added;
 }
-defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
+defineExpose({ addSearchWaypoint, hasOfferPreview: computed(() => offerDetailOpen.value && !desk.activeMission.value),
+  hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
   hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value),
   hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value && !pickingWaypoint.value &&
@@ -1196,8 +1203,8 @@ onBeforeUnmount(() => {
   background: transparent !important; pointer-events: none; }
 .mission-desk--embedded .mission-desk__shell,
 .mission-desk--embedded .mission-desk__workspace { pointer-events: none; }
-/* The idle offer surface, not the whole map shell or an inner offer list, is
-   the one scroll container. Keep a clear strip of map/SOS visible below it. */
+/* The card clips its contents; the list section (parent of the rows) or
+   detail section scrolls beneath the fixed header. Keep map/SOS visible. */
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__shell {
   overflow: hidden; padding-bottom: 0;
 }
@@ -1207,6 +1214,10 @@ onBeforeUnmount(() => {
   padding: .75rem; max-height: calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; overscroll-behavior: contain;
   background: rgba(var(--v-theme-surface), .95);
+}
+.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--offers {
+  height: min(var(--offer-list-height), calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  display: flex; flex-direction: column; overflow: hidden;
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) {
   padding: 0; background: transparent;
@@ -1234,7 +1245,7 @@ onBeforeUnmount(() => {
   color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); }
 /* This card is at most 42rem even on desktop: viewport breakpoints in the
    reusable inbox cannot decide whether its list and detail fit side by side. */
-.mission-desk__empty :deep(.offers__layout) { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+.mission-desk__empty :deep(.offers__layout) { grid-template-columns: minmax(0, 1fr); gap: 0; }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__items) {
   max-height: none; overflow: visible; padding: 0;
 }
@@ -1248,6 +1259,37 @@ onBeforeUnmount(() => {
     width: min(30rem, calc(50vw - 1.5rem - env(safe-area-inset-left, 0px)));
     margin: calc(50dvh + 1.75rem + env(safe-area-inset-top, 0px)) 0 0 calc(1rem + env(safe-area-inset-left, 0px));
     max-height: max(4rem, calc(50dvh - 2.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
+}
+/* Reviewing an offer exposes the shared map instead of covering the route
+   behind the card. Persistent Search pauses; the map action rail stays free. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
+    width: min(25rem, calc(50vw - 1.5rem));
+    height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    margin: calc(8.5rem + env(safe-area-inset-top, 0px)) 0 0 calc(1rem + env(safe-area-inset-left, 0px));
+    max-height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (min-width: 1024px) {
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
+    width: min(25rem, calc(50vw - 1.5rem));
+    height: calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    margin: calc(8.5rem + env(safe-area-inset-top, 0px)) calc(5.5rem + env(safe-area-inset-right, 0px)) 0 auto;
+  }
+}
+@media (max-width: 599px) {
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
+    position: absolute; left: calc(.75rem + env(safe-area-inset-left, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
+    width: auto; margin: 0; height: min(42dvh, 24rem);
+    max-height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (max-width: 599px) and (max-height: 500px) {
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
+    height: 26dvh;
   }
 }
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }
