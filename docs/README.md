@@ -42,6 +42,7 @@
 | [ENVIRONMENT.md](./ENVIRONMENT.md) | Complete active `.env.example` key reference and consumer boundaries | Dev, DevOps |
 | [WORKFLOWS.md](./WORKFLOWS.md) | Git hooks, CI/CD, deploy, Android build | DevOps |
 | [USER_MANUAL.md](./USER_MANUAL.md) | End-user guide with screenshots placeholders | QA, User |
+| [MISSION_GPS_ACCEPTANCE.md](./MISSION_GPS_ACCEPTANCE.md) | Private mission GPS field acceptance checklist (not yet signed off) | QA, Dev |
 | [DIAGRAMS/](./DIAGRAMS/) | ERD, SOS flowchart, location sequence (Mermaid) | All |
 
 ---

@@ -4,7 +4,7 @@
       <div>
         <span class="live-panel__eyebrow"><v-icon icon="mdi-map-marker-radius" size="17" /> اتاق خصوصی مأموریت</span>
         <h3>{{ routeActive ? 'نقشهٔ مأموریت' : 'موقعیت اعضای مأموریت' }}</h3>
-        <p>{{ routeActive ? 'محل حادثه و مسیرها در همین نقشه‌اند؛ درخواست‌کننده و امدادگر موقعیت خود را فقط برای اعضای مجاز مأموریت می‌فرستند.' : 'موقعیت درخواست‌کننده و امدادگر در مأموریت فعال با اجازهٔ GPS خودکار است؛ نمایش آن برای طرف مقابل را مدیر کنترل می‌کند.' }}</p>
+        <p>{{ routeActive ? 'محل حادثه و مسیرها در همین نقشه‌اند؛ فقط موقعیت‌های دریافت‌شدهٔ اعضای مجاز نمایش داده می‌شوند.' : 'ارسال خصوصی موقعیت درخواست‌کننده و امدادگر در مأموریت فعال خودکار آغاز می‌شود، اما به اجازهٔ GPS و اتصال نیاز دارد؛ مدیر دسترسی دو طرف را کنترل می‌کند.' }}</p>
       </div>
       <div class="d-flex flex-wrap align-center ga-2">
         <slot name="map-toolbar" />
@@ -33,7 +33,7 @@
         <div class="live-panel__map">
           <MapCanvas v-if="!externalCanvas" :center="center" :zoom="13" :constrain-bounds="false" :show-zoom="!fullscreen"
             :compass-action="fullscreen" :style-url="mapStyleUrl"
-            :aria-label="routeActive ? 'نقشهٔ مأموریت و موقعیت به‌اشتراک‌گذاشته‌شدهٔ اعضا' : 'نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر'"
+            :aria-label="routeActive ? 'نقشهٔ مأموریت، مسیرها و موقعیت‌های دریافت‌شدهٔ مجاز' : 'نقشهٔ موقعیت‌های دریافت‌شدهٔ اعضای مجاز مأموریت'"
             @ready="onMapReady" />
           <slot name="map-actions" />
         </div>
@@ -91,7 +91,7 @@
         <template v-else-if="isAdmin">
           <details class="live-panel__presence-details">
             <summary>دسترسی اعضا به موقعیت</summary>
-            <p>اشتراک درخواست‌کننده و امدادگر خودکار و خصوصی است؛ نمایش موقعیت هرکدام برای طرف مقابل را اینجا تعیین کنید. مدیر همیشه هر دو را می‌بیند.</p>
+            <p>ارسال موقعیت درخواست‌کننده و امدادگر در مأموریت فعال خودکار است، اگر GPS و اتصال برقرار باشد؛ نمایش هرکدام برای طرف مقابل را اینجا تعیین کنید. دسترسی مدیر به هر دو حفظ می‌شود.</p>
             <v-alert v-if="policyError" type="warning" variant="tonal" role="alert">{{ policyError }}</v-alert>
             <template v-if="locationPolicy">
               <v-checkbox v-model="locationPolicy.rescuerVisibleToRequester" label="نمایش امدادگر به درخواست‌کننده" density="compact" hide-details />
@@ -108,10 +108,10 @@
           </v-btn>
           <v-btn v-if="live.sharing.value" color="error" variant="tonal" rounded="lg" block
             @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
-          <p class="live-panel__note">موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
+          <p class="live-panel__note">ارسال موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
         </template>
         <template v-else>
-          <p class="live-panel__note" role="status">اشتراک خصوصی موقعیت شما برای اعضای مجاز مأموریت خودکار است؛ پخش عمومی مستقل است.</p>
+          <p class="live-panel__note" role="status">برنامه در مأموریت فعال اشتراک خصوصی موقعیت شما را خودکار آغاز می‌کند؛ دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد. پخش عمومی مستقل است.</p>
           <v-alert v-if="auth.user?.id === mission.requesterId && (requesterShare.statusError || requesterShare.gpsError(mission.id))"
             type="warning" variant="tonal" role="alert">
             {{ requesterShare.statusError || requesterShare.gpsError(mission.id) }}

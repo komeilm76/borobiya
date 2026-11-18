@@ -78,7 +78,7 @@
       <div v-if="api.term.value.trim().length >= 2" class="place-search__results">
         <p v-if="api.loading.value && !api.results.value.length" class="place-search__feedback" role="status">در حال جست‌وجو…</p>
         <div v-else-if="api.failed.value && !api.results.value.length" class="place-search__feedback" role="alert">
-          <p>جست‌وجوی مکان در دسترس نیست؛ اتصال یا محدودهٔ نقشه را بررسی کنید.</p>
+          <p>جست‌وجوی مکان انجام نشد؛ کمی بعد دوباره تلاش کنید یا محدوده را تغییر دهید.</p>
           <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
         </div>
         <p v-else-if="api.searched.value && !api.results.value.length" class="place-search__feedback" role="status">
@@ -112,15 +112,18 @@
       </div>
       <div v-if="api.failed.value && api.diagnostic.value && api.term.value.trim().length >= 2"
         class="place-search__diagnostic" role="group" aria-label="گزارش خطای جست‌وجو">
-        <p v-if="api.diagnostic.value.includes('LIMIT_5_ACCEPTED')">درگاه همین جست‌وجو را با ۵ نتیجه می‌پذیرد اما درخواست ۳۰ نتیجه را رد می‌کند؛ نسخهٔ درگاه نقشه را با برنامه به‌روزرسانی کنید. نتیجهٔ ناقص نمایش داده نمی‌شود.</p>
-        <p v-else-if="api.diagnostic.value.includes('LIMIT_5_REJECTED')">درگاه جست‌وجو هر دو درخواست ۵ و ۳۰ نتیجه را رد کرد؛ محدوده یا پارامترهای درگاه باید بررسی شوند.</p>
-        <p v-else-if="api.diagnostic.value.includes('invalid_geocode_query')">درگاه نقشه درخواست را رد کرد؛ نسخهٔ برنامه و درگاه جست‌وجو را با هم بررسی کنید.</p>
-        <p v-else-if="api.diagnostic.value.includes('geocoding_unavailable')">فتون یا اتصال درگاه نقشه در دسترس نیست؛ وضعیت سرویس را بررسی کنید.</p>
-        <p v-else-if="api.diagnostic.value.includes('MAP_BOUNDS_UNAVAILABLE')">محدودهٔ نقشه هنوز آماده نیست؛ بارگذاری نقشه را بررسی کنید.</p>
-        <p>گزارش امن خطا (بدون متن جست‌وجو یا مختصات):</p>
-        <code dir="ltr">{{ api.diagnostic.value }}</code>
-        <v-btn class="place-search__copy-report" variant="text" prepend-icon="mdi-content-copy" @click="copyDiagnostic">کپی گزارش</v-btn>
-        <small v-if="copyStatus" role="status">{{ copyStatus === 'copied' ? 'گزارش کپی شد.' : 'کپی خودکار ممکن نیست؛ متن بالا را لمس طولانی کنید و کپی کنید.' }}</small>
+        <p v-if="api.diagnostic.value.includes('LIMIT_5_ACCEPTED')">جست‌وجو با تنظیمات فعلی کامل نشد؛ نتایج ناقص نمایش داده نمی‌شوند. اگر مشکل ادامه داشت، گزارش فنی را برای پشتیبانی بفرستید.</p>
+        <p v-else-if="api.diagnostic.value.includes('LIMIT_5_REJECTED')">سرویس جست‌وجو این درخواست را نمی‌پذیرد؛ اگر مشکل ادامه داشت، گزارش فنی را برای پشتیبانی بفرستید.</p>
+        <p v-else-if="api.diagnostic.value.includes('invalid_geocode_query')">درخواست جست‌وجو پذیرفته نشد. محدوده یا واژهٔ جست‌وجو را تغییر دهید؛ اگر مشکل ادامه داشت، گزارش فنی را برای پشتیبانی بفرستید.</p>
+        <p v-else-if="api.diagnostic.value.includes('geocoding_unavailable')">سرویس جست‌وجوی مکان فعلاً در دسترس نیست؛ کمی بعد دوباره تلاش کنید.</p>
+        <p v-else-if="api.diagnostic.value.includes('MAP_BOUNDS_UNAVAILABLE')">نقشه هنوز آماده نیست؛ پس از بارگذاری آن دوباره تلاش کنید.</p>
+        <details class="place-search__diagnostic-details">
+          <summary>جزئیات فنی برای پشتیبانی</summary>
+          <p>گزارش خطا (بدون متن جست‌وجو یا مختصات):</p>
+          <code dir="ltr">{{ api.diagnostic.value }}</code>
+          <v-btn class="place-search__copy-report" variant="text" prepend-icon="mdi-content-copy" @click="copyDiagnostic">کپی گزارش</v-btn>
+          <small v-if="copyStatus" role="status">{{ copyStatus === 'copied' ? 'گزارش کپی شد.' : 'کپی خودکار ممکن نیست؛ متن بالا را لمس طولانی کنید و کپی کنید.' }}</small>
+        </details>
       </div>
     </div>
   </v-card>
@@ -173,6 +176,8 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search__show-all { flex: 0 0 auto; min-width: 44px; min-height: 44px; height: 44px; white-space: nowrap; }
 .place-search__diagnostic { margin-top: 0.6rem; padding: 0.5rem; border-radius: 0.5rem; background: rgba(var(--v-theme-error), 0.09); }
 .place-search__diagnostic p { margin: 0 0 0.25rem; }
+.place-search__diagnostic-details summary { display: list-item; min-height: 44px; padding-block: .55rem; cursor: pointer; font-weight: 600; }
+.place-search__diagnostic-details summary:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .place-search__diagnostic code { display: block; direction: ltr; text-align: start; user-select: text; overflow-wrap: anywhere; font-size: 0.8rem; }
 .place-search__diagnostic small { display: block; }
 .place-search__copy-report { min-height: 44px; }
