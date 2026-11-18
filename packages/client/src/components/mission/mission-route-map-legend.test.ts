@@ -41,7 +41,7 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(mapLegend).not.toContain('<details');
     expect(page).not.toContain('class="mission-route__legend"');
     expect(page).toContain('class="mission-desk__map-cards"');
-    expect(page).toContain("hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value &&\n    (!activeTool.value || activeTool.value === 'status'))");
+    expect(page).toContain("hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value && !pickingWaypoint.value &&\n    (!activeTool.value || activeTool.value === 'status'))");
     expect(page).toContain('id="mission-tool-legend" class="mission-desk__legend-action" icon="mdi-map-outline"');
     expect(page).toContain(':aria-expanded="legendOpen" aria-controls="mission-map-legend" @click="toggleLegend"');
     expect(page.indexOf('id="mission-tool-legend"')).toBeLessThan(page.indexOf('id="mission-tool-status"'));

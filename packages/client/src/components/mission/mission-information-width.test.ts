@@ -17,7 +17,7 @@ function rule(source: string, selector: string): string {
 
 describe("responsive Mission Information", () => {
   it("keeps the information and steps surfaces distinct, with an immediate photo preview and full detail on demand", () => {
-    expect(view).toContain("'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool");
+    expect(view).toContain("'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint");
     expect(view).toContain("'mission-desk__bottom-stack--information': activeTool === 'status'");
     expect(view).toContain('<MissionStatusPanel v-if="activeTool === \'status\'"');
     expect(view).toContain('id="mission-tool-status"');

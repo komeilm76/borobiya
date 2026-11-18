@@ -2,8 +2,8 @@
   <main class="mission-desk" :class="{ 'mission-desk--embedded': embedded, 'mission-desk--active': desk.activeMission.value,
     'mission-desk--terminal-hold': !!desk.terminalHold.value,
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
-    'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool,
-    'mission-desk--steps-guidance': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool &&
+    'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint,
+    'mission-desk--steps-guidance': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint &&
       (navigation.active.value || !!routing.error.value || !!navigation.error.value),
     'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport' }" dir="rtl" @keydown.esc="dismissTool">
     <!-- The map workspace owns the persistent public canvas even while idle. -->
@@ -301,7 +301,7 @@
             aria-label="نمایش محل حادثه و مسیر مأموریت" title="نمایش محل حادثه و مسیر مأموریت"
             :disabled="!mapReady || !!desk.terminalHold.value" @click="frameMissionRoute" />
         </div>
-        <div v-if="!desk.terminalHold.value && (!activeTool || activeTool === 'status')"
+        <div v-if="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === 'status')"
           id="mission-steps-stack" class="mission-desk__bottom-stack" :class="{ 'mission-desk__bottom-stack--information': activeTool === 'status' }">
           <section v-if="legendOpen" id="mission-map-legend" class="mission-desk__map-legend bb-floating-card"
             aria-labelledby="mission-map-legend-title" dir="rtl" tabindex="-1">
@@ -341,13 +341,13 @@
             </div>
           </div>
         </div>
-        <v-btn v-show="!desk.terminalHold.value && (!activeTool || activeTool === 'status')"
+        <v-btn v-show="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === 'status')"
           id="mission-tool-legend" class="mission-desk__legend-action" icon="mdi-map-outline"
           :color="legendOpen ? 'primary' : 'surface'" variant="flat"
           :aria-label="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
           :title="legendOpen ? 'بستن راهنمای نقشه' : 'راهنمای نقشه'"
           :aria-expanded="legendOpen" aria-controls="mission-map-legend" @click="toggleLegend" />
-        <v-btn id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"
+        <v-btn v-show="!pickingWaypoint" id="mission-tool-status" class="mission-desk__info-action" icon="mdi-information-outline"
           :color="activeTool === 'status' ? 'primary' : 'surface'" variant="flat"
           :aria-label="activeTool === 'status' ? 'بستن اطلاعات مأموریت' : 'نمایش اطلاعات مأموریت'"
           :title="activeTool === 'status' ? 'بستن اطلاعات مأموریت' : 'اطلاعات مأموریت'"
@@ -478,6 +478,7 @@ const mapReady = ref(false);
 const followingGps = ref(true);
 const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
+const pickingWaypoint = ref(false);
 const legendOpen = ref(false);
 function toggleLegend(): void {
   legendOpen.value = !legendOpen.value;
@@ -490,7 +491,7 @@ watch(() => desk.terminalHold.value, (held) => { if (held) legendOpen.value = fa
 // measure their actual viewport height before positioning the external SOS,
 // Search and in-map icon rails. Clear the shared variable on every exit path.
 watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
-  () => desk.terminalHold.value, legendOpen], async (_values, _previous, onCleanup) => {
+  () => desk.terminalHold.value, legendOpen, pickingWaypoint], async (_values, _previous, onCleanup) => {
   let disposed = false;
   let observer: ResizeObserver | undefined;
   let onResize: (() => void) | undefined;
@@ -500,7 +501,7 @@ watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
     if (onResize) window.removeEventListener("resize", onResize);
     document.documentElement.style.removeProperty("--bb-map-mission-sheet-height");
   });
-  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || activeTool.value) return;
+  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || activeTool.value || pickingWaypoint.value) return;
   await nextTick();
   if (disposed) return;
   const element = document.getElementById("mission-steps-stack");
@@ -555,7 +556,6 @@ watch(routing.routes, () => {
   closeRouteSection(false);
 }, { flush: "sync" });
 
-const pickingWaypoint = ref(false);
 const waypointLat = ref("");
 const waypointLon = ref("");
 const waypointError = ref("");
@@ -593,8 +593,8 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 }
 defineExpose({ addSearchWaypoint, hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
-  hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value),
-  hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value &&
+  hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value),
+  hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value && !pickingWaypoint.value &&
     (!activeTool.value || activeTool.value === 'status')) });
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
@@ -682,6 +682,7 @@ function cancelWaypointPick(): void {
 }
 function toggleWaypointPick(): void {
   pickingWaypoint.value = !pickingWaypoint.value;
+  if (pickingWaypoint.value) legendOpen.value = false;
   waypointError.value = "";
   activeTool.value = pickingWaypoint.value ? null : "route";
   const focusId = pickingWaypoint.value ? "mission-cancel-waypoint" : "mission-route-panel";
@@ -989,8 +990,16 @@ onBeforeUnmount(() => {
 .mission-desk { min-height: calc(100vh - 130px); padding: clamp(18px, 4vw, 52px) 18px 100px; color: rgb(var(--v-theme-on-background)); background: radial-gradient(ellipse at 86% 4%, rgba(33,130,113,.10), transparent 52%), rgb(var(--v-theme-background)); }
 .mission-desk__workspace { scroll-margin-top: 16px; }
 .mission-route { margin-top: 12px; padding: clamp(14px, 2vw, 22px); border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px); }
-.mission-desk__map-hint { position: absolute; z-index: 2; inset-inline: 12px; bottom: 32px; width: fit-content; max-width: calc(100% - 24px); padding: 8px 12px; border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-surface); font-size: .85rem; }
-.mission-desk__map-hint button { margin-inline-start: 12px; color: rgb(var(--v-theme-primary)); text-decoration: underline; font: inherit; font-weight: 700; }
+.mission-desk__map-hint { position: absolute; z-index: 2; inset-inline: 12px; bottom: 32px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .35rem .6rem;
+  width: fit-content; max-width: calc(100% - 24px); padding: .45rem .6rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); font-size: .875rem; line-height: 1.45; }
+.mission-desk__map-hint button { position: sticky; top: 0; min-height: 44px; padding: .35rem .65rem;
+  border: 0; border-radius: 12px; background: var(--bb-color-inset); color: rgb(var(--v-theme-primary));
+  cursor: pointer; font: inherit; font-weight: 800; }
+.mission-desk__map-hint [role="alert"] { grid-column: 1 / -1; }
 :global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; cursor: pointer; }
 :global(.mission-desk__incident-pin:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 :global(.mission-desk__incident-pin[aria-disabled="true"]) { cursor: default; }
@@ -1543,6 +1552,13 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 599px) {
   .mission-desk--active { padding: 0; }
+  /* Picking replaces the stage dock with one map hint; leave SOS and the
+     lower camera rail uncovered, even on a landscape/zoomed phone. */
+  .mission-desk--active .mission-desk__map-hint {
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: max(4rem, calc(100dvh - 16rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
   /* The shared map owns the idle action rail above this panel. Do not shrink
      and offset the offers to one side: use a centered, single scroll surface. */
   .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {

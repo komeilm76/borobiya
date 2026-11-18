@@ -61,7 +61,7 @@ describe("mission map controls", () => {
     expect(missionMap).toContain('v-if="!desk.terminalHold.value && activeTool !== \'route\'');
     expect(style).toContain('pointer-events: auto;');
     expect(style).toContain('color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));');
-    expect(missionMap).toContain('v-if="!desk.terminalHold.value && (!activeTool || activeTool === \'status\')"');
+    expect(missionMap).toContain('v-if="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === \'status\')"');
     expect(style).toContain('max-height: max(6rem, calc(100dvh - 10.5rem');
     expect(compiled.code).toContain('.mission-desk__terminal-alert[data-v-verification]');
     expect(missionMap).toContain('v-if="embedded && desk.cancelledMissionId.value"');

@@ -71,7 +71,7 @@ describe("map workspace scroll ownership", () => {
     const css = style(mission, "UserMissionView.vue");
     const team = style(room, "MissionLivePanel.vue");
     const stage = style(status, "MissionStatusPanel.vue");
-    expect(mission).toContain('v-if="!desk.terminalHold.value && (!activeTool || activeTool === \'status\')"');
+    expect(mission).toContain('v-if="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === \'status\')"');
     expect(css).toContain('max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));\n    max-height: none;');
     expect(team).toContain('max-height: min(15.5rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));');

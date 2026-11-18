@@ -46,7 +46,7 @@ describe("mission steps beside Navigate's bottom dock", () => {
     expect(mission).toContain('observer.observe(element);');
     expect(mission).toContain('window.innerHeight - element.getBoundingClientRect().top');
     expect(mission).toContain('document.documentElement.style.removeProperty("--bb-map-mission-sheet-height")');
-    expect(mission).toContain('hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value)');
+    expect(mission).toContain('hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value)');
     expect(mission).toContain("'mission-desk--steps-guidance': !!desk.activeMission.value");
     expect(map).toContain("'user-map-view--mission-steps': mode === 'missions' && !!missionWorkspace?.hasStepsSheet");
     expect(shell).toContain(':root { --bb-map-mission-sheet-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem');
