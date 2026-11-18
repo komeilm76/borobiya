@@ -17,7 +17,7 @@ describe("participant automatic mission share and independent general share butt
     expect(panel).toContain('<template v-else-if="isAdmin">');
     expect(panel).not.toContain('v-else-if="canPublish"');
     expect(app).toContain('useRequesterMissionShareStore(pinia);');
-    expect(panel).toContain('requesterShare.mission?.id === props.mission.id && requesterShare.sharing');
+    expect(panel).toContain('requesterShare.isSharingMission(props.mission.id)');
     expect(panel).toContain("missionShare.mission?.id === props.mission.id && missionShare.sharing");
     expect(mission).toContain('@sharing-change="teamSharing = $event"');
     expect(mission).not.toContain("@click=\"live.stopSharing()\"");

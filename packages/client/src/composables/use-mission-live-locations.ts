@@ -38,7 +38,7 @@ export interface MissionLiveRuntime {
 }
 const STALE_MS = 30_000;
 
-function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number }) => void,
+export function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number }) => void,
   onError: (denied: boolean) => void): () => void {
   if (typeof navigator === "undefined" || !navigator.geolocation) throw new Error("GEOLOCATION_UNAVAILABLE");
   const id = navigator.geolocation.watchPosition(({ coords }) => onFix({

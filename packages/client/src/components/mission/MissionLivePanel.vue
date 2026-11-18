@@ -84,8 +84,8 @@
         <template v-if="fullscreen">
           <p class="live-panel__note" role="status">
             {{ missionShare.sharing && missionShare.mission?.id === mission.id
-              ? 'اشتراک موقعیت امدادگر با اعضای این مأموریت فعال است.'
-              : 'موقعیت امدادگر پس از تأیید مأموریت و اجازهٔ GPS به‌صورت خودکار با اعضای این مأموریت به اشتراک گذاشته می‌شود. اگر اشتراک برقرار نشد، هشدار بالای صفحه را بررسی کنید.' }}
+              ? 'اشتراک خصوصی موقعیت امدادگر برای اعضای مجاز این مأموریت فعال است.'
+              : 'موقعیت امدادگر پس از تأیید مأموریت و اجازهٔ GPS به‌صورت خودکار برای اعضای مجاز این مأموریت ارسال می‌شود. اگر اشتراک برقرار نشد، هشدار بالای صفحه را بررسی کنید.' }}
           </p>
         </template>
         <template v-else-if="isAdmin">
@@ -110,7 +110,14 @@
             @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
           <p class="live-panel__note">موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
         </template>
-        <p v-else class="live-panel__note" role="status">اشتراک خصوصی موقعیت شما برای اعضای مجاز مأموریت خودکار است؛ برای خطای GPS یا اتصال، هشدارهای وضعیت را بررسی کنید. پخش عمومی مستقل است.</p>
+        <template v-else>
+          <p class="live-panel__note" role="status">اشتراک خصوصی موقعیت شما برای اعضای مجاز مأموریت خودکار است؛ پخش عمومی مستقل است.</p>
+          <v-alert v-if="auth.user?.id === mission.requesterId && (requesterShare.statusError || requesterShare.gpsError(mission.id))"
+            type="warning" variant="tonal" role="alert">
+            {{ requesterShare.statusError || requesterShare.gpsError(mission.id) }}
+            <v-btn variant="text" size="small" @click="requesterShare.retry(mission.id)">بررسی دوباره</v-btn>
+          </v-alert>
+        </template>
       </div>
     </div>
   </section>
@@ -127,6 +134,7 @@ import { createLiveCameraIntent } from "@/mission/live-camera-intent";
 import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
 import { getMissionLocationPolicy, putMissionLocationPolicy, type MissionLocationPolicy } from "@/api/mission";
+import { accountSessionKey } from "@/composables/device-identity";
 import { useRequesterMissionShareStore } from "@/stores/requester-mission-share";
 import { useMissionPresence } from "@/composables/use-mission-presence";
 import { missionPresenceLabel } from "@/mission/presence";
@@ -160,7 +168,7 @@ const presence = useMissionPresence(computed(() => props.mission.id), computed((
   computed(() => auth.user?.id ?? null));
 // Participant publishers are app-owned; only the admin opts in from this panel.
 watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)
-  : auth.user?.id === props.mission.requesterId ? Boolean(requesterShare.mission?.id === props.mission.id && requesterShare.sharing) : live.sharing.value, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
+  : auth.user?.id === props.mission.requesterId ? requesterShare.isSharingMission(props.mission.id) : live.sharing.value, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
 watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }, { flush: "sync" });
 const isAdmin = computed(() => auth.user?.role === "admin");
 const locationPolicy = ref<MissionLocationPolicy | null>(null);
@@ -168,15 +176,16 @@ const savedPolicy = ref<MissionLocationPolicy | null>(null);
 const policyError = ref<string | null>(null);
 const savingPolicy = ref(false);
 const canAdminShare = computed(() => Boolean(savedPolicy.value?.adminVisibleToRequester || savedPolicy.value?.adminVisibleToRescuer));
-watch(() => [props.mission.id, auth.accessToken, auth.user?.id, isAdmin.value] as const,
-  async ([id, token, _owner, admin], _previous, onCleanup) => {
+watch(() => [props.mission.id, accountSessionKey(auth.user?.id ?? null, auth.accessToken), auth.user?.id, isAdmin.value] as const,
+  async ([id, session, _owner, admin], _previous, onCleanup) => {
+    const token = auth.accessToken;
     let cancelled = false;
     onCleanup(() => { cancelled = true; });
     locationPolicy.value = null;
     savedPolicy.value = null;
     policyError.value = null;
     live.stopSharing();
-    if (!admin || !token) return;
+    if (!admin || !token || !session) return;
     try {
       const next = await getMissionLocationPolicy(token, id);
       if (!cancelled) { locationPolicy.value = { ...next }; savedPolicy.value = { ...next }; }
@@ -187,16 +196,22 @@ async function savePolicy(): Promise<void> {
   const draft = locationPolicy.value;
   if (!isAdmin.value || !token || !draft || savingPolicy.value) return;
   const id = props.mission.id;
+  const session = accountSessionKey(auth.user?.id ?? null, token);
   savingPolicy.value = true;
   policyError.value = null;
   try {
     const result = await putMissionLocationPolicy(token, id, draft);
-    if (props.mission.id !== id || auth.accessToken !== token) return;
+    if (props.mission.id !== id || !session ||
+      accountSessionKey(auth.user?.id ?? null, auth.accessToken) !== session) return;
     savedPolicy.value = { ...result };
     locationPolicy.value = { ...result };
     if (!result.adminVisibleToRequester && !result.adminVisibleToRescuer) live.stopSharing();
-  } catch { policyError.value = "ذخیرهٔ دسترسی‌ها انجام نشد؛ تنظیمات پیشین همچنان معتبر است."; }
-  finally { savingPolicy.value = false; }
+  } catch {
+    if (props.mission.id === id && session &&
+      accountSessionKey(auth.user?.id ?? null, auth.accessToken) === session) {
+      policyError.value = "ذخیرهٔ دسترسی‌ها انجام نشد؛ تنظیمات پیشین همچنان معتبر است.";
+    }
+  } finally { savingPolicy.value = false; }
 }
 const map = shallowRef<MapLibreMap | null>(null);
 const cameraIntent = createLiveCameraIntent();

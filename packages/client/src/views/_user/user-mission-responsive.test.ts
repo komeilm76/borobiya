@@ -148,7 +148,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(actions.indexOf('mission-tool-route')).toBeGreaterThan(actions.indexOf('mission-tool-team'));
     expect(view).not.toContain('mission-desk__dock');
     expect(panel).toContain('watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)');
-    expect(panel).toContain('requesterShare.mission?.id === props.mission.id && requesterShare.sharing');
+    expect(panel).toContain('requesterShare.isSharingMission(props.mission.id)');
     expect(panel).toContain('<template v-else-if="isAdmin">');
     expect(panel).toContain('aria-label="بستن پنل اعضای مأموریت"');
     expect(panel).toContain('watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }');
