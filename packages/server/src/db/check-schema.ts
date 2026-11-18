@@ -19,7 +19,7 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    console.info(`Database schema ready (${REQUIRED_MIGRATION}); proposal and mission tables present.`);
+    console.info(`Database schema ready (${REQUIRED_MIGRATION}); required mission tables and policy columns present.`);
   } finally {
     await client.end();
   }

@@ -12,30 +12,52 @@ export const REQUIRED_MIGRATION_TIMESTAMP = latest.when;
 export interface SchemaReadiness {
   readonly latestAppliedAt: number | null;
   readonly missingTables: readonly string[];
+  readonly missingColumns: readonly string[];
   readonly ready: boolean;
 }
 
-/** Read-only schema probe. Never run migrations implicitly when starting the development app. */
+const missionPolicyColumns = ["rescuer_visible_to_requester", "requester_visible_to_rescuer",
+  "admin_visible_to_requester", "admin_visible_to_rescuer"] as const;
+
+/** Read-only schema probe against the API's database. A journal row alone cannot
+ * prove that the mission policy columns actually exist (e.g. manual schema drift). */
 export async function checkSchemaReadiness(query: (sql: string) => Promise<readonly Record<string, unknown>[]>): Promise<SchemaReadiness> {
   const [tables] = await query(`SELECT
     to_regclass('drizzle.__drizzle_migrations')::text AS journal,
     to_regclass('public.mission_proposals')::text AS proposals,
-    to_regclass('public.missions')::text AS missions`);
+    to_regclass('public.missions')::text AS missions,
+    to_regclass('public.mission_track_points')::text AS track_points,
+    to_regclass('public.mission_suggested_routes')::text AS suggested_routes`);
   const missingTables = ([
     ["drizzle.__drizzle_migrations", tables?.journal],
     ["public.mission_proposals", tables?.proposals],
-    ["public.missions", tables?.missions]
+    ["public.missions", tables?.missions],
+    ["public.mission_track_points", tables?.track_points],
+    ["public.mission_suggested_routes", tables?.suggested_routes]
   ] as const).filter(([, found]) => !found).map(([name]) => name);
+  const present = tables?.missions ? await query(`SELECT column_name FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'missions'
+      AND column_name IN ('rescuer_visible_to_requester', 'requester_visible_to_rescuer',
+        'admin_visible_to_requester', 'admin_visible_to_rescuer')`) : [];
+  const found = new Set(present.map((row) => row.column_name));
+  const missingColumns = tables?.missions ? missionPolicyColumns.filter((name) => !found.has(name)) : [];
   const [last] = tables?.journal ? await query("SELECT max(created_at) AS latest FROM drizzle.__drizzle_migrations") : [];
   const timestamp = last?.latest == null ? null : Number(last.latest);
   const latestAppliedAt = timestamp !== null && Number.isFinite(timestamp) ? timestamp : null;
-  return { latestAppliedAt, missingTables,
-    ready: missingTables.length === 0 && latestAppliedAt !== null && latestAppliedAt >= REQUIRED_MIGRATION_TIMESTAMP };
+  return { latestAppliedAt, missingTables, missingColumns,
+    ready: missingTables.length === 0 && missingColumns.length === 0 && latestAppliedAt !== null &&
+      latestAppliedAt >= REQUIRED_MIGRATION_TIMESTAMP };
 }
 
 export function schemaReadinessMessage(state: SchemaReadiness): string {
-  const missing = state.missingTables.length ? ` Missing: ${state.missingTables.join(", ")}.` : "";
-  return `Database schema is behind the checked-in ${REQUIRED_MIGRATION} migration.${missing} ` +
+  const missing = state.missingTables.length ? ` Missing tables: ${state.missingTables.join(", ")}.` : "";
+  const columns = state.missingColumns.length ? ` Missing mission columns: ${state.missingColumns.join(", ")}.` : "";
+  const drift = state.latestAppliedAt !== null && state.latestAppliedAt >= REQUIRED_MIGRATION_TIMESTAMP &&
+    (state.missingTables.length > 0 || state.missingColumns.length > 0);
+  if (drift) return `Database journal claims ${REQUIRED_MIGRATION} but required schema objects are missing.${missing}${columns} ` +
+    "Stop: back up and reconcile the database with an operator; rerunning migrations cannot repair an already-recorded migration. " +
+    "Do not delete the database volume or edit the migration journal.";
+  return `Database schema is behind the checked-in ${REQUIRED_MIGRATION} migration.${missing}${columns} ` +
     "Apply the reviewed migrations to the SAME database as the API with " +
     "`bun --filter @borobiya/server db:migrate:runtime` (host) or " +
     "`docker compose run --rm --build api bun src/db/migrate.ts` (Compose). " +

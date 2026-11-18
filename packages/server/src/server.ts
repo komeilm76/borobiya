@@ -1,8 +1,24 @@
+import postgres from "postgres";
 import { createFastifyApp } from "./app";
 import { parseServerEnv } from "./config/env";
+import { safeMigrationErrorDetails } from "./db/migration-error";
+import { checkSchemaReadiness, schemaReadinessMessage } from "./db/schema-readiness";
 
 export async function startServer() {
   const config = parseServerEnv();
+  // Check the *same* DATABASE_URL this process will use before exposing healthy
+  // HTTP. Do not run migrations at startup: the operator must apply/review them.
+  const probe = postgres(config.databaseUrl, { max: 1, connect_timeout: 5 });
+  try {
+    const state = await checkSchemaReadiness(async (sql) => await probe.unsafe(sql));
+    if (!state.ready) throw new Error(schemaReadinessMessage(state));
+  } catch (error) {
+    if (error instanceof Error && /^(Database schema is behind|Database journal claims)/.test(error.message)) throw error;
+    const details = safeMigrationErrorDetails(error, config.databaseUrl);
+    throw new Error(`Database schema preflight failed: ${details.join("; ") || "Check database connectivity."}`);
+  } finally {
+    await probe.end();
+  }
   const app = await createFastifyApp(config, { startMaintenanceJobs: true });
 
   // Docker and other process supervisors stop containers with SIGTERM. Close

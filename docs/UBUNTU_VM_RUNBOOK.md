@@ -1775,6 +1775,7 @@ the service is still warming up (graphs/index) or publishing to a different port
 
 ```bash
 docker compose run --rm --build api bun src/db/migrate.ts   # one-off migrator (never run at container start)
+docker compose run --rm api bun src/db/check-schema.ts      # read-only: latest journal, mission columns + trace tables
 docker compose run --rm api bun src/db/seed.ts              # explicit seed: the question catalog and friends
 curl -fsS http://localhost:8080/health && echo              # gateway liveness ("ok", answered by nginx itself)
 curl -fsS http://localhost:8080/api/_public/health && echo  # the API's health, through the gateway
@@ -1987,6 +1988,7 @@ Symptom first, always — grep this section for the error text.
   in a private terminal. It replaces *only placeholders*, preserves existing database passwords
   and refuses to invent one if a DB volume exists. Then run `python3 scripts/vm.py launch`
   to recreate the API. Do not paste `.env`, rendered Compose config or secret-bearing logs.
+- **Requester, rescuer and admin mission lists all return `500 INTERNAL_ERROR`** — each list selects the entire `missions` row. On an API image with migration `0020`'s four visibility columns, an older database produces SQLSTATE `42703` even for an empty list. From the VM checkout, first run the **read-only** check against the Compose API's database: `docker compose run --rm --build api bun src/db/check-schema.ts`. If it reports an old journal or missing columns/tables, back up the database and run `docker compose run --rm --build api bun src/db/migrate.ts`, then repeat the check and recreate/restart the API (`docker compose up -d --build api`). Never delete the database volume. If the journal claims the latest migration but columns are missing, stop and investigate drift with the operator rather than editing the journal or assuming a rerun can fix it. If the check passes, confirm that Vite's `API_PROXY_TARGET` actually points to this API and inspect its sanitized `unhandled request failure` SQLSTATE in `docker compose logs api` (do not share credentials or full logs).
 - **`postgres` unhealthy / migration returns `28P01`** — a healthy local socket is *not* proof
   that other containers can authenticate. Compare `.env` credentials with the ones originally
   used to initialize the app database; first try restoring the known old value from a secure

@@ -759,6 +759,20 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     expect(after[0]!.json()).toMatchObject({ total: 0, items: [] });
     expect(after[1]!.statusCode, after[1]!.body).toBe(200);
     expect(after[1]!.json()).toMatchObject({ total: 1, items: [{ id: accepted.json().missionId, sosRequestId: sosId }] });
+    // These three list variants all select the complete missions row. Exercise
+    // the exact request shapes that fail on an API database missing migration 0020.
+    const lists = await Promise.all([
+      app.inject({ method: "GET", url: "/_user/sos/missions?role=rescuer&page=1&limit=20",
+        headers: { authorization: `Bearer ${rescuerToken}` } }),
+      app.inject({ method: "GET", url: "/_user/sos/missions?role=requester&page=1&limit=50",
+        headers: { authorization: `Bearer ${requesterToken}` } }),
+      app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions?includeTerminal=true`,
+        headers: { authorization: `Bearer ${adminToken}` } })
+    ]);
+    for (const response of lists) expect(response.statusCode, response.body).toBe(200);
+    expect(lists[0]!.json()).toMatchObject({ total: 1, items: [{ id: accepted.json().missionId }] });
+    expect(lists[1]!.json()).toMatchObject({ total: 1, items: [{ id: accepted.json().missionId }] });
+    expect(lists[2]!.json()).toEqual([expect.objectContaining({ id: accepted.json().missionId })]);
   });
 
   it("scopes live mission-room subscriptions and delivers committed status once to each participant and admin", async () => {
