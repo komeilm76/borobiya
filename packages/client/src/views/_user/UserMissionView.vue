@@ -52,7 +52,7 @@
           <h3>در حال حاضر مأموریت فعالی ندارید</h3>
           <p>پیشنهادهای دریافتی و جزئیات پذیرش در همین زبانه در دسترس‌اند.</p>
         </template>
-        <ProposalInboxContent :selected-offer-id="null" />
+        <ProposalInboxContent :selected-offer-id="null" :compact-map="embedded" />
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
@@ -1220,7 +1220,7 @@ onBeforeUnmount(() => {
 .mission-desk--embedded .mission-desk__empty :deep(.offers__eyebrow) { color: rgb(var(--v-theme-primary)); }
 .mission-desk--embedded .mission-desk__empty :deep(.offers__hero p) { color: var(--bb-color-muted); }
 .mission-desk--embedded .mission-desk__empty :deep(.offers__stat) {
-  min-width: 4.5rem; min-height: 4.5rem; border-color: var(--bb-color-outline);
+  min-width: 44px; min-height: 44px; border-color: var(--bb-color-outline);
   background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface));
 }
 .mission-desk--embedded .mission-desk__empty :deep(.offers__stat-number) { color: rgb(var(--v-theme-primary)); }
@@ -1229,7 +1229,7 @@ onBeforeUnmount(() => {
   border: 0; border-top: 1px solid var(--bb-color-outline); border-radius: 0;
   box-shadow: none; background: transparent;
 }
-.mission-desk--embedded .mission-desk__empty :deep(.offers__empty) { border: 0; background: transparent; padding: 1rem; }
+.mission-desk--embedded .mission-desk__empty :deep(.offers__empty) { border: 0; background: transparent; padding: .65rem; }
 .mission-desk__inline-outcome { margin-bottom: .8rem; border: 1px solid rgb(var(--v-theme-success));
   color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); }
 /* This card is at most 42rem even on desktop: viewport breakpoints in the
@@ -1239,7 +1239,7 @@ onBeforeUnmount(() => {
   max-height: none; overflow: visible; padding: 0;
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__empty) {
-  margin-top: .75rem; padding: 1rem;
+  margin-top: .4rem; padding: .65rem;
 }
 @media (min-width: 600px) and (max-width: 1023px) {
   /* On the tablet's viewport map Search owns the upper-left half. Keep the

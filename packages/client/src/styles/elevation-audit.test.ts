@@ -32,8 +32,11 @@ describe("remaining CSS, Tailwind and Vuetify elevation audit", () => {
     expect(sos).toContain(".history__item:focus-visible { outline:");
     expect(offers).toContain(".offer-card:focus-visible, .offers__pages :focus-visible { outline:");
     for (const [css, selector] of [[offers, ".offers__items"], [sos, ".history__items"], [rescuer, ".history__items"]]) {
-      const gutterRule = css.slice(css.lastIndexOf(`${selector} {`));
-      expect(gutterRule.slice(0, gutterRule.indexOf("}"))).toContain("padding: 8px 10px 12px;"); // scroll clip must leave a shadow gutter
+      // The map's compact list has no inner scroller/shadow gutter; audit the
+      // full-page inbox's scrollable list, which still needs its gutter.
+      const fullPageCss = selector === ".offers__items" ? css.split("/* Mission map:")[0]! : css;
+      const gutterRule = fullPageCss.slice(fullPageCss.lastIndexOf(`${selector} {`));
+      expect(gutterRule.slice(0, gutterRule.indexOf("}"))).toContain("padding: 8px 10px 12px;");
     }
     for (const css of [offers, sos, rescuer]) {
       expect(css.slice(css.lastIndexOf("@media (prefers-reduced-motion: reduce)"))).toContain("transform: none;");

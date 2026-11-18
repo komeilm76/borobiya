@@ -1,5 +1,5 @@
 <template>
-  <div class="offers" dir="rtl">
+  <div class="offers" :class="{ 'offers--map': compactMap, 'offers--detail-open': compactMap && detailOpen }" dir="rtl">
     <div class="offers__shell">
       <header class="offers__hero">
         <div class="offers__intro">
@@ -7,16 +7,20 @@
           <h3>پیشنهادهای فعال</h3>
           <p>جزئیات را بررسی کنید؛ پذیرش یک مأموریت، پیشنهادهای دیگر را می‌بندد.</p>
         </div>
-        <div class="offers__stat" aria-live="polite">
+        <div class="offers__stat" aria-live="polite"
+          :aria-label="compactMap ? (inbox.failed || (inbox.loading && !inbox.proposals.length) ? 'تعداد پیشنهادها تأیید نشده' : `${inbox.total.toLocaleString('fa-IR')} پیشنهاد در انتظار`) : undefined">
           <v-icon icon="mdi-bell-ring-outline" size="27" />
           <span class="offers__stat-number">{{ inbox.failed || (inbox.loading && !inbox.proposals.length) ? '؟' : inbox.total.toLocaleString('fa-IR') }}</span>
           <span>{{ inbox.failed ? 'تعداد تأیید نشده' : inbox.loading && !inbox.proposals.length ? 'در حال دریافت' : 'پیشنهاد در انتظار' }}</span>
         </div>
+        <v-btn v-if="compactMap" class="offers__map-refresh" icon="mdi-refresh" variant="tonal" color="primary"
+          :loading="inbox.loading" aria-label="به‌روزرسانی پیشنهادها" title="به‌روزرسانی پیشنهادها"
+          @click="inbox.refresh()" />
       </header>
 
       <v-alert v-if="inbox.decisionError" class="mb-5" type="error" variant="tonal" role="alert" closable
         @click:close="inbox.decisionError = null">{{ inbox.decisionError }}</v-alert>
-      <v-alert v-if="inbox.acceptedMissionId" class="mb-5" type="success" variant="tonal" role="status">
+      <v-alert v-if="inbox.acceptedMissionId && (!compactMap || !inbox.acceptedOffer?.details)" class="mb-5" type="success" variant="tonal" role="status">
         مأموریت پذیرفته شد. پیشنهادهای دیگر شما به‌صورت خودکار بسته شدند. شناسهٔ مأموریت:
         <bdi dir="ltr">{{ inbox.acceptedMissionId }}</bdi>
         <v-btn class="ms-3" to="/_user/map?tab=missions" color="primary" variant="tonal" size="small">مشاهدهٔ مأموریت</v-btn>
@@ -30,7 +34,8 @@
         <div class="accepted-map__intro">
           <div>
             <h2>مأموریت پذیرفته‌شده</h2>
-            <p>محل حادثه و اعضای مأموریت روی نقشهٔ اصلی در زبانهٔ مأموریت‌ها نمایش داده می‌شوند؛ اینجا نقشهٔ دوم یا درخواست GPS جداگانه باز نمی‌شود.</p>
+            <p v-if="compactMap">محل حادثه و اعضا روی نقشهٔ همین زبانه نمایش داده می‌شوند.</p>
+            <p v-else>محل حادثه و اعضای مأموریت روی نقشهٔ اصلی در زبانهٔ مأموریت‌ها نمایش داده می‌شوند؛ اینجا نقشهٔ دوم یا درخواست GPS جداگانه باز نمی‌شود.</p>
           </div>
           <v-btn color="primary" variant="tonal" rounded="lg" to="/_user/map?tab=missions" @click="emit('close')">نمایش روی نقشه</v-btn>
         </div>
@@ -39,7 +44,7 @@
         </p>
       </section>
 
-      <div class="offers__toolbar">
+      <div v-if="!compactMap" class="offers__toolbar">
         <div>
           <h2>فهرست و جزئیات</h2>
           <p>فقط درخواست‌هایی که برای شما فرستاده شده‌اند نمایش داده می‌شوند.</p>
@@ -55,21 +60,22 @@
         <v-btn color="primary" rounded="lg" @click="inbox.refresh()">تلاش دوباره</v-btn>
       </div>
       <div v-else-if="inbox.loading && !inbox.proposals.length" class="offers__grid" aria-label="در حال دریافت پیشنهادها">
-        <v-skeleton-loader v-for="n in 3" :key="n" type="article, actions" class="offers__skeleton" />
+        <v-skeleton-loader v-for="n in compactMap ? 2 : 3" :key="n" :type="compactMap ? 'list-item-two-line' : 'article, actions'" class="offers__skeleton" />
       </div>
-      <div v-else-if="!inbox.proposals.length" class="offers__empty">
+      <div v-else-if="!inbox.proposals.length && !inbox.acceptedMissionId" class="offers__empty">
         <div class="offers__empty-icon"><v-icon icon="mdi-hand-heart-outline" size="34" /></div>
         <h3>فعلاً پیشنهادی در انتظار نیست</h3>
         <p>هنگام دریافت درخواست تازه، زنگ نقشه به شما خبر می‌دهد. این فهرست هر ۳۰ ثانیه نیز تازه می‌شود.</p>
         <v-btn variant="text" color="primary" rounded="lg" @click="emit('close')">بازگشت به نقشه</v-btn>
       </div>
-      <div v-else class="offers__layout">
-        <section class="offers__list" aria-label="فهرست پیشنهادهای مأموریت">
-          <div class="offers__items" role="region" aria-label="پیشنهادها؛ برای موارد بیشتر پیمایش کنید"
-            :tabindex="inbox.proposals.length > 1 ? 0 : -1">
+      <div v-else-if="inbox.proposals.length" class="offers__layout">
+        <section ref="listRef" class="offers__list" aria-label="فهرست پیشنهادهای مأموریت">
+          <div class="offers__items" role="region" :aria-label="compactMap ? 'پیشنهادهای مأموریت' : 'پیشنهادها؛ برای موارد بیشتر پیمایش کنید'"
+            :tabindex="!compactMap && inbox.proposals.length > 1 ? 0 : -1">
             <button v-for="offer in inbox.proposals" :key="offer.id" class="offer-card" type="button"
-              :class="{ 'offer-card--selected': selected?.id === offer.id }"
-              :aria-pressed="selected?.id === offer.id" @click="selectOffer(offer.id)">
+              :class="{ 'offer-card--selected': selected?.id === offer.id && (!compactMap || detailOpen) }"
+              :data-offer-id="offer.id" :aria-pressed="selected?.id === offer.id && (!compactMap || detailOpen)"
+              @click="selectOffer(offer.id)">
               <span class="offer-card__stripe" :class="`offer-card__stripe--${severity(offer).tone}`" />
               <span class="offer-card__body">
                 <span class="offer-card__top">
@@ -97,6 +103,8 @@
         </section>
 
         <section v-if="selected" ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده" tabindex="-1">
+          <v-btn v-if="compactMap" class="offer-detail__back" icon="mdi-arrow-right" variant="text" color="primary"
+            aria-label="بازگشت به فهرست پیشنهادها" title="بازگشت به پیشنهادها" @click="closeMapDetail" />
           <div class="offer-detail__top">
             <span class="offer-detail__kicker">پروندهٔ امداد · {{ proposalTime(selected.createdAt) }}</span>
             <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
@@ -119,7 +127,7 @@
             </div>
             <div class="offer-detail__section">
               <h3><v-icon icon="mdi-map-marker-outline" size="19" /> محل حادثه</h3>
-              <p class="offer-detail__map">پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود. جزئیات و مختصات را پیش از تصمیم بررسی کنید.</p>
+              <p v-if="!compactMap" class="offer-detail__map">پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود. جزئیات و مختصات را پیش از تصمیم بررسی کنید.</p>
               <p class="offer-detail__coords">مختصات: <bdi dir="ltr">{{ selected.details.sosRequest.location.lat.toFixed(5) }}, {{ selected.details.sosRequest.location.lon.toFixed(5) }}</bdi>
                 <span v-if="selected.details.sosRequest.location.isManual"> · انتخاب دستی</span></p>
             </div>
@@ -186,29 +194,42 @@ import { proposalDistance, proposalSeverity, proposalTime } from "@/sos/proposal
 import { useAuthStore } from "@/stores/auth";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
 
-const props = defineProps<{ selectedOfferId: string | null }>();
+const props = withDefaults(defineProps<{ selectedOfferId: string | null; compactMap?: boolean }>(), { compactMap: false });
 const emit = defineEmits<{ close: [] }>();
 const inbox = useProposalInboxStore();
 const auth = useAuthStore();
 const selectedId = ref<string | null>(props.selectedOfferId);
+const detailOpen = ref(Boolean(props.compactMap && props.selectedOfferId));
+const listRef = ref<HTMLElement | null>(null);
 const selected = computed(() => selectedId.value
   ? inbox.proposals.find((item) => item.id === selectedId.value) ?? null
   : inbox.proposals[0] ?? null);
 const detailRef = ref<HTMLElement | null>(null);
 async function selectOffer(id: string): Promise<void> {
   selectedId.value = id;
+  if (props.compactMap) detailOpen.value = true;
   await nextTick();
   if (selectedId.value !== id || !detailRef.value) return;
   const detail = detailRef.value;
-  // Scroll only the offer surface, not the map, app shell and nested list.
-  // scrollIntoView() scrolls every ancestor and made the workspace jump.
+  // In the mission map the list and details are two states of ONE bounded
+  // surface. Return to its top instead of jumping the entire map or app shell.
   const panel = detail.closest<HTMLElement>(".mission-desk__empty, .map-proposal__details-scroll");
-  if (panel) {
+  if (props.compactMap) panel?.scrollTo({ top: 0, behavior: "auto" });
+  else if (panel) {
+    // Elsewhere the existing full inbox retains its stacked master/detail view.
     const top = detail.getBoundingClientRect().top - panel.getBoundingClientRect().top;
     if (top < 0 || top > panel.clientHeight - 64)
       panel.scrollTo({ top: panel.scrollTop + top - 12, behavior: "auto" });
   }
   detail.focus({ preventScroll: true });
+}
+async function closeMapDetail(): Promise<void> {
+  detailOpen.value = false;
+  await nextTick();
+  listRef.value?.closest<HTMLElement>(".mission-desk__empty")?.scrollTo({ top: 0, behavior: "auto" });
+  const cards = listRef.value?.querySelectorAll<HTMLButtonElement>(".offer-card");
+  (Array.from(cards ?? []).find((card) => card.dataset.offerId === selectedId.value) ?? cards?.[0])
+    ?.focus({ preventScroll: true });
 }
 const confirmAction = ref<"accept" | "decline" | null>(null);
 const tripEndError = ref<string | null>(null);
@@ -275,14 +296,25 @@ async function submitDecision(): Promise<void> {
   if (success) {
     confirmAction.value = null;
     declineReason.value = "";
-    if (action === "decline") selectedId.value = null;
+    if (action === "decline") {
+      selectedId.value = null;
+      if (props.compactMap) void closeMapDetail();
+    }
   }
 }
 // The inbox keeps the previous page's rows visible while the next page loads.
 // An ID chosen on the old page must not strand the new page without details.
-watch(() => inbox.page, () => { selectedId.value = null; });
-watch(() => props.selectedOfferId, (id) => { selectedId.value = id; });
-watch(() => selected.value?.id, () => {
+watch(() => inbox.page, () => { selectedId.value = null; detailOpen.value = false; });
+watch(() => props.selectedOfferId, (id) => {
+  selectedId.value = id; detailOpen.value = Boolean(props.compactMap && id);
+});
+watch(() => selected.value?.id, (id) => {
+  // A refresh can withdraw an offer while its map detail is open. Return to
+  // the list rather than leaving a stale choice or an empty detail on screen.
+  if (props.compactMap && selectedId.value && selectedId.value !== id) {
+    selectedId.value = null;
+    void closeMapDetail();
+  }
   photoGeneration++;
   photoSrc.value = null;
   photoError.value = null;
@@ -291,6 +323,7 @@ watch(() => selected.value?.id, () => {
   declineReason.value = "";
 });
 watch(() => auth.user?.id, () => {
+  detailOpen.value = false;
   myPosition.value = null;
   locating.value = false;
   locationGeneration++;
@@ -389,6 +422,57 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
   .offer-card__top { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 7px 9px; }
   .offer-card__severity { grid-column: 2; justify-self: start; }
 }
+/* Mission map: a compact inbox, then an explicit detail step inside the same
+   bounded surface. The full-page inbox above keeps its own generous layout. */
+.offers--map:not(.offers--detail-open) .offer-detail,
+.offers--map.offers--detail-open .offers__list { display: none; }
+.offers--map .offers__hero { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: .4rem; align-items: center; }
+.offers--map .offers__eyebrow, .offers--map .offers__hero p,
+.offers--map .offers__stat > :deep(.v-icon), .offers--map .offers__stat > span:last-child { display: none; }
+.offers--map .offers__hero h3 { margin: 0; font-size: 1rem; line-height: 1.35; }
+.offers--map .offers__stat { min-width: 44px; min-height: 44px; padding: .25rem .4rem; }
+.offers--map .offers__stat-number { font-size: 1rem; }
+.offers--map .offers__map-refresh { min-width: 44px; min-height: 44px; }
+.offers--map .offers__layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
+.offers--map .offers__grid { grid-template-columns: 1fr; gap: .35rem; }
+.offers--map .offers__list, .offers--map .offers__items { gap: .35rem; }
+.offers--map .offers__items { max-height: none; overflow: visible; padding: 0; }
+.offers--map .offer-card { min-height: 64px; border-color: var(--bb-color-outline); box-shadow: none; }
+.offers--map .offer-card:not(:disabled):not(.offer-card--selected):hover { transform: none; border-color: rgb(var(--v-theme-primary)); box-shadow: none; }
+.offers--map .offer-card--selected { border-color: rgb(var(--v-theme-primary)); box-shadow: inset 0 0 0 1px rgb(var(--v-theme-primary)); }
+.offers--map .offer-card__body { padding: .45rem .65rem; gap: .15rem; }
+.offers--map .offer-card__icon { display: none; }
+.offers--map .offer-card__top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem; align-items: start; }
+.offers--map .offer-card__title { font-size: .875rem; line-height: 1.35; }
+.offers--map .offer-card__severity { grid-column: 2; grid-row: 1; align-self: start; padding: .12rem .4rem; font-size: .8rem; }
+.offers--map .offer-card__description { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .8rem; line-height: 1.35; -webkit-line-clamp: unset; }
+.offers--map .offer-card__foot { font-size: .8rem; line-height: 1.25; }
+.offers--map .offer-card__foot span:last-child { display: none; }
+.offers--map .offers__pages { margin-top: .2rem; }
+.offers--map .offers__pages :deep(.v-btn) { min-width: 44px; min-height: 44px; }
+.offers--map .offer-detail { overflow: visible; }
+.offers--map .offer-detail__back { position: sticky; top: 0; z-index: 2; min-width: 44px; min-height: 44px;
+  background: rgb(var(--v-theme-surface)); }
+.offers--map .offer-detail__top { padding: .25rem .65rem .5rem; background: transparent; }
+.offers--map .offer-detail__top h2 { margin: .2rem 0; font-size: 1rem; line-height: 1.4; }
+.offers--map .offer-detail__facts { gap: .4rem; padding: .5rem .65rem 0; }
+.offers--map .offer-detail__facts > div { flex: 1 1 8rem; gap: 1px; padding: .4rem .5rem; }
+.offers--map .offer-detail__section { padding: .6rem .65rem 0; }
+.offers--map .offer-detail__section h3 { margin: 0 0 .25rem; }
+.offers--map .offer-detail__description { margin: 0; line-height: 1.55; }
+.offers--map .offer-detail__coords { margin: .2rem 0 0; overflow-wrap: anywhere; }
+.offers--map .offer-detail__actions { margin-top: .65rem; padding: .65rem .65rem 1rem; }
+.offers--map .offer-detail__actions p { margin-bottom: .4rem; }
+.offers--map .offer-detail__buttons > * { flex: 1 1 8rem; min-width: 0; min-height: 44px; height: auto; }
+.offers--map .offer-detail__buttons :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.offers--map .offer-detail__photo img { max-height: 12rem; }
+.offers--map .accepted-map { margin-top: .5rem; padding: .65rem; }
+.offers--map .offers__empty { margin-top: .4rem; padding: .65rem; }
+.offers--map .offers__empty-icon { display: none; }
+.offers--map .offers__empty h3 { margin: .35rem 0; font-size: 1rem; }
+.offers--map .offers__empty p { margin-bottom: .4rem; font-size: .875rem; line-height: 1.5; }
+
 @media (prefers-reduced-motion: reduce) { .offer-card { transition: none; }.offer-card:not(:disabled):not(.offer-card--selected):hover { transform: none; } }
 
 :global(:root.dark .offer-card:not(.offer-card--selected)) { border-color: var(--bb-color-outline); }

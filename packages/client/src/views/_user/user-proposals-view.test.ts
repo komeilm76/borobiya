@@ -54,7 +54,7 @@ describe("rescuer inbox content in the map dialog", () => {
     expect(view).toContain('confirmAction = \'accept\'');
     expect(view).toContain("پیشنهادهای دیگر شما خودکار بسته می‌شوند");
     expect(view).toContain("inbox.decide(id, action");
-    expect(view).toContain('if (action === "decline") selectedId.value = null;');
+    expect(view).toContain('if (action === "decline") {\n      selectedId.value = null;\n      if (props.compactMap) void closeMapDetail();');
     expect(view).toContain("v-textarea");
   });
 });
