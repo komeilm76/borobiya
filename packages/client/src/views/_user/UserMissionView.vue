@@ -67,22 +67,21 @@
           <template #route-planner>
             <v-card v-show="routing.visible.value && activeTool === 'route' && routeSection !== 'transport'" id="mission-route-panel"
               tag="section" elevation="3" rounded="xl" class="mission-route bb-map-navigation-card bb-floating-card"
+              :class="{ 'mission-route--editor': routeSection !== 'plan' }"
               aria-label="برنامه‌ریزی مسیر مأموریت" tabindex="-1">
               <header class="mission-route__header">
                 <span class="mission-route__emblem" aria-hidden="true"><v-icon :icon="routeSection === 'plan' ? 'mdi-map-marker-path' : routeSection === 'transport' ? 'mdi-car-multiple' : 'mdi-routes'" /></span>
                 <div class="mission-route__heading">
-                  <small>مأموریت فعال · {{ routeSection === 'plan' ? 'برنامه‌ریزی سفر' : routeSection === 'transport' ? 'انتخاب وسیله' : 'انتخاب مسیر' }}</small>
-                  <h2>{{ routeSection === 'plan' ? 'مسیر تا محل حادثه' : routeSection === 'transport' ? 'وسیلهٔ حرکت' : 'مسیرهای پیشنهادی' }}</h2>
+                  <small>مأموریت فعال · {{ routeSection === 'plan' ? 'برنامه‌ریزی سفر' : routeSection === 'stops' ? 'ایستگاه‌های میانی' : routeSection === 'transport' ? 'انتخاب وسیله' : 'انتخاب مسیر' }}</small>
+                  <h2>{{ routeSection === 'plan' ? 'مسیر تا محل حادثه' : routeSection === 'stops' ? 'ویرایش ایستگاه‌ها' : routeSection === 'transport' ? 'وسیلهٔ حرکت' : 'مسیرهای پیشنهادی' }}</h2>
                 </div>
                 <v-btn v-if="navigation.active.value" icon="mdi-stop-circle-outline" variant="tonal" color="error"
                   aria-label="توقف راهبری" title="توقف راهبری" @click="stopGuidance" />
                 <v-btn v-if="routeSection !== 'plan'" icon="mdi-arrow-right" variant="text" color="primary"
                   aria-label="بازگشت به برنامهٔ سفر" @click="closeRouteSection()" />
-                <v-btn v-else-if="(routing.from.value || routing.via.value.length) && !navigation.active.value" icon="mdi-delete-outline" variant="text" color="error"
-                  :disabled="!routing.target.value || routing.targetLoading.value"
-                  aria-label="درخواست پاک کردن مسیر" @click="routeDeleteConfirmOpen = true" />
                 <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند" @click="closeTool('route')" />
               </header>
+              <div class="mission-route__body" :class="`mission-route__body--${routeSection}`">
               <v-progress-linear v-if="routing.targetLoading.value" indeterminate color="primary" aria-label="دریافت محل حادثه" />
               <v-alert v-if="routing.error.value" class="my-3" type="warning" variant="tonal" role="alert">
                 {{ routing.error.value }}
@@ -121,6 +120,15 @@
                       @click="routing.findRoutes()">{{ routing.from.value ? 'محاسبهٔ دوبارهٔ مسیر' : 'دریافت موقعیت و مسیر' }}</v-btn>
                   </template>
                 </section>
+                <details v-if="routeSection === 'plan'" class="mission-route__route-details">
+                  <summary>وسیله، مسیر، ایستگاه‌ها و جزئیات <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
+                  <div class="mission-route__route-details-body">
+                    <div v-if="routeSection === 'plan'" class="mission-route__section-links" role="group" aria-label="تنظیمات مسیر">
+                  <button type="button" :disabled="navigation.active.value" @click="openTransportSection"><v-icon icon="mdi-car-multiple" /><span><strong>وسیله</strong><small>{{ transportProfiles.find(item => item.value === routing.profile.value)?.title }}</small></span><v-icon icon="mdi-chevron-left" /></button>
+                  <button type="button" :disabled="!routing.routes.value.length || navigation.active.value" @click="openAlternativesSection"><v-icon icon="mdi-routes" /><span><strong>مسیرها</strong><small>{{ routing.routes.value.length ? `مسیر ${(routing.selectedIndex.value + 1).toLocaleString('fa-IR')} از ${routing.routes.value.length.toLocaleString('fa-IR')}` : 'پس از دریافت مسیر' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
+                  <button type="button" :disabled="navigation.active.value" @click="openStopsSection"><v-icon icon="mdi-map-marker-plus-outline" /><span><strong>ایستگاه‌ها</strong><small>{{ routing.via.value.length ? `${routing.via.value.length.toLocaleString('fa-IR')} مورد` : 'اختیاری' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
+                </div>
+
                 <div v-if="routeSection === 'plan'" class="mission-route__endpoints" role="group" aria-label="مبدأ و مقصد">
                   <div class="mission-route__endpoint">
                     <span class="mission-route__endpoint-mark" aria-hidden="true" />
@@ -144,16 +152,21 @@
                   <v-btn color="primary" variant="tonal" rounded="lg"
                     :disabled="routing.loading.value" @click="routing.findRoutes(true)">به‌روزرسانی مبدأ</v-btn>
                 </div>
-                <div v-if="routeSection === 'plan'" class="mission-route__section-links" role="group" aria-label="تنظیمات مسیر">
-                  <button type="button" :disabled="navigation.active.value" @click="openTransportSection"><v-icon icon="mdi-car-multiple" /><span><strong>انتخاب وسیلهٔ دیگر</strong><small>{{ transportProfiles.find(item => item.value === routing.profile.value)?.title }}</small></span><v-icon icon="mdi-chevron-left" /></button>
-                  <button type="button" :disabled="!routing.routes.value.length || navigation.active.value" @click="openAlternativesSection"><v-icon icon="mdi-routes" /><span><strong>انتخاب مسیر دیگر</strong><small>{{ routing.routes.value.length ? `مسیر ${(routing.selectedIndex.value + 1).toLocaleString('fa-IR')} از ${routing.routes.value.length.toLocaleString('fa-IR')}` : 'پس از دریافت مسیر' }}</small></span><v-icon icon="mdi-chevron-left" /></button>
+                <v-btn v-if="(routing.from.value || routing.via.value.length) && !navigation.active.value"
+                  variant="text" color="error" prepend-icon="mdi-delete-outline"
+                  :disabled="!routing.target.value || routing.targetLoading.value"
+                  @click="routeDeleteConfirmOpen = true">پاک‌کردن برنامهٔ مسیر</v-btn>
+                <div v-if="routeSection === 'plan' && routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
+                  <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
+                    label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
+                    @update:model-value="focusRouteStep(Number($event))" />
+                  <p role="status">{{ currentStopLabel }}</p>
                 </div>
-                <details v-if="routeSection === 'plan'" class="mission-route__stops" @toggle="onWaypointDisclosureToggle">
-                  <summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)
-                    <span v-if="routing.via.value.length" class="mission-route__stops-count">{{ routing.via.value.length.toLocaleString('fa-IR') }} ایستگاه</span>
-                  </summary>
+                  </div>
+                </details>
+                <section v-if="routeSection === 'stops'" class="mission-route__stops" aria-label="ویرایش ایستگاه‌های میانی">
+                  <p class="mission-route__help">حداکثر ۶ ایستگاه؛ محل حادثه مقصد نهایی می‌ماند.</p>
                   <div class="mission-route__stops-body">
-                    <p class="mission-route__help">نقطهٔ میانی را از نقشه یا با مختصات اضافه کنید. محل حادثه مقصد نهایی باقی می‌ماند.</p>
                     <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-map-marker-plus-outline"
                       class="mission-route__map-stop" :disabled="navigation.active.value || routing.via.value.length >= 6 || !mapReady || !routing.target.value"
                       :aria-pressed="pickingWaypoint" @click="toggleWaypointPick">
@@ -190,13 +203,7 @@
                       :disabled="navigation.active.value" hide-details color="primary" density="compact" class="mission-route__optimize"
                       @update:model-value="routing.setOptimize(Boolean($event))" />
                   </div>
-                </details>
-                <div v-if="routeSection === 'plan' && routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
-                  <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
-                    label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
-                    @update:model-value="focusRouteStep(Number($event))" />
-                  <p role="status">{{ currentStopLabel }}</p>
-                </div>
+                </section>
                 <p v-if="routeSection === 'alternatives'" class="mission-route__preview-note" role="status">
                   لمس هر مسیر فقط پیش‌نمایش آن را روی نقشه نشان می‌دهد؛ برای نگه‌داشتن آن، «تأیید این مسیر» را بزنید. بازگشت، مسیر قبلی را نگه می‌دارد.
                 </p>
@@ -230,6 +237,7 @@
                   برای این وسیله فقط یک مسیر در شبکهٔ راه‌های محلی پیدا شد؛ وجود چند مسیر تضمین نمی‌شود.
                 </p>
               </template>
+              </div>
             </v-card>
           </template>
         </MissionLivePanel>
@@ -488,7 +496,7 @@ watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
 const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
-const routeSection = ref<RouteWorkspaceSection>("plan");
+const routeSection = ref<RouteWorkspaceSection | "stops">("plan");
 const routeDeleteConfirmOpen = ref(false);
 function closeRouteSection(restore = true): void {
   if (restore) routeWorkspace.close(); else routeWorkspace.reset();
@@ -496,6 +504,11 @@ function closeRouteSection(restore = true): void {
   if (restore) void nextTick(() => {
     if (activeTool.value === "route") document.getElementById("mission-route-panel")?.focus({ preventScroll: true });
   });
+}
+function openStopsSection(): void {
+  if (navigation.active.value || !routing.target.value) return;
+  routeSection.value = "stops";
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
 function openTransportSection(): void {
   if (navigation.active.value || !routing.target.value) return;
@@ -515,7 +528,12 @@ function acceptAlternative(): void {
   routeWorkspace.accept(); routeSection.value = routeWorkspace.section;
   void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
-watch(routing.routes, () => closeRouteSection(false), { flush: "sync" });
+watch(routing.routes, () => {
+  // Editing a stop invalidates the route preview, but must not close the stop
+  // editor mid-click (otherwise a second stop or reorder becomes impossible).
+  if (routeSection.value === "stops") { routeWorkspace.reset(); return; }
+  closeRouteSection(false);
+}, { flush: "sync" });
 
 const pickingWaypoint = ref(false);
 const waypointLat = ref("");
@@ -648,13 +666,6 @@ function toggleWaypointPick(): void {
   activeTool.value = pickingWaypoint.value ? null : "route";
   const focusId = pickingWaypoint.value ? "mission-cancel-waypoint" : "mission-route-panel";
   void nextTick(() => document.getElementById(focusId)?.focus({ preventScroll: true }));
-}
-function onWaypointDisclosureToggle(event: Event): void {
-  // The nested manual-coordinate disclosure must not cancel map-pick mode.
-  if (event.target !== event.currentTarget) return;
-  // Closing the optional editor must also end map-pick mode: otherwise the next
-  // tap on the visible map can silently insert a waypoint from a hidden control.
-  if (!(event.target as HTMLDetailsElement).open) pickingWaypoint.value = false;
 }
 function onWaypointDrag(index: number, event: DragEvent): void {
   if (navigation.active.value) { event.preventDefault(); return; }
@@ -965,7 +976,7 @@ onBeforeUnmount(() => {
 :global(.mission-desk__incident-pin[aria-disabled="true"]) { cursor: default; }
 :global(.mission-desk__incident-pin::after) { content: ''; position: absolute; top: 100%; border-inline: 6px solid transparent; border-top: 8px solid #b91c1c; }
 :global(.mission-desk__selected-stop) { outline: 3px solid #fbbf24; outline-offset: 4px; border-radius: 50%; }
-.mission-route__header { position: sticky; z-index: 1; top: -.85rem; display: flex; align-items: center;
+.mission-route__header { position: relative; z-index: 1; top: auto; display: flex; align-items: center;
   gap: .5rem; margin: -.85rem -.85rem .75rem; padding: .5rem .85rem;
   border-bottom: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface)); }
 .mission-route__heading { min-width: 0; flex: 1; }
@@ -1026,12 +1037,6 @@ onBeforeUnmount(() => {
 .mission-route__metrics span { font-size: .8rem; opacity: .8; }
 .mission-route__metrics strong { font-size: 1.02rem; }
 .mission-route__header p { font-size: 0.9rem; opacity: .78; }
-.mission-route__stops { margin-block: .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
-.mission-route__stops-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .5rem; min-height: 46px; padding: .6rem .75rem; cursor: pointer; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
-.mission-route__stops-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 4px; }
-.mission-route__stops[open] .mission-route__stops-toggle { border-bottom: 1px solid var(--bb-color-outline); }
-.mission-route__stops-count { margin-inline-start: auto; color: rgb(var(--v-theme-primary)); font-size: .82rem; }
-.mission-route__stops-body { padding: .65rem .75rem .75rem; }
 .mission-route__help { margin: 0 0 .6rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
 .mission-route__map-stop { max-width: 100%; }
 .mission-route__map-stop :deep(.v-btn__content) { white-space: normal; text-align: center; }
@@ -1088,8 +1093,8 @@ onBeforeUnmount(() => {
   .mission-desk__toolbar { flex-wrap: wrap; }
   .mission-desk__toolbar > div { flex: 1 1 100%; min-width: 0; }
   .mission-desk__toolbar p { max-width: none; }
-  .mission-route__section-links { grid-template-columns: 1fr; }
-  .mission-route__section-links button { min-height: 44px; }
+  .mission-route__section-links { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mission-route__section-links button { min-height: 60px; }
   .mission-cancel-actions { flex-direction: column; align-items: stretch; gap: 8px; }
   .mission-cancel-actions :deep(.v-spacer) { display: none; }
   .mission-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
@@ -1203,8 +1208,8 @@ onBeforeUnmount(() => {
 .mission-desk--embedded .mission-desk__guidance,
 .mission-desk--embedded .mission-desk__card,
 .mission-desk--embedded .mission-route { pointer-events: auto; }
-/* Match /_user/map: the canvas owns the viewport, with independent scrollable
-   tools that can all close. No tall card or persistent planner takes map space. */
+/* Match /_user/map: the canvas owns the viewport, with independent compact
+   tools that can all close. No persistent planner takes map space. */
 .mission-desk--active {
   height: 100dvh; min-height: 0; padding: 0; overflow: hidden;
   background: rgb(var(--v-theme-background)); isolation: isolate;
@@ -1216,14 +1221,66 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 8;
   inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
   width: min(28rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
-  margin: 0; padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
-  scroll-padding-top: 4.5rem; /* Focused controls clear the sticky close header. */
+  margin: 0; padding: 1rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
   box-shadow: var(--bb-shadow-overlay);
 }
-/* Planning is a bounded map tool, not a second full-height workspace. The
-   inner content scrolls while the incident and map controls remain visible. */
-.mission-desk--active .mission-route { width: min(27rem, calc(100vw - 1.5rem)); max-height: min(52dvh, 28rem); padding: .85rem; }
+/* The map remains visible. The route surface is fixed; normal scrolling belongs
+   to the stop list (or the alternatives list), not the outer card. */
+.mission-desk--active .mission-route { display: flex; flex-direction: column; width: min(25rem, calc(100vw - 1.5rem));
+  max-height: min(48dvh, 23rem); padding: .7rem; overflow: hidden; }
+.mission-desk--active .mission-route--editor { max-height: min(56dvh, 29rem); }
+.mission-desk--active .mission-route:has(.mission-route__route-details[open]) { max-height: min(68dvh, 32rem); }
+.mission-route__body { flex: 1 1 auto; min-height: 0; min-width: 0; }
+.mission-route__body--stops, .mission-route__body--alternatives { display: flex; flex-direction: column; }
+.mission-route__header { flex: none; margin: -.7rem -.7rem .35rem; padding: .35rem .6rem; }
+.mission-route__section-links { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; margin: .4rem 0; }
+.mission-route__section-links button { display: grid; justify-items: center; align-content: center; text-align: center;
+  gap: 1px; padding: .35rem .15rem; min-height: 64px; }
+.mission-route__section-links button > :deep(.v-icon:last-child) { display: none; }
+.mission-route__section-links button > span { justify-items: center; }
+.mission-route__section-links button strong { font-size: .8rem; }
+.mission-route__section-links button small { line-height: 1.25; overflow-wrap: anywhere; }
+.mission-route__decision { gap: .35rem; margin: 0 0 .35rem; padding: .5rem .6rem; }
+.mission-route__decision-heading > :deep(.v-icon) { font-size: 18px !important; }
+.mission-route__decision-heading small { line-height: 1.3; }
+.mission-route__decision .mission-route__metrics { gap: 0; }
+.mission-route__decision .mission-route__metrics strong { font-size: .9rem; }
+.mission-route__route-details { border-top: 1px solid var(--bb-color-outline); }
+.mission-route__route-details summary { display: flex; align-items: center; min-height: 44px; gap: .25rem;
+  cursor: pointer; font-size: .8rem; font-weight: 700; color: rgb(var(--v-theme-primary)); }
+.mission-route__route-details summary :deep(.v-icon) { margin-inline-start: auto; }
+.mission-route__route-details[open] summary :deep(.v-icon) { transform: rotate(180deg); }
+.mission-route__route-details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
+.mission-route__route-details-body { max-height: min(25dvh, 9rem); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-gutter: stable; padding-inline: .1rem; }
+.mission-route__route-details-body .mission-route__endpoints { margin: .2rem 0; }
+.mission-route__route-details-body > .v-btn { min-height: 44px; }
+.mission-route__stops { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; margin: 0; padding: .2rem 0;
+  border: 0; background: transparent; }
+.mission-route__stops-body { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; align-items: stretch;
+  padding: 0; }
+.mission-route__stops .mission-route__map-stop, .mission-route__stops .mission-route__manual,
+.mission-route__stops .mission-route__optimize, .mission-route__stops .mission-route__help { flex: none; }
+.mission-route__stop-list { flex: 0 1 auto; min-height: 0; max-height: min(14rem, 24dvh); overflow-y: auto;
+  overscroll-behavior: contain; scrollbar-gutter: stable; padding-inline: .15rem; }
+.mission-route__choices { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.mission-route__body--alternatives > .mission-route__navigation { flex: none; }
+/* When the manual editor expands, scroll its entire body instead of nesting a
+   stop-list scroller around the coordinate fields and optimization control. */
+.mission-route__body--stops:has(.mission-route__manual[open]) { overflow-y: auto; overscroll-behavior: contain; }
+.mission-route__body--stops:has(.mission-route__manual[open]) .mission-route__stop-list {
+  flex: none; max-height: none; overflow: visible;
+}
+.mission-route__body--plan:has(.mission-route__navigation p),
+.mission-route__body--plan:has([role="alert"]) { overflow-y: auto; overscroll-behavior: contain; }
+@media (max-height: 560px) {
+  /* Accessibility fallback for a landscape/zoomed phone: keep all actions
+     reachable inside the content, never scroll the outer map card. */
+  .mission-route__body { overflow-y: auto; overscroll-behavior: contain; }
+  .mission-route__route-details-body { max-height: none; overflow: visible; }
+  .mission-route__body--stops .mission-route__stop-list { flex: none; max-height: none; overflow: visible; }
+}
 .mission-desk--active .mission-desk__card { z-index: 9; }
 /* The key opens above the progress or information sheet; the clear lower-left
    rail holds its launcher directly above the Mission Information launcher. */
@@ -1233,9 +1290,9 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; gap: .5rem; min-height: 0; pointer-events: auto; }
 /* The default briefing is a compact snapshot; only explicit detail expansion
    grows the scroll surface. The height cap still protects short viewports. */
-.mission-desk__bottom-stack--information { max-height: min(24rem, 60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+.mission-desk__bottom-stack--information { max-height: min(19rem, 55dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
 .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
-  max-height: min(70dvh, 34rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  max-height: min(65dvh, 28rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
 }
 @media (min-width: 600px) and (max-width: 1023px) {
   /* Keep the briefing readable without filling the tablet map. */
@@ -1291,9 +1348,10 @@ onBeforeUnmount(() => {
 }
 .mission-desk--active .mission-desk__bottom-stack #mission-status-panel {
   position: relative; inset: auto; flex: 1 1 auto; min-height: 0;
-  width: 100%; max-height: none; margin: 0;
-  padding-left: max(1rem, env(safe-area-inset-left, 0px));
-  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  width: 100%; max-height: none; margin: 0; padding: .75rem;
+  padding-left: max(.75rem, env(safe-area-inset-left, 0px));
+  padding-right: max(.75rem, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; overflow: hidden;
 }
 .mission-desk--active .mission-desk__load-alert {
   position: absolute; z-index: 12; top: calc(3.5rem + env(safe-area-inset-top, 0px));
@@ -1448,6 +1506,10 @@ onBeforeUnmount(() => {
     width: auto;
     max-height: min(48dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
+  .mission-desk--active .mission-route--editor { max-height: min(56dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-route__emblem { display: none; }
+  .mission-desk--active .mission-route:has(.mission-route__route-details[open]) {
+    max-height: min(68dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   /* The shared vehicle sheet sits above SOS on the private mission map. */
   .mission-desk__workspace :deep(.point-transport-choices-shell) {
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
@@ -1469,9 +1531,9 @@ onBeforeUnmount(() => {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .mission-desk__bottom-stack--information {
-    max-height: min(24rem, 75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+    max-height: min(19rem, 70dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
-    max-height: min(75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(65dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
@@ -1516,7 +1578,7 @@ onBeforeUnmount(() => {
     max-height: min(60dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
   .mission-desk__bottom-stack--information {
-    max-height: min(24rem, 75dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(19rem, 70dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
   /* Match the embedded selector's specificity: otherwise its 9rem top wins
      even though the short-phone rules appear later in the stylesheet. */
@@ -1531,7 +1593,7 @@ onBeforeUnmount(() => {
      At 480px+ the sheet starts at least 11.25rem from the top, leaving a
      1rem gap after guidance; its own scroller keeps the guarded action usable. */
   .mission-desk__bottom-stack { max-height: max(7rem, min(48dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
-  .mission-desk__bottom-stack--information { max-height: min(24rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .mission-desk__bottom-stack--information { max-height: min(19rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
     max-height: calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }

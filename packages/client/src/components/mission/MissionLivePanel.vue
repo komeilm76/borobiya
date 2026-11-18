@@ -11,7 +11,7 @@
         <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
           {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
         </v-chip>
-        <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
+        <v-btn v-if="hasFreshMembers" :disabled="!map || !visible" variant="tonal" size="small" color="primary" rounded="lg"
           prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
       </div>
     </div>
@@ -45,6 +45,9 @@
         :tabindex="fullscreen ? -1 : undefined">
         <header class="live-panel__room-heading">
           <h2>اعضای مأموریت</h2>
+          <v-btn icon="mdi-fit-to-screen" size="small" variant="tonal" color="primary"
+            aria-label="نمایش همهٔ اعضای دارای موقعیت تازه روی نقشه" title="نمایش همهٔ اعضا روی نقشه"
+            :disabled="!hasFreshMembers || !map || !visible" @click="focusMembers(true)" />
           <v-btn v-if="fullscreen" icon="mdi-close" variant="text" aria-label="بستن پنل اعضای مأموریت" @click="emit('close-room')" />
         </header>
         <ul class="live-panel__member-list" aria-label="فهرست اعضای مأموریت" tabindex="0">
@@ -198,7 +201,7 @@ const cameraIntent = createLiveCameraIntent();
 let detachCameraGesture: (() => void) | null = null;
 // MapCanvas supplies the constructor after its lazy MapLibre import finishes.
 let markerConstructor: typeof Marker | null = null;
-const hasMarkers = computed(() => Object.values(live.locations.value).some(Boolean));
+const hasFreshMembers = computed(() => live.participantStatus.value.some((member) => member.fresh && member.entry));
 // Announce only changes in whether each participant shares a fresh/old fix.
 // The visible timestamps can still update on every GPS fix without interrupting speech.
 const locationAnnouncement = computed(() => missionLocationAnnouncement(live.participantStatus.value));
@@ -242,10 +245,11 @@ function syncMarkers(): void {
 }
 function focusMembers(userInitiated = false) {
   if (!props.visible || !map.value) return;
-  const camera = missionLiveCamera(Object.values(live.locations.value).filter((entry) => entry != null));
+  const camera = missionLiveCamera(live.participantStatus.value
+    .filter((member) => member.fresh && member.entry).map((member) => member.entry!));
   if (!camera) return;
   if (userInitiated) {
-    cameraIntent.reset(); // Explicit show-all restores automatic room framing.
+    cameraIntent.noteGesture(); // Explicit framing must not be stolen by later GPS/peer updates.
     emit("camera-selected"); // Preserve this explicit view against GPS follow.
     if (props.fullscreen) emit("close-room"); // Reveal the points rather than covering them with the sheet.
   }
@@ -293,7 +297,7 @@ watch(() => [props.externalMap, props.externalMarker] as const, ([instance, Mark
 }, { immediate: true, flush: "post" });
 function frameRoom(): void {
   if (!props.visible) return;
-  if (hasMarkers.value) focusMembers();
+  if (hasFreshMembers.value) focusMembers();
   // Never leave the camera on a withdrawn participant's last known position.
   else map.value?.easeTo({ center: props.center, zoom: 13, duration: 350 });
 }

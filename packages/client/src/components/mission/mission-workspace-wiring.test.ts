@@ -27,7 +27,8 @@ describe("mission map workspace", () => {
     expect(view).toContain('routeWorkspace.accept()');
     expect(view).toContain('if (activeTool.value === "route") closeRouteSection();');
     expect(view).toContain('if (activeTool.value === "route" && routeSection.value !== "plan") { closeRouteSection(); return; }');
-    expect(view).toContain('watch(routing.routes, () => closeRouteSection(false), { flush: "sync" });');
+    expect(view).toContain('if (routeSection.value === "stops") { routeWorkspace.reset(); return; }');
+    expect(view).toContain('closeRouteSection(false);\n}, { flush: "sync" });');
     expect(view).toContain('<PointTransportChoicesSheet :mission-id="desk.activeMission.value.id"');
     expect(view).toContain(':open="activeTool === \'route\' && routeSection === \'transport\'"');
     expect(view).toContain('v-if="routeSection === \'alternatives\' && routing.routes.value.length"');

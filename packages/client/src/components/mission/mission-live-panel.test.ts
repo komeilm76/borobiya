@@ -44,9 +44,9 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain('cameraIntent.shouldAutoFrame(props.routeActive)');
     expect(panel).toContain('if (next === "" && previous && !props.routeActive) {');
     expect(panel).toContain('else if (next !== previous && cameraIntent.shouldAutoFrame(props.routeActive)) frameRoom();');
-    expect(panel).toContain('if (hasMarkers.value) focusMembers();');
+    expect(panel).toContain('if (hasFreshMembers.value) focusMembers();');
     expect(panel).toContain('else map.value?.easeTo({ center: props.center, zoom: 13, duration: 350 });');
-    expect(panel).toContain('cameraIntent.reset(); // Explicit show-all restores automatic room framing.');
+    expect(panel).toContain('cameraIntent.noteGesture(); // Explicit framing must not be stolen by later GPS/peer updates.');
     expect(panel).toContain('cameraIntent.reset(); // Closing a private route intentionally restores the room overview.');
   });
 

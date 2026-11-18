@@ -43,7 +43,7 @@ describe("responsive Mission Information", () => {
     // starts at 956px. The Information panel fits with room on both sides.
     expect(27 * 16).toBeGreaterThan(16 + 25 * 16);
     expect(27 * 16 + 26 * 16).toBeLessThan(1024 - 1.25 * 16 - 48);
-    expect(css).toContain('max-height: min(24rem, 60dvh, calc(100dvh - 15rem');
+    expect(css).toContain('max-height: min(19rem, 55dvh, calc(100dvh - 15rem');
     expect(css).toContain('.mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {');
     // The closed snapshot can fit on an ordinary 768px-tall desktop without
     // occupying most of the map. Expanded details retain a single scroll area.
@@ -53,7 +53,7 @@ describe("responsive Mission Information", () => {
   it("preserves the full-width bottom-opening phone layout and focusable close action", () => {
     const phone = css.slice(css.indexOf('@media (max-width: 599px) {'));
     expect(phone).toContain('.mission-desk__bottom-stack--information {');
-    expect(phone).toContain('max-height: min(24rem, 75dvh, calc(100dvh - 19rem');
+    expect(phone).toContain('max-height: min(19rem, 70dvh, calc(100dvh - 19rem');
     expect(phone).toContain('.mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {');
     expect(phone).toContain('.mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     expect(detail).toContain('aria-label="بستن اطلاعات مأموریت"');

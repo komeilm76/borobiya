@@ -34,6 +34,16 @@ describe("full-screen mission member focus", () => {
     expect(panel).toContain('role="region" aria-label="اعضای مأموریت"');
     expect(panel).toContain('v-if="!fullscreen && isAdmin" class="live-panel__privacy"');
   });
+  it("frames all and only fresh authorized members via a small header control", () => {
+    expect(panel).toContain('icon="mdi-fit-to-screen" size="small" variant="tonal"');
+    expect(panel).toContain('aria-label="نمایش همهٔ اعضای دارای موقعیت تازه روی نقشه"');
+    expect(panel).toContain(':disabled="!hasFreshMembers || !map || !visible" @click="focusMembers(true)"');
+    expect(panel).toContain('.filter((member) => member.fresh && member.entry).map((member) => member.entry!)');
+    expect(panel).toContain('if (!props.visible || !map.value) return;');
+    expect(panel).toContain('cameraIntent.noteGesture(); // Explicit framing must not be stolen by later GPS/peer updates.');
+    expect(panel).toContain('emit("camera-selected"); // Preserve this explicit view against GPS follow.');
+    expect(panel).toContain('if (props.fullscreen) emit("close-room"); // Reveal the points rather than covering them with the sheet.');
+  });
   it("has accessible tap targets and legible role avatars in light and dark modes", () => {
     const css = parse(panel).descriptor.styles[0]!.content;
     const compiled = compileStyle({ source: css, filename: "MissionLivePanel.vue", id: "data-v-member-focus", scoped: true });

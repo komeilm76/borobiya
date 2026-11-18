@@ -14,7 +14,7 @@ describe("mission route workspace on a map", () => {
     const settings = page.indexOf('class="mission-route__section-links"');
     expect(decision).toBeGreaterThan(0);
     expect(endpoints).toBeGreaterThan(decision);
-    expect(settings).toBeGreaterThan(endpoints);
+    expect(settings).toBeLessThan(endpoints); // Advanced coordinates sit behind the compact settings link.
     expect(page).toContain('مبدأ فقط پس از درخواست شما از GPS گرفته می‌شود.');
     expect(page).toContain('@click="routing.findRoutes()"');
     expect(page).toContain('@click="startGuidance"');
@@ -27,7 +27,8 @@ describe("mission route workspace on a map", () => {
     expect(header).toContain('@click="stopGuidance"');
     expect(header).toContain('aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند"');
     expect(page).toContain('v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"');
-    expect(css).toContain('.mission-route__header { position: sticky; z-index: 1;');
+    expect(css).toContain('.mission-route__header { position: relative; z-index: 1;');
+    expect(css).toContain('.mission-desk--active .mission-route { display: flex; flex-direction: column;');
     expect(css).toContain('.mission-route__header :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }');
   });
   it("gives only the open route sheet usable height on short phones without changing map or SOS", () => {

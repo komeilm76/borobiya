@@ -40,7 +40,8 @@ describe("mission route decisions on the full-screen map", () => {
     expect(view).toContain('@click="previewAlternative(index)"');
     expect(view).toContain('@click="acceptAlternative"');
     expect(view).toContain('@click="closeRouteSection()"');
-    expect(view).toContain('watch(routing.routes, () => closeRouteSection(false), { flush: "sync" });');
+    expect(view).toContain('if (routeSection.value === "stops") { routeWorkspace.reset(); return; }');
+    expect(view).toContain('closeRouteSection(false);\n}, { flush: "sync" });');
   });
   it("uses theme-aware compact surfaces, readable text and a bounded primary action", () => {
     const style = parse(view).descriptor.styles[0]!.content;

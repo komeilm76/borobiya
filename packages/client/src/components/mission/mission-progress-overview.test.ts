@@ -49,7 +49,13 @@ describe("at-a-glance mission progress and information", () => {
     expect(panel).not.toContain('desk.showCancellation()');
     expect(panel).toContain('<MissionBriefDetails :mission-id="desk.activeMission.value?.id ?? \'\'" :visible="visible" />');
     expect(info).toContain('<details class="mission-brief__details">');
-    expect(info).toContain("brief.hasPhoto ? 'شرح کامل، مختصات و تصویر بزرگ‌تر' : 'شرح کامل و مختصات'");
+    expect(info).toContain('جزئیات و شناسهٔ مأموریت');
+    expect(info).toContain('class="mission-brief__identity"');
+    expect(info).not.toContain('class="mission-brief__facts"');
+    expect(info.match(/{{ brief.requesterName }}/g)).toHaveLength(1);
+    expect(info.match(/{{ brief.incidentTypeName }}/g)).toHaveLength(1);
+    expect(info.indexOf('class="mission-brief__overview"')).toBeLessThan(info.indexOf('<details class="mission-brief__details">'));
+    expect(info.indexOf('class="mission-brief__id"')).toBeGreaterThan(info.indexOf('<details class="mission-brief__details">'));
     expect(info).toContain('مختصات ثبت‌شدهٔ حادثه');
     expect(info).toContain('getMissionBrief(token, id, controller.signal)');
     expect(info).toContain('getSosPhotoSrc(id, token)');

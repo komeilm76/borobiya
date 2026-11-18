@@ -28,7 +28,7 @@ describe("Missions search, short phones and shared-map tab boundaries", () => {
     expect(room).toContain('if (!props.visible) { clearMarkers(); return; }');
     expect(room).toContain('watch(() => props.visible, (visible) => {\n  syncMarkers();');
     expect(room).toContain('if (!props.visible || !map.value) return;');
-    expect(room).toContain('if (!props.visible) return;\n  if (hasMarkers.value) focusMembers();');
+    expect(room).toContain('if (!props.visible) return;\n  if (hasFreshMembers.value) focusMembers();');
     expect(mission).toContain('const incident = props.visible && routing.visible.value ? routing.target.value?.incident : null;');
     expect(mission).toContain('clearRouteOverlays(!incident);');
     expect(mission).toContain('watch(() => props.visible, (visible) => {\n  syncRouteMap();');
@@ -55,7 +55,7 @@ describe("Missions search, short phones and shared-map tab boundaries", () => {
     // two rows of icon buttons above it even at 480px high.
     const sheetCap = Math.min(480 * .65, 32 * 16, Math.max(4.75 * 16, 480 - 17.5 * 16));
     expect(480 - sheetCap - 4 * 16 - 48).toBeGreaterThan(5.25 * 16 + 5 * 16);
-    expect(short).toContain('.mission-desk__bottom-stack--information { max-height: min(24rem, calc(100dvh - 10.25rem');
+    expect(short).toContain('.mission-desk__bottom-stack--information { max-height: min(19rem, calc(100dvh - 10.25rem');
     expect(short).toContain('.mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {\n    max-height: calc(100dvh - 10.25rem');
     expect(css).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');

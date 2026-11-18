@@ -89,7 +89,8 @@ describe("map workspace scroll ownership", () => {
     expect(team).toContain('.live-panel__member-list { list-style: none;');
     expect(team).toContain('overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;');
     expect(team).toContain('overflow: hidden; backdrop-filter: blur(12px);');
-    expect(stage).toContain('.mission-desk__card-header { position: sticky;');
+    expect(stage).toContain('.mission-desk__card-header { display: flex; flex: none;');
+    expect(style(room, 'MissionLivePanel.vue')).toContain('overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;');
     expect(css).toContain('.mission-desk__terminal-alert :deep(.v-btn) { position: sticky; bottom: 0;');
     expect(css).toContain('.mission-desk__guidance--warning span { flex: 1 1 100%; max-height: none; overflow: visible; }');
     expect(css).toContain('.mission-desk__empty :deep(.offers__items) {\n  max-height: none; overflow: visible;');

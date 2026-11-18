@@ -46,7 +46,7 @@ const nested: Record<string, string[]> = {
   "views/_admin/AdminDispatchView.vue": [".dispatch-mission-timeline"],
   "views/_admin/AdminUsersView.vue": [".admin-users-table-wrap", ".admin-mobile-card"],
   "views/_user/UserMapView.vue": [".user-map-view > .user-map-view__canvas"],
-  "views/_user/UserMissionView.vue": [".mission-route__stops", ".mission-route__choice"],
+  "views/_user/UserMissionView.vue": [".mission-route__endpoints", ".mission-route__choice"],
   "components/shell/ProposalInboxContent.vue": [".offers__stat", ".offer-card", ".offer-detail__facts > div", ".offers__skeleton", ".offer-detail__map", ".offer-detail__photo"],
   "views/_user/UserRescuerHistoryView.vue": [".history__item"],
   "views/_user/UserSosHistoryView.vue": [".history__item", ".history__evidence img"]
