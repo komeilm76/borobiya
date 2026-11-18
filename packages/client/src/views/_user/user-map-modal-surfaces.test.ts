@@ -36,7 +36,7 @@ describe("all three phone map modal surfaces", () => {
     expect(phone).toContain("padding-left: calc(1rem + env(safe-area-inset-left, 0px));");
     expect(phone).toContain("padding-right: calc(1rem + env(safe-area-inset-right, 0px));");
     expect(phone).toContain("overflow-y: auto; overscroll-behavior: contain;");
-    expect(phone).toContain(".place-search .place-search__results) { max-height: none; overflow: visible; }");
+    expect(phone).toContain(".user-map-view__search-dialog .place-search__content) {\n    flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;");
     expect(phone).toContain(".live-companions .live-companions__peers) { max-height: none; overflow: visible; }");
     expect(phone).toContain(".history-playback) { max-height: none !important; overflow: visible; }");
     expect(compiled(view, "UserMapView.vue")).toContain(":is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content");
@@ -48,6 +48,7 @@ describe("all three phone map modal surfaces", () => {
     expect(phone).toContain(".user-map-view__live-dialog .live-companions.v-card");
     expect(phone).toContain("width: 100%; padding: 0; border: 0; border-radius: 0 !important;");
     expect(phone).toContain("overflow: visible; background: transparent; backdrop-filter: none; box-shadow: none !important;");
+    expect(phone).toContain(".user-map-view__search-dialog .place-search.v-card) {\n    height: 100%; min-height: 0; max-height: 100%; display: flex; flex-direction: column; overflow: hidden;");
     expect(phone).toContain(".history-playback__grants, .history-playback__range, .history-playback__transport");
     expect(phone).toContain("padding: 0; border: 0; border-radius: 0; background: transparent;");
     expect(search).toContain('class="place-search__result"');

@@ -60,7 +60,7 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(map).toContain('PlaceSearchPanel :api="placeSearch"');
     expect(map).not.toContain('id="map-navigation-search"');
     expect(css(map, 'UserMapView.vue')).toContain('.user-map-view__search-dialog');
-    expect(map).toContain('.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }');
+    expect(map).toContain('.user-map-view__search-dialog .place-search__content) {\n    flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;');
     expect(map).toContain('بازگشت به برنامهٔ سفر');
     expect(map).toContain('توقف و پایان سفر');
     expect(point).toContain('aria-label="حذف مقصد و مسیر"');

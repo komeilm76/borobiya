@@ -73,52 +73,55 @@
         @click="$emit('show-all')"
       ><span class="place-search__show-all-label">نقشه ({{ (api.mapActive.value ? api.mapResults.value.length : api.results.value.length).toLocaleString('fa-IR') }})</span></v-btn>
     </form>
-    <div v-if="api.term.value.trim().length >= 2" class="place-search__results">
-      <p v-if="api.loading.value && !api.results.value.length" class="place-search__feedback" role="status">در حال جست‌وجو…</p>
-      <div v-else-if="api.failed.value && !api.results.value.length" class="place-search__feedback" role="alert">
-        <p>جست‌وجوی مکان در دسترس نیست؛ اتصال یا محدودهٔ نقشه را بررسی کنید.</p>
-        <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
-      </div>
-      <p v-else-if="api.searched.value && !api.results.value.length" class="place-search__feedback" role="status">
-        مکانی در این محدوده پیدا نشد.
-      </p>
-      <template v-else-if="api.results.value.length">
-        <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال به‌روزرسانی این محدوده؛ فقط نتایج داخل محدوده باقی می‌مانند.</p>
-        <div v-else-if="api.failed.value" class="place-search__feedback" role="alert">
-          <p>به‌روزرسانی ناموفق بود؛ نتایج قبلیِ داخل همین محدوده در دسترس‌اند.</p>
+    <div class="place-search__content" role="region" aria-label="نتایج و وضعیت جست‌وجو"
+      :tabindex="api.term.value.trim().length >= 2 ? 0 : -1">
+      <div v-if="api.term.value.trim().length >= 2" class="place-search__results">
+        <p v-if="api.loading.value && !api.results.value.length" class="place-search__feedback" role="status">در حال جست‌وجو…</p>
+        <div v-else-if="api.failed.value && !api.results.value.length" class="place-search__feedback" role="alert">
+          <p>جست‌وجوی مکان در دسترس نیست؛ اتصال یا محدودهٔ نقشه را بررسی کنید.</p>
           <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
         </div>
-        <p v-else class="place-search__feedback" role="status">نتایج را از فهرست انتخاب کنید یا همه را روی نقشه ببینید.</p>
-        <ul aria-label="نتایج جست‌وجوی مکان" role="list">
-          <li v-for="place in api.results.value" :key="place.placeId">
-            <button
-              type="button"
-              class="place-search__result"
-              :class="{ 'place-search__result--selected': api.selectedPlaceId.value === place.placeId }"
-              :aria-pressed="api.selectedPlaceId.value === place.placeId"
-              @click="$emit('select', place)"
-            >
-              <span class="place-search__result-title">
-                <strong>{{ place.name }}</strong>
-                <small v-if="api.selectedPlaceId.value === place.placeId">انتخاب‌شده</small>
-              </span>
-              <span class="place-search__address">{{ place.address }}</span>
-            </button>
-          </li>
-        </ul>
-      </template>
-    </div>
-    <div v-if="api.failed.value && api.diagnostic.value && api.term.value.trim().length >= 2"
-      class="place-search__diagnostic" role="group" aria-label="گزارش خطای جست‌وجو">
-      <p v-if="api.diagnostic.value.includes('LIMIT_5_ACCEPTED')">درگاه همین جست‌وجو را با ۵ نتیجه می‌پذیرد اما درخواست ۳۰ نتیجه را رد می‌کند؛ نسخهٔ درگاه نقشه را با برنامه به‌روزرسانی کنید. نتیجهٔ ناقص نمایش داده نمی‌شود.</p>
-      <p v-else-if="api.diagnostic.value.includes('LIMIT_5_REJECTED')">درگاه جست‌وجو هر دو درخواست ۵ و ۳۰ نتیجه را رد کرد؛ محدوده یا پارامترهای درگاه باید بررسی شوند.</p>
-      <p v-else-if="api.diagnostic.value.includes('invalid_geocode_query')">درگاه نقشه درخواست را رد کرد؛ نسخهٔ برنامه و درگاه جست‌وجو را با هم بررسی کنید.</p>
-      <p v-else-if="api.diagnostic.value.includes('geocoding_unavailable')">فتون یا اتصال درگاه نقشه در دسترس نیست؛ وضعیت سرویس را بررسی کنید.</p>
-      <p v-else-if="api.diagnostic.value.includes('MAP_BOUNDS_UNAVAILABLE')">محدودهٔ نقشه هنوز آماده نیست؛ بارگذاری نقشه را بررسی کنید.</p>
-      <p>گزارش امن خطا (بدون متن جست‌وجو یا مختصات):</p>
-      <code dir="ltr">{{ api.diagnostic.value }}</code>
-      <v-btn class="place-search__copy-report" variant="text" prepend-icon="mdi-content-copy" @click="copyDiagnostic">کپی گزارش</v-btn>
-      <small v-if="copyStatus" role="status">{{ copyStatus === 'copied' ? 'گزارش کپی شد.' : 'کپی خودکار ممکن نیست؛ متن بالا را لمس طولانی کنید و کپی کنید.' }}</small>
+        <p v-else-if="api.searched.value && !api.results.value.length" class="place-search__feedback" role="status">
+          مکانی در این محدوده پیدا نشد.
+        </p>
+        <template v-else-if="api.results.value.length">
+          <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال به‌روزرسانی این محدوده؛ فقط نتایج داخل محدوده باقی می‌مانند.</p>
+          <div v-else-if="api.failed.value" class="place-search__feedback" role="alert">
+            <p>به‌روزرسانی ناموفق بود؛ نتایج قبلیِ داخل همین محدوده در دسترس‌اند.</p>
+            <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
+          </div>
+          <p v-else class="place-search__feedback" role="status">نتایج را از فهرست انتخاب کنید یا همه را روی نقشه ببینید.</p>
+          <ul aria-label="نتایج جست‌وجوی مکان" role="list">
+            <li v-for="place in api.results.value" :key="place.placeId">
+              <button
+                type="button"
+                class="place-search__result"
+                :class="{ 'place-search__result--selected': api.selectedPlaceId.value === place.placeId }"
+                :aria-pressed="api.selectedPlaceId.value === place.placeId"
+                @click="$emit('select', place)"
+              >
+                <span class="place-search__result-title">
+                  <strong>{{ place.name }}</strong>
+                  <small v-if="api.selectedPlaceId.value === place.placeId">انتخاب‌شده</small>
+                </span>
+                <span class="place-search__address">{{ place.address }}</span>
+              </button>
+            </li>
+          </ul>
+        </template>
+      </div>
+      <div v-if="api.failed.value && api.diagnostic.value && api.term.value.trim().length >= 2"
+        class="place-search__diagnostic" role="group" aria-label="گزارش خطای جست‌وجو">
+        <p v-if="api.diagnostic.value.includes('LIMIT_5_ACCEPTED')">درگاه همین جست‌وجو را با ۵ نتیجه می‌پذیرد اما درخواست ۳۰ نتیجه را رد می‌کند؛ نسخهٔ درگاه نقشه را با برنامه به‌روزرسانی کنید. نتیجهٔ ناقص نمایش داده نمی‌شود.</p>
+        <p v-else-if="api.diagnostic.value.includes('LIMIT_5_REJECTED')">درگاه جست‌وجو هر دو درخواست ۵ و ۳۰ نتیجه را رد کرد؛ محدوده یا پارامترهای درگاه باید بررسی شوند.</p>
+        <p v-else-if="api.diagnostic.value.includes('invalid_geocode_query')">درگاه نقشه درخواست را رد کرد؛ نسخهٔ برنامه و درگاه جست‌وجو را با هم بررسی کنید.</p>
+        <p v-else-if="api.diagnostic.value.includes('geocoding_unavailable')">فتون یا اتصال درگاه نقشه در دسترس نیست؛ وضعیت سرویس را بررسی کنید.</p>
+        <p v-else-if="api.diagnostic.value.includes('MAP_BOUNDS_UNAVAILABLE')">محدودهٔ نقشه هنوز آماده نیست؛ بارگذاری نقشه را بررسی کنید.</p>
+        <p>گزارش امن خطا (بدون متن جست‌وجو یا مختصات):</p>
+        <code dir="ltr">{{ api.diagnostic.value }}</code>
+        <v-btn class="place-search__copy-report" variant="text" prepend-icon="mdi-content-copy" @click="copyDiagnostic">کپی گزارش</v-btn>
+        <small v-if="copyStatus" role="status">{{ copyStatus === 'copied' ? 'گزارش کپی شد.' : 'کپی خودکار ممکن نیست؛ متن بالا را لمس طولانی کنید و کپی کنید.' }}</small>
+      </div>
     </div>
   </v-card>
 </template>
@@ -149,13 +152,14 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 <style scoped>
 .place-search {
   container-type: inline-size;
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
   padding: 0.6rem 0.85rem;
   border: 1px solid rgba(25, 53, 54, 0.09);
   background: rgba(var(--v-theme-surface), 0.95);
   backdrop-filter: blur(10px);
 }
 
-.place-search__body { display: flex; flex-wrap: wrap; align-items: center; gap: 0.65rem 0.85rem; }
+.place-search__body { display: flex; flex: none; flex-wrap: wrap; align-items: center; gap: 0.65rem 0.85rem; }
 .place-search__indicator { flex: 0 0 auto; width: 0.65rem; height: 0.65rem; border-radius: 50%; background: #7d9291; }
 .place-search--active .place-search__indicator { background: #1f8a5b; box-shadow: 0 0 0 4px rgba(31, 138, 91, 0.18); }
 .place-search--warn .place-search__indicator { background: #c57b14; box-shadow: none; }
@@ -164,7 +168,7 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search__headline { margin: 0; color: #173b3c; font-size: 0.86rem; font-weight: 800; line-height: 1.4; }
 .place-search__detail { margin: 0.12rem 0 0; color: #536d6c; font-size: 0.82rem; line-height: 1.55; overflow-wrap: anywhere; }
 .place-search__actions { display: flex; align-items: center; margin-inline-start: auto; }
-.place-search__form { display: flex; align-items: start; gap: 0.5rem; margin-top: 0.75rem; }
+.place-search__form { display: flex; flex: none; align-items: start; gap: 0.5rem; margin-top: 0.75rem; }
 .place-search__form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }
 .place-search__show-all { flex: 0 0 auto; min-width: 44px; min-height: 44px; height: 44px; white-space: nowrap; }
 .place-search__diagnostic { margin-top: 0.6rem; padding: 0.5rem; border-radius: 0.5rem; background: rgba(var(--v-theme-error), 0.09); }
@@ -172,7 +176,11 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search__diagnostic code { display: block; direction: ltr; text-align: start; user-select: text; overflow-wrap: anywhere; font-size: 0.8rem; }
 .place-search__diagnostic small { display: block; }
 .place-search__copy-report { min-height: 44px; }
-.place-search__results { margin-top: 0.5rem; max-height: min(17rem, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
+.place-search__content { flex: 0 1 auto; min-height: 0; max-height: min(17rem, 40dvh); margin-top: .5rem;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.place-search__content:empty { margin-top: 0; }
+.place-search__content:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
+.place-search__results { min-height: 0; }
 .place-search__feedback { margin: 0.35rem 0.25rem 0.5rem; color: #536d6c; font-size: 0.82rem; line-height: 1.6; }
 .place-search__feedback p { margin: 0 0 0.5rem; }
 .place-search__results ul { margin: 0; padding: 0; list-style: none; }

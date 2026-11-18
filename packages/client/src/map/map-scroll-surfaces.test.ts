@@ -29,10 +29,13 @@ function style(sfc: string, filename: string): string {
 describe("map workspace scroll ownership", () => {
   it("gives Search and Companions one scroller at each breakpoint", () => {
     const css = style(map, "UserMapView.vue");
-    expect(css).toContain('max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));\n  overflow-y: auto;');
-    expect(css).toContain(':global(.user-map-view__search .place-search__results) { max-height: none; overflow: visible; }');
+    expect(css).toContain(':global(.user-map-view__search .place-search.v-card) {\n  max-height: calc(100dvh - 6rem');
+    expect(css).toContain('overflow: hidden;\n}');
+    const searchCss = style(source('../components/map/PlaceSearchPanel.vue'), 'PlaceSearchPanel.vue');
+    expect(searchCss).toContain('.place-search__content { flex: 0 1 auto; min-height: 0;');
+    expect(searchCss).toContain('overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;');
+    expect(css).toContain(':global(.user-map-view__search-dialog .place-search__content) {\n    flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;');
     expect(css).toContain(':global(.user-map-view__live .live-companions__peers) { max-height: none; overflow: visible; }');
-    expect(css).toContain('.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;'); // Fullscreen phone dialog body.
     expect(css).toContain('max-height: none;\n    overflow: visible;'); // Tablet page scroll, not nested search.
     expect(style(share, "ShareDialog.vue")).not.toMatch(/\.share-dialog__results\s*\{[^}]*overflow-y:\s*auto/);

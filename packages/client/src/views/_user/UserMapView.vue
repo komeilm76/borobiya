@@ -2565,13 +2565,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  /* Search fields, feedback and results travel as one surface instead of
-     trapping gestures inside a tiny results-only viewport. */
+  /* The card owns the scrollbar; never paint a result or its scrollbar outside its border. */
   max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  overflow-y: auto; overscroll-behavior: contain;
+  overflow: visible;
 }
-:global(.user-map-view__search .place-search__results) { max-height: none; overflow: visible; }
-:global(.user-map-view__search .place-search.v-card) { overflow: visible; }
+:global(.user-map-view__search .place-search.v-card) {
+  max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+}
 :global(.user-map-view__live .live-companions__peers) { max-height: none; overflow: visible; }
 
 .user-map-view__playback {
@@ -2693,6 +2694,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__search {
     inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
     inset-inline-end: 1rem; max-height: calc((100dvh - 8rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2);
+    overflow: visible;
+  }
+  :global(.user-map-view__search .place-search.v-card) {
+    max-height: calc((100dvh - 8rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2);
   }
   .user-map-view__live {
     inset-block-start: auto; inset-block-end: calc(1rem + env(safe-area-inset-bottom, 0px));
@@ -2793,8 +2798,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     padding-right: calc(1rem + env(safe-area-inset-right, 0px));
     overflow-y: auto; overscroll-behavior: contain;
   }
+  :global(.user-map-view__search-dialog.v-dialog > .v-overlay__content > .v-card > .v-card-text.user-map-view__search-body) { overflow: hidden; }
   :global(.user-map-view__search-dialog .user-map-view__search) {
-    position: static; width: 100%; max-height: none; display: flex; flex-direction: column;
+    position: static; width: 100%; height: 100%; min-height: 0; max-height: none;
+    display: flex; flex-direction: column; overflow: hidden;
   }
   :global(.user-map-view__history-dialog .user-map-view__playback) {
     position: static; width: 100%; max-height: none; overflow: visible; pointer-events: auto;
@@ -2813,7 +2820,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   :global(:is(.user-map-view__search-dialog .place-search__headline,
     .user-map-view__history-dialog .history-playback__title-block h2,
     .user-map-view__live-dialog .live-companions__title-block h2)) { display: none; }
-  :global(.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }
+  :global(.user-map-view__search-dialog .place-search.v-card) {
+    height: 100%; min-height: 0; max-height: 100%; display: flex; flex-direction: column; overflow: hidden;
+  }
+  :global(.user-map-view__search-dialog .place-search__content) {
+    flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain;
+  }
   :global(.user-map-view__history-dialog .history-playback) { max-height: none !important; overflow: visible; }
   :global(.user-map-view__history-dialog .history-playback .history-playback__body) {
     margin-top: 0.75rem; padding-top: 0; border-top: 0; gap: 0.75rem;
