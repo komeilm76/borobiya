@@ -93,3 +93,20 @@ export async function rateMission(token: string, id: string, input: MissionRatin
     method: "POST", accessToken: token, body: missionRatingSchema.parse(input)
   });
 }
+
+export const missionLocationPolicySchema = z.strictObject({
+  requesterId: z.string().uuid().optional(), rescuerId: z.string().uuid().optional(),
+  rescuerVisibleToRequester: z.boolean(), requesterVisibleToRescuer: z.boolean(),
+  adminVisibleToRequester: z.boolean(), adminVisibleToRescuer: z.boolean()
+});
+export type MissionLocationPolicy = Omit<z.infer<typeof missionLocationPolicySchema>, "requesterId" | "rescuerId">;
+export async function getMissionLocationPolicy(token: string, id: string): Promise<MissionLocationPolicy> {
+  return missionLocationPolicySchema.parse(await requestJson<unknown>(
+    `/_user/missions/${encodeURIComponent(missionSchema.shape.id.parse(id))}/location-policy`,
+    { accessToken: token, cache: "no-store" }));
+}
+export async function putMissionLocationPolicy(token: string, id: string, policy: MissionLocationPolicy): Promise<MissionLocationPolicy> {
+  return missionLocationPolicySchema.parse(await requestJson<unknown>(
+    `/_user/missions/${encodeURIComponent(missionSchema.shape.id.parse(id))}/location-policy`,
+    { method: "PUT", body: policy, accessToken: token, cache: "no-store" }));
+}

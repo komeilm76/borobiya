@@ -38,6 +38,8 @@ import { registerMissionTimelineEvents } from "./sos/timeline-events";
 import { registerSosCancellationRoutes } from "./sos/cancellation";
 import { DrizzleSosCancellationStore, type SosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleMissionProgressStore, type MissionProgressStore } from "./db/mission-progress-store";
+import { DrizzleMissionLocationStore, type MissionLocationStore } from "./db/mission-location-store";
+import { registerMissionLocationRoutes } from "./sos/mission-locations";
 import { DrizzleSyncStore, type SyncStore } from "./db/sync-store";
 import { registerUserSyncRoute } from "./sos/sync";
 import { registerMultipartParser } from "./plugins/multipart";
@@ -100,6 +102,7 @@ export interface FastifyAppDependencies {
   sosDispatchStore?: SosDispatchStore;
   /** Override the mission progress write in tests. */
   missionProgressStore?: MissionProgressStore;
+  missionLocationStore?: MissionLocationStore;
   syncStore?: SyncStore;
   /** Cancellation catalog and atomic requester cancellation. */
   sosCancellationStore?: SosCancellationStore;
@@ -186,6 +189,7 @@ export async function createFastifyApp(
       cancelRequestAsRequester: async () => ({ status: "not_found" as const }),
       cancelMissionAsRescuer: async () => ({ status: "not_found" as const })
     });
+  const missionLocations = dependencies.missionLocationStore ?? (database ? new DrizzleMissionLocationStore(database.db) : undefined);
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
   const liveLocationService = createLiveLocationService({
@@ -198,6 +202,7 @@ export async function createFastifyApp(
     users: securityQuestionsStore,
     live: liveLocationService,
     missions: missionProgressStore,
+    missionLocations,
     corsOrigins: config.corsOrigins,
     logger: app.log
   });
@@ -274,6 +279,7 @@ export async function createFastifyApp(
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
   await registerMissionProgressRoutes(app, missionProgressStore, realtime.io);
+  if (missionLocations) registerMissionLocationRoutes(app, missionLocations, realtime.io);
   registerMissionTimelineEvents(app, { store: missionProgressStore, sessions: securityQuestionsStore,
     jwtSecret: config.jwtSecret });
   await registerUserSyncRoute(app, dependencies.syncStore ?? (database ? new DrizzleSyncStore(database.db) : {

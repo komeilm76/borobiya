@@ -35,7 +35,7 @@ describe("full-screen mission member focus", () => {
     expect(panel.indexOf('v-for="member in live.participantStatus.value"')).toBeLessThan(panel.indexOf('class="live-panel__presence-details"'));
     expect(panel).toContain('موقعیت قدیمی برای راهبری مناسب نیست');
     expect(panel).toContain('role="region" aria-label="اعضا و اشتراک موقعیت مأموریت"');
-    expect(panel).toContain('v-else-if="canPublish"'); // Embedded requester/admin sharing remains voluntary.
+    expect(panel).toContain('v-else-if="isAdmin"'); // Only the admin can opt into mission sharing.
   });
   it("uses accessible tap targets and legible inset rows in light and dark modes", () => {
     const css = parse(panel).descriptor.styles[0]!.content;

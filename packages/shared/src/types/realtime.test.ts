@@ -20,7 +20,7 @@ describe("typed realtime event catalog", () => {
     expectTypeOf<keyof ServerToClientEvents>().toEqualTypeOf<
       "location:peer-update" | "location:share-ended" | "sos:new-request" |
       "sos:proposal-received" | "sos:proposal-accepted" | "mission:status-updated" |
-      "mission:location" | "mission:cancelled-by-requester" | "mission:cancelled-by-rescuer">();
+      "mission:location" | "mission:location-policy" | "mission:cancelled-by-requester" | "mission:cancelled-by-rescuer">();
     expectTypeOf<Parameters<ServerToClientEvents["mission:location"]>[0]>().toEqualTypeOf<MissionLocationEvent>();
     expectTypeOf<Parameters<ServerToClientEvents["mission:status-updated"]>[0]>().toEqualTypeOf<MissionStatusUpdatedEvent>();
     expectTypeOf<Parameters<ServerToClientEvents["mission:cancelled-by-rescuer"]>[0]>().toEqualTypeOf<RescuerCancellationEvent>();

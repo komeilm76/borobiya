@@ -7,14 +7,17 @@ const mission = readFileSync(new URL("../../views/_user/UserMissionView.vue", im
 const store = readFileSync(new URL("../../stores/rescuer-mission-share.ts", import.meta.url), "utf8");
 
 // Source-pinned UI wiring, never mount Vue SFCs (docs/TASKS.md).
-describe("assigned rescuer automatic share and other roles' general share button", () => {
+describe("participant automatic mission share and independent general share button", () => {
   it("starts the app-scoped publisher on confirmed acceptance, not only on the mission page", () => {
     expect(app).toContain("const missionShare = useRescuerMissionShareStore(pinia);");
     expect(app).toContain("watch(() => proposalInbox.acceptedMissionId, (id) => { if (id) void missionShare.refresh(); }");
     expect(store).toContain('defineStore("rescuer-mission-share"');
     expect(store).toContain("auth.user?.role === \"user\"");
     expect(panel).toContain('<template v-if="fullscreen">');
-    expect(panel).toContain('<template v-else-if="canPublish">');
+    expect(panel).toContain('<template v-else-if="isAdmin">');
+    expect(panel).not.toContain('v-else-if="canPublish"');
+    expect(app).toContain('useRequesterMissionShareStore(pinia);');
+    expect(panel).toContain('requesterShare.mission?.id === props.mission.id && requesterShare.sharing');
     expect(panel).toContain("missionShare.mission?.id === props.mission.id && missionShare.sharing");
     expect(mission).toContain('@sharing-change="teamSharing = $event"');
     expect(mission).not.toContain("@click=\"live.stopSharing()\"");
@@ -22,19 +25,15 @@ describe("assigned rescuer automatic share and other roles' general share button
   it("keeps the manual general broadcast control above SOS for requester/admin", () => {
     expect(app).toContain("const broadcast = useBroadcastStore(pinia);");
     expect(app).toContain('v-if="showGeneralShareButton" class="app-general-share"');
-    expect(app).toContain('route.name !== "user-map" &&');
-    expect(app).toContain('showSosButton.value && auth.user?.role === "user" && !!missionShare.mission');
-    expect(app).toContain('showSosButton.value && !!auth.user && mapTripSession.navigating.value');
-    expect(app).toContain('broadcast.setAutomatic("mission", active)');
-    expect(app).toContain('broadcast.setAutomatic("navigation", active)');
-    expect(app).toContain('broadcast.retryAutomatic()');
+    expect(app).toContain('route.name !== "user-map"');
+    expect(app).not.toContain("broadcast.setAutomatic(");
     expect(app).toContain('accountSessionKey(auth.user?.id ?? null, auth.accessToken)');
     expect(app).toContain('mapTripSession.endForMission()');
     expect(app).toContain(':aria-pressed="broadcast.view.isActive" :disabled="!broadcast.isSupported"');
     expect(app).toContain('@click="broadcast.toggle()"');
     expect(app.indexOf('class="app-general-share"')).toBeLessThan(app.indexOf('<SosTriggerButton'));
     expect(app).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);');
-    expect(panel).toContain("دکمهٔ پخش عمومی کنار SOS جداست و موقعیت را به این اتاق نمی‌فرستد");
+    expect(panel).toContain("پخش عمومی مستقل است");
     expect(app).toContain('missionShare.statusError || missionShare.gpsError');
     expect(app).toContain('@click="missionShare.retry()"');
   });

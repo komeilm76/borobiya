@@ -98,12 +98,11 @@
       variant="flat"
       @click="centerOnOwnLocation"
     />
-    <!-- Manual Broadcast is available outside active assignments and guidance;
-         App owns the automatic broadcast lifecycle in those two states. -->
+    <!-- General Broadcast is a separate manual choice, including during a mission or guidance. -->
     <v-btn
       class="user-map-view__share"
       :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value && !(isPhone && (activeTool || (mode === 'missions' && missionWorkspace?.hasOpenMapTool)))"
+      v-show="!(isPhone && (activeTool || (mode === 'missions' && missionWorkspace?.hasOpenMapTool)))"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
       :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
@@ -252,7 +251,6 @@
           <h2>همراهان</h2>
           <div class="user-map-view__dialog-actions">
             <v-btn
-              v-if="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value"
               :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
               :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : undefined"
               :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"

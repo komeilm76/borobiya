@@ -451,6 +451,10 @@ export const missions = pgTable(
     rescuerId: uuid("rescuer_id").notNull().references(() => users.id),
     requesterId: uuid("requester_id").notNull().references(() => users.id),
     status: text("status").$type<MissionStatus>().notNull().default("pending"),
+    rescuerVisibleToRequester: boolean("rescuer_visible_to_requester").notNull().default(true),
+    requesterVisibleToRescuer: boolean("requester_visible_to_rescuer").notNull().default(true),
+    adminVisibleToRequester: boolean("admin_visible_to_requester").notNull().default(false),
+    adminVisibleToRescuer: boolean("admin_visible_to_rescuer").notNull().default(false),
     cancelledBy: text("cancelled_by").$type<"requester" | "rescuer" | "admin" | "system">(),
     cancellationReasonId: uuid("cancellation_reason_id").references(() => cancellationReasons.id),
     cancellationCustomText: text("cancellation_custom_text"),
@@ -467,6 +471,25 @@ export const missions = pgTable(
     index("missions_requester_id_idx").on(table.requesterId)
   ]
 );
+
+/** Mission GPS is not general location history or an outgoing public share. */
+export const missionTrackPoints = pgTable("mission_track_points", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  missionId: uuid("mission_id").notNull().references(() => missions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  role: text("role").$type<"requester" | "rescuer" | "admin">().notNull(),
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
+  accuracy: doublePrecision("accuracy"),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  check("mission_track_points_role_check", sql`"role" IN ('requester', 'rescuer', 'admin')`),
+  check("mission_track_points_lat_check", sql`"lat" BETWEEN -90 AND 90`),
+  check("mission_track_points_lon_check", sql`"lon" BETWEEN -180 AND 180`),
+  check("mission_track_points_accuracy_check", sql`"accuracy" IS NULL OR "accuracy" >= 0`),
+  index("mission_track_points_mission_observed_idx").on(table.missionId, table.observedAt, table.id)
+]);
 
 /** Durable, uniquely keyed responder abuse/review flag; written in the cancellation transaction. */
 export const adminAlerts = pgTable(

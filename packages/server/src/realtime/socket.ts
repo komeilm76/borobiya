@@ -5,6 +5,7 @@ import { Server, type Socket } from "socket.io";
 import { idSchema, missionLocationPublishSchema, type LocationUpdateAck, type MissionJoinAck, type MissionLocationAck, type MissionLocationEvent, type MissionStatusUpdatedEvent, type RequesterCancellationEvent, type RescuerCancellationEvent, type ShareEndedEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
 import type { ClientToServerEvents, ServerToClientEvents } from "@borobiya/shared";
 export type { LocationUpdateAck, MissionJoinAck, MissionLocationAck } from "@borobiya/shared";
+import type { MissionLocationStore } from "../db/mission-location-store";
 import type { MissionProgressStore } from "../db/mission-progress-store";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
@@ -26,6 +27,7 @@ export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted" satisfies key
 export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated" satisfies keyof ServerToClientEvents;
 export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe" satisfies keyof ClientToServerEvents;
 export const MISSION_LOCATION_PUBLISH_EVENT = "mission:location-publish" satisfies keyof ClientToServerEvents;
+export const MISSION_LOCATION_POLICY_EVENT = "mission:location-policy" satisfies keyof ServerToClientEvents;
 export const MISSION_LOCATION_EVENT = "mission:location" satisfies keyof ServerToClientEvents;
 export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer" satisfies keyof ServerToClientEvents;
 export const MISSION_CANCELLED_BY_REQUESTER_EVENT = "mission:cancelled-by-requester" satisfies keyof ServerToClientEvents;
@@ -60,6 +62,7 @@ export interface RealtimeDependencies {
   jwtSecret: string;
   users: UserSecurityQuestionsStore;
   live: LiveLocationService;
+  missionLocations?: MissionLocationStore;
   missions?: Pick<MissionProgressStore, "canJoinMissionRoom" | "missionLocationRole">;
   /** Allowed browser origins for the WebSocket handshake; omitted means same-origin only. */
   corsOrigins?: string[];
@@ -325,11 +328,9 @@ export async function handleLocationUpdate(
   }
 }
 
-async function locationUpdateAck(
-  sender: UpdateSender,
-  payload: unknown,
-  dependencies: HandleLocationUpdateDependencies
-): Promise<LocationUpdateAck> {
+/** Shared session/account/rate validation; private mission fixes must not call the
+ * general location service (which persists public history and fans out to shares). */
+async function validateLocationSender(sender: UpdateSender, dependencies: HandleLocationUpdateDependencies): Promise<LocationUpdateAck | null> {
   const identity = sender.data;
   if (!identity?.userId || !identity.deviceId) {
     return { ok: false, status: "rejected", code: "UNAUTHORIZED", message: "Reconnect with a valid session." };
@@ -389,6 +390,21 @@ async function locationUpdateAck(
     }
   }
 
+  return null;
+}
+
+async function locationUpdateAck(
+  sender: UpdateSender,
+  payload: unknown,
+  dependencies: HandleLocationUpdateDependencies
+): Promise<LocationUpdateAck> {
+  const invalid = await validateLocationSender(sender, dependencies);
+  if (invalid) return invalid;
+  const identity = sender.data;
+  if (!identity.userId || !identity.deviceId) return {
+    ok: false, status: "rejected", code: "UNAUTHORIZED", message: "Reconnect with a valid session."
+  };
+
   const result = await dependencies.live.applyUpdate({
     userId: identity.userId,
     deviceId: identity.deviceId,
@@ -427,7 +443,8 @@ async function locationUpdateAck(
   return { ok: true, status: "accepted", peers: result.peers };
 }
 
-/** An explicit mission-location publish reuses all existing live GPS/session/device/rate checks. */
+/** Mission fixes have a separate trace and recipient policy. Never emit to the
+ * mission room: membership alone does not imply permission to see every member. */
 export async function publishMissionLocation(sender: UpdateSender, payload: unknown,
   dependencies: RealtimeDependencies): Promise<MissionLocationAck> {
   const parsed = missionLocationPublishSchema.safeParse(payload);
@@ -437,25 +454,52 @@ export async function publishMissionLocation(sender: UpdateSender, payload: unkn
   if (age > 60_000 || age < -10_000) return {
     ok: false, status: "rejected", code: "INVALID_TIMESTAMP", message: "A live mission fix must be recent."
   };
-  const identity = sender.data;
-  if ((identity.role !== "user" && identity.role !== "admin") || !identity.userId || !dependencies.missions?.missionLocationRole) {
+  const identity = { ...sender.data };
+  if ((identity.role !== "user" && identity.role !== "admin") || !identity.userId || !dependencies.missionLocations) {
     return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
   }
   try {
-    const role = await dependencies.missions.missionLocationRole(missionId, identity.userId, identity.role);
-    if (!role) return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
-    const accepted = await handleLocationUpdate(sender, location, dependencies);
-    if (!accepted.ok) return accepted;
-    // A cancellation may commit while the fix persists. Recheck immediately before fan-out
-    // so an already-terminal mission cannot publish through a previously joined room.
-    if (sender.connected === false || !sender.data.userId || sender.data.userId !== identity.userId ||
-      !(await dependencies.missions.missionLocationRole(missionId, identity.userId, identity.role))) {
+    const invalid = await validateLocationSender(sender, dependencies);
+    if (invalid) return invalid;
+    if (location.priorityDeviceId !== identity.deviceId) return {
+      ok: false, status: "rejected", code: "WRONG_DEVICE", message: "The reporting device does not match this session."
+    };
+    // Policy before persistence and again before fanout; intersect both decisions.
+    const before = await dependencies.missionLocations.policy(missionId, identity.userId, identity.role);
+    if (!before) return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
+    if (identity.role === "admin" && !before.adminVisibleToRequester && !before.adminVisibleToRescuer) {
+      return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Admin location sharing is off." };
+    }
+    const persisted = await dependencies.missionLocations.record({ missionId, userId: identity.userId,
+      accountRole: identity.role, lat: location.lat, lon: location.lon,
+      accuracy: location.accuracy ?? null, observedAt: new Date(location.timestamp) });
+    if (!persisted) return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
+    const after = sender.connected === false ? null :
+      await dependencies.missionLocations.policy(missionId, identity.userId, identity.role);
+    // A logout/deactivation or socket identity replacement may race the write.
+    const sameSocket = sender.connected !== false && sender.data.userId === identity.userId &&
+      sender.data.deviceId === identity.deviceId && sender.data.sessionId === identity.sessionId &&
+      sender.data.role === identity.role;
+    const user = sameSocket ? await dependencies.users.findUserById(identity.userId) : null;
+    const session = user?.isActive && !user.isSuspended && user.role === identity.role &&
+      (user.role === "admin" || !user.mustCompleteSecurityQuestions) && identity.sessionId && identity.deviceId
+      ? await dependencies.users.hasActiveSession({ userId: identity.userId,
+          sessionId: identity.sessionId, deviceId: identity.deviceId }) : false;
+    if (!after || !session || before.requesterId !== after.requesterId || before.rescuerId !== after.rescuerId) {
       return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
     }
+    const role = persisted.role;
     const event: MissionLocationEvent = { missionId, userId: identity.userId, role,
       lat: location.lat, lon: location.lon, accuracy: location.accuracy ?? null,
-      timestamp: new Date().toISOString() };
-    sender.to(missionRoom(missionId)).emit(MISSION_LOCATION_EVENT, event);
+      timestamp: new Date(location.timestamp).toISOString() };
+    const allowed = (recipient: "requester" | "rescuer") => role === "requester" ?
+      recipient === "rescuer" && before.requesterVisibleToRescuer && after.requesterVisibleToRescuer :
+      role === "rescuer" ? recipient === "requester" && before.rescuerVisibleToRequester && after.rescuerVisibleToRequester :
+      recipient === "requester" ? before.adminVisibleToRequester && after.adminVisibleToRequester :
+        before.adminVisibleToRescuer && after.adminVisibleToRescuer;
+    if (allowed("requester")) sender.to(userRoom(after.requesterId)).emit(MISSION_LOCATION_EVENT, event);
+    if (allowed("rescuer")) sender.to(userRoom(after.rescuerId)).emit(MISSION_LOCATION_EVENT, event);
+    if (role !== "admin") sender.to(ADMIN_ROOM).emit(MISSION_LOCATION_EVENT, event);
     sender.emit(MISSION_LOCATION_EVENT, event);
     return { ok: true, status: "accepted" };
   } catch (error) {

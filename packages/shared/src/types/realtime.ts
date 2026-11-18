@@ -48,6 +48,7 @@ export interface ServerToClientEvents {
   "sos:proposal-accepted": (payload: SosProposalAcceptedEvent) => void;
   "mission:status-updated": (payload: MissionStatusUpdatedEvent) => void;
   "mission:location": (payload: MissionLocationEvent) => void;
+  "mission:location-policy": (payload: { missionId: string; visibleRoles: ("requester" | "rescuer" | "admin")[] }) => void;
   "mission:cancelled-by-requester": (payload: RequesterCancellationEvent) => void;
   /** Admins receive additional location/review fields; participants receive only the common fields. */
   "mission:cancelled-by-rescuer": (payload: RescuerCancellationEvent) => void;

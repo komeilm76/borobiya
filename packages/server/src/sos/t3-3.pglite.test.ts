@@ -31,6 +31,7 @@ import { DrizzleUserRegistrationStore } from "../db/registration-store";
 import { DrizzleUserSecurityQuestionsStore } from "../db/security-questions-store";
 import { DrizzleSosDispatchStore } from "../db/sos-dispatch-store";
 import { DrizzleMissionProgressStore } from "../db/mission-progress-store";
+import { DrizzleMissionLocationStore } from "../db/mission-location-store";
 import { DrizzleSosCancellationStore } from "../db/sos-cancellation-store";
 import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
@@ -195,6 +196,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       sosRequestStore: new DrizzleSosRequestStore(db),
       sosDispatchStore: new DrizzleSosDispatchStore(db),
       missionProgressStore: new DrizzleMissionProgressStore(db),
+      missionLocationStore: new DrizzleMissionLocationStore(db),
       sosCancellationStore: new DrizzleSosCancellationStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir)
@@ -810,6 +812,13 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
         });
       });
       expect(await publish(outsider, missionId, "dev-000009")).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+      expect(await publish(admin, missionId, "dev-000001")).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+      const policyResult = await app.inject({ method: "PUT", url: `/_user/missions/${missionId}/location-policy`,
+        headers: { authorization: `Bearer ${adminToken}` }, payload: {
+          rescuerVisibleToRequester: true, requesterVisibleToRescuer: true,
+          adminVisibleToRequester: true, adminVisibleToRescuer: true
+        } });
+      expect(policyResult.statusCode, policyResult.body).toBe(200);
       expect(await publish(admin, missionId, "dev-000001")).toMatchObject({ ok: true });
       expect(await publish(requester, missionId, "dev-000001")).toMatchObject({ ok: true });
       expect(await publish(rescuer, missionId, "dev-000008")).toMatchObject({ ok: true });
@@ -823,6 +832,12 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
         ]);
       }
       expect(positions.outsider).toEqual([]);
+      const privateRows = await pg.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM "mission_track_points" WHERE "mission_id" = $1', [missionId]);
+      expect(privateRows.rows[0]?.count).toBe("3");
+      const publicRows = await pg.query<{ count: string }>(
+        'SELECT count(*)::text AS count FROM "location_history" WHERE "user_id" = $1', [rescuerId]);
+      expect(publicRows.rows[0]?.count).toBe("0");
       // The ordinary live-share event is not an implicit mission-sharing opt-in.
       await new Promise<void>((resolve, reject) => {
         rescuer.timeout(3000).emit("location:update", { lat: 35.74, lon: 51.44,
@@ -837,6 +852,17 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       expect(positions.admin).toHaveLength(3);
       expect(positions.requester).toHaveLength(3);
       expect(positions.rescuer).toHaveLength(3);
+      const hide = await app.inject({ method: "PUT", url: `/_user/missions/${missionId}/location-policy`,
+        headers: { authorization: `Bearer ${adminToken}` }, payload: {
+          rescuerVisibleToRequester: false, requesterVisibleToRescuer: true,
+          adminVisibleToRequester: false, adminVisibleToRescuer: false
+        } });
+      expect(hide.statusCode, hide.body).toBe(200);
+      expect(await publish(rescuer, missionId, "dev-000008")).toMatchObject({ ok: true });
+      await new Promise((resolve) => setTimeout(resolve, 35));
+      expect(positions.requester).toHaveLength(3); // Revocation is enforced on the wire.
+      expect(positions.admin).toHaveLength(4);
+      expect(positions.outsider).toEqual([]);
 
       const listMissions = async () => app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions`,
         headers: { authorization: `Bearer ${adminToken}` } });
@@ -879,7 +905,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       const allMissions = await app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions?includeTerminal=true`,
         headers: { authorization: `Bearer ${adminToken}` } });
       expect(allMissions.json().map((row: { id: string }) => row.id)).toEqual([missionId]);
-      expect(positions.admin).toHaveLength(3);
+      expect(positions.admin).toHaveLength(4);
 
     } finally {
       admin.close(); requester.close(); rescuer.close(); outsider.close();

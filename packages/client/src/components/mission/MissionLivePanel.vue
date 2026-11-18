@@ -4,7 +4,7 @@
       <div>
         <span class="live-panel__eyebrow"><v-icon icon="mdi-map-marker-radius" size="17" /> اتاق خصوصی مأموریت</span>
         <h3>{{ routeActive ? 'نقشهٔ مأموریت' : 'موقعیت اعضای مأموریت' }}</h3>
-        <p>{{ routeActive ? 'محل حادثه و مسیرها در همین نقشه‌اند؛ موقعیت امدادگر در مأموریت فعال خودکار و موقعیت دیگر اعضا با انتخاب خودشان نشان داده می‌شود.' : 'موقعیت امدادگر در مأموریت فعال خودکار است؛ دیگر اعضا فقط با انتخاب خود موقعیتشان را در این اتاق به اشتراک می‌گذارند.' }}</p>
+        <p>{{ routeActive ? 'محل حادثه و مسیرها در همین نقشه‌اند؛ درخواست‌کننده و امدادگر موقعیت خود را فقط برای اعضای مجاز مأموریت می‌فرستند.' : 'موقعیت درخواست‌کننده و امدادگر در مأموریت فعال با اجازهٔ GPS خودکار است؛ نمایش آن برای طرف مقابل را مدیر کنترل می‌کند.' }}</p>
       </div>
       <div class="d-flex flex-wrap align-center ga-2">
         <slot name="map-toolbar" />
@@ -88,25 +88,36 @@
               : 'موقعیت امدادگر پس از تأیید مأموریت و اجازهٔ GPS به‌صورت خودکار با اعضای این مأموریت به اشتراک گذاشته می‌شود. اگر اشتراک برقرار نشد، هشدار بالای صفحه را بررسی کنید.' }}
           </p>
         </template>
-        <template v-else-if="canPublish">
-          <p v-if="live.recoveryPending.value && !live.error.value" class="live-panel__note" role="status">
-            پس از بازگشت اتصال، وضعیت مأموریت در حال بررسی است. تا تأیید سرور اشتراک موقعیت فعال نمی‌شود.
-          </p>
-          <v-btn v-if="!live.sharing.value" color="primary" variant="flat" rounded="lg" block
-            :disabled="!live.connected.value || live.recoveryPending.value" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
-            اشتراک موقعیت من با اعضا و مدیر
+        <template v-else-if="isAdmin">
+          <details class="live-panel__presence-details">
+            <summary>دسترسی اعضا به موقعیت</summary>
+            <p>اشتراک درخواست‌کننده و امدادگر خودکار و خصوصی است؛ نمایش موقعیت هرکدام برای طرف مقابل را اینجا تعیین کنید. مدیر همیشه هر دو را می‌بیند.</p>
+            <v-alert v-if="policyError" type="warning" variant="tonal" role="alert">{{ policyError }}</v-alert>
+            <template v-if="locationPolicy">
+              <v-checkbox v-model="locationPolicy.rescuerVisibleToRequester" label="نمایش امدادگر به درخواست‌کننده" density="compact" hide-details />
+              <v-checkbox v-model="locationPolicy.requesterVisibleToRescuer" label="نمایش درخواست‌کننده به امدادگر" density="compact" hide-details />
+              <v-checkbox v-model="locationPolicy.adminVisibleToRequester" label="ارسال موقعیت من به درخواست‌کننده" density="compact" hide-details />
+              <v-checkbox v-model="locationPolicy.adminVisibleToRescuer" label="ارسال موقعیت من به امدادگر" density="compact" hide-details />
+              <v-btn variant="tonal" color="primary" :loading="savingPolicy" @click="savePolicy">ذخیرهٔ دسترسی‌ها</v-btn>
+            </template>
+          </details>
+          <p v-if="live.recoveryPending.value" class="live-panel__note" role="status">پس از اتصال دوباره، وضعیت مأموریت در حال بررسی است.</p>
+          <v-btn v-if="canAdminShare && !live.sharing.value" color="primary" variant="flat" rounded="lg" block
+            :disabled="!live.connected.value || live.recoveryPending.value || savingPolicy" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
+            آغاز ارسال موقعیت مدیر به اعضای انتخاب‌شده
           </v-btn>
-          <v-btn v-else color="error" variant="tonal" rounded="lg" block prepend-icon="mdi-stop-circle-outline"
-            @click="live.stopSharing()">توقف اشتراک موقعیت من</v-btn>
-          <p class="live-panel__note">این اشتراک اختصاصی مأموریت و داوطلبانه است؛ دکمهٔ پخش عمومی کنار SOS جداست و موقعیت را به این اتاق نمی‌فرستد. با خروج از این صفحه یا قطع اتصال متوقف می‌شود.</p>
+          <v-btn v-if="live.sharing.value" color="error" variant="tonal" rounded="lg" block
+            @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
+          <p class="live-panel__note">موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
         </template>
+        <p v-else class="live-panel__note" role="status">اشتراک خصوصی موقعیت شما برای اعضای مجاز مأموریت خودکار است؛ برای خطای GPS یا اتصال، هشدارهای وضعیت را بررسی کنید. پخش عمومی مستقل است.</p>
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
@@ -115,6 +126,8 @@ import { freshMissionMemberCamera } from "@/mission/member-focus";
 import { createLiveCameraIntent } from "@/mission/live-camera-intent";
 import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
+import { getMissionLocationPolicy, putMissionLocationPolicy, type MissionLocationPolicy } from "@/api/mission";
+import { useRequesterMissionShareStore } from "@/stores/requester-mission-share";
 import { useMissionPresence } from "@/composables/use-mission-presence";
 import { missionPresenceLabel } from "@/mission/presence";
 import { missionLocationAnnouncement } from "@/mission/location-phase";
@@ -138,19 +151,53 @@ const emit = defineEmits<{
 }>();
 const auth = useAuthStore();
 const missionShare = useRescuerMissionShareStore();
+const requesterShare = useRequesterMissionShareStore();
 const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const live = useMissionLiveLocations(computed(() => props.mission), computed(() => auth.accessToken),
   computed(() => auth.user?.id ?? null), () => auth.ensureSession());
 const presence = useMissionPresence(computed(() => props.mission.id), computed(() => auth.accessToken),
   computed(() => auth.user?.id ?? null));
-// The rescuer's automatic publisher is app-owned, not unmounted with this map.
-// Other roles may still opt into a *separate* mission-room share from their panels.
+// Participant publishers are app-owned; only the admin opts in from this panel.
 watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)
-  : live.sharing.value, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
+  : auth.user?.id === props.mission.requesterId ? Boolean(requesterShare.mission?.id === props.mission.id && requesterShare.sharing) : live.sharing.value, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
 watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }, { flush: "sync" });
-const canPublish = computed(() => auth.user?.role === "admin" ||
-  auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);
+const isAdmin = computed(() => auth.user?.role === "admin");
+const locationPolicy = ref<MissionLocationPolicy | null>(null);
+const savedPolicy = ref<MissionLocationPolicy | null>(null);
+const policyError = ref<string | null>(null);
+const savingPolicy = ref(false);
+const canAdminShare = computed(() => Boolean(savedPolicy.value?.adminVisibleToRequester || savedPolicy.value?.adminVisibleToRescuer));
+watch(() => [props.mission.id, auth.accessToken, auth.user?.id, isAdmin.value] as const,
+  async ([id, token, _owner, admin], _previous, onCleanup) => {
+    let cancelled = false;
+    onCleanup(() => { cancelled = true; });
+    locationPolicy.value = null;
+    savedPolicy.value = null;
+    policyError.value = null;
+    live.stopSharing();
+    if (!admin || !token) return;
+    try {
+      const next = await getMissionLocationPolicy(token, id);
+      if (!cancelled) { locationPolicy.value = { ...next }; savedPolicy.value = { ...next }; }
+    } catch { if (!cancelled) policyError.value = "تنظیمات موقعیت بارگیری نشد؛ دوباره صفحه را باز کنید."; }
+  }, { immediate: true });
+async function savePolicy(): Promise<void> {
+  const token = auth.accessToken;
+  const draft = locationPolicy.value;
+  if (!isAdmin.value || !token || !draft || savingPolicy.value) return;
+  const id = props.mission.id;
+  savingPolicy.value = true;
+  policyError.value = null;
+  try {
+    const result = await putMissionLocationPolicy(token, id, draft);
+    if (props.mission.id !== id || auth.accessToken !== token) return;
+    savedPolicy.value = { ...result };
+    locationPolicy.value = { ...result };
+    if (!result.adminVisibleToRequester && !result.adminVisibleToRescuer) live.stopSharing();
+  } catch { policyError.value = "ذخیرهٔ دسترسی‌ها انجام نشد؛ تنظیمات پیشین همچنان معتبر است."; }
+  finally { savingPolicy.value = false; }
+}
 const map = shallowRef<MapLibreMap | null>(null);
 const cameraIntent = createLiveCameraIntent();
 let detachCameraGesture: (() => void) | null = null;

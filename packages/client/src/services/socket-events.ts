@@ -16,6 +16,7 @@ export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received" satisfies key
 export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated" satisfies keyof ServerToClientEvents;
 export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe" satisfies keyof ClientToServerEvents;
 export const MISSION_LOCATION_PUBLISH_EVENT = "mission:location-publish" satisfies keyof ClientToServerEvents;
+export const MISSION_LOCATION_POLICY_EVENT = "mission:location-policy" satisfies keyof ServerToClientEvents;
 export const MISSION_LOCATION_EVENT = "mission:location" satisfies keyof ServerToClientEvents;
 export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer" satisfies keyof ServerToClientEvents;
 export const MISSION_CANCELLED_BY_REQUESTER_EVENT = "mission:cancelled-by-requester" satisfies keyof ServerToClientEvents;

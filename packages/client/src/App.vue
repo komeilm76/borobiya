@@ -200,12 +200,6 @@
       variant="flat" @click="broadcast.toggle()" />
     <span v-if="showGeneralShareButton && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
       class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
-    <v-snackbar :model-value="broadcast.automaticActive && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
-      color="warning" location="bottom" multi-line :timeout="-1" role="alert">
-      {{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}
-      <template #actions><v-btn v-if="broadcast.isSupported && !broadcast.view.isActive" variant="text"
-        @click="broadcast.retryAutomatic()">تلاش دوباره</v-btn></template>
-    </v-snackbar>
     <SosTriggerButton v-if="showSosButton" @trigger="sosSheet.openSheet()" />
     <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
     <v-snackbar :model-value="Boolean(missionShare.statusError || missionShare.gpsError) && (missionShare.hadActiveMission || !!proposalInbox.acceptedMissionId || route.name === 'user-mission')"
@@ -293,6 +287,7 @@ import { accountSessionKey } from "./composables/device-identity";
 import { pinia } from "./stores";
 import { useAdminSosStore } from "./stores/admin-sos";
 import { useProposalInboxStore } from "./stores/proposal-inbox";
+import { useRequesterMissionShareStore } from "./stores/requester-mission-share";
 import { useRescuerMissionShareStore } from "./stores/rescuer-mission-share";
 import { mapTripSession } from "./map/trip-session";
 import { useBroadcastStore } from "./stores/broadcast";
@@ -304,6 +299,8 @@ const auth = useAuthStore(pinia);
 const adminSos = useAdminSosStore(pinia);
 const proposalInbox = useProposalInboxStore(pinia);
 const missionShare = useRescuerMissionShareStore(pinia);
+// Requester GPS is verified and app-owned too, not dependent on opening the room panel.
+useRequesterMissionShareStore(pinia);
 const broadcast = useBroadcastStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
 watch(() => proposalInbox.acceptedMissionId, (id) => { if (id) void missionShare.refresh(); }, { flush: "sync" });
@@ -324,13 +321,7 @@ const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
   () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
 );
-// The mission-room publisher is separate. General Broadcast follows only a
-// server-confirmed assignment or a started (including pending) travel guidance,
-// regardless of which workspace tab is currently visible.
-watch(() => showSosButton.value && auth.user?.role === "user" && !!missionShare.mission,
-  (active) => broadcast.setAutomatic("mission", active), { immediate: true, flush: "sync" });
-watch(() => showSosButton.value && !!auth.user && mapTripSession.navigating.value,
-  (active) => broadcast.setAutomatic("navigation", active), { immediate: true, flush: "sync" });
+// General Broadcast is a separate manual opt-in; missions and navigation never turn it on.
 // A trip started in another login must not silently inherit that session's GPS
 // or leave the Broadcast button hidden with no active publisher.
 watch(() => accountSessionKey(auth.user?.id ?? null, auth.accessToken), (next, previous) => {
@@ -382,12 +373,9 @@ const route = useRoute();
 // Both map-first workspaces use the same full-viewport shell and navigation drawer.
 // Proposal and route-choice overlays remain specific to the companion map.
 const isMapRoute = computed(() => route.name === "user-map" || route.name === "user-mission");
-// The companion map owns its existing share icon. The mission map also needs
-// the general opt-in icon for requester/admin, above the global SOS button.
-// An assigned rescuer's mission publisher is separate and cannot be disabled here.
-const showGeneralShareButton = computed(() => showSosButton.value && route.name !== "user-map" &&
-  !missionShare.mission && !missionShare.hadActiveMission && !proposalInbox.acceptedMissionId &&
-  (auth.user?.role === "admin" || !missionShare.refreshing));
+// The companion map owns its share icon. Other pages keep an independent manual
+// general Broadcast action above SOS, even during an active mission.
+const showGeneralShareButton = computed(() => showSosButton.value && route.name !== "user-map");
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutUnconfirmed = ref(false);

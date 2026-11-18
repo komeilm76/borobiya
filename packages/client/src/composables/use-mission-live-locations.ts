@@ -2,7 +2,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 import { missionLocationEventSchema, missionStatusUpdatedEventSchema,
   rescuerCancellationEventSchema, requesterCancellationEventSchema, type MissionLocationEvent } from "@shared/index";
 import { MISSION_LOCATION_EVENT, MISSION_LOCATION_PUBLISH_EVENT, MISSION_SUBSCRIBE_EVENT,
-  MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT } from "@/services/socket-events";
+  MISSION_STATUS_UPDATED_EVENT, MISSION_LOCATION_POLICY_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { ownDeviceId, decodeAccessTokenClaims } from "./device-identity";
 import { readAllUserSync } from "@/api/sync";
@@ -47,7 +47,7 @@ function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number
   return () => navigator.geolocation.clearWatch(id);
 }
 
-/** Private mission-room listener. Only the app-owned active rescuer publisher opts into autoShare. */
+/** Private mission-room listener. Only app-owned verified participant publishers opt into autoShare. */
 export function useMissionLiveLocations(
   mission: Ref<LiveMissionIdentity | null>, token: Ref<string | null>, userId: Ref<string | null>,
   ensureSession?: () => Promise<unknown>, runtime: MissionLiveRuntime = {}, autoShare = false
@@ -164,7 +164,7 @@ export function useMissionLiveLocations(
           connected.value = true;
           if (!lastDisconnectAt) {
             error.value = null;
-            if (autoShare && current.rescuerId === owner) startSharing();
+            if (autoShare && (current.rescuerId === owner || current.requesterId === owner)) startSharing();
           }
         }
       });
@@ -219,7 +219,7 @@ export function useMissionLiveLocations(
       recoveryPending.value = false;
       if (connected.value) {
         error.value = null;
-        if (autoShare && current.rescuerId === owner) startSharing();
+        if (autoShare && (current.rescuerId === owner || current.requesterId === owner)) startSharing();
       }
     } catch {
       if (valid()) {
@@ -300,6 +300,16 @@ export function useMissionLiveLocations(
       });
       opened.socket.on("connect_error", () => { if (active()) void recoverAuth(opened, gen); });
       opened.socket.on(MISSION_LOCATION_EVENT, (payload: unknown) => { if (active()) handleEvent(payload); });
+      opened.socket.on(MISSION_LOCATION_POLICY_EVENT, (payload: unknown) => {
+        if (!active() || !payload || typeof payload !== "object") return;
+        const update = payload as { missionId?: unknown; visibleRoles?: unknown };
+        if (update.missionId !== current.id || !Array.isArray(update.visibleRoles) ||
+          !update.visibleRoles.every((role) => ["requester", "rescuer", "admin"].includes(role))) return;
+        for (const role of ["requester", "rescuer", "admin"] as const) {
+          if (!update.visibleRoles.includes(role)) delete locations.value[role];
+        }
+        locations.value = { ...locations.value };
+      });
       opened.socket.on(MISSION_STATUS_UPDATED_EVENT, (payload: unknown) => { if (active()) onMissionStatus(payload); });
       opened.socket.on(MISSION_CANCELLED_BY_REQUESTER_EVENT, (payload: unknown) => {
         if (active()) onCancellation(payload, "requester");

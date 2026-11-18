@@ -65,58 +65,70 @@ it("authorizes private mission subscriptions against both the live session and m
   expect(await joinMissionRoom(foreign as never, { missionId }, dependencies)).toEqual({ ok: false, code: "UNAUTHORIZED" });
 });
 
-it("publishes only fresh, explicit, authorized mission fixes to the private room", async () => {
+it("keeps mission fixes out of public history and enforces per-recipient policy", async () => {
   const missionId = randomUUID();
+  const requesterId = randomUUID();
+  const rescuerId = userId;
   const sender = makeSocket({ data: { userId, role: "user", sessionId, deviceId } });
-  const applyUpdate = vi.fn(async () => ({ status: "accepted" as const, peers: [],
-    fix: { lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() } }));
-  const missionLocationRole = vi.fn(async () => "rescuer" as const);
-  const dependencies = { jwtSecret, users: makeStore(userRecord()),
-    live: { applyUpdate }, missions: { missionLocationRole, canJoinMissionRoom: async () => true } };
-  const payload = { missionId, location: { lat: 35.7, lon: 51.4, timestamp: new Date().toISOString(), priorityDeviceId: deviceId } };
+  const applyUpdate = vi.fn();
+  const policy = { requesterId, rescuerId, rescuerVisibleToRequester: false,
+    requesterVisibleToRescuer: true, adminVisibleToRequester: false, adminVisibleToRescuer: false };
+  const record = vi.fn(async () => ({ ...policy, role: "rescuer" as const }));
+  const activePolicy = vi.fn(async () => policy);
+  const dependencies = { jwtSecret, users: makeStore(userRecord()), live: { applyUpdate },
+    missionLocations: { record, policy: activePolicy, setPolicy: vi.fn(), history: vi.fn() } };
+  const payload = { missionId, location: { lat: 35.7, lon: 51.4,
+    timestamp: new Date().toISOString(), priorityDeviceId: deviceId } };
   expect(await publishMissionLocation(sender as never, payload, dependencies)).toMatchObject({ ok: true });
-  expect(missionLocationRole).toHaveBeenCalledTimes(2);
-  expect(applyUpdate).toHaveBeenCalledOnce();
-  const emitted = sender.emitted.filter((entry) => entry.event === MISSION_LOCATION_EVENT);
-  expect(emitted).toHaveLength(2);
-  expect(emitted[0]?.room).toBe(missionRoom(missionId));
-  expect(missionLocationEventSchema.parse(emitted[0]?.payload)).toMatchObject({
+  expect(record).toHaveBeenCalledOnce();
+  expect(applyUpdate).not.toHaveBeenCalled();
+  expect(sender.emitted.map((entry) => entry.room)).toEqual(["admin", undefined]);
+  expect(missionLocationEventSchema.parse(sender.emitted[0]?.payload)).toMatchObject({
     userId, missionId, role: "rescuer", lat: 35.7, lon: 51.4
   });
-
   const outsider = makeSocket({ data: { userId, role: "user", sessionId, deviceId } });
   expect(await publishMissionLocation(outsider as never, payload, {
-    ...dependencies, missions: { ...dependencies.missions, missionLocationRole: async () => null }
+    ...dependencies, missionLocations: { ...dependencies.missionLocations, policy: async () => null }
   })).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
   expect(outsider.emitted).toEqual([]);
-  expect(applyUpdate).toHaveBeenCalledOnce();
-
+  expect(record).toHaveBeenCalledOnce();
   const admin = makeSocket({ data: { userId, role: "admin", sessionId, deviceId } });
-  expect(await publishMissionLocation(admin as never, payload, {
-    ...dependencies, users: makeStore(userRecord({ role: "admin" })),
-    missions: { ...dependencies.missions, missionLocationRole: async (_missionId, _userId, role) =>
-      role === "admin" ? "admin" as const : null }
+  const adminDependencies = { ...dependencies, users: makeStore(userRecord({ role: "admin" })),
+    missionLocations: { ...dependencies.missionLocations,
+      record: async () => ({ ...policy, role: "admin" as const }) } };
+  expect(await publishMissionLocation(admin as never, payload, adminDependencies))
+    .toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+  expect(admin.emitted).toEqual([]);
+  expect(await publishMissionLocation(admin as never, payload, { ...adminDependencies,
+    missionLocations: { ...adminDependencies.missionLocations, policy: async () =>
+      ({ ...policy, adminVisibleToRequester: true }) }
   })).toMatchObject({ ok: true });
-  expect(admin.emitted.filter((event) => event.event === MISSION_LOCATION_EVENT)[0]?.payload)
-    .toMatchObject({ role: "admin", userId });
+  expect(admin.emitted.map((entry) => entry.room)).toEqual([userRoom(requesterId), undefined]);
+  expect(await publishMissionLocation(outsider as never, { ...payload,
+    location: { ...payload.location, priorityDeviceId: randomUUID() }
+  }, dependencies)).toMatchObject({ ok: false, code: "WRONG_DEVICE" });
   expect(await publishMissionLocation(outsider as never, { ...payload,
     location: { ...payload.location, timestamp: new Date(Date.now() - 61_000).toISOString() }
   }, dependencies)).toMatchObject({ ok: false, code: "INVALID_TIMESTAMP" });
 });
 
-it("never broadcasts across cancellation committed during a location write", async () => {
+it("never broadcasts a fix after cancellation or a policy revocation during its write", async () => {
   const sender = makeSocket({ data: { userId, role: "user", sessionId, deviceId } });
   const missionId = randomUUID();
-  const missionLocationRole = vi.fn().mockResolvedValueOnce("requester").mockResolvedValueOnce(null);
+  const policy = { requesterId: userId, rescuerId: randomUUID(),
+    rescuerVisibleToRequester: true, requesterVisibleToRescuer: true,
+    adminVisibleToRequester: false, adminVisibleToRescuer: false };
+  const current = vi.fn().mockResolvedValueOnce(policy).mockResolvedValueOnce(null);
   const dependencies = { jwtSecret, users: makeStore(userRecord()),
-    live: { applyUpdate: async () => ({ status: "accepted" as const, peers: [],
-      fix: { lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() } }) },
-    missions: { missionLocationRole, canJoinMissionRoom: async () => true } };
+    live: { applyUpdate: vi.fn() },
+    missionLocations: { policy: current, record: async () => ({ ...policy, role: "requester" as const }),
+      setPolicy: vi.fn(), history: vi.fn() } };
   const ack = await publishMissionLocation(sender as never, { missionId,
     location: { lat: 35.7, lon: 51.4, timestamp: new Date().toISOString(), priorityDeviceId: deviceId }
   }, dependencies);
   expect(ack).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
   expect(sender.emitted.filter((item) => item.event === MISSION_LOCATION_EVENT)).toEqual([]);
+  expect(dependencies.live.applyUpdate).not.toHaveBeenCalled();
 });
 
 const jwtSecret = "a".repeat(48);

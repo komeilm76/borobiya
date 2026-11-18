@@ -17,7 +17,7 @@ function block(css: string, selector: string): string {
 describe("photographed mission and sharing map controls", () => {
   it("removes Broadcast from the iPhone briefing instead of covering its bottom edge", () => {
     const button = map.slice(map.indexOf('class="user-map-view__share"'), map.indexOf('@click="broadcast.toggle()"'));
-    expect(button).toContain("!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value");
+    expect(button).not.toContain("!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value");
     expect(mission).toContain('hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value)');
     expect(mission).toContain('<MissionStatusPanel v-if="activeTool === \'status\'"');
     expect(map).toContain('v-show="(mode !== \'missions\' || !missionWorkspace?.hasActiveMission) && !(isPhone && activeTool)"');
