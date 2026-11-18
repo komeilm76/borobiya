@@ -28,7 +28,7 @@ export function useRequesterMissionAutoShare(
   let generation = 0;
   // Each accepted rescuer has a separate authorized room/socket, but the requester's
   // device needs only one native GPS watch. Multiplex fixes to active publishers.
-  type Fix = { lat: number; lon: number; accuracy?: number };
+  type Fix = { lat: number; lon: number; accuracy?: number; timestamp?: number };
   const observers = new Set<{ fix: (value: Fix) => void; error: (denied: boolean) => void }>();
   let stopNative: (() => void) | null = null;
   const watchPosition: NonNullable<MissionLiveRuntime["watchPosition"]> = (fix, error) => {

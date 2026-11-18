@@ -30,7 +30,7 @@ export interface LiveMissionIdentity {
 }
 export interface MissionLiveRuntime {
   openSocket?: (token: string) => Promise<RealtimeClient>;
-  watchPosition?: (onFix: (fix: { lat: number; lon: number; accuracy?: number }) => void,
+  watchPosition?: (onFix: (fix: { lat: number; lon: number; accuracy?: number; timestamp?: number }) => void,
     onError: (denied: boolean) => void) => () => void;
   now?: () => number;
   readSync?: (token: string, since: string, signal?: AbortSignal) => Promise<UserSyncResponse>;
@@ -38,11 +38,11 @@ export interface MissionLiveRuntime {
 }
 const STALE_MS = 30_000;
 
-export function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number }) => void,
+export function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number; timestamp?: number }) => void,
   onError: (denied: boolean) => void): () => void {
   if (typeof navigator === "undefined" || !navigator.geolocation) throw new Error("GEOLOCATION_UNAVAILABLE");
-  const id = navigator.geolocation.watchPosition(({ coords }) => onFix({
-    lat: coords.latitude, lon: coords.longitude, accuracy: coords.accuracy
+  const id = navigator.geolocation.watchPosition(({ coords, timestamp }) => onFix({
+    lat: coords.latitude, lon: coords.longitude, accuracy: coords.accuracy, timestamp
   }), (error) => onError(error.code === 1), { enableHighAccuracy: true, maximumAge: 5000, timeout: 12_000 });
   return () => navigator.geolocation.clearWatch(id);
 }
@@ -332,7 +332,7 @@ export function useMissionLiveLocations(
       }
     }
   }
-  function publish(fix: { lat: number; lon: number; accuracy?: number }, share: number,
+  function publish(fix: { lat: number; lon: number; accuracy?: number; timestamp?: number }, share: number,
     owner: string, device: string, identity: string | null): void {
     const current = mission.value;
     const socket = client?.socket;
@@ -340,11 +340,16 @@ export function useMissionLiveLocations(
       !socket?.connected || owner !== userId.value || device !== ownDeviceId(token.value) ||
       identity !== sessionIdentity(token.value) || identity !== socketIdentity) return;
     if (current.requesterId !== owner && current.rescuerId !== owner && !isAdmin(token.value)) return;
-    const timestamp = currentTime();
-    if (timestamp - lastPublished < 5000) return;
-    lastPublished = timestamp;
+    const now = currentTime();
+    // Native geolocation can return a cached fix. Its observation time, not the
+    // Socket.IO send time, belongs in the private GPS trace and freshness badge.
+    const observedAt = fix.timestamp ?? now;
+    if (!Number.isFinite(observedAt) || now - observedAt > 60_000 || observedAt - now > 10_000) return;
+    if (now - lastPublished < 5000) return;
+    lastPublished = now;
+    const { timestamp: _observed, ...coordinates } = fix;
     socket.timeout(5000).emit(MISSION_LOCATION_PUBLISH_EVENT, { missionId: current.id,
-      location: { ...fix, timestamp: new Date(timestamp).toISOString(), priorityDeviceId: device } },
+      location: { ...coordinates, timestamp: new Date(observedAt).toISOString(), priorityDeviceId: device } },
     (timeout: Error | null, response: { ok?: boolean; code?: string } | undefined) => {
       if (share !== shareGeneration || !sharing.value || client?.socket !== socket ||
         mission.value?.id !== current.id || userId.value !== owner || device !== ownDeviceId(token.value) ||

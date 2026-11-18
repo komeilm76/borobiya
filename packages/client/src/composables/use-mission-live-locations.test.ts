@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { RealtimeClient } from "@/services/socket";
 import type { UserSyncResponse } from "@shared/index";
 import { MISSION_LOCATION_EVENT, MISSION_LOCATION_PUBLISH_EVENT, MISSION_SUBSCRIBE_EVENT } from "@/services/socket-events";
-import { useMissionLiveLocations } from "./use-mission-live-locations";
+import { browserWatch, useMissionLiveLocations } from "./use-mission-live-locations";
 
 const mission = { id: "70000000-0000-4000-8000-000000000001",
   requesterId: "70000000-0000-4000-8000-000000000002", rescuerId: "70000000-0000-4000-8000-000000000003" };
@@ -28,6 +28,47 @@ function fakeSocket() {
 async function settle() { await Promise.resolve(); await Promise.resolve(); await nextTick(); }
 
 describe("mission live positions (T3.5.7)", () => {
+  it("preserves the browser's observation timestamp rather than substituting the watch callback time", () => {
+    const observedAt = Date.UTC(2026, 9, 23, 10, 0, 0);
+    const clearWatch = vi.fn();
+    vi.stubGlobal("navigator", { geolocation: {
+      watchPosition: (onFix: PositionCallback) => {
+        onFix({ coords: { latitude: 35.7, longitude: 51.4, accuracy: 12 }, timestamp: observedAt } as GeolocationPosition);
+        return 7;
+      }, clearWatch
+    } });
+    try {
+      const received = vi.fn();
+      const stop = browserWatch(received, vi.fn());
+      expect(received).toHaveBeenCalledWith({ lat: 35.7, lon: 51.4, accuracy: 12, timestamp: observedAt });
+      stop();
+      expect(clearWatch).toHaveBeenCalledWith(7);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("uses observation time for published traces and rejects an old or future native fix locally", async () => {
+    const now = Date.UTC(2026, 9, 23, 10, 0, 0);
+    const session = fakeSocket();
+    let fix!: (value: { lat: number; lon: number; accuracy?: number; timestamp?: number }) => void;
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, now: () => now,
+        watchPosition: (onFix) => { fix = onFix; return vi.fn(); } }))!;
+    try {
+      await settle();
+      live.startSharing();
+      fix({ lat: 35.7, lon: 51.4, timestamp: now - 61_000 });
+      fix({ lat: 35.7, lon: 51.4, timestamp: now + 11_000 });
+      fix({ lat: 35.7, lon: 51.4, timestamp: now - 4_000 });
+      const publishes = session.emitted.filter(({ event }) => event === MISSION_LOCATION_PUBLISH_EVENT);
+      expect(publishes).toHaveLength(1);
+      expect(publishes[0]?.payload).toMatchObject({ location: {
+        lat: 35.7, lon: 51.4, timestamp: new Date(now - 4_000).toISOString()
+      } });
+      expect(live.sharing.value).toBe(true);
+    } finally { scope.stop(); }
+  });
+
   it("subscribes privately, validates participant identity, marks stale location updates as old without conflating them with presence, and cleans on mission switch", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-24T10:00:00.000Z"));
