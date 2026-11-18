@@ -31,10 +31,15 @@ describe("offers inside the idle mission map", () => {
     expect(offers).toContain('.offers--map .offer-card__top { display: grid; grid-template-columns: minmax(0, 1fr) auto;');
     expect(offers).toContain('.offers--map .offer-card__description { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;');
     expect(offers).toContain('.offers--map .offer-card__foot span:last-child { display: none; }');
-    expect(offers).toContain('.offers--map .offer-detail__buttons > * { flex: 1 1 8rem; min-width: 0; min-height: 44px;');
+    expect(offers).toContain('.offers--map .offer-detail__buttons { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);');
+    expect(offers).toContain('.offers--map .offer-detail__buttons > * { min-width: 0; min-height: 44px;');
+    expect(offers).toContain('.offers--map .offer-detail { display: grid; grid-template-rows: auto minmax(0, 1fr) auto;');
+    expect(offers).toContain('class="offer-detail__header"');
+    expect(offers).toContain('class="offer-detail__content"');
+    expect(offers).toContain('class="offer-detail__actions"');
     expect(offers).toContain('aria-label="بازگشت به فهرست پیشنهادها"');
     expect(offers).toContain('aria-label="به‌روزرسانی پیشنهادها"');
-    expect(offers).toContain('if (props.compactMap) detail.scrollTo({ top: 0, behavior: "auto" });');
+    expect(offers).toContain('if (props.compactMap) detail.querySelector<HTMLElement>(".offer-detail__content")?.scrollTo({ top: 0, behavior: "auto" });');
     expect(offers).toContain('card.dataset.offerId === selectedId.value');
     expect(offers).toContain('?.focus({ preventScroll: true });');
     expect(offers).toContain('watch(() => inbox.page, () => { selectedId.value = null; detailOpen.value = false; });');

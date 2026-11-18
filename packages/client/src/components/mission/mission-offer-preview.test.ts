@@ -36,7 +36,14 @@ describe('pending mission offer map preview', () => {
     expect(inbox).toContain("previewRoute ? formatRouteDistance(previewRoute.distance_m) : '—'");
     expect(inbox).toContain("previewCalculatedAt + previewRoute.duration_s * 1000");
     expect(inbox).toContain('زمان تقریبی و بدون ترافیک است.');
-    expect(inbox).toContain('GPS تازه روی نقشه لازم است.');
+    expect(inbox).toContain('موقعیت GPS تازه یا یک مبدأ انتخابی لازم است.');
+    expect(inbox).toContain('خط‌چین روی نقشه تنها جهت مستقیم تا حادثه را نشان می‌دهد؛ مسیر جاده نیست.');
+    expect(inbox).toContain('attachOfferRouteScreen(map, linePoints');
+    expect(inbox).toContain('offerCameraPadding(mapRect, panelRect)');
+    expect(inbox).toContain('map.getContainer().getBoundingClientRect()');
+    expect(inbox).toContain('manualOrigin, routeAttempt, () => auth.user?.id');
+    expect(inbox).toContain("map.on('click', onPick)");
+    expect(inbox).toContain("map.off('click', onPick)");
     expect(inbox).toContain("previewError.value = 'مسیر خودرو در دسترس نیست؛ فاصله و زمان قابل برآورد نیست.'");
     expect(inbox).toContain('.offer-detail__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));');
   });

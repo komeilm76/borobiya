@@ -1237,7 +1237,7 @@ onBeforeUnmount(() => {
 .mission-desk--embedded .mission-desk__empty :deep(.offers__stat-number) { color: rgb(var(--v-theme-primary)); }
 .mission-desk--embedded .mission-desk__empty :deep(.offers__toolbar) { margin: .6rem 0; }
 .mission-desk--embedded .mission-desk__empty :deep(.offer-detail) {
-  border: 0; border-top: 1px solid var(--bb-color-outline); border-radius: 0;
+  border: 0; border-radius: 0;
   box-shadow: none; background: transparent;
 }
 .mission-desk--embedded .mission-desk__empty :deep(.offers__empty) { border: 0; background: transparent; padding: .65rem; }
@@ -1268,16 +1268,16 @@ onBeforeUnmount(() => {
    behind the card. Persistent Search pauses; the map action rail stays free. */
 @media (min-width: 600px) and (max-width: 1023px) {
   .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
-    width: min(25rem, calc(50vw - 1.5rem));
-    height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    width: min(27rem, calc(50vw - 1.5rem));
+    height: min(72dvh, 38rem, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     margin: calc(8.5rem + env(safe-area-inset-top, 0px)) 0 0 calc(1rem + env(safe-area-inset-left, 0px));
     max-height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 }
 @media (min-width: 1024px) {
   .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
-    width: min(25rem, calc(50vw - 1.5rem));
-    height: calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    width: min(30rem, calc(50vw - 1.5rem));
+    height: min(68dvh, 38rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     margin: calc(8.5rem + env(safe-area-inset-top, 0px)) calc(5.5rem + env(safe-area-inset-right, 0px)) 0 auto;
   }
 }
@@ -1289,13 +1289,13 @@ onBeforeUnmount(() => {
     position: absolute; left: calc(.75rem + env(safe-area-inset-left, 0px));
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(7.5rem + env(safe-area-inset-bottom, 0px));
-    width: auto; margin: 0; height: min(42dvh, 24rem);
+    width: auto; margin: 0; height: min(50dvh, 30rem);
     max-height: calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 }
 @media (max-width: 599px) and (max-height: 500px) {
   .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
-    height: 26dvh;
+    height: 40dvh;
   }
 }
 .mission-desk--embedded .mission-desk__guidance { top: calc(9rem + env(safe-area-inset-top, 0px)); }

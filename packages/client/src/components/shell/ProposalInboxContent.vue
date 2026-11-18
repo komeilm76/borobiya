@@ -107,43 +107,69 @@
         </section>
 
         <section v-if="selected" ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده" tabindex="-1">
-          <v-btn v-if="compactMap" class="offer-detail__back" icon="mdi-arrow-right" variant="text" color="primary"
-            aria-label="بازگشت به فهرست پیشنهادها" title="بازگشت به پیشنهادها" @click="closeMapDetail" />
-          <v-alert v-if="compactMap && inbox.failed" type="warning" variant="tonal" role="alert" density="compact">
-            به‌روزرسانی ناموفق بود؛ این پیشنهاد ممکن است تغییر کرده باشد.
-            <v-btn variant="text" color="primary" :loading="inbox.loading" @click="inbox.refresh()">تلاش دوباره</v-btn>
-          </v-alert>
-          <div class="offer-detail__top">
-            <span class="offer-detail__kicker">پروندهٔ امداد · {{ proposalTime(selected.createdAt) }}</span>
-            <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
-            <span class="offer-detail__pill" :class="`offer-card__severity--${severity(selected).tone}`">
-              <v-icon icon="mdi-alert-circle-outline" size="16" /> {{ severity(selected).label }}
-            </span>
-          </div>
-
-          <template v-if="selected.details">
-            <div class="offer-detail__facts">
-              <div><span>درخواست‌دهنده</span><strong>{{ selected.details.requesterName }}</strong></div>
-              <div v-if="!compactMap"><span>فاصلهٔ تقریبی</span><strong>{{ proposalDistance(myPosition, selected.details) }}</strong></div>
+          <div class="offer-detail__header">
+            <v-btn v-if="compactMap" class="offer-detail__back" icon="mdi-arrow-right" variant="text" color="primary"
+              aria-label="بازگشت به فهرست پیشنهادها" title="بازگشت به پیشنهادها" @click="closeMapDetail" />
+            <div class="offer-detail__top">
+              <span class="offer-detail__kicker">پیشنهاد امداد · {{ proposalTime(selected.createdAt) }}</span>
+              <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
+              <span class="offer-detail__pill" :class="`offer-card__severity--${severity(selected).tone}`">
+                <v-icon icon="mdi-alert-circle-outline" size="16" /> {{ severity(selected).label }}
+              </span>
             </div>
+            <v-btn v-if="compactMap" icon="mdi-fit-to-screen" variant="text" color="primary"
+              aria-label="نمایش محل و مسیر پیشنهاد روی نقشه" title="نمایش مسیر روی نقشه"
+              @click="frameOfferRoute" />
+          </div>
+          <div class="offer-detail__content">
+            <v-alert v-if="compactMap && inbox.failed" type="warning" variant="tonal" role="alert" density="compact">
+              به‌روزرسانی ناموفق بود؛ این پیشنهاد ممکن است تغییر کرده باشد.
+              <v-btn variant="text" color="primary" :loading="inbox.loading" @click="inbox.refresh()">تلاش دوباره</v-btn>
+            </v-alert>
+            <template v-if="selected.details">
             <div v-if="compactMap" class="offer-detail__route" role="status" aria-live="polite">
               <div class="offer-detail__route-heading"><v-icon icon="mdi-map-marker-path" size="19" aria-hidden="true" /> پیش‌نمایش مسیر روی نقشه · خودرو</div>
               <div class="offer-detail__metrics">
                 <div><span>زمان رسیدن · برآورد اولیه</span><strong>{{ previewRoute ? new Date(previewCalculatedAt + previewRoute.duration_s * 1000).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) : '—' }}</strong></div>
                 <div><span>مسافت مسیر</span><strong>{{ previewRoute ? formatRouteDistance(previewRoute.distance_m) : '—' }}</strong></div>
               </div>
-              <p v-if="previewRoute">{{ formatRouteDuration(previewRoute.duration_s) }} از مبدأ GPS هنگام محاسبه؛ زمان تقریبی و بدون ترافیک است.</p>
+              <p v-if="previewRoute">{{ formatRouteDuration(previewRoute.duration_s) }} از مبدأ {{ manualOrigin ? 'انتخابی' : 'GPS هنگام محاسبه' }}؛ زمان تقریبی و بدون ترافیک است.
+                <span v-if="!manualOrigin && !ownPosition">موقعیت فعلی دیگر تأیید نشده است.</span>
+              </p>
               <p v-if="previewRoute && !previewPainted" role="status">مسیر محاسبه شد، اما هنوز روی نقشه رسم نشده است.
                 <v-btn size="small" variant="text" color="primary" @click="previewRepaintToken++">تلاش برای نمایش مسیر</v-btn>
               </p>
               <p v-else-if="previewRoute" class="sr-only">مسیر روی نقشه نمایش داده شد.</p>
-              <p v-else-if="previewLoading">در حال محاسبهٔ مسیر از موقعیت فعلی شما…</p>
-              <p v-else-if="previewError" role="alert">{{ previewError }}</p>
-              <template v-else>
-                <p>برای پیش‌نمایش مسیر و زمان رسیدن، موقعیت GPS تازه روی نقشه لازم است. محل حادثه روی نقشه مشخص است.</p>
-                <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
-                  @click="emit('request-location')">دریافت موقعیت من</v-btn>
+              <p v-else-if="previewLoading">در حال محاسبهٔ مسیر از مبدأ {{ manualOrigin ? 'انتخابی' : 'GPS' }}…</p>
+              <template v-else-if="previewError">
+                <p role="alert">{{ previewError }}
+                  <span v-if="previewPainted">خط‌چین روی نقشه تنها جهت مستقیم تا حادثه را نشان می‌دهد؛ مسیر جاده نیست.</span>
+                </p>
+                <div class="offer-detail__origin-actions">
+                  <v-btn size="small" variant="tonal" color="primary" :disabled="!offerOrigin" @click="routeAttempt++">محاسبهٔ دوبارهٔ مسیر</v-btn>
+                  <v-btn size="small" variant="text" color="primary" :disabled="!map"
+                    @click="pickingOrigin = !pickingOrigin">{{ pickingOrigin ? 'لغو انتخاب مبدأ' : 'تغییر مبدأ روی نقشه' }}</v-btn>
+                </div>
+                <p v-if="pickingOrigin" role="status">برای تعیین مبدأ، روی نقطهٔ دلخواه در نقشه بزنید.</p>
               </template>
+              <template v-else>
+                <p>برای محاسبهٔ مسیر، موقعیت GPS تازه یا یک مبدأ انتخابی لازم است. محل حادثه روی نقشه مشخص است.</p>
+                <div class="offer-detail__origin-actions">
+                  <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
+                    @click="emit('request-location')">دریافت موقعیت من</v-btn>
+                  <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-map-marker-plus"
+                    :disabled="!map" @click="pickingOrigin = !pickingOrigin">{{ pickingOrigin ? 'لغو انتخاب مبدأ' : 'مبدأ از روی نقشه' }}</v-btn>
+                </div>
+                <p v-if="pickingOrigin" role="status">برای تعیین مبدأ، روی نقطهٔ دلخواه در نقشه بزنید.</p>
+              </template>
+              <div v-if="manualOrigin" class="offer-detail__origin-actions">
+                <span>مبدأ انتخابی · نه موقعیت زنده</span>
+                <v-btn size="small" variant="text" color="primary" @click="manualOrigin = null">استفاده از GPS</v-btn>
+              </div>
+            </div>
+            <div class="offer-detail__facts">
+              <div><span>درخواست‌دهنده</span><strong>{{ selected.details.requesterName }}</strong></div>
+              <div v-if="!compactMap"><span>فاصلهٔ تقریبی</span><strong>{{ proposalDistance(myPosition, selected.details) }}</strong></div>
             </div>
             <v-btn v-if="!compactMap && !myPosition" size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
               :loading="locating" class="offer-detail__locate mt-2" @click="locateMe">محاسبهٔ فاصله با اجازهٔ شما</v-btn>
@@ -156,7 +182,12 @@
               <h3><v-icon icon="mdi-map-marker-outline" size="19" /> محل حادثه</h3>
               <p v-if="!compactMap" class="offer-detail__map">پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود. جزئیات و مختصات را پیش از تصمیم بررسی کنید.</p>
               <p v-if="compactMap" class="offer-detail__address" role="status"><v-icon icon="mdi-map-marker-outline" size="18" aria-hidden="true" /> نشانی نزدیک (تقریبی): <bdi dir="auto">{{ addressStatus === 'loading' ? 'در حال دریافت…' : addressStatus === 'ready' ? address : addressStatus === 'error' ? 'دریافت نشانی ممکن نشد.' : 'نشانی مشخصی برای این نقطه پیدا نشد.' }}</bdi></p>
-              <p class="offer-detail__coords">مختصات: <bdi dir="ltr">{{ selected.details.sosRequest.location.lat.toFixed(5) }}, {{ selected.details.sosRequest.location.lon.toFixed(5) }}</bdi>
+              <details v-if="compactMap" class="offer-detail__coordinates">
+                <summary>مختصات دقیق <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
+                <p class="offer-detail__coords"><bdi dir="ltr">{{ selected.details.sosRequest.location.lat.toFixed(5) }}, {{ selected.details.sosRequest.location.lon.toFixed(5) }}</bdi>
+                  <span v-if="selected.details.sosRequest.location.isManual"> · انتخاب دستی</span></p>
+              </details>
+              <p v-else class="offer-detail__coords">مختصات: <bdi dir="ltr">{{ selected.details.sosRequest.location.lat.toFixed(5) }}, {{ selected.details.sosRequest.location.lon.toFixed(5) }}</bdi>
                 <span v-if="selected.details.sosRequest.location.isManual"> · انتخاب دستی</span></p>
             </div>
             <div v-if="selected.details.sosRequest.photoUrl" class="offer-detail__section">
@@ -168,17 +199,18 @@
               <p v-if="photoError" class="offer-detail__hint" role="status">{{ photoError }} <v-btn size="small" variant="text" @click="loadPhoto">تلاش دوباره</v-btn></p>
               <p class="offer-detail__hint">پیوند تصویر کوتاه‌مدت است؛ برای مشاهدهٔ دوباره، دکمه را بزنید.</p>
             </div>
-          </template>
-          <p v-else class="offer-detail__hint">جزئیات این پیشنهاد هنوز در دسترس نیست؛ فهرست را تازه کنید.</p>
+            </template>
+            <p v-else class="offer-detail__hint">جزئیات این پیشنهاد هنوز در دسترس نیست؛ فهرست را تازه کنید.</p>
+          </div>
 
           <div class="offer-detail__actions">
             <p><v-icon icon="mdi-information-outline" size="17" /> پذیرش فقط یک مأموریت در هر زمان ممکن است.</p>
             <div class="offer-detail__buttons">
-              <v-btn color="primary" size="large" rounded="lg" prepend-icon="mdi-check-circle-outline" :loading="inbox.decidingId === selected.id"
+              <v-btn color="primary" size="large" rounded="lg" :prepend-icon="compactMap ? undefined : 'mdi-check-circle-outline'" :loading="inbox.decidingId === selected.id"
                 :disabled="!selected.details || Boolean(inbox.decidingId) || Boolean(inbox.acceptedMissionId)"
-                @click="confirmAction = 'accept'">پذیرش مأموریت</v-btn>
+                aria-label="بررسی پذیرش این مأموریت" @click="confirmAction = 'accept'">{{ compactMap ? 'پذیرش' : 'پذیرش مأموریت' }}</v-btn>
               <v-btn variant="outlined" size="large" rounded="lg" color="error" :disabled="Boolean(inbox.decidingId) || Boolean(inbox.acceptedMissionId)"
-                @click="confirmAction = 'decline'">رد پیشنهاد</v-btn>
+                aria-label="بررسی رد این پیشنهاد" @click="confirmAction = 'decline'">رد پیشنهاد</v-btn>
             </div>
           </div>
         </section>
@@ -217,6 +249,8 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import { clearOfferRoute, paintOfferRoute } from "@/map/offer-route-overlay";
+import { attachOfferRouteScreen } from "@/map/offer-route-screen";
+import { offerCameraPadding } from "@/map/offer-camera-padding";
 import { getMissionRouteChoices, type RouteChoice, type RoutePoint } from "@/api/mission-routing";
 import { reversePlace } from "@/api/geocoding";
 import { missionMapCamera } from "@/sos/mission-map";
@@ -257,11 +291,35 @@ const previewCalculatedAt = ref(0);
 const previewGeometry = useMissionRouteGeometry(previewRoute);
 const offerForPreview = computed(() => props.compactMap && props.visible && detailOpen.value ? selected.value : null);
 const incident = computed(() => offerForPreview.value?.details?.sosRequest.location ?? null);
+const manualOrigin = ref<RoutePoint | null>(null);
+const pickingOrigin = ref(false);
+const offerOrigin = computed(() => manualOrigin.value ?? props.ownPosition ?? null);
+const routeAttempt = ref(0);
+watch(() => offerForPreview.value?.id, () => { manualOrigin.value = null; pickingOrigin.value = false; });
+watch([() => props.map, pickingOrigin, incident], (_values, _previous, onCleanup) => {
+  const map = props.map;
+  if (!pickingOrigin.value || !map || !incident.value) return;
+  const onPick = (event: { lngLat: { lat: number; lng: number } }) => {
+    // A map tap is an explicit planning origin, never a shared/live fix.
+    const lat = event.lngLat.lat;
+    const lon = ((event.lngLat.lng + 180) % 360 + 360) % 360 - 180;
+    if (!Number.isFinite(lat) || Math.abs(lat) > 90 || !Number.isFinite(lon)) return;
+    manualOrigin.value = { lat, lon };
+    pickingOrigin.value = false;
+  };
+  map.on('click', onPick);
+  onCleanup(() => map.off('click', onPick));
+});
 // An offer switch, page change, tab change or logout invalidates BOTH requests.
+// A disappearing GPS fix is not grounds to erase an already calculated
+// snapshot. A later fresh fix starts the preview only if none was obtained.
+watch(() => Boolean(props.ownPosition), (hasFix) => {
+  if (hasFix && !previewOrigin.value && !manualOrigin.value && incident.value) routeAttempt.value++;
+});
 watch([() => offerForPreview.value?.id, () => incident.value?.lat, () => incident.value?.lon,
-  () => Boolean(props.ownPosition), () => auth.user?.id], (_values, _previous, onCleanup) => {
+  manualOrigin, routeAttempt, () => auth.user?.id], (_values, _previous, onCleanup) => {
   const target = incident.value;
-  const origin = props.ownPosition;
+  const origin = offerOrigin.value;
   previewRoute.value = null;
   previewOrigin.value = null;
   previewLoading.value = false;
@@ -294,17 +352,46 @@ watch([() => offerForPreview.value?.id, () => incident.value?.lat, () => inciden
   }).finally(() => { if (!controller.signal.aborted) previewLoading.value = false; });
 }, { immediate: true });
 
+function frameOfferRoute(): void {
+  const map = props.map, target = incident.value;
+  if (!map || !target) return;
+  try {
+    const mapRect = map.getContainer().getBoundingClientRect();
+    if (!mapRect.width || !mapRect.height) return;
+    const panelRect = detailRef.value?.closest('.mission-desk__empty')?.getBoundingClientRect() ?? null;
+    const padding = offerCameraPadding(mapRect, panelRect);
+    const camera = missionMapCamera(target, previewOrigin.value, [], previewGeometry.value.bounds);
+    if (camera.kind === 'both') map.fitBounds(camera.bounds, { maxZoom: camera.maxZoom, duration: 400, padding });
+    else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 400,
+      offset: [(padding.left - padding.right) / 2, (padding.top - padding.bottom) / 2] });
+  } catch { /* A zero-sized map can recover when MapCanvas becomes ready. */ }
+}
 const previewPainted = ref(false);
 const previewRepaintToken = ref(0);
-watch([() => props.map, () => props.markerClass, incident, previewRoute, () => props.visible, previewRepaintToken], (_values, _previous, onCleanup) => {
+watch([() => props.map, () => props.markerClass, incident, previewRoute, previewError,
+  manualOrigin, () => props.visible, previewRepaintToken], (_values, _previous, onCleanup) => {
   const map = props.map, MarkerClass = props.markerClass, target = incident.value;
   previewPainted.value = false;
-  if (!map || !MarkerClass || !target || !props.visible) return;
+  if (!map || !target || !props.visible) return;
   let marker: Marker | null = null;
-  try {
+  let originMarker: Marker | null = null;
+  if (MarkerClass) try {
     marker = new MarkerClass({ color: '#cc623f' }).setLngLat([target.lon, target.lat]).addTo(map);
     marker.getElement().setAttribute('aria-label', 'محل حادثهٔ پیشنهاد انتخاب‌شده');
+    if (manualOrigin.value) {
+      originMarker = new MarkerClass({ color: '#2563a6' })
+        .setLngLat([manualOrigin.value.lon, manualOrigin.value.lat]).addTo(map);
+      originMarker.getElement().setAttribute('aria-label', 'مبدأ انتخاب‌شده برای پیش‌نمایش؛ نه موقعیت زنده');
+    }
   } catch { /* The map may be changing styles or unmounting. */ }
+  // A DOM/SVG path follows map projection and stays visible above basemap
+  // tiles even if the MapLibre style has not yet accepted our source/layer.
+  const roadPoints = previewGeometry.value.data.features[0]?.geometry.coordinates;
+  const dashedGuide = !previewRoute.value && !!previewError.value && !!previewOrigin.value;
+  const linePoints: [number, number][] | undefined = roadPoints ?? (dashedGuide && previewOrigin.value
+    ? [[previewOrigin.value.lon, previewOrigin.value.lat], [target.lon, target.lat]] : undefined);
+  const detachScreen = linePoints
+    ? attachOfferRouteScreen(map, linePoints, (visible) => { previewPainted.value = visible; }, dashedGuide) : null;
   let painting = false;
   const paint = () => {
     // Adding a source/layer can itself fire styledata. Avoid reentrant writes
@@ -312,27 +399,22 @@ watch([() => props.map, () => props.markerClass, incident, previewRoute, () => p
     if (painting) return;
     painting = true;
     try {
-      if (!previewRoute.value) { clearOfferRoute(map); previewPainted.value = false; }
-      else previewPainted.value = paintOfferRoute(map, previewGeometry.value.data);
+      if (!previewRoute.value) clearOfferRoute(map);
+      else paintOfferRoute(map, previewGeometry.value.data);
+      // SVG visibility is reported by the screen overlay, not by whether the
+      // MapLibre style has loaded (also true for the dashed non-road guide).
     } finally { painting = false; }
   };
   map.on('styledata', paint);
   map.on('idle', paint);
   paint();
-  try {
-    const camera = missionMapCamera(target, previewOrigin.value, [], previewGeometry.value.bounds);
-    if (camera.kind === 'both') map.fitBounds(camera.bounds, { maxZoom: camera.maxZoom, duration: 400,
-      padding: { top: window.innerWidth < 600 && window.innerHeight < 500 ? 85 : 105,
-        bottom: window.innerWidth < 600 ? Math.round(window.innerHeight * (window.innerHeight < 500 ? .56 : .62)) : 96,
-        left: window.innerWidth >= 600 && window.innerWidth < 1024 ? Math.min(440, Math.round(window.innerWidth * .52)) : 25,
-        right: window.innerWidth >= 1024 ? Math.min(470, Math.round(window.innerWidth * .34)) : window.innerWidth >= 600 ? 80 : 25 } });
-    else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 400,
-      offset: [0, window.innerWidth < 600 ? -Math.min(130, Math.round(window.innerHeight * .2)) : 0] });
-  } catch { /* A zero-sized map can recover when MapCanvas becomes ready. */ }
+  frameOfferRoute();
   onCleanup(() => {
     map.off('styledata', paint);
     map.off('idle', paint);
+    detachScreen?.();
     marker?.remove();
+    originMarker?.remove();
     clearOfferRoute(map);
     previewPainted.value = false;
   });
@@ -347,7 +429,7 @@ async function selectOffer(id: string): Promise<void> {
   // In the mission map the list and details are two states of ONE bounded
   // surface. Return to its top instead of jumping the entire map or app shell.
   const panel = detail.closest<HTMLElement>(".mission-desk__empty, .map-proposal__details-scroll");
-  if (props.compactMap) detail.scrollTo({ top: 0, behavior: "auto" });
+  if (props.compactMap) detail.querySelector<HTMLElement>(".offer-detail__content")?.scrollTo({ top: 0, behavior: "auto" });
   else if (panel) {
     // Elsewhere the existing full inbox retains its stacked master/detail view.
     const top = detail.getBoundingClientRect().top - panel.getBoundingClientRect().top;
@@ -507,6 +589,7 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offer-card__foot span:first-child { opacity: .9; }
 .offers__pages { display: flex; justify-content: center; gap: 8px; align-items: center; font-size: .8rem; }
 .offer-detail { background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); border: 1px solid rgba(128,155,151,.25); box-shadow: var(--bb-shadow-surface); overflow: hidden; }
+.offer-detail__header, .offer-detail__content { display: contents; }
 .offer-detail__top { padding: 28px clamp(22px, 3vw, 36px); border-bottom: 1px solid rgba(128,155,151,.18); background: linear-gradient(105deg, rgba(42,137,114,.1), transparent 80%); }
 .offer-detail__kicker { font-size: 0.82rem; color: rgb(var(--v-theme-primary)); font-weight: 700; }.offer-detail__top h2 { margin: 8px 0 12px; font-size: clamp(1.35rem, 2vw, 1.7rem); font-weight: 800; }
 .offer-detail__pill { display: inline-flex; align-items: center; gap: 5px; }
@@ -517,6 +600,7 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offer-detail__coords { margin: 10px 0 0; font-size: 0.82rem; opacity: .7; }.offer-detail__photo { max-width: 100%; overflow: hidden; border-radius: var(--bb-radius-nested, 16px); background: #163b39; }.offer-detail__photo img { max-width: 100%; max-height: 360px; display: block; margin-inline: auto; object-fit: contain; }
 .offer-detail__hint { font-size: 0.82rem; line-height: 1.7; opacity: .7; margin: 8px 0 0; overflow-wrap: anywhere; }
 .offer-detail > .offer-detail__hint, .offer-detail > .offer-detail__locate { margin-inline: clamp(22px, 3vw, 36px); }
+.offer-detail__content > .offer-detail__hint, .offer-detail__content > .offer-detail__locate { margin-inline: clamp(22px, 3vw, 36px); }
 .offer-detail > .offer-detail__hint { margin-top: 8px; }
 .offer-detail__actions { margin-top: 26px; padding: 22px clamp(22px, 3vw, 36px) 27px; border-top: 1px solid rgba(128,155,151,.18); }.offer-detail__actions p { margin: 0 0 16px; display: flex; gap: 8px; align-items: center; font-size: .8rem; opacity: .75; }.offer-detail__buttons { display: flex; flex-wrap: wrap; gap: 10px; }
 .offers__empty { border: 1px dashed rgba(89,145,133,.4); background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); text-align: center; padding: 65px 20px; margin-top: 18px; }.offers__empty-icon { display: inline-flex; padding: 15px; background: rgba(48,148,123,.12); border-radius: 50%; color: rgb(var(--v-theme-primary)); }.offers__empty h3 { font-size: 1.25rem; margin: 16px 0 8px; }.offers__empty p { opacity: .7; font-size: .9rem; line-height: 1.8; max-width: 440px; margin: 0 auto 20px; }.offers__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }.offers__skeleton { border-radius: var(--bb-radius-nested, 16px); }
@@ -581,8 +665,8 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offers--map:not(.offers--detail-open) .offers__layout,
 .offers--map:not(.offers--detail-open) .offers__list { display: block; }
 .offers--map:not(.offers--detail-open) .offers__list { max-height: var(--offer-list-max-height); overflow-y: auto; scrollbar-gutter: auto; }
-.offers--map .offers__list :deep(.v-alert), .offers--map .offer-detail > :deep(.v-alert) { margin: .35rem; }
-.offers--map .offers__list :deep(.v-alert .v-btn), .offers--map .offer-detail > :deep(.v-alert .v-btn) { min-height: 44px; height: auto; }
+.offers--map .offers__list :deep(.v-alert), .offers--map .offer-detail__content > :deep(.v-alert) { margin: .35rem; }
+.offers--map .offers__list :deep(.v-alert .v-btn), .offers--map .offer-detail__content > :deep(.v-alert .v-btn) { min-height: 44px; height: auto; }
 .offers--map .offers__hero { flex: none; }
 .offers--map .offers__shell > :deep(.v-alert) { flex: none; margin: .3rem 0 !important; }
 .offers--map .offers__grid { grid-template-columns: 1fr; gap: .35rem; }
@@ -602,30 +686,53 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offers--map .offer-card__foot span:last-child { display: none; }
 .offers--map .offers__pages { margin-top: .2rem; }
 .offers--map .offers__pages :deep(.v-btn) { min-width: 44px; min-height: 44px; }
-.offers--map .offer-detail { border-radius: 0; }
-.offers--map .offer-detail__route { padding: .6rem .65rem; margin: .5rem .65rem 0; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+.offers--map .offer-detail { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; overflow: hidden; border-radius: 0; }
+.offers--map .offer-detail__header { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: .3rem; align-items: center; padding: .4rem .4rem .5rem; border-bottom: 1px solid var(--bb-color-outline);
+  background: rgb(var(--v-theme-surface)); }
+.offers--map .offer-detail__header :deep(.v-btn) { min-width: 44px; min-height: 44px; }
+.offers--map .offer-detail__content { display: block; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: .15rem .25rem .6rem; }
+.offers--map .offer-detail__route { padding: .6rem .65rem; margin: .45rem .4rem 0;
+  border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
 .offers--map .offer-detail__route-heading { display: flex; align-items: center; gap: .3rem; font-size: .875rem; font-weight: 800; color: rgb(var(--v-theme-primary)); }
 .offers--map .offer-detail__metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; margin-top: .4rem; }
-.offers--map .offer-detail__metrics > div { min-width: 0; display: grid; gap: .1rem; }
+.offers--map .offer-detail__metrics > div { min-width: 0; display: grid; gap: .1rem; padding: .45rem .5rem;
+  border: 1px solid var(--bb-color-outline); border-radius: .75rem; background: rgb(var(--v-theme-surface)); }
 .offers--map .offer-detail__metrics span { font-size: .8rem; color: var(--bb-color-muted); }
 .offers--map .offer-detail__metrics strong { font-size: 1.05rem; }
 .offers--map .offer-detail__route p { margin: .4rem 0 0; font-size: .8rem; line-height: 1.5; }
 .offers--map .offer-detail__route :deep(.v-btn) { min-height: 44px; height: auto; }
+.offers--map .offer-detail__origin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; margin-top: .3rem; font-size: .8rem; }
+.offers--map .offer-detail__origin-actions :deep(.v-btn) { min-height: 44px; height: auto; }
+.offers--map .offer-detail__coordinates { margin-top: .25rem; }
+.offers--map .offer-detail__coordinates summary { display: flex; align-items: center; gap: .3rem; width: fit-content;
+  min-height: 44px; color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 700; cursor: pointer; }
+.offers--map .offer-detail__coordinates summary::-webkit-details-marker { display: none; }
+.offers--map .offer-detail__coordinates summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.offers--map .offer-detail__coordinates[open] summary :deep(.v-icon) { transform: rotate(180deg); }
 .offers--map .offer-detail__address { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem; margin: .2rem 0; line-height: 1.6; overflow-wrap: anywhere; }
 .offers--map .offer-detail__address bdi { min-width: 0; }
-.offers--map .offer-detail__back { position: sticky; top: 0; z-index: 2; min-width: 44px; min-height: 44px;
-  background: rgb(var(--v-theme-surface)); }
-.offers--map .offer-detail__top { padding: .25rem .65rem .5rem; background: transparent; }
-.offers--map .offer-detail__top h2 { margin: .2rem 0; font-size: 1rem; line-height: 1.4; }
-.offers--map .offer-detail__facts { gap: .4rem; padding: .5rem .65rem 0; }
-.offers--map .offer-detail__facts > div { flex: 1 1 8rem; gap: 1px; padding: .4rem .5rem; }
-.offers--map .offer-detail__section { padding: .6rem .65rem 0; }
-.offers--map .offer-detail__section h3 { margin: 0 0 .25rem; }
+.offers--map .offer-detail__back { min-width: 44px; min-height: 44px; }
+.offers--map .offer-detail__top { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center;
+  gap: .1rem .35rem; min-width: 0; padding: 0; border: 0; background: transparent; }
+.offers--map .offer-detail__kicker { grid-column: 1 / -1; font-size: .8rem; color: var(--bb-color-muted); }
+.offers--map .offer-detail__top h2 { min-width: 0; margin: 0; font-size: 1rem; line-height: 1.35; overflow-wrap: anywhere; }
+.offers--map .offer-detail__pill { padding: .2rem .45rem; font-size: .8rem; }
+.offers--map .offer-detail__pill :deep(.v-icon) { display: none; }
+.offers--map .offer-detail__facts { gap: 0; padding: .3rem .65rem 0; }
+.offers--map .offer-detail__facts > div { display: flex; align-items: baseline; gap: .4rem; flex: none;
+  padding: .2rem 0; background: transparent; border: 0; border-radius: 0; }
+.offers--map .offer-detail__section { margin: .55rem .65rem 0; padding: .55rem 0 0; border-top: 1px solid var(--bb-color-outline); }
+.offers--map .offer-detail__section h3 { margin: 0 0 .3rem; }
 .offers--map .offer-detail__description { margin: 0; line-height: 1.55; }
 .offers--map .offer-detail__coords { margin: .2rem 0 0; overflow-wrap: anywhere; }
-.offers--map .offer-detail__actions { margin-top: .65rem; padding: .65rem .65rem 1rem; }
-.offers--map .offer-detail__actions p { margin-bottom: .4rem; }
-.offers--map .offer-detail__buttons > * { flex: 1 1 8rem; min-width: 0; min-height: 44px; height: auto; }
+.offers--map .offer-detail__actions { margin: 0; padding: .55rem .7rem;
+  background: rgb(var(--v-theme-surface)); border-top: 1px solid var(--bb-color-outline); }
+.offers--map .offer-detail__actions p { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.offers--map .offer-detail__buttons { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: .5rem; }
+.offers--map .offer-detail__buttons > * { min-width: 0; min-height: 44px; height: auto; padding-inline: .3rem; }
 .offers--map .offer-detail__buttons :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .offers--map .offer-detail__photo img { max-height: 12rem; }
 .offers--map .accepted-map { margin-top: .5rem; padding: .65rem; }
@@ -645,6 +752,7 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
   background: var(--bb-color-inset);
   border: 1px solid var(--bb-color-outline);
 }
+:global(:root.dark .offers--map .offer-detail__facts > div) { background: transparent; border: 0; }
 :global(:root.dark .offer-card__severity--urgent) { color: #ffadad; background: #422b2b; }
 :global(:root.dark .offer-card__severity--important) { color: #f9ca76; background: #443522; }
 :global(:root.dark .offer-card__severity--standard) { color: var(--bb-color-primary); background: #1d4038; }
