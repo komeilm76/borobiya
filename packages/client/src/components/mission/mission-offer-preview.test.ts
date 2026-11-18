@@ -16,11 +16,12 @@ describe('pending mission offer map preview', () => {
     expect(mission).toContain(':map="externalMap"');
     expect(inbox).toContain("getMissionRouteChoices(previewOrigin.value, target, 'car', controller.signal)");
     expect(inbox).toContain('useMissionRouteGeometry(previewRoute)');
-    expect(inbox).toContain("const OFFER_SOURCE = 'mission-offer-route-preview'");
+    expect(inbox).toContain('paintOfferRoute(map, previewGeometry.value.data)');
+    expect(inbox).toContain("map.on('styledata', paint)");
     expect(inbox).toContain("map.on('idle', paint)");
+    expect(inbox).toContain("map.off('styledata', paint)");
     expect(inbox).toContain("map.off('idle', paint)");
-    expect(inbox).toContain('if (map.getLayer(OFFER_LAYER)) map.removeLayer(OFFER_LAYER);');
-    expect(inbox).toContain('if (map.getSource(OFFER_SOURCE)) map.removeSource(OFFER_SOURCE);');
+    expect(inbox).toContain('clearOfferRoute(map)');
     expect(inbox).toContain('onCleanup(() => controller.abort())');
     expect(inbox).toContain('() => auth.user?.id');
     expect(inbox).toContain('() => Boolean(props.ownPosition)');
@@ -42,13 +43,14 @@ describe('pending mission offer map preview', () => {
 
   it('keeps the parent list scroll inside the card and clears map area on phone and desktop', () => {
     expect(mission).toContain("'mission-desk__empty--preview': offerDetailOpen");
-    expect(mission).toContain('Math.min(inbox.proposals.length, 10) * 78');
-    expect(mission).toContain('height: min(var(--offer-list-height), calc(100dvh - 14rem');
+    expect(mission).not.toContain('--offer-list-height');
+    expect(mission).toContain('height: auto; display: flex; flex-direction: column; overflow: hidden;');
+    expect(mission).toContain('--offer-list-max-height: max(3rem, calc(100dvh - 19rem');
     expect(mission).toContain('.mission-desk__empty--preview {\n    position: absolute;');
     expect(mission).toContain('@media (min-width: 1024px) {\n  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview');
     expect(inbox).toContain('.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto;');
+    expect(inbox).toContain('.offers--map:not(.offers--detail-open) .offers__list { max-height: var(--offer-list-max-height); overflow-y: auto; scrollbar-gutter: auto; }');
     expect(inbox).toContain('.offers--map .offers__items { max-height: none; overflow: visible; padding: 0; }');
-    expect(inbox).toContain('scrollbar-gutter: stable;');
     for (const [source, filename] of [[inbox, 'ProposalInboxContent.vue'], [mission, 'UserMissionView.vue']] as const) {
       const css = parse(source, { filename }).descriptor.styles[0]!.content;
       expect(compileStyle({ source: css, filename, id: 'data-v-offer-preview', scoped: true }).errors).toEqual([]);

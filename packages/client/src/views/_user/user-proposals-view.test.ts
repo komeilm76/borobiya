@@ -21,7 +21,8 @@ describe("rescuer inbox content in the map dialog", () => {
 
   it("uses the parent map only for compact offers, not a second map in the proposal dialog", () => {
     expect(view).not.toContain('<MapCanvas');
-    expect(view).toContain('import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";');
+    expect(view).toContain('import type { Map as MapLibreMap, Marker } from "maplibre-gl";');
+    expect(view).toContain('import { clearOfferRoute, paintOfferRoute } from "@/map/offer-route-overlay";');
     expect(view).toContain('const offerForPreview = computed(() => props.compactMap && props.visible && detailOpen.value');
     expect(view).toContain('پس از پذیرش، محل حادثه روی نقشهٔ مشترک مأموریت‌ها مشخص می‌شود.');
   });

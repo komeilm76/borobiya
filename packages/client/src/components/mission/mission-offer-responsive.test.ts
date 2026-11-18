@@ -20,9 +20,10 @@ describe("offers inside the idle mission map", () => {
     expect(offers).toContain('@container (max-width: 42rem) {\n  .offers__layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }');
     expect(mission).toContain('.mission-desk__empty :deep(.offers__items) {\n  max-height: none; overflow: visible; padding: 0;');
     expect(mission).toContain('.mission-desk__empty--offers {\n  height:');
-    expect(mission).toContain('display: flex; flex-direction: column; overflow: hidden;');
+    expect(mission).toContain('height: auto; display: flex; flex-direction: column; overflow: hidden;');
     expect(mission).toContain('overflow-y: auto; overscroll-behavior: contain;\n  background: rgba(var(--v-theme-surface), .95);');
-    expect(offers).toContain('.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }');
+    expect(offers).toContain('.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }');
+    expect(offers).toContain('.offers--map:not(.offers--detail-open) .offers__list { max-height: var(--offer-list-max-height); overflow-y: auto; scrollbar-gutter: auto; }');
   });
 
   it("keeps compact severity, title, summary and time legible, with full detail and decisions on demand", () => {

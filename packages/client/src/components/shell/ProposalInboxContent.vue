@@ -133,6 +133,10 @@
                 <div><span>مسافت مسیر</span><strong>{{ previewRoute ? formatRouteDistance(previewRoute.distance_m) : '—' }}</strong></div>
               </div>
               <p v-if="previewRoute">{{ formatRouteDuration(previewRoute.duration_s) }} از مبدأ GPS هنگام محاسبه؛ زمان تقریبی و بدون ترافیک است.</p>
+              <p v-if="previewRoute && !previewPainted" role="status">مسیر محاسبه شد، اما هنوز روی نقشه رسم نشده است.
+                <v-btn size="small" variant="text" color="primary" @click="previewRepaintToken++">تلاش برای نمایش مسیر</v-btn>
+              </p>
+              <p v-else-if="previewRoute" class="sr-only">مسیر روی نقشه نمایش داده شد.</p>
               <p v-else-if="previewLoading">در حال محاسبهٔ مسیر از موقعیت فعلی شما…</p>
               <p v-else-if="previewError" role="alert">{{ previewError }}</p>
               <template v-else>
@@ -211,7 +215,8 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
+import type { Map as MapLibreMap, Marker } from "maplibre-gl";
+import { clearOfferRoute, paintOfferRoute } from "@/map/offer-route-overlay";
 import { getMissionRouteChoices, type RouteChoice, type RoutePoint } from "@/api/mission-routing";
 import { reversePlace } from "@/api/geocoding";
 import { missionMapCamera } from "@/sos/mission-map";
@@ -289,32 +294,29 @@ watch([() => offerForPreview.value?.id, () => incident.value?.lat, () => inciden
   }).finally(() => { if (!controller.signal.aborted) previewLoading.value = false; });
 }, { immediate: true });
 
-const OFFER_SOURCE = 'mission-offer-route-preview';
-const OFFER_LAYER = 'mission-offer-route-preview-line';
-watch([() => props.map, () => props.markerClass, incident, previewRoute, () => props.visible], (_values, _previous, onCleanup) => {
+const previewPainted = ref(false);
+const previewRepaintToken = ref(0);
+watch([() => props.map, () => props.markerClass, incident, previewRoute, () => props.visible, previewRepaintToken], (_values, _previous, onCleanup) => {
   const map = props.map, MarkerClass = props.markerClass, target = incident.value;
+  previewPainted.value = false;
   if (!map || !MarkerClass || !target || !props.visible) return;
   let marker: Marker | null = null;
   try {
     marker = new MarkerClass({ color: '#cc623f' }).setLngLat([target.lon, target.lat]).addTo(map);
     marker.getElement().setAttribute('aria-label', 'محل حادثهٔ پیشنهاد انتخاب‌شده');
   } catch { /* The map may be changing styles or unmounting. */ }
+  let painting = false;
   const paint = () => {
-    if (!map.isStyleLoaded()) return;
+    // Adding a source/layer can itself fire styledata. Avoid reentrant writes
+    // and only repair the overlay if either layer is missing after a style swap.
+    if (painting) return;
+    painting = true;
     try {
-      if (!previewRoute.value) {
-        if (map.getLayer(OFFER_LAYER)) map.removeLayer(OFFER_LAYER);
-        if (map.getSource(OFFER_SOURCE)) map.removeSource(OFFER_SOURCE);
-        return;
-      }
-      if (map.getLayer(OFFER_LAYER) && map.getSource(OFFER_SOURCE)) return;
-      const source = map.getSource(OFFER_SOURCE) as GeoJSONSource | undefined;
-      if (source) source.setData(previewGeometry.value.data);
-      else map.addSource(OFFER_SOURCE, { type: 'geojson', data: previewGeometry.value.data });
-      if (!map.getLayer(OFFER_LAYER)) map.addLayer({ id: OFFER_LAYER, type: 'line', source: OFFER_SOURCE,
-        paint: { 'line-color': '#147e72', 'line-width': 5, 'line-opacity': .95 } });
-    } catch { /* An in-flight style swap will be repaired at idle. */ }
+      if (!previewRoute.value) { clearOfferRoute(map); previewPainted.value = false; }
+      else previewPainted.value = paintOfferRoute(map, previewGeometry.value.data);
+    } finally { painting = false; }
   };
+  map.on('styledata', paint);
   map.on('idle', paint);
   paint();
   try {
@@ -328,12 +330,11 @@ watch([() => props.map, () => props.markerClass, incident, previewRoute, () => p
       offset: [0, window.innerWidth < 600 ? -Math.min(130, Math.round(window.innerHeight * .2)) : 0] });
   } catch { /* A zero-sized map can recover when MapCanvas becomes ready. */ }
   onCleanup(() => {
+    map.off('styledata', paint);
     map.off('idle', paint);
     marker?.remove();
-    try {
-      if (map.getLayer(OFFER_LAYER)) map.removeLayer(OFFER_LAYER);
-      if (map.getSource(OFFER_SOURCE)) map.removeSource(OFFER_SOURCE);
-    } catch { /* MapLibre already replaced the style. */ }
+    clearOfferRoute(map);
+    previewPainted.value = false;
   });
 }, { flush: 'post' });
 
@@ -570,8 +571,16 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offers--map .offers__stat-number { font-size: 1rem; }
 .offers--map .offers__map-refresh { min-width: 44px; min-height: 44px; }
 .offers--map .offers__layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 0; flex: 1; min-height: 0; }
-.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.offers--map .offers__list, .offers--map .offer-detail { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .offers--map .offers__list { align-content: start; padding: .25rem .15rem .25rem .1rem; }
+/* Let a short list size the card naturally. Only the list's parent scrolls
+   once its content exceeds the map space; never reserve an idle scrollbar. */
+.offers--map:not(.offers--detail-open) { height: auto; }
+.offers--map:not(.offers--detail-open) .offers__shell,
+.offers--map:not(.offers--detail-open) .offers__layout { flex: none; }
+.offers--map:not(.offers--detail-open) .offers__layout,
+.offers--map:not(.offers--detail-open) .offers__list { display: block; }
+.offers--map:not(.offers--detail-open) .offers__list { max-height: var(--offer-list-max-height); overflow-y: auto; scrollbar-gutter: auto; }
 .offers--map .offers__list :deep(.v-alert), .offers--map .offer-detail > :deep(.v-alert) { margin: .35rem; }
 .offers--map .offers__list :deep(.v-alert .v-btn), .offers--map .offer-detail > :deep(.v-alert .v-btn) { min-height: 44px; height: auto; }
 .offers--map .offers__hero { flex: none; }

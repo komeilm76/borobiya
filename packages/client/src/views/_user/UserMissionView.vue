@@ -42,8 +42,7 @@
       </v-alert>
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
       <section v-else-if="!desk.activeMission.value && !desk.error.value" class="mission-desk__empty"
-        :class="{ 'mission-desk__empty--offers': inbox.proposals.length > 0, 'mission-desk__empty--preview': offerDetailOpen }"
-        :style="embedded && inbox.proposals.length ? { '--offer-list-height': `${96 + Math.min(inbox.proposals.length, 10) * 78 + (inbox.totalPages > 1 ? 44 : 0)}px` } : undefined">
+        :class="{ 'mission-desk__empty--offers': inbox.proposals.length > 0, 'mission-desk__empty--preview': offerDetailOpen }">
         <v-alert v-if="embedded && desk.cancelledMissionId.value" type="success" variant="tonal" rounded="lg"
           class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
         <v-alert v-else-if="embedded && desk.completedMissionId.value" type="success" variant="tonal" rounded="lg"
@@ -1216,8 +1215,9 @@ onBeforeUnmount(() => {
   background: rgba(var(--v-theme-surface), .95);
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--offers {
-  height: min(var(--offer-list-height), calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-  display: flex; flex-direction: column; overflow: hidden;
+  height: auto; display: flex; flex-direction: column; overflow: hidden;
+  /* The list owns the scroll only when its natural height exceeds this space. */
+  --offer-list-max-height: max(3rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) {
   padding: 0; background: transparent;
@@ -1260,6 +1260,9 @@ onBeforeUnmount(() => {
     margin: calc(50dvh + 1.75rem + env(safe-area-inset-top, 0px)) 0 0 calc(1rem + env(safe-area-inset-left, 0px));
     max-height: max(4rem, calc(50dvh - 2.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--offers {
+    --offer-list-max-height: max(3rem, calc(50dvh - 7.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
 }
 /* Reviewing an offer exposes the shared map instead of covering the route
    behind the card. Persistent Search pauses; the map action rail stays free. */
@@ -1279,6 +1282,9 @@ onBeforeUnmount(() => {
   }
 }
 @media (max-width: 599px) {
+  .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--offers {
+    --offer-list-max-height: max(2rem, calc(100dvh - 21rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
   .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty--preview {
     position: absolute; left: calc(.75rem + env(safe-area-inset-left, 0px));
     right: calc(.75rem + env(safe-area-inset-right, 0px));
