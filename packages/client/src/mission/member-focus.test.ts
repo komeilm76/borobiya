@@ -30,10 +30,9 @@ describe("full-screen mission member focus", () => {
     expect(panel).toContain('if (!props.visible || !center || !map.value) return;');
     expect(panel).toContain('if (props.fullscreen) emit("close-room"); // The sheet otherwise covers the centered marker on phones.');
     expect(panel).toContain('if (props.fullscreen) emit("close-room"); // Reveal the points rather than covering them with the sheet.');
-    expect(panel).toContain('v-if="fullscreen" class="live-panel__presence-details"');
-    expect(panel).toContain('v-if="fullscreen" class="live-panel__presence-chips" role="status"');
-    expect(panel.indexOf('v-for="member in live.participantStatus.value"')).toBeLessThan(panel.indexOf('class="live-panel__presence-chips"'));
-    expect(panel.indexOf('class="live-panel__presence-chips"')).toBeLessThan(panel.indexOf('class="live-panel__presence-details"'));
+    expect(panel).toContain('<details v-if="fullscreen" class="live-panel__presence-details">');
+    expect(panel).toContain('class="live-panel__member-presence"');
+    expect(panel.indexOf('v-for="member in live.participantStatus.value"')).toBeLessThan(panel.indexOf('class="live-panel__presence-details"'));
     expect(panel).toContain('موقعیت قدیمی برای راهبری مناسب نیست');
     expect(panel).toContain('role="region" aria-label="اعضا و اشتراک موقعیت مأموریت"');
     expect(panel).toContain('v-else-if="canPublish"'); // Embedded requester/admin sharing remains voluntary.

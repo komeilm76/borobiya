@@ -46,46 +46,41 @@
         <div v-if="fullscreen" class="live-panel__room-heading">
           <h2>اعضای مأموریت</h2>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل اعضای مأموریت" @click="emit('close-room')" />
-          <div class="live-panel__room-tools">
-            <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
-              {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
-            </v-chip>
-            <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
-              prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش همهٔ اعضا</v-btn>
-          </div>
+        </div>
+        <div v-if="fullscreen" class="live-panel__room-tools">
+          <span class="live-panel__connection" :class="{ 'live-panel__connection--online': live.connected.value && !live.recoveryPending.value }" role="status">
+            <span aria-hidden="true" />{{ !live.connected.value ? 'اتصال برقرار نیست' : live.recoveryPending.value ? 'در حال بررسی مأموریت' : 'اتصال زنده' }}
+          </span>
+          <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
+            prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش اعضا روی نقشه</v-btn>
         </div>
         <v-alert v-if="fullscreen && live.error.value" type="warning" variant="tonal" role="alert">
           {{ live.error.value }} <v-btn size="small" variant="text" @click="live.start()">تلاش دوباره</v-btn>
         </v-alert>
         <div v-for="member in live.participantStatus.value" :key="member.role" class="live-panel__member">
-          <span class="live-panel__dot" :class="member.role" />
-          <div>
+          <span class="live-panel__dot" :class="member.role" aria-hidden="true" />
+          <div class="live-panel__member-copy">
             <strong>{{ member.role === 'requester' ? 'درخواست‌کننده' : member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز' }}</strong>
-            <small v-if="member.entry">آخرین مشاهده: {{ new Date(member.entry.timestamp).toLocaleString('fa-IR') }}</small>
-            <small v-else>هنوز موقعیتی به اشتراک گذاشته نشده است.</small>
+            <small class="live-panel__member-state" :class="{ 'live-panel__member-state--fresh': member.fresh }">
+              {{ !member.entry ? 'موقعیت در دسترس نیست' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
+              <template v-if="member.entry"> · {{ new Date(member.entry.timestamp).toLocaleTimeString('fa-IR') }}</template>
+            </small>
+            <small v-if="fullscreen && member.role !== 'admin'" class="live-panel__member-presence">
+              اتصال: {{ missionPresenceLabel[member.role === 'requester' ? presence.requester.value : presence.rescuer.value] }}
+            </small>
+            <small v-else-if="member.entry">آخرین مشاهده: {{ new Date(member.entry.timestamp).toLocaleString('fa-IR') }}</small>
           </div>
-          <v-chip :color="member.fresh ? 'success' : 'grey'" variant="tonal" size="small">
-            {{ !member.entry ? 'اشتراک آغاز نشده' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
-          </v-chip>
           <v-btn v-if="fullscreen" icon="mdi-crosshairs-gps" variant="tonal" color="primary"
             :disabled="!member.fresh || !map"
             :aria-label="`نمایش موقعیت تازهٔ ${member.role === 'requester' ? 'درخواست‌کننده' : member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز'} روی نقشه`"
             :title="member.fresh ? 'نمایش موقعیت تازه روی نقشه' : 'موقعیت تازه‌ای برای نمایش روی نقشه نیست'"
             @click="focusMember(member.role)" />
         </div>
-        <div v-if="fullscreen" class="live-panel__presence-chips" role="status" aria-live="polite">
-          <v-chip size="small" variant="tonal" :color="presence.requester.value === 'online' ? 'success' : 'warning'">
-            اتصال درخواست‌کننده: {{ missionPresenceLabel[presence.requester.value] }}
-          </v-chip>
-          <v-chip size="small" variant="tonal" :color="presence.rescuer.value === 'online' ? 'success' : 'warning'">
-            اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
-          </v-chip>
-        </div>
-        <p v-if="fullscreen" class="live-panel__presence-details">
-          اتصال، مستقل از اشتراک موقعیت است؛ پس از ۵ دقیقه بررسی دستی لازم است و مأموریت خودکار لغو نمی‌شود.
-          موقعیت قدیمی برای راهبری مناسب نیست؛ فقط موقعیت تازه را می‌توان روی نقشه مرکز کرد.
-        </p>
-        <p v-else class="live-panel__note">این نشانگر فقط تازگی موقعیت اشتراک‌گذاشته‌شده را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
+        <details v-if="fullscreen" class="live-panel__presence-details">
+          <summary>دربارهٔ موقعیت و اتصال</summary>
+          <p>اتصال به اتاق، با داشتن موقعیت تازه فرق دارد. موقعیت قدیمی برای راهبری مناسب نیست. پس از ۵ دقیقه قطع اتصال، وضعیت مأموریت را دستی بررسی کنید؛ مأموریت خودکار لغو نمی‌شود.</p>
+        </details>
+        <p v-else class="live-panel__note">تازگی موقعیت و وضعیت اتصال جداگانه نمایش داده می‌شوند.</p>
         <template v-if="fullscreen">
           <p class="live-panel__note" role="status">
             {{ missionShare.sharing && missionShare.mission?.id === mission.id
@@ -310,7 +305,7 @@ onBeforeUnmount(() => {
 @container (max-width: 599px) {
   .live-panel--routing .live-panel__map { height: min(42dvh, 360px); min-height: 275px; }
   .live-panel__member { flex-wrap: wrap; }
-  .live-panel__member > .v-chip { max-width: 100%; }
+  .live-panel__member-copy { overflow-wrap: anywhere; }
   .live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }
   .live-panel__members :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
@@ -332,30 +327,38 @@ onBeforeUnmount(() => {
 }
 .live-panel--fullscreen .live-panel__members {
   position: absolute; z-index: 6; inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
-  width: min(27rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
-  padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
-  scroll-padding-top: 6rem; /* Keyboard focus stays below the sticky team header. */
-  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
+  width: min(24rem, calc(100vw - 1.5rem)); max-height: min(48dvh, 25rem);
+  padding: .75rem; overflow-y: auto; overscroll-behavior: contain;
+  scroll-padding-top: 4rem; /* Keyboard focus stays below the sticky team header. */
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
   background: rgba(var(--v-theme-surface), .95); box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px);
+  gap: .45rem;
 }
-.live-panel__room-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.live-panel__room-heading h2 { flex: 1 1 auto; margin: 0; font-size: 1.05rem; }
-.live-panel__room-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
-.live-panel__presence-details { margin: .25rem 0 0; padding: .5rem .65rem; border-radius: var(--bb-radius-nested, 16px);
-  background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.6; }
-.live-panel__presence-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.live-panel--fullscreen .live-panel__member { padding: .6rem .7rem; }
-.live-panel--fullscreen .live-panel__member > .v-chip { max-width: 100%; }
+.live-panel__room-heading { display: flex; align-items: center; gap: .5rem; }
+.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; }
+.live-panel__room-heading :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }
+.live-panel--fullscreen .live-panel__room-heading {
+  position: sticky; top: -.75rem; z-index: 1; margin: -.75rem -.75rem .35rem;
+  padding: .35rem .75rem; background: rgb(var(--v-theme-surface)); border-bottom: 1px solid var(--bb-color-outline);
+}
+.live-panel__room-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .35rem .5rem; padding-bottom: .45rem; border-bottom: 1px solid var(--bb-color-outline); }
+.live-panel__room-tools :deep(.v-btn) { min-height: 44px; height: auto; }
+.live-panel__connection { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; color: var(--bb-color-muted); }
+.live-panel__connection > span { width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--v-theme-warning)); }
+.live-panel__connection--online > span { background: rgb(var(--v-theme-success)); }
+.live-panel__presence-details { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
+.live-panel__presence-details summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: rgb(var(--v-theme-primary)); font-weight: 700; }
+.live-panel__presence-details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.live-panel__presence-details p { margin: 0 0 .3rem; padding: .5rem .65rem; background: var(--bb-color-inset); border-radius: var(--bb-radius-nested, 16px); }
+.live-panel--fullscreen .live-panel__member { flex-wrap: nowrap; gap: .5rem; padding: .45rem .6rem; min-height: 58px; }
+.live-panel__member-copy { min-width: 0; }
+.live-panel__member-state--fresh { color: rgb(var(--v-theme-primary)); opacity: 1 !important; }
+.live-panel__member-presence { color: var(--bb-color-muted); }
 @media (max-width: 599px) {
   .live-panel--fullscreen .live-panel__members {
     inset-inline: .75rem; width: auto;
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  }
-  .live-panel--fullscreen .live-panel__room-heading {
-    position: sticky; top: -1rem; z-index: 1; margin: -1rem -1rem .75rem;
-    padding: .75rem 1rem; background: rgb(var(--v-theme-surface));
-    border-bottom: 1px solid var(--bb-color-outline);
+    max-height: min(48dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
