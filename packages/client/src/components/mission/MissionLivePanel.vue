@@ -41,85 +41,65 @@
         <slot name="route-planner" />
       </div>
       <div :id="fullscreen ? 'mission-team-panel' : undefined" v-show="!fullscreen || roomOpen"
-        class="live-panel__members" role="region" aria-label="اعضا و اشتراک موقعیت مأموریت"
+        class="live-panel__members" role="region" aria-label="اعضای مأموریت"
         :tabindex="fullscreen ? -1 : undefined">
-        <div v-if="fullscreen" class="live-panel__room-heading">
+        <header class="live-panel__room-heading">
           <h2>اعضای مأموریت</h2>
-          <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل اعضای مأموریت" @click="emit('close-room')" />
-        </div>
-        <div v-if="fullscreen" class="live-panel__room-tools">
-          <span class="live-panel__connection" :class="{ 'live-panel__connection--online': live.connected.value && !live.recoveryPending.value }" role="status">
-            <span aria-hidden="true" />{{ !live.connected.value ? 'اتصال برقرار نیست' : live.recoveryPending.value ? 'در حال بررسی مأموریت' : 'اتصال زنده' }}
-          </span>
-          <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
-            prepend-icon="mdi-fit-to-screen" @click="focusMembers(true)">نمایش اعضا روی نقشه</v-btn>
-        </div>
-        <v-alert v-if="fullscreen && live.error.value" type="warning" variant="tonal" role="alert">
-          {{ live.error.value }} <v-btn size="small" variant="text" @click="live.start()">تلاش دوباره</v-btn>
-        </v-alert>
-        <div v-for="member in live.participantStatus.value" :key="member.role" class="live-panel__member">
-          <span class="live-panel__dot" :class="member.role" aria-hidden="true" />
-          <div class="live-panel__member-copy">
-            <strong>{{ member.role === 'requester' ? 'درخواست‌کننده' : member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز' }}</strong>
-            <small class="live-panel__member-state" :class="{ 'live-panel__member-state--fresh': member.fresh }">
-              {{ !member.entry ? 'موقعیت در دسترس نیست' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
-              <template v-if="member.entry"> · {{ new Date(member.entry.timestamp).toLocaleTimeString('fa-IR') }}</template>
-            </small>
-            <small v-if="fullscreen && member.role !== 'admin'" class="live-panel__member-presence">
-              اتصال: {{ missionPresenceLabel[member.role === 'requester' ? presence.requester.value : presence.rescuer.value] }}
-            </small>
-            <small v-else-if="member.entry">آخرین مشاهده: {{ new Date(member.entry.timestamp).toLocaleString('fa-IR') }}</small>
-          </div>
-          <v-btn v-if="fullscreen" icon="mdi-crosshairs-gps" variant="tonal" color="primary"
-            :disabled="!member.fresh || !map"
-            :aria-label="`نمایش موقعیت تازهٔ ${member.role === 'requester' ? 'درخواست‌کننده' : member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز'} روی نقشه`"
-            :title="member.fresh ? 'نمایش موقعیت تازه روی نقشه' : 'موقعیت تازه‌ای برای نمایش روی نقشه نیست'"
-            @click="focusMember(member.role)" />
-        </div>
-        <details v-if="fullscreen" class="live-panel__presence-details">
-          <summary>دربارهٔ موقعیت و اتصال</summary>
-          <p>اتصال به اتاق، با داشتن موقعیت تازه فرق دارد. موقعیت قدیمی برای راهبری مناسب نیست. پس از ۵ دقیقه قطع اتصال، وضعیت مأموریت را دستی بررسی کنید؛ مأموریت خودکار لغو نمی‌شود.</p>
-        </details>
-        <p v-else class="live-panel__note">تازگی موقعیت و وضعیت اتصال جداگانه نمایش داده می‌شوند.</p>
-        <template v-if="fullscreen">
-          <p class="live-panel__note" role="status">
-            {{ missionShare.sharing && missionShare.mission?.id === mission.id
-              ? 'اشتراک خصوصی موقعیت امدادگر برای اعضای مجاز این مأموریت فعال است.'
-              : 'موقعیت امدادگر پس از تأیید مأموریت و اجازهٔ GPS به‌صورت خودکار برای اعضای مجاز این مأموریت ارسال می‌شود. اگر اشتراک برقرار نشد، هشدار بالای صفحه را بررسی کنید.' }}
-          </p>
-        </template>
-        <template v-else-if="isAdmin">
-          <details class="live-panel__presence-details">
-            <summary>دسترسی اعضا به موقعیت</summary>
-            <p>ارسال موقعیت درخواست‌کننده و امدادگر در مأموریت فعال خودکار است، اگر GPS و اتصال برقرار باشد؛ نمایش هرکدام برای طرف مقابل را اینجا تعیین کنید. دسترسی مدیر به هر دو حفظ می‌شود.</p>
-            <v-alert v-if="policyError" type="warning" variant="tonal" role="alert">{{ policyError }}</v-alert>
-            <template v-if="locationPolicy">
-              <v-checkbox v-model="locationPolicy.rescuerVisibleToRequester" label="نمایش امدادگر به درخواست‌کننده" density="compact" hide-details />
-              <v-checkbox v-model="locationPolicy.requesterVisibleToRescuer" label="نمایش درخواست‌کننده به امدادگر" density="compact" hide-details />
-              <v-checkbox v-model="locationPolicy.adminVisibleToRequester" label="ارسال موقعیت من به درخواست‌کننده" density="compact" hide-details />
-              <v-checkbox v-model="locationPolicy.adminVisibleToRescuer" label="ارسال موقعیت من به امدادگر" density="compact" hide-details />
-              <v-btn variant="tonal" color="primary" :loading="savingPolicy" @click="savePolicy">ذخیرهٔ دسترسی‌ها</v-btn>
-            </template>
-          </details>
-          <p v-if="live.recoveryPending.value" class="live-panel__note" role="status">پس از اتصال دوباره، وضعیت مأموریت در حال بررسی است.</p>
-          <v-btn v-if="canAdminShare && !live.sharing.value" color="primary" variant="flat" rounded="lg" block
-            :disabled="!live.connected.value || live.recoveryPending.value || savingPolicy" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
-            آغاز ارسال موقعیت مدیر به اعضای انتخاب‌شده
-          </v-btn>
-          <v-btn v-if="live.sharing.value" color="error" variant="tonal" rounded="lg" block
-            @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
-          <p class="live-panel__note">ارسال موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
-        </template>
-        <template v-else>
-          <p class="live-panel__note" role="status">برنامه در مأموریت فعال اشتراک خصوصی موقعیت شما را خودکار آغاز می‌کند؛ دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد. پخش عمومی مستقل است.</p>
-          <v-alert v-if="auth.user?.id === mission.requesterId && (requesterShare.statusError || requesterShare.gpsError(mission.id))"
-            type="warning" variant="tonal" role="alert">
-            {{ requesterShare.statusError || requesterShare.gpsError(mission.id) }}
-            <v-btn variant="text" size="small" @click="requesterShare.retry(mission.id)">بررسی دوباره</v-btn>
-          </v-alert>
-        </template>
+          <v-btn v-if="fullscreen" icon="mdi-close" variant="text" aria-label="بستن پنل اعضای مأموریت" @click="emit('close-room')" />
+        </header>
+        <ul class="live-panel__member-list" aria-label="فهرست اعضای مأموریت" tabindex="0">
+          <li v-for="member in live.participantStatus.value" :key="member.role">
+            <button type="button" class="live-panel__member" :disabled="!member.fresh || !member.entry || !map || !visible"
+              @click="focusMember(member.role)">
+              <span class="live-panel__avatar" :class="member.role" aria-hidden="true">
+                <v-icon :icon="member.role === 'rescuer' ? 'mdi-lifebuoy' : member.role === 'admin' ? 'mdi-shield-account' : 'mdi-account'" size="20" />
+                <i :class="{ 'live-panel__avatar-status--fresh': member.fresh }" />
+              </span>
+              <span class="live-panel__member-copy">
+                <strong>{{ memberLabel(member.role) }}</strong>
+                <small>{{ !member.entry ? 'موقعیت در دسترس نیست' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
+                  <template v-if="member.entry"> · {{ new Date(member.entry.timestamp).toLocaleTimeString('fa-IR') }}</template>
+                </small>
+              </span>
+              <v-icon v-if="member.fresh && member.entry && map && visible" icon="mdi-crosshairs-gps" size="18" aria-hidden="true" />
+              <span v-if="member.fresh && member.entry && map && visible" class="sr-only">نمایش روی نقشه</span>
+            </button>
+          </li>
+        </ul>
       </div>
     </div>
+    <v-alert v-if="fullscreen && live.error.value" class="live-panel__room-alert"
+      type="warning" variant="tonal" role="alert">
+      {{ live.error.value }} <v-btn size="small" variant="text" @click="live.start()">تلاش دوباره</v-btn>
+    </v-alert>
+    <v-alert v-if="!fullscreen && isAdmin && policyError" type="warning" variant="tonal" role="alert">{{ policyError }}</v-alert>
+    <details v-if="!fullscreen && isAdmin" class="live-panel__privacy">
+      <summary>{{ live.sharing.value ? 'ارسال موقعیت مدیر فعال · تنظیم دسترسی' : 'تنظیم دسترسی و موقعیت مدیر' }}</summary>
+      <p>ارسال موقعیت درخواست‌کننده و امدادگر در مأموریت فعال خودکار است، اگر GPS و اتصال برقرار باشد؛ نمایش هرکدام برای طرف مقابل را اینجا تعیین کنید. دسترسی مدیر به هر دو حفظ می‌شود.</p>
+      <template v-if="locationPolicy">
+        <v-checkbox v-model="locationPolicy.rescuerVisibleToRequester" label="نمایش امدادگر به درخواست‌کننده" density="compact" hide-details />
+        <v-checkbox v-model="locationPolicy.requesterVisibleToRescuer" label="نمایش درخواست‌کننده به امدادگر" density="compact" hide-details />
+        <v-checkbox v-model="locationPolicy.adminVisibleToRequester" label="ارسال موقعیت من به درخواست‌کننده" density="compact" hide-details />
+        <v-checkbox v-model="locationPolicy.adminVisibleToRescuer" label="ارسال موقعیت من به امدادگر" density="compact" hide-details />
+        <v-btn variant="tonal" color="primary" :loading="savingPolicy" @click="savePolicy">ذخیرهٔ دسترسی‌ها</v-btn>
+      </template>
+      <p v-if="live.recoveryPending.value" role="status">پس از اتصال دوباره، وضعیت مأموریت در حال بررسی است.</p>
+      <v-btn v-if="canAdminShare && !live.sharing.value" color="primary" variant="flat" rounded="lg"
+        :disabled="!live.connected.value || live.recoveryPending.value || savingPolicy" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
+        آغاز ارسال موقعیت مدیر به اعضای انتخاب‌شده
+      </v-btn>
+      <v-btn v-if="live.sharing.value" color="error" variant="tonal" rounded="lg"
+        @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
+      <p>ارسال موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
+    </details>
+    <template v-if="!fullscreen && !isAdmin">
+      <p class="live-panel__note" role="status">برنامه در مأموریت فعال اشتراک خصوصی موقعیت شما را خودکار آغاز می‌کند؛ دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد. پخش عمومی مستقل است.</p>
+      <v-alert v-if="auth.user?.id === mission.requesterId && (requesterShare.statusError || requesterShare.gpsError(mission.id))"
+        type="warning" variant="tonal" role="alert">
+        {{ requesterShare.statusError || requesterShare.gpsError(mission.id) }}
+        <v-btn variant="text" size="small" @click="requesterShare.retry(mission.id)">بررسی دوباره</v-btn>
+      </v-alert>
+    </template>
   </section>
 </template>
 
@@ -272,6 +252,9 @@ function focusMembers(userInitiated = false) {
   if (camera.kind === "single") map.value.easeTo({ center: camera.center, zoom: camera.zoom, duration: 350 });
   else map.value.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 350 });
 }
+function memberLabel(role: Role): string {
+  return role === "requester" ? "درخواست‌کننده" : role === "rescuer" ? "امدادگر" : "مدیر مرکز";
+}
 function focusMember(role: Role): void {
   const center = freshMissionMemberCamera(live.participantStatus.value, role);
   if (!props.visible || !center || !map.value) return;
@@ -355,21 +338,42 @@ onBeforeUnmount(() => {
 .live-panel__map :deep(.map-canvas) { height: 100%; min-height: 20rem; }
 .live-panel--routing .live-panel__map { height: min(50dvh, 450px); min-height: 310px; }
 .live-panel--routing .live-panel__map :deep(.map-canvas) { min-height: 0; }
-.live-panel__members { display: grid; gap: 12px; align-content: start; }
-.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
-.live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
-.live-panel__member :deep(.v-btn) { flex: none; min-width: 44px; height: 44px; }
-.live-panel__member :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.live-panel__member strong { font-size: .85rem; }.live-panel__member small { font-size: 0.82rem; opacity: .78; }
-.live-panel__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }.live-panel__dot.requester { background: #dc593b; }.live-panel__dot.rescuer { background: #16826c; }.live-panel__dot.admin { background: #5555ae; }
+.live-panel__members { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: .65rem; gap: .35rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); box-shadow: var(--bb-shadow-overlay); }
+.live-panel__room-heading { display: flex; align-items: center; gap: .5rem; flex: none; }
+.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: .92rem; font-weight: 800; }
+.live-panel__room-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
+.live-panel__member-list { list-style: none; margin: 0; padding: 0; min-height: 0; max-height: min(13rem, 35dvh);
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.live-panel__member-list:focus-visible, .live-panel__member:focus-visible, .live-panel__privacy summary:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
+.live-panel__member-list li + li { border-top: 1px solid var(--bb-color-outline); }
+.live-panel__member { display: flex; align-items: center; text-align: start; width: 100%; min-height: 52px; gap: .65rem;
+  padding: .35rem .3rem; border: 0; border-radius: var(--bb-radius-nested, 16px); background: transparent;
+  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font: inherit; }
+.live-panel__member:not(:disabled):hover { background: var(--bb-color-inset); }
+.live-panel__member:disabled { cursor: default; opacity: .72; }
+.live-panel__member-copy { display: grid; gap: 1px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.live-panel__member strong { font-size: .85rem; line-height: 1.4; }
+.live-panel__member small { font-size: .8rem; line-height: 1.4; color: var(--bb-color-muted); }
+.live-panel__avatar { position: relative; display: grid; place-items: center; flex: none; width: 36px; height: 36px;
+  border-radius: 50%; background: rgba(var(--v-theme-primary), .12); color: rgb(var(--v-theme-primary)); }
+.live-panel__avatar.requester { background: rgba(220,89,59,.13); color: #dc593b; }
+.live-panel__avatar.rescuer { background: rgba(22,130,108,.13); color: #16826c; }
+.live-panel__avatar.admin { background: rgba(85,85,174,.13); color: #5555ae; }
+.live-panel__avatar i { position: absolute; inset: auto 0 0 auto; width: 9px; height: 9px;
+  border: 2px solid rgb(var(--v-theme-surface)); border-radius: 50%; background: rgb(var(--v-theme-warning)); }
+.live-panel__avatar i.live-panel__avatar-status--fresh { background: rgb(var(--v-theme-success)); }
+.live-panel__member > .v-icon { flex: none; color: rgb(var(--v-theme-primary)); }
+.live-panel__privacy { margin-top: .65rem; padding: .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
+.live-panel__privacy summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
+.live-panel__privacy p { font-size: .8rem; line-height: 1.6; }
+.live-panel__room-alert { position: absolute; z-index: 7; inset: calc(.5rem + env(safe-area-inset-top, 0px)) 1rem auto; max-width: 25rem; pointer-events: auto; }
 @container (min-width: 721px) { .live-panel--routing .live-panel__map { position: sticky; top: 16px; z-index: 1; } }
 @container (max-width: 720px) { .live-panel__grid { grid-template-columns: minmax(0,1fr); } }
 @container (max-width: 599px) {
   .live-panel--routing .live-panel__map { height: min(42dvh, 360px); min-height: 275px; }
-  .live-panel__member { flex-wrap: wrap; }
-  .live-panel__member-copy { overflow-wrap: anywhere; }
-  .live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }
-  .live-panel__members :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 
 /* Map-first mission mode. Other callers keep the normal in-flow room card. */
@@ -389,52 +393,23 @@ onBeforeUnmount(() => {
 }
 .live-panel--fullscreen .live-panel__members {
   position: absolute; z-index: 6; inset: auto auto calc(5.5rem + env(safe-area-inset-bottom, 0px)) 1rem;
-  width: min(24rem, calc(100vw - 1.5rem)); max-height: min(48dvh, 25rem);
-  padding: .75rem; overflow-y: auto; overscroll-behavior: contain;
-  scroll-padding-top: 4rem; /* Keyboard focus stays below the sticky team header. */
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
-  background: rgba(var(--v-theme-surface), .95); box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px);
-  gap: .45rem;
+  width: min(18rem, calc(100vw - 1.5rem)); max-height: min(15.5rem, 42dvh);
+  overflow: hidden; backdrop-filter: blur(12px);
 }
-.live-panel__room-heading { display: flex; align-items: center; gap: .5rem; }
-.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; }
-.live-panel__room-heading :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }
-.live-panel--fullscreen .live-panel__room-heading {
-  position: sticky; top: -.75rem; z-index: 1; margin: -.75rem -.75rem .35rem;
-  padding: .35rem .75rem; background: rgb(var(--v-theme-surface)); border-bottom: 1px solid var(--bb-color-outline);
-}
-.live-panel__room-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .35rem .5rem; padding-bottom: .45rem; border-bottom: 1px solid var(--bb-color-outline); }
-.live-panel__room-tools :deep(.v-btn) { min-height: 44px; height: auto; }
-.live-panel__connection { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; color: var(--bb-color-muted); }
-.live-panel__connection > span { width: 8px; height: 8px; border-radius: 50%; background: rgb(var(--v-theme-warning)); }
-.live-panel__connection--online > span { background: rgb(var(--v-theme-success)); }
-.live-panel__presence-details { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
-.live-panel__presence-details summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: rgb(var(--v-theme-primary)); font-weight: 700; }
-.live-panel__presence-details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.live-panel__presence-details p { margin: 0 0 .3rem; padding: .5rem .65rem; background: var(--bb-color-inset); border-radius: var(--bb-radius-nested, 16px); }
-.live-panel--fullscreen .live-panel__member { flex-wrap: nowrap; gap: .5rem; padding: .45rem .6rem; min-height: 58px; }
-.live-panel__member-copy { min-width: 0; }
-.live-panel__member-state--fresh { color: rgb(var(--v-theme-primary)); opacity: 1 !important; }
-.live-panel__member-presence { color: var(--bb-color-muted); }
 @media (max-width: 599px) {
   .live-panel--fullscreen .live-panel__members {
-    inset-inline: .75rem; width: auto;
+    inset-inline: .75rem; width: auto; max-height: min(15.5rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: min(48dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
 }
 @media (max-width: 599px) and (max-height: 560px) {
-  /* The room header has its own close button. Replace the stage/banner on
-     short screens, leaving the lower action strip clear of the room. */
   .live-panel--fullscreen .live-panel__members {
     top: calc(.75rem + env(safe-area-inset-top, 0px));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: none;
   }
+  .live-panel--fullscreen .live-panel__member-list { max-height: none; flex: 1 1 auto; }
 }
 
-:global(:root.dark .live-panel__member) {
-  background: var(--bb-color-inset);
-  border: 1px solid var(--bb-color-outline);
-}
+:global(:root.dark .live-panel__member:not(:disabled):hover) { background: var(--bb-color-inset); }
 </style>

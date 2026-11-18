@@ -64,8 +64,8 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain(":aria-label=\"routeActive ? 'نقشهٔ مأموریت، مسیرها و موقعیت‌های دریافت‌شدهٔ مجاز' : 'نقشهٔ موقعیت‌های دریافت‌شدهٔ اعضای مجاز مأموریت'\"");
     expect(panel).toContain("دسترسی مدیر به هر دو حفظ می‌شود");
     expect(panel).toContain("دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد");
-    expect(panel).toContain("member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز'");
-    expect(panel).toContain("آخرین مشاهده:");
+    expect(panel).toContain("memberLabel(member.role)");
+    expect(panel).toContain("new Date(member.entry.timestamp).toLocaleTimeString('fa-IR')");
     expect(panel).toContain("useMissionPresence");
     expect(panel).toContain("missionPresenceLabel[presence.rescuer.value]");
     expect(panel).toContain("مأموریت خودکار لغو نمی‌شود");

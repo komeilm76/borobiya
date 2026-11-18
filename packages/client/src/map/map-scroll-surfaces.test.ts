@@ -74,7 +74,7 @@ describe("map workspace scroll ownership", () => {
     expect(mission).toContain('v-if="!desk.terminalHold.value && (!activeTool || activeTool === \'status\')"');
     expect(css).toContain('max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));\n    max-height: none;');
-    expect(team).toContain('max-height: min(48dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));');
+    expect(team).toContain('max-height: min(15.5rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));');
     expect(team).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
     // Tools replace the progress sheet while the camera/SOS strip remains clear.
     for (const height of [561, 667, 800]) {
@@ -86,7 +86,9 @@ describe("map workspace scroll ownership", () => {
       const cameraTop = height - 5.75 * 16 - 48;
       expect(cameraTop - panelBottom).toBeGreaterThanOrEqual(12);
     }
-    expect(team).toContain('.live-panel--fullscreen .live-panel__room-heading {\n  position: sticky;');
+    expect(team).toContain('.live-panel__member-list { list-style: none;');
+    expect(team).toContain('overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;');
+    expect(team).toContain('overflow: hidden; backdrop-filter: blur(12px);');
     expect(stage).toContain('.mission-desk__card-header { position: sticky;');
     expect(css).toContain('.mission-desk__terminal-alert :deep(.v-btn) { position: sticky; bottom: 0;');
     expect(css).toContain('.mission-desk__guidance--warning span { flex: 1 1 100%; max-height: none; overflow: visible; }');

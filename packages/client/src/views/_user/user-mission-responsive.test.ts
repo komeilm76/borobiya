@@ -124,7 +124,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(panel).toContain('externalCanvas?: boolean; externalMap?: MapLibreMap | null;');
     expect(panel).toContain('v-show="!fullscreen || roomOpen"');
     expect(panel).toContain('v-if="!fullscreen && live.error.value"');
-    expect(panel).toContain('v-if="fullscreen" class="live-panel__room-heading"');
+    expect(panel).toContain('class="live-panel__room-heading"');
     expect(panel).toContain('@click="live.startSharing()"');
     expect(panel).toContain('.live-panel--fullscreen .live-panel__map :deep(.map-canvas)');
     expect(panel).toContain('height: 100%; min-height: 0; border-radius: 0;');
@@ -151,7 +151,7 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).not.toContain('mission-desk__dock');
     expect(panel).toContain('watch(() => props.fullscreen ? Boolean(missionShare.mission?.id === props.mission.id && missionShare.sharing)');
     expect(panel).toContain('requesterShare.isSharingMission(props.mission.id)');
-    expect(panel).toContain('<template v-else-if="isAdmin">');
+    expect(panel).toContain('v-if="!fullscreen && isAdmin" class="live-panel__privacy"');
     expect(panel).toContain('aria-label="بستن پنل اعضای مأموریت"');
     expect(panel).toContain('watch(live.endedMissionId, (id) => { if (id) emit("mission-ended", id); }');
     expect(view).toContain('@mission-ended="onMissionEnded"');

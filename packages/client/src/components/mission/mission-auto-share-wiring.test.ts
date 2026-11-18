@@ -13,9 +13,9 @@ describe("participant automatic mission share and independent general share butt
     expect(app).toContain("watch(() => proposalInbox.acceptedMissionId, (id) => { if (id) void missionShare.refresh(); }");
     expect(store).toContain('defineStore("rescuer-mission-share"');
     expect(store).toContain("auth.user?.role === \"user\"");
-    expect(panel).toContain('<template v-if="fullscreen">');
-    expect(panel).toContain('<template v-else-if="isAdmin">');
-    expect(panel).not.toContain('v-else-if="canPublish"');
+    expect(panel).toContain('v-if="!fullscreen && isAdmin" class="live-panel__privacy"');
+    expect(panel).toContain('v-if="!fullscreen && !isAdmin"');
+    expect(panel).not.toContain('v-if="canPublish"');
     expect(app).toContain('useRequesterMissionShareStore(pinia);');
     expect(panel).toContain('requesterShare.isSharingMission(props.mission.id)');
     expect(panel).toContain("missionShare.mission?.id === props.mission.id && missionShare.sharing");

@@ -1193,6 +1193,7 @@ onBeforeUnmount(() => {
 .mission-desk--embedded :deep(.live-panel--fullscreen) { background: transparent; pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__map) { pointer-events: none; }
 .mission-desk--embedded :deep(.live-panel__members),
+.mission-desk--embedded :deep(.live-panel__room-alert),
 .mission-desk--embedded :deep(.live-panel__map-actions),
 .mission-desk--embedded .mission-desk__map-focus,
 .mission-desk--embedded .mission-desk__bottom-stack,

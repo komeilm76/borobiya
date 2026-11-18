@@ -20,31 +20,27 @@ describe("full-screen mission member focus", () => {
     expect(freshMissionMemberCamera([{ role: "requester", entry: null, fresh: true }], "requester")).toBeNull();
     expect(freshMissionMemberCamera(statuses, "requester")).toEqual([51.4, 35.7]);
   });
-  it("leaves the map mounted and a single role action adjacent to its freshness label", () => {
-    expect(panel).toContain('v-if="fullscreen" icon="mdi-crosshairs-gps"');
-    expect(panel).toContain(':disabled="!member.fresh || !map"');
+  it("makes the entire fresh, authorized role row the map-focus target", () => {
+    expect(panel).toContain('type="button" class="live-panel__member"');
+    expect(panel).toContain(':disabled="!member.fresh || !member.entry || !map || !visible"');
     expect(panel).toContain('@click="focusMember(member.role)"');
     expect(panel).toContain('freshMissionMemberCamera(live.participantStatus.value, role)');
     expect(panel).toContain('cameraIntent.noteGesture();');
     expect(panel).toContain('emit("camera-selected");');
     expect(panel).toContain('if (!props.visible || !center || !map.value) return;');
+    expect(panel).toContain('map.value.easeTo({ center, zoom: 15, duration: 350 });');
     expect(panel).toContain('if (props.fullscreen) emit("close-room"); // The sheet otherwise covers the centered marker on phones.');
     expect(panel).toContain('if (props.fullscreen) emit("close-room"); // Reveal the points rather than covering them with the sheet.');
-    expect(panel).toContain('<details v-if="fullscreen" class="live-panel__presence-details">');
-    expect(panel).toContain('class="live-panel__member-presence"');
-    expect(panel.indexOf('v-for="member in live.participantStatus.value"')).toBeLessThan(panel.indexOf('class="live-panel__presence-details"'));
-    expect(panel).toContain('موقعیت قدیمی برای راهبری مناسب نیست');
-    expect(panel).toContain('role="region" aria-label="اعضا و اشتراک موقعیت مأموریت"');
-    expect(panel).toContain('v-else-if="isAdmin"'); // Only the admin can opt into mission sharing.
+    expect(panel).toContain('role="region" aria-label="اعضای مأموریت"');
+    expect(panel).toContain('v-if="!fullscreen && isAdmin" class="live-panel__privacy"');
   });
-  it("uses accessible tap targets and legible inset rows in light and dark modes", () => {
+  it("has accessible tap targets and legible role avatars in light and dark modes", () => {
     const css = parse(panel).descriptor.styles[0]!.content;
     const compiled = compileStyle({ source: css, filename: "MissionLivePanel.vue", id: "data-v-member-focus", scoped: true });
     expect(compiled.errors).toEqual([]);
-    expect(css).toContain('.live-panel__member :deep(.v-btn)');
-    expect(css).toContain('min-width: 44px; height: 44px;');
-    expect(css).toContain('.live-panel__member :deep(.v-btn:focus-visible)');
-    expect(css).toContain('background: var(--bb-color-inset);');
+    expect(css).toContain('min-height: 52px; gap: .65rem;');
+    expect(css).toContain('.live-panel__member-list:focus-visible, .live-panel__member:focus-visible');
     expect(css).toContain('border: 1px solid var(--bb-color-outline);');
+    expect(css).toContain(':global(:root.dark .live-panel__member:not(:disabled):hover)');
   });
 });

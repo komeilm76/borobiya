@@ -40,6 +40,6 @@ describe("mission location announcements", () => {
     expect(panel).not.toContain('class="live-panel__members" aria-live="polite"');
     expect(panel).toContain('role="status" aria-live="polite" aria-atomic="true">{{ locationAnnouncement }}');
     expect(panel).toContain("missionLocationAnnouncement(live.participantStatus.value)");
-    expect(panel).toContain("آخرین مشاهده:"); // the real timestamp remains available on demand
+    expect(panel).toContain("new Date(member.entry.timestamp).toLocaleTimeString('fa-IR')"); // timestamp is visible on each role row
   });
 });
