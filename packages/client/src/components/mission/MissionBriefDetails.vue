@@ -56,6 +56,7 @@
               کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
               <input :value="missionId" readonly dir="ltr" aria-label="شناسهٔ کامل مأموریت برای کپی دستی" @focus="($event.target as HTMLInputElement).select()" />
             </label>
+            <div v-if="address"><span>نشانی تقریبی کامل · از مختصات ثبت‌شده</span><p dir="auto" class="mission-brief__description">{{ address }}</p></div>
             <div><span>شرح کامل نیاز</span><p dir="auto" class="mission-brief__description">{{ brief.description }}</p></div>
             <div><span>مختصات ثبت‌شدهٔ حادثه</span><bdi dir="ltr">{{ brief.incident.lat.toFixed(5) }}, {{ brief.incident.lon.toFixed(5) }}</bdi></div>
             <div v-if="photoSrc" class="mission-brief__photo-full">
@@ -173,18 +174,20 @@ onBeforeUnmount(clear);
 
 <style scoped>
 .mission-brief { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-.mission-brief__body { display: grid; gap: .35rem; min-width: 0; font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
-.mission-brief__body span { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; }
+.mission-brief__body { display: grid; gap: .35rem; min-width: 0; font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.mission-brief__body span { color: var(--bb-color-muted); font-size: .82rem; font-weight: 700; }
 .mission-brief__body strong { font-weight: 750; }
 .mission-brief__notice { margin: .35rem 0; }
 .mission-brief__overview { display: grid; gap: .45rem; }
 .mission-brief__identity { display: flex; align-items: center; gap: .6rem; min-width: 0; }
 .mission-brief__identity > div { display: grid; gap: 1px; min-width: 0; }
-.mission-brief__identity strong { font-size: .95rem; overflow-wrap: anywhere; }
+.mission-brief__identity strong { font-size: 1rem; overflow-wrap: anywhere; }
 .mission-brief__incident-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px;
   border-radius: 12px; background: rgba(var(--v-theme-error), .12); color: rgb(var(--v-theme-error)) !important; }
-.mission-brief__address { display: flex; align-items: start; gap: .6rem; min-width: 0; padding: .45rem .6rem;
-  border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+/* Like Travel's A-to-B rail, the incident address is part of the surface,
+   not another little card inside it. Full text is available in Details. */
+.mission-brief__address { display: flex; align-items: start; gap: .6rem; min-width: 0; padding: .5rem .1rem;
+  border-top: 1px solid var(--bb-color-outline); }
 .mission-brief__address > :deep(.v-icon) { flex: none; margin-top: .15rem; color: rgb(var(--v-theme-primary)); }
 .mission-brief__address > div { display: grid; gap: 1px; min-width: 0; }
 .mission-brief__address p, .mission-brief__details p { margin: 0; }

@@ -46,9 +46,12 @@
           class="mission-desk__inline-outcome" role="status">لغو مأموریت در سرور ثبت شد؛ مرکز امداد برای جایگزینی امدادگر مطلع شد.</v-alert>
         <v-alert v-else-if="embedded && desk.completedMissionId.value" type="success" variant="tonal" rounded="lg"
           class="mission-desk__inline-outcome" role="status">پایان امدادرسانی در سرور ثبت شد.</v-alert>
-        <div class="mission-desk__empty-icon"><v-icon icon="mdi-check-decagram-outline" size="36" /></div>
-        <h3>در حال حاضر مأموریت فعالی ندارید</h3>
-        <p>پیشنهادهای دریافتی و جزئیات پذیرش در همین زبانه در دسترس‌اند.</p>
+        <p v-if="embedded" class="sr-only">در حال حاضر مأموریت فعالی ندارید؛ پیشنهادها را در همین بخش بررسی کنید.</p>
+        <template v-else>
+          <div class="mission-desk__empty-icon"><v-icon icon="mdi-check-decagram-outline" size="36" /></div>
+          <h3>در حال حاضر مأموریت فعالی ندارید</h3>
+          <p>پیشنهادهای دریافتی و جزئیات پذیرش در همین زبانه در دسترس‌اند.</p>
+        </template>
         <ProposalInboxContent :selected-offer-id="null" />
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
@@ -278,7 +281,13 @@
             </small>
             <small v-if="routing.selectedRoute.value" class="mission-desk__planned-distance">{{ formatRouteDistance(routing.selectedRoute.value.distance_m) }} مسیر برنامه‌ریزی‌شده · زمان رسیدن زنده در دسترس نیست</small>
           </div>
-          <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
+          <div class="mission-desk__guidance-actions" role="group" aria-label="کنترل‌های راهبری مأموریت">
+            <v-btn icon="mdi-routes" variant="tonal" color="primary" rounded="lg"
+              aria-label="بررسی برنامهٔ مسیر مأموریت؛ راهبری ادامه دارد" title="بررسی مسیر"
+              @click="openRouteWorkspace" />
+            <v-btn variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline"
+              aria-label="توقف راهبری؛ مسیر مأموریت حفظ می‌شود" @click="stopGuidance"><span class="mission-desk__stop-label">توقف راهبری</span></v-btn>
+          </div>
         </div>
         <div v-show="!pickingWaypoint && activeTool !== 'status' && activeTool !== 'team'"
           class="mission-desk__map-focus" :class="{ 'mission-desk__map-focus--pair': routing.visible.value && !!routing.target.value }"
@@ -1164,19 +1173,37 @@ onBeforeUnmount(() => {
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty {
   width: min(42rem, calc(100vw - 1.5rem));
   margin: calc(8.5rem + env(safe-area-inset-top, 0px)) auto 0;
-  padding: .9rem; max-height: calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  padding: .75rem; max-height: calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   overflow-y: auto; overscroll-behavior: contain;
-  background: rgb(var(--v-theme-surface));
+  background: rgba(var(--v-theme-surface), .95);
 }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers) {
   padding: 0; background: transparent;
 }
+/* The inbox is reused elsewhere as a full page. Within the map it has one
+   Travel-like header and one outer glass surface, not a dark hero inside a card. */
+.mission-desk--embedded .mission-desk__empty :deep(.offers__hero) {
+  padding: .25rem .1rem .65rem; border-bottom: 1px solid var(--bb-color-outline);
+  border-radius: 0; background: transparent; box-shadow: none; color: rgb(var(--v-theme-on-surface));
+}
+.mission-desk--embedded .mission-desk__empty :deep(.offers__eyebrow) { color: rgb(var(--v-theme-primary)); }
+.mission-desk--embedded .mission-desk__empty :deep(.offers__hero p) { color: var(--bb-color-muted); }
+.mission-desk--embedded .mission-desk__empty :deep(.offers__stat) {
+  min-width: 4.5rem; min-height: 4.5rem; border-color: var(--bb-color-outline);
+  background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface));
+}
+.mission-desk--embedded .mission-desk__empty :deep(.offers__stat-number) { color: rgb(var(--v-theme-primary)); }
+.mission-desk--embedded .mission-desk__empty :deep(.offers__toolbar) { margin: .6rem 0; }
+.mission-desk--embedded .mission-desk__empty :deep(.offer-detail) {
+  border: 0; border-top: 1px solid var(--bb-color-outline); border-radius: 0;
+  box-shadow: none; background: transparent;
+}
+.mission-desk--embedded .mission-desk__empty :deep(.offers__empty) { border: 0; background: transparent; padding: 1rem; }
 .mission-desk__inline-outcome { margin-bottom: .8rem; border: 1px solid rgb(var(--v-theme-success));
   color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); }
 /* This card is at most 42rem even on desktop: viewport breakpoints in the
    reusable inbox cannot decide whether its list and detail fit side by side. */
 .mission-desk__empty :deep(.offers__layout) { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
-.mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__hero) { padding: .75rem; }
 .mission-desk--embedded:not(.mission-desk--active) .mission-desk__empty :deep(.offers__items) {
   max-height: none; overflow: visible; padding: 0;
 }
@@ -1414,13 +1441,28 @@ onBeforeUnmount(() => {
 .mission-desk__guidance--warning {
   width: min(30rem, calc(100vw - 1.5rem)); border: 1px solid rgb(var(--v-theme-warning));
 }
-.mission-desk__guidance--active { width: min(30rem, calc(100vw - 1.5rem)); padding: .55rem .7rem; border: 1px solid var(--bb-color-outline); }
-.mission-desk__guidance-symbol { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px; background: rgba(var(--v-theme-primary), .15); color: rgb(var(--v-theme-primary)); }
-.mission-desk__guidance-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.mission-desk__guidance-copy strong { font-size: .87rem; }
-.mission-desk__guidance-copy small { font-size: .8rem; line-height: 1.4; }
+/* The active mission cue uses Travel's emblem, information hierarchy and action
+   rhythm. It stays above the map: the guarded stage action owns the bottom dock. */
+.mission-desk__guidance--active { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto;
+  width: min(30rem, calc(100vw - 1.5rem)); gap: .6rem; padding: .7rem .75rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); backdrop-filter: blur(12px); }
+.mission-desk__guidance-symbol { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px;
+  background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary)); }
+.mission-desk__guidance-copy { min-width: 0; display: grid; gap: 1px; line-height: 1.4; }
+.mission-desk__guidance-copy strong { font-size: .95rem; line-height: 1.35; }
+.mission-desk__guidance-copy small { font-size: .82rem; line-height: 1.4; }
 .mission-desk__direct-distance { color: rgb(var(--v-theme-primary)); font-weight: 800; }
-.mission-desk__guidance--active :deep(.v-btn) { min-height: 44px; height: auto; }
+.mission-desk__planned-distance { color: var(--bb-color-muted); }
+.mission-desk__guidance-actions { display: flex; align-items: center; gap: .35rem; }
+.mission-desk__guidance--active :deep(.v-btn) { min-width: 44px; min-height: 44px; height: auto;
+  border-radius: 14px !important; font-weight: 800; }
+.mission-desk__guidance--active :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+@media (min-width: 600px) and (max-height: 700px) {
+  /* A zoomed/landscape desktop still needs a clear lane above the stage dock. */
+  .mission-desk__guidance--active { max-height: min(7rem, 25dvh); overflow-y: auto; overscroll-behavior: contain; }
+  .mission-desk__guidance-actions { position: sticky; top: 0; align-self: start; }
+}
 /* The key uses Mission Information's card treatment, not an inset strip in
    the steps widget. The two surfaces stay in normal flex flow, never overlap. */
 .mission-desk__map-legend { flex: none; min-width: 0; max-height: min(8rem, 25dvh);
@@ -1433,11 +1475,11 @@ onBeforeUnmount(() => {
   display: flex; flex-direction: column; overflow: hidden;
   padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
-  background: rgba(var(--v-theme-surface), .97); color: rgb(var(--v-theme-on-surface));
+  background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
-.mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: .85rem; font-weight: 800; }
+.mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: 1rem; font-weight: 800; }
 .mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .2rem .35rem;
-  margin: 0; padding: 0; list-style: none; font-size: .8rem; line-height: 1.3; }
+  margin: 0; padding: 0; list-style: none; font-size: .875rem; line-height: 1.35; }
 .mission-desk__map-legend-body li { display: flex; align-items: center; min-width: 0; gap: .25rem; overflow-wrap: anywhere; }
 .mission-desk__map-legend small { display: block; margin-top: .3rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.35; }
 .mission-desk__legend-symbol { display: inline-grid; place-items: center; flex: none;
@@ -1551,6 +1593,18 @@ onBeforeUnmount(() => {
   .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
     max-height: min(65dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
+  /* Compact the Travel-style actions without shrinking their 44px targets.
+     Both Review and Stop stay visible, including on 320px/landscape phones. */
+  .mission-desk__guidance--active { grid-template-columns: minmax(0, 1fr) auto; gap: .35rem;
+    padding: .45rem .6rem; }
+  .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
+  .mission-desk__guidance-actions { position: sticky; top: 0; align-self: start; }
+  .mission-desk__guidance-actions :deep(.v-btn) { width: 44px; min-width: 44px; height: 44px; padding: 0; }
+  .mission-desk__guidance-actions .mission-desk__stop-label { display: none; }
+  .mission-desk__guidance--active .mission-desk__planned-distance {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
   /* Do not nest a thumb-sized scroller inside the warning. The whole banner
      scrolls if necessary while its safety actions stay in reach. */
   .mission-desk__guidance--warning {
@@ -1628,13 +1682,6 @@ onBeforeUnmount(() => {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
     bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
     flex-direction: row;
-  }
-  .mission-desk__guidance--active .mission-desk__guidance-symbol { display: none; }
-  /* A fresh direct-distance cue remains visible beside Stop. Keep the longer
-     planned-route disclaimer available to screen readers without crowding this row. */
-  .mission-desk__guidance--active .mission-desk__planned-distance {
-    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
   }
   .mission-desk__direct-distance { line-height: 1.25; }
 }

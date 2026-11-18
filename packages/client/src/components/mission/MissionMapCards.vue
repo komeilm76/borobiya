@@ -80,16 +80,17 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
   background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
-.mission-desk__next-step { display: grid; gap: .3rem; min-width: 0; }
-.mission-desk__next-step > span { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
+.mission-desk__next-step { display: grid; gap: .35rem; min-width: 0;
+  padding-top: .45rem; border-top: 1px solid var(--bb-color-outline); }
+.mission-desk__next-step > span { color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
 .mission-desk__next-step :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
 .mission-desk__next-step :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-map-cards__notice { margin: 0; font-size: .8rem; line-height: 1.5; color: rgb(var(--v-theme-warning)); }
 .mission-desk__phase-summary { min-width: 0; }
 .mission-desk__phase-heading { display: flex; align-items: center; gap: .3rem; }
 .mission-desk__phase-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
-.mission-desk__phase-heading strong { font-size: .9rem; }
-.mission-desk__phase-heading span { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; overflow-wrap: anywhere; }
+.mission-desk__phase-heading strong { font-size: 1rem; line-height: 1.35; }
+.mission-desk__phase-heading span { color: var(--bb-color-muted); font-size: .82rem; font-weight: 700; overflow-wrap: anywhere; }
 /* At phone widths keep stage/status legible instead of squeezing it between
    four touch targets; team and route stay adjacent on the second row. */
 @media (max-width: 420px) {
@@ -102,7 +103,7 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
 .mission-desk__phase-steps { display: grid; gap: 1px; min-width: 0; margin: .35rem 0 0; padding: 0; list-style: none; }
 .mission-desk__phase-step { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center; gap: .35rem; min-width: 0; min-height: 29px; padding: 2px 4px;
-  border-radius: 9px; color: var(--bb-color-muted); font-size: .82rem; line-height: 1.4; }
+  border-radius: 9px; color: var(--bb-color-muted); font-size: .875rem; line-height: 1.4; }
 .mission-desk__phase-marker { display: grid; width: 21px; height: 21px; place-items: center;
   border-radius: 50%; color: var(--bb-color-muted); background: var(--bb-color-inset); font-size: .8rem; font-weight: 800; }
 .mission-desk__phase-step--passed { color: rgb(var(--v-theme-primary)); font-weight: 700; }
