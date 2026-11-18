@@ -73,7 +73,7 @@
               :class="{ 'mission-route--editor': routeSection !== 'plan' }"
               aria-label="برنامه‌ریزی مسیر مأموریت" tabindex="-1">
               <header class="mission-route__header">
-                <span class="mission-route__emblem" aria-hidden="true"><v-icon :icon="routeSection === 'plan' ? 'mdi-map-marker-path' : routeSection === 'transport' ? 'mdi-car-multiple' : 'mdi-routes'" /></span>
+                <span class="mission-route__emblem" aria-hidden="true"><v-icon :icon="routeSection === 'plan' ? 'mdi-map-marker-path' : routeSection === 'stops' ? 'mdi-map-marker-plus-outline' : 'mdi-routes'" /></span>
                 <div class="mission-route__heading">
                   <small>مأموریت فعال · {{ routeSection === 'plan' ? 'برنامه‌ریزی سفر' : routeSection === 'stops' ? 'ایستگاه‌های میانی' : routeSection === 'transport' ? 'انتخاب وسیله' : 'انتخاب مسیر' }}</small>
                   <h2>{{ routeSection === 'plan' ? 'مسیر تا محل حادثه' : routeSection === 'stops' ? 'ویرایش ایستگاه‌ها' : routeSection === 'transport' ? 'وسیلهٔ حرکت' : 'مسیرهای پیشنهادی' }}</h2>
@@ -225,8 +225,11 @@
                   <button v-for="(choice, index) in routing.routes.value" :key="index" type="button"
                     class="mission-route__choice" :class="{ 'mission-route__choice--selected': routing.selectedIndex.value === index }"
                     :aria-pressed="routing.selectedIndex.value === index" :disabled="navigation.active.value" @click="previewAlternative(index)">
-                    <strong>مسیر {{ (index + 1).toLocaleString('fa-IR') }}</strong>
-                    <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
+                    <span class="mission-route__choice-heading">
+                      <strong>مسیر {{ (index + 1).toLocaleString('fa-IR') }}</strong>
+                      <span v-if="routing.selectedIndex.value === index" class="mission-route__choice-selected">در حال پیش‌نمایش</span>
+                    </span>
+                    <span class="mission-route__choice-metrics">{{ formatRouteDuration(choice.duration_s) }} · {{ formatRouteDistance(choice.distance_m) }}</span>
                     <small v-if="choice.elevation">صعود تخمینی: {{ Math.round(choice.elevation.gain_m).toLocaleString('fa-IR') }} متر · نزول تخمینی: {{ Math.round(choice.elevation.loss_m).toLocaleString('fa-IR') }} متر</small>
                     <small v-else>ارتفاع: دادهٔ آفلاین برای تمام این مسیر موجود نیست.</small>
                     <span v-if="elevationCharts[index]" class="mission-route__elevation-chart">
@@ -239,13 +242,15 @@
                     </span>
                   </button>
                 </div>
-                <p v-if="routeSection === 'alternatives' && routing.routes.value.some(choice => choice.elevation)" class="text-caption mt-2">
+                <p v-if="routeSection === 'alternatives' && routing.routes.value.some(choice => choice.elevation)" class="mission-route__elevation-note text-caption mt-2">
                   ارتفاع تقریبی از داده‌های محلی Mapzen/Tilezen محاسبه شده است؛ برای تصمیم ایمنی در مسیر به تنهایی کافی نیست.
                   <a href="/terrain-attribution.html" target="_blank" rel="noopener noreferrer">منابع و حق انتساب داده‌های ارتفاع (آفلاین)</a>
                 </p>
-                <div v-if="routeSection === 'alternatives'" class="mission-route__navigation">
-                  <v-btn color="primary" variant="flat" rounded="lg" @click="acceptAlternative">تأیید این مسیر</v-btn>
-                  <v-btn color="primary" variant="text" rounded="lg" @click="closeRouteSection()">بازگشت بدون تغییر</v-btn>
+                <div v-if="routeSection === 'alternatives'" class="mission-route__navigation mission-route__navigation--choice-actions">
+                  <v-btn color="primary" variant="tonal" rounded="lg" @click="closeRouteSection()">بازگشت بدون تغییر</v-btn>
+                  <v-btn color="primary" variant="flat" rounded="lg"
+                    :disabled="!routing.selectedRoute.value || routing.loading.value || navigation.active.value"
+                    @click="acceptAlternative">تأیید این مسیر</v-btn>
                 </div>
                 <p v-if="routeSection === 'plan' && routing.routes.value.length === 1" class="text-caption mt-2" role="status">
                   برای این وسیله فقط یک مسیر در شبکهٔ راه‌های محلی پیدا شد؛ وجود چند مسیر تضمین نمی‌شود.
@@ -1047,7 +1052,10 @@ onBeforeUnmount(() => {
 .mission-route__decision .mission-route__metrics > div + div { border-inline-start: 1px solid var(--bb-color-outline); }
 .mission-route__decision .mission-route__navigation { display: grid; gap: .4rem; margin: 0; }
 .mission-route__decision .mission-route__navigation p { margin: 0; }
-.mission-route__preview-note { margin: .5rem 0 0; padding: .5rem .65rem; border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); font-size: .875rem; line-height: 1.5; }
+/* Travel's chooser places its preview instruction on the same surface as
+   the options; it is not another bordered/inset card. */
+.mission-route__preview-note { flex: none; margin: 0; padding: .45rem .1rem;
+  color: var(--bb-color-muted); font-size: .875rem; line-height: 1.5; }
 .mission-route__section-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: .2rem 0;
   border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); overflow: hidden; }
 .mission-route__section-links button { display: flex; align-items: center; justify-content: center; gap: .25rem;
@@ -1089,13 +1097,27 @@ onBeforeUnmount(() => {
 .mission-route__optimize { margin-top: .5rem; }
 .mission-route__step-control { margin-top: .55rem; padding: .55rem .25rem; border-top: 1px solid var(--bb-color-outline); }
 .mission-route__step-control p { margin: 0; font-size: .875rem; }
-.mission-route__choices { margin-top: .65rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: .5rem; }
-.mission-route__choice { display: grid; text-align: start; gap: .4rem; color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); padding: .75rem; cursor: pointer; font: inherit; }
+.mission-route__choices { margin-top: .25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: .5rem; }
+.mission-route__choice { display: grid; align-content: start; text-align: start; gap: .25rem; min-height: 72px;
+  color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-on-surface), .035);
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  padding: .65rem .75rem; cursor: pointer; font: inherit; font-size: .875rem; }
+.mission-route__choice-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem .65rem; }
+.mission-route__choice-heading strong { font-size: .95rem; }
+.mission-route__choice-selected { margin-inline-start: auto; color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
+.mission-route__choice-metrics { font-variant-numeric: tabular-nums; }
 .mission-route__choice--selected { border-color: rgb(var(--v-theme-primary)); box-shadow: inset 0 0 0 1px rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
+.mission-route__choice:hover:not(:disabled) { border-color: rgb(var(--v-theme-primary)); }
 .mission-route__choice:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-route__choice:disabled { opacity: .7; cursor: not-allowed; }
 .mission-route__navigation { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-top: .65rem; }
-.mission-route__choice small { opacity: .75; }
+.mission-route__navigation--choice-actions { flex: none; margin-top: .45rem; padding-top: .6rem;
+  border-top: 1px solid var(--bb-color-outline); }
+.mission-route__navigation--choice-actions :deep(.v-btn) { flex: 1 1 8rem; min-height: 46px; height: auto;
+  border-radius: 14px !important; font-weight: 800; }
+.mission-route__navigation--choice-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.mission-route__elevation-note { flex: none; line-height: 1.45; }
+.mission-route__choice small { font-size: .82rem; line-height: 1.45; color: var(--bb-color-muted); }
 .mission-route__elevation-chart { display: grid; gap: 4px; min-width: 0; }
 .mission-route__elevation-chart svg { display: block; width: 100%; height: 72px; direction: ltr; overflow: visible; }
 .mission-route__elevation-area { fill: rgb(var(--v-theme-primary)); opacity: .13; }
@@ -1330,6 +1352,10 @@ onBeforeUnmount(() => {
      reachable inside the content, never scroll the outer map card. */
   .mission-route__body { overflow-y: auto; overscroll-behavior: contain; }
   .mission-route__body--stops .mission-route__stop-list { flex: none; max-height: none; overflow: visible; }
+  .mission-route__body--alternatives .mission-route__choices { flex: none; max-height: none; overflow: visible; }
+}
+@media (forced-colors: active) {
+  .mission-route__choice[aria-pressed="true"] { outline: 2px solid Highlight; }
 }
 .mission-desk--active .mission-desk__card { z-index: 9; }
 /* The key opens above the progress or information sheet; the clear lower-left
@@ -1423,10 +1449,10 @@ onBeforeUnmount(() => {
 }
 .mission-desk__terminal-heading { display: flex; gap: .7rem; align-items: flex-start; }
 .mission-desk__terminal-heading > :deep(.v-icon) { flex: 0 0 auto; color: rgb(var(--v-theme-warning)); }
-.mission-desk__terminal-heading strong { display: block; font-size: .92rem; line-height: 1.5; }
-.mission-desk__terminal-heading p { margin: .3rem 0 .75rem; font-size: .83rem; line-height: 1.6; }
+.mission-desk__terminal-heading strong { display: block; font-size: 1rem; line-height: 1.4; }
+.mission-desk__terminal-heading p { margin: .3rem 0 .75rem; font-size: .875rem; line-height: 1.5; }
 .mission-desk__terminal-error { padding: .55rem .7rem; border-radius: .7rem;
-  background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.5; }
+  background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); font-size: .875rem; line-height: 1.5; }
 .mission-desk__terminal-alert :deep(.v-btn) { position: sticky; bottom: 0;
   min-height: 44px; height: auto; width: 100%; }
 .mission-desk__terminal-alert :deep(.v-btn__content) { white-space: normal; text-align: center; }
@@ -1448,8 +1474,12 @@ onBeforeUnmount(() => {
 .mission-desk__guidance span { min-width: 0; overflow-wrap: anywhere; }
 .mission-desk__guidance :deep(.v-btn) { flex-shrink: 0; }
 .mission-desk__guidance--warning {
-  width: min(30rem, calc(100vw - 1.5rem)); border: 1px solid rgb(var(--v-theme-warning));
+  width: min(30rem, calc(100vw - 1.5rem)); padding: .55rem .75rem;
+  border: 1px solid rgb(var(--v-theme-warning)); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); backdrop-filter: blur(12px);
+  font-size: .875rem; line-height: 1.5;
 }
+.mission-desk__guidance--warning :deep(.v-btn) { min-width: 44px; min-height: 44px; height: auto; }
 /* The active mission cue uses Travel's emblem, information hierarchy and action
    rhythm. It stays above the map: the guarded stage action owns the bottom dock. */
 .mission-desk__guidance--active { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto;

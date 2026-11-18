@@ -6,7 +6,8 @@
       {{ desk.progressError.value || desk.error.value || 'وضعیت درخواست لغو هنوز تأیید نشده است؛ پیش از ادامه دوباره بررسی کنید.' }}
       <v-btn variant="text" size="small" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
     </v-alert>
-    <p v-if="!teamSharing" class="mission-map-cards__notice" role="status">
+    <p v-if="!teamSharing" class="mission-map-cards__notice mission-map-cards__notice--sharing" role="status">
+      <v-icon icon="mdi-signal-off" size="18" aria-hidden="true" />
       اشتراک موقعیت مأموریت برقرار نیست؛ اتصال یا اجازهٔ GPS را بررسی کنید.
     </p>
     <div class="mission-desk__phase-summary">
@@ -85,7 +86,10 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
 .mission-desk__next-step > span { color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
 .mission-desk__next-step :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
 .mission-desk__next-step :deep(.v-btn__content) { white-space: normal; text-align: center; }
-.mission-map-cards__notice { margin: 0; font-size: .8rem; line-height: 1.5; color: rgb(var(--v-theme-warning)); }
+.mission-map-cards__notice { margin: 0; font-size: .875rem; line-height: 1.5; color: rgb(var(--v-theme-on-surface)); }
+.mission-map-cards__notice--sharing { display: flex; align-items: flex-start; gap: .4rem; padding: .35rem .5rem;
+  border-inline-start: 3px solid rgb(var(--v-theme-warning)); background: var(--bb-color-inset); }
+.mission-map-cards__notice--sharing > :deep(.v-icon) { flex: none; color: rgb(var(--v-theme-warning)); }
 .mission-desk__phase-summary { min-width: 0; }
 .mission-desk__phase-heading { display: flex; align-items: center; gap: .3rem; }
 .mission-desk__phase-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
