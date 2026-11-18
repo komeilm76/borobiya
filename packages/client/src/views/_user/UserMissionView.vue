@@ -236,6 +236,9 @@
         <PointTransportChoicesSheet :mission-id="desk.activeMission.value.id" :mission-profile="routing.profile.value"
           :open="activeTool === 'route' && routeSection === 'transport'" :show-search="false"
           @confirm="confirmMissionTransport" @close="closeRouteSection()" />
+        <v-alert v-if="routeSaveWarning && !desk.terminalHold.value" type="warning" variant="tonal" role="alert">
+          {{ routeSaveWarning }}
+        </v-alert>
         <div v-if="!desk.terminalHold.value && activeTool !== 'route' && (routing.error.value || navigation.error.value)"
           class="mission-desk__guidance mission-desk__guidance--warning" role="alert">
           <span>{{ routing.error.value || navigation.error.value }}</span>
@@ -388,6 +391,7 @@ import MissionMapCards from "@/components/mission/MissionMapCards.vue";
 import ProposalInboxContent from "@/components/shell/ProposalInboxContent.vue";
 import PointTransportChoicesSheet from "@/components/map/PointTransportChoicesSheet.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
+import { saveSuggestedMissionRoute } from "@/api/mission";
 import { createMissionRouteWorkspace, type RouteWorkspaceSection } from "@/mission/route-workspace";
 import { missionMapCamera, missionRouteStop } from "@/sos/mission-map";
 import { incidentDistanceMetres } from "@/mission/incident-distance";
@@ -608,10 +612,26 @@ function resetRoutePlan(): void {
   waypointError.value = "";
   closeTool("route");
 }
+const routeSaveWarning = ref<string | null>(null);
 function startGuidance(): void {
   // A denied/unavailable GPS watch must leave the route and its error visible.
   followingGps.value = true;
-  if (navigation.start()) closeTool("route");
+  const missionId = desk.activeMission.value?.id;
+  const selected = routing.selectedRoute.value;
+  const profile = routing.profile.value;
+  const token = auth.accessToken;
+  const session = missionSession.value;
+  if (!navigation.start()) return;
+  routeSaveWarning.value = null;
+  closeTool("route");
+  if (!missionId || !selected || !token || !session) return;
+  void saveSuggestedMissionRoute(token, missionId, {
+    polyline: selected.polyline, distanceM: selected.distance_m, profile
+  }).catch(() => {
+    if (desk.activeMission.value?.id === missionId && missionSession.value === session) {
+      routeSaveWarning.value = "ذخیرهٔ مسیر پیشنهادی فعلی انجام نشد؛ راهبری ادامه دارد، اما سابقه ممکن است مسیر انتخاب‌شدهٔ قبلی را نشان دهد.";
+    }
+  });
 }
 function stopGuidance(): void {
   navigation.stop();
@@ -888,7 +908,7 @@ watch(() => routing.error.value, (routeError) => {
   }
 });
 watch(() => desk.activeMission.value?.id, (next, previous) => {
-  if (next !== previous) { teamSharing.value = false; legendOpen.value = false; }
+  if (next !== previous) { teamSharing.value = false; legendOpen.value = false; routeSaveWarning.value = null; }
   if (previous && next !== previous) {
     if (next) closeRoutes(); // Same mounted canvas, new private incident.
     else releaseRouteMap(); // The mission panel is about to unmount.
@@ -923,6 +943,7 @@ onMounted(() => { if (missionSession.value) void desk.load(); });
 watch(missionSession, (next) => {
   teamSharing.value = false;
   legendOpen.value = false;
+  routeSaveWarning.value = null;
   closeRoutes();
   desk.reset();
   if (next) void desk.load();

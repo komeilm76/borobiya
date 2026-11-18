@@ -13,6 +13,9 @@ import {
   locationShares,
   missionProposals,
   missionRatings,
+  missions,
+  missionSuggestedRoutes,
+  missionTrackPoints,
   passwordResetChallenges,
   passwordResetTokens,
   userSecurityAnswers,
@@ -533,5 +536,28 @@ describe("mission_proposals table and users.is_on_mission flag (T3.3.1 / T3.4.1)
     expect(sql).toContain(
       'CREATE INDEX "mission_proposals_rescuer_status_idx" ON "mission_proposals" USING btree ("rescuer_id","status")'
     );
+  });
+});
+
+describe("private mission GPS and selected-route migrations", () => {
+  it("defaults participant visibility on and admin visibility off in schema and SQL", () => {
+    const columns = new Map(getTableConfig(missions).columns.map((column) => [column.name, column]));
+    for (const [name, value] of [["rescuer_visible_to_requester", true], ["requester_visible_to_rescuer", true],
+      ["admin_visible_to_requester", false], ["admin_visible_to_rescuer", false]] as const) {
+      expect(columns.get(name)?.default).toBe(value);
+      expect(columns.get(name)?.notNull).toBe(true);
+    }
+    const sql = readFileSync(new URL("../../drizzle/0020_private_mission_locations.sql", import.meta.url), "utf8");
+    expect(sql).toContain('"admin_visible_to_requester" boolean DEFAULT false NOT NULL');
+    expect(sql).toContain('"rescuer_visible_to_requester" boolean DEFAULT true NOT NULL');
+    expect(sql).toContain('CREATE INDEX "mission_track_points_mission_observed_idx"');
+    expect(getTableConfig(missionTrackPoints).foreignKeys).toHaveLength(2);
+  });
+  it("persists the selected preview separately from the GPS track", () => {
+    const sql = readFileSync(new URL("../../drizzle/0021_mission_suggested_route.sql", import.meta.url), "utf8");
+    expect(sql).toContain('CREATE TABLE "mission_suggested_routes"');
+    expect(sql).toContain('"mission_id" uuid PRIMARY KEY NOT NULL');
+    expect(sql).toContain('"polyline" text NOT NULL');
+    expect(getTableConfig(missionSuggestedRoutes).foreignKeys).toHaveLength(1);
   });
 });

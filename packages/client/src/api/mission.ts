@@ -110,3 +110,47 @@ export async function putMissionLocationPolicy(token: string, id: string, policy
     `/_user/missions/${encodeURIComponent(missionSchema.shape.id.parse(id))}/location-policy`,
     { method: "PUT", body: policy, accessToken: token, cache: "no-store" }));
 }
+
+const missionTracePointSchema = z.strictObject({
+  role: z.enum(["requester", "rescuer", "admin"]), lat: z.number().finite().min(-90).max(90),
+  lon: z.number().finite().min(-180).max(180),
+  accuracy: z.number().finite().nonnegative().nullable(), observedAt: z.iso.datetime({ offset: true })
+});
+const suggestedRouteSchema = z.strictObject({
+  profile: z.enum(["car", "bicycle", "foot"]), polyline: z.string().min(1).max(200_000),
+  distanceM: z.number().finite().nonnegative(), selectedAt: z.iso.datetime({ offset: true })
+});
+const tracePageSchema = z.strictObject({
+  points: z.array(missionTracePointSchema).max(1000), nextCursor: z.number().int().positive().nullable(),
+  suggestedRoute: suggestedRouteSchema.nullable()
+});
+export type MissionTracePoint = z.infer<typeof missionTracePointSchema>;
+export type MissionTrace = { points: MissionTracePoint[]; suggestedRoute: z.infer<typeof suggestedRouteSchema> | null;
+  incomplete: boolean };
+
+/** Page by durable insert ID; never silently treat a capped or failed history as a full GPS trace. */
+export async function getMissionLocationTrace(token: string, id: string, signal?: AbortSignal): Promise<MissionTrace> {
+  const path = `/_user/missions/${encodeURIComponent(missionSchema.shape.id.parse(id))}/location-trace`;
+  const points: MissionTracePoint[] = [];
+  let cursor: number | null = null;
+  let suggestedRoute: MissionTrace["suggestedRoute"] = null;
+  for (let page = 0; page < 20; page++) {
+    const result = tracePageSchema.parse(await requestJson<unknown>(
+      `${path}${cursor ? `?cursor=${cursor}` : ""}`, { accessToken: token, cache: "no-store", signal }));
+    points.push(...result.points);
+    suggestedRoute = result.suggestedRoute;
+    if (!result.nextCursor) return { points, suggestedRoute, incomplete: false };
+    if (result.nextCursor === cursor || result.points.length === 0) throw new Error("INVALID_MISSION_TRACE_CURSOR");
+    cursor = result.nextCursor;
+  }
+  return { points, suggestedRoute, incomplete: true };
+}
+
+/** Snapshot the route preview selected by the assigned rescuer when guidance starts. */
+export async function saveSuggestedMissionRoute(token: string, id: string, route: {
+  polyline: string; profile: "car" | "bicycle" | "foot"; distanceM: number
+}): Promise<void> {
+  await requestJson<unknown>(`/_user/missions/${encodeURIComponent(missionSchema.shape.id.parse(id))}/suggested-route`, {
+    method: "POST", accessToken: token, body: route
+  });
+}

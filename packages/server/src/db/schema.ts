@@ -472,6 +472,19 @@ export const missions = pgTable(
   ]
 );
 
+/** Rescuer-selected route preview captured when guidance begins; never infer a suggested
+ * route retrospectively from the actual GPS track. */
+export const missionSuggestedRoutes = pgTable("mission_suggested_routes", {
+  missionId: uuid("mission_id").primaryKey().references(() => missions.id, { onDelete: "cascade" }),
+  profile: text("profile").$type<"car" | "bicycle" | "foot">().notNull(),
+  polyline: text("polyline").notNull(),
+  distanceM: doublePrecision("distance_m").notNull(),
+  selectedAt: timestamp("selected_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  check("mission_suggested_routes_profile_check", sql`"profile" IN ('car', 'bicycle', 'foot')`),
+  check("mission_suggested_routes_distance_check", sql`"distance_m" >= 0`)
+]);
+
 /** Mission GPS is not general location history or an outgoing public share. */
 export const missionTrackPoints = pgTable("mission_track_points", {
   id: bigserial("id", { mode: "number" }).primaryKey(),

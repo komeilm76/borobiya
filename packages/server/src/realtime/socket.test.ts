@@ -76,7 +76,7 @@ it("keeps mission fixes out of public history and enforces per-recipient policy"
   const record = vi.fn(async () => ({ ...policy, role: "rescuer" as const }));
   const activePolicy = vi.fn(async () => policy);
   const dependencies = { jwtSecret, users: makeStore(userRecord()), live: { applyUpdate },
-    missionLocations: { record, policy: activePolicy, setPolicy: vi.fn(), history: vi.fn() } };
+    missionLocations: { record, policy: activePolicy, setPolicy: vi.fn(), history: vi.fn(), saveSuggestedRoute: vi.fn() } };
   const payload = { missionId, location: { lat: 35.7, lon: 51.4,
     timestamp: new Date().toISOString(), priorityDeviceId: deviceId } };
   expect(await publishMissionLocation(sender as never, payload, dependencies)).toMatchObject({ ok: true });
@@ -122,7 +122,7 @@ it("never broadcasts a fix after cancellation or a policy revocation during its 
   const dependencies = { jwtSecret, users: makeStore(userRecord()),
     live: { applyUpdate: vi.fn() },
     missionLocations: { policy: current, record: async () => ({ ...policy, role: "requester" as const }),
-      setPolicy: vi.fn(), history: vi.fn() } };
+      setPolicy: vi.fn(), history: vi.fn(), saveSuggestedRoute: vi.fn() } };
   const ack = await publishMissionLocation(sender as never, { missionId,
     location: { lat: 35.7, lon: 51.4, timestamp: new Date().toISOString(), priorityDeviceId: deviceId }
   }, dependencies);

@@ -112,7 +112,9 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('id="mission-tool-status" class="mission-desk__info-action"');
     expect(view).toContain('function dismissTool(): void {');
     expect(view).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
-    expect(view).toContain('if (navigation.start()) closeTool("route");');
+    expect(view).toContain('if (!navigation.start()) return;');
+    expect(view).toContain('closeTool("route");');
+    expect(view).toContain('saveSuggestedMissionRoute(token, missionId, {');
     expect(view).not.toContain('scrollIntoView(');
     expect(view).not.toContain("<MapCanvas");
     expect(view).toContain('<div v-if="desk.activeMission.value" id="mission-workspace"');

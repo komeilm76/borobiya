@@ -885,7 +885,45 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
         expect(recipient.map((event) => missionStatusUpdatedEventSchema.parse(event))).toEqual([payload]);
       }
       expect(received.outsider).toEqual([]);
+      const suggested = { profile: "car", polyline: "_p~iF~ps|U_ulLnnqC_mqNvxq`@", distanceM: 8500 };
+      expect((await app.inject({ method: "POST", url: `/_user/missions/${missionId}/suggested-route`,
+        headers: { authorization: `Bearer ${requesterToken}` }, payload: suggested })).statusCode).toBe(404);
+      expect((await app.inject({ method: "GET", url: `/_user/missions/${missionId}/location-trace`,
+        headers: { authorization: `Bearer ${requesterToken}` } })).statusCode).toBe(404);
+      const saved = await app.inject({ method: "POST", url: `/_user/missions/${missionId}/suggested-route`,
+        headers: { authorization: `Bearer ${await tokenFor(rescuerId, rescuerSession)}` }, payload: suggested });
+      expect(saved.statusCode, saved.body).toBe(204);
       await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [missionId]);
+      const traceUrl = `/_user/missions/${missionId}/location-trace`;
+      const requesterTrace = await app.inject({ method: "GET", url: traceUrl,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(requesterTrace.statusCode).toBe(200);
+      expect(requesterTrace.headers["cache-control"]).toBe("no-store");
+      expect(requesterTrace.json().points.map((point: { role: string }) => point.role)).toEqual(["requester"]);
+      expect(requesterTrace.json().suggestedRoute).toBeNull(); // The route reveals the hidden rescuer's origin.
+      const rescuerTrace = await app.inject({ method: "GET", url: traceUrl,
+        headers: { authorization: `Bearer ${await tokenFor(rescuerId, rescuerSession)}` } });
+      expect(rescuerTrace.json().points.map((point: { role: string }) => point.role))
+        .toEqual(["requester", "rescuer", "rescuer"]);
+      expect(rescuerTrace.json().suggestedRoute).toMatchObject(suggested);
+      const adminTrace = await app.inject({ method: "GET", url: traceUrl,
+        headers: { authorization: `Bearer ${adminToken}` } });
+      expect(adminTrace.json().points).toHaveLength(4);
+      const foreignTrace = await app.inject({ method: "GET", url: traceUrl,
+        headers: { authorization: `Bearer ${await tokenFor(outsiderId, outsiderSession)}` } });
+      expect(foreignTrace.statusCode).toBe(404);
+      await pg.query(`INSERT INTO "mission_track_points" ("mission_id", "user_id", "role", "lat", "lon", "observed_at")
+        SELECT $1, $2, 'requester', 35.7, 51.4, now() FROM generate_series(1, 1001)`, [missionId, REQUESTER_ID]);
+      const firstTrace = await app.inject({ method: "GET", url: traceUrl,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(firstTrace.json().points).toHaveLength(1000);
+      expect(firstTrace.json().nextCursor).toEqual(expect.any(Number));
+      const nextTrace = await app.inject({ method: "GET", url: `${traceUrl}?cursor=${firstTrace.json().nextCursor}`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(nextTrace.json().points).toHaveLength(2);
+      expect(nextTrace.json().nextCursor).toBeNull();
+      expect((await app.inject({ method: "POST", url: `/_user/missions/${missionId}/suggested-route`,
+        headers: { authorization: `Bearer ${await tokenFor(rescuerId, rescuerSession)}` }, payload: suggested })).statusCode).toBe(404);
       expect(await publish(rescuer, missionId, "dev-000008")).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
       expect((await listMissions()).json()).toEqual([]);
       const historyUrl = `/_user/sos/missions/${missionId}/timeline`;

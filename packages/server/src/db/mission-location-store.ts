@@ -1,6 +1,6 @@
-import { and, asc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, or } from "drizzle-orm";
 import type { Database } from "./client";
-import { missions, missionTrackPoints } from "./schema";
+import { missions, missionSuggestedRoutes, missionTrackPoints } from "./schema";
 
 const ACTIVE = ["pending", "on_the_way", "arrived", "in_progress"] as const;
 export type MissionMemberRole = "requester" | "rescuer" | "admin";
@@ -17,11 +17,18 @@ export interface MissionFix {
 export interface MissionTrackPoint {
   lat: number; lon: number; accuracy: number | null; observedAt: string; role: MissionMemberRole;
 }
+export interface SuggestedMissionRoute {
+  profile: "car" | "bicycle" | "foot"; polyline: string; distanceM: number; selectedAt: string;
+}
+export interface MissionTracePage {
+  points: MissionTrackPoint[]; nextCursor: number | null; suggestedRoute: SuggestedMissionRoute | null;
+}
 export interface MissionLocationStore {
   record(input: MissionFix): Promise<({ role: MissionMemberRole; requesterId: string; rescuerId: string } & MissionPolicy) | null>;
   policy(missionId: string, userId: string, accountRole: "user" | "admin"): Promise<({ requesterId: string; rescuerId: string } & MissionPolicy) | null>;
   setPolicy(missionId: string, policy: MissionPolicy): Promise<MissionPolicy | null>;
-  history(missionId: string, userId: string, accountRole: "user" | "admin", limit: number): Promise<MissionTrackPoint[] | null>;
+  saveSuggestedRoute(missionId: string, rescuerId: string, input: Omit<SuggestedMissionRoute, "selectedAt">): Promise<boolean>;
+  history(missionId: string, userId: string, accountRole: "user" | "admin", limit: number, cursor?: number): Promise<MissionTracePage | null>;
 }
 
 const columns = { requesterId: missions.requesterId, rescuerId: missions.rescuerId,
@@ -67,8 +74,20 @@ export class DrizzleMissionLocationStore implements MissionLocationStore {
       adminVisibleToRescuer: row.adminVisibleToRescuer } : null;
   }
 
-  async history(missionId: string, userId: string, accountRole: "user" | "admin", limit: number) {
-    // Authorization occurs before any coordinates are read. No general share grants this access.
+  async saveSuggestedRoute(missionId: string, rescuerId: string, input: Omit<SuggestedMissionRoute, "selectedAt">) {
+    return this.db.transaction(async (tx) => {
+      const [mission] = await tx.select({ status: missions.status }).from(missions)
+        .where(and(eq(missions.id, missionId), eq(missions.rescuerId, rescuerId))).for("share");
+      if (!mission || !ACTIVE.includes(mission.status as typeof ACTIVE[number])) return false;
+      await tx.insert(missionSuggestedRoutes).values({ missionId, ...input, selectedAt: new Date() })
+        .onConflictDoUpdate({ target: missionSuggestedRoutes.missionId,
+          set: { ...input, selectedAt: new Date() } });
+      return true;
+    });
+  }
+
+  async history(missionId: string, userId: string, accountRole: "user" | "admin", limit: number, cursor = 0) {
+    // Authorization occurs before any coordinates or route geometry are read.
     const [mission] = await this.db.select({ ...columns, status: missions.status }).from(missions)
       .where(and(eq(missions.id, missionId), accountRole === "admin" ? undefined :
         or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId)))).limit(1);
@@ -78,12 +97,21 @@ export class DrizzleMissionLocationStore implements MissionLocationStore {
         ...(mission.adminVisibleToRequester ? ["admin" as const] : [])] :
         ["rescuer", ...(mission.requesterVisibleToRescuer ? ["requester" as const] : []),
           ...(mission.adminVisibleToRescuer ? ["admin" as const] : [])];
-    const rows = await this.db.select({ lat: missionTrackPoints.lat, lon: missionTrackPoints.lon,
+    const rows = await this.db.select({ id: missionTrackPoints.id, lat: missionTrackPoints.lat, lon: missionTrackPoints.lon,
       accuracy: missionTrackPoints.accuracy, observedAt: missionTrackPoints.observedAt,
       role: missionTrackPoints.role })
       .from(missionTrackPoints).where(and(eq(missionTrackPoints.missionId, missionId),
-        inArray(missionTrackPoints.role, permitted)))
-      .orderBy(asc(missionTrackPoints.observedAt), asc(missionTrackPoints.id)).limit(limit);
-    return rows.map((row) => ({ ...row, observedAt: row.observedAt.toISOString() }));
+        inArray(missionTrackPoints.role, permitted), gt(missionTrackPoints.id, cursor)))
+      .orderBy(asc(missionTrackPoints.id)).limit(limit + 1);
+    const [route] = await this.db.select({ profile: missionSuggestedRoutes.profile, polyline: missionSuggestedRoutes.polyline,
+      distanceM: missionSuggestedRoutes.distanceM, selectedAt: missionSuggestedRoutes.selectedAt })
+      .from(missionSuggestedRoutes).where(eq(missionSuggestedRoutes.missionId, missionId)).limit(1);
+    const selected = rows.slice(0, limit);
+    return { points: selected.map(({ id: _id, ...row }) => ({ ...row, observedAt: row.observedAt.toISOString() })),
+      nextCursor: rows.length > limit ? selected.at(-1)!.id : null,
+      // The selected route begins at the rescuer's position; never return it to a
+      // requester whose rescuer location is hidden, even after completion.
+      suggestedRoute: route && (accountRole === "admin" || userId === mission.rescuerId ||
+        mission.rescuerVisibleToRequester) ? { ...route, selectedAt: route.selectedAt.toISOString() } : null };
   }
 }
