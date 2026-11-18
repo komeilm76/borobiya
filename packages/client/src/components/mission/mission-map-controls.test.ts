@@ -154,7 +154,8 @@ describe("mission map controls", () => {
     expect(room).toContain(':id="fullscreen ? \'mission-team-panel\' : undefined"');
     expect(room).toContain('aria-label="بستن پنل اعضای مأموریت"');
     expect(missionMap).toContain('<template #team>');
-    expect(room).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
-    expect(missionMap).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(room).toContain('inset: auto 0 0; width: 100%;');
+    expect(missionMap).toContain('.mission-desk--docked-tool .mission-desk__info-action {');
+    expect(missionMap).toContain('.mission-desk--active.mission-desk--docked-tool .mission-desk__map-focus,');
   });
 });

@@ -596,6 +596,9 @@ a {
   .app-shell--map:has(.user-map-view--mission-steps) .sos-fab.sos-fab {
     inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
   }
+  .app-shell--map:has(.user-map-view--mission-docked) .sos-fab.sos-fab {
+    inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
+  }
 }
 
 :root.dark {

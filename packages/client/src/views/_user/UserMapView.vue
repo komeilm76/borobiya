@@ -6,6 +6,7 @@
     'user-map-view--mission-offer-preview': mode === 'missions' && !!missionWorkspace?.hasOfferPreview,
     'user-map-view--mission-tool-open': mode === 'missions' && !!missionWorkspace?.hasOpenMapTool,
     'user-map-view--mission-steps': mode === 'missions' && !!missionWorkspace?.hasStepsSheet,
+    'user-map-view--mission-docked': mode === 'missions' && !!missionWorkspace?.hasDockedToolSheet,
     'user-map-view--route-preview': mode === 'trips' && journey.sheetOpen.value && !!journey.point.value,
     'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
@@ -2943,6 +2944,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view--mission-steps .user-map-view__search-action {
     inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
   }
+  .user-map-view--mission-docked .user-map-view__search-action {
+    inset-block-end: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
+  }
 
   .user-map-view__panel {
     position: static;
@@ -3003,6 +3007,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 7.5rem);
     right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
+  .user-map-view--mission-active.user-map-view--mission-docked
+    .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 4rem);
+    right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-active.user-map-view--mission-docked .user-map-view__share {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + 7.5rem);
+    right: calc(.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
 }
 @media (max-width: 599px) and (max-height: 420px) {
   /* A trip dock plus three vertical rows cannot fit below the tabs in
@@ -3022,6 +3035,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
   }
   .user-map-view--mission-steps:has(.mission-desk__map-focus--pair) .user-map-view__share {
+    right: calc(11.25rem + env(safe-area-inset-right, 0px));
+  }
+  .user-map-view--mission-docked .user-map-view__share {
+    bottom: min(calc(var(--bb-map-mission-sheet-height, 15rem) + 7.5rem),
+      calc(100dvh - 7.5rem - env(safe-area-inset-top, 0px)));
+    right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--mission-docked:has(.mission-desk__map-focus--pair) .user-map-view__share {
     right: calc(11.25rem + env(safe-area-inset-right, 0px));
   }
 }

@@ -18,7 +18,8 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('if (routing.from.value) void routing.findRoutes();'); // No GPS prompt before explicit route action.
     expect(transport).toContain('v-for="mode in transportOptions"');
     expect(transport).toContain('watch([() => props.open, () => props.api?.point.value ?? props.missionId]');
-    expect(view).toContain('.mission-desk__workspace :deep(.point-transport-choices-shell) {\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(view).toContain('.mission-desk__workspace :deep(.point-transport-choices-shell) {\n    bottom: 0; z-index: 11;');
+    expect(transport).toContain('.point-transport-choices-shell--mission .point-transport-choices.bb-map-navigation-card {');
   });
 
   it("states the actual mission outcome and keeps optional stops out of the primary route path", () => {

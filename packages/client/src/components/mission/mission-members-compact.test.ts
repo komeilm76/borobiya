@@ -32,8 +32,10 @@ describe("compact mission member profiles", () => {
     expect(css).toContain('overflow: hidden; backdrop-filter: blur(12px);');
     expect(source).toContain('aria-label="فهرست اعضای مأموریت" tabindex="0"');
     expect(css).toContain('.live-panel__member-list:focus-visible, .live-panel__member:focus-visible');
-    expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
-    expect(css).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('inset: auto 0 0; width: 100%;');
+    expect(css).toContain('padding: .65rem max(.75rem, env(safe-area-inset-right, 0px)) calc(.65rem + env(safe-area-inset-bottom, 0px))');
+    expect(css).toContain('border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0;');
+    expect(css).toContain('.live-panel--fullscreen .live-panel__member-list { max-height: none; flex: 0 1 auto; }');
     expect(compileStyle({ source: css, filename: "MissionLivePanel.vue", id: "members", scoped: true }).errors).toEqual([]);
   });
 });

@@ -44,7 +44,7 @@ describe("mission steps beside Navigate's bottom dock", () => {
     expect(steps).toContain('border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0;');
     expect(steps).toContain('.mission-desk--steps-visible #mission-steps-stack {'); // Beats short-phone cap.
     expect(mission).toContain('observer.observe(element);');
-    expect(mission).toContain('window.innerHeight - element.getBoundingClientRect().top');
+    expect(mission).toContain('window.innerHeight - rect.top');
     expect(mission).toContain('document.documentElement.style.removeProperty("--bb-map-mission-sheet-height")');
     expect(mission).toContain('hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value)');
     expect(mission).toContain("'mission-desk--steps-guidance': !!desk.activeMission.value");

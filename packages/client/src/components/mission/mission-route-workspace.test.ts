@@ -31,13 +31,13 @@ describe("mission route workspace on a map", () => {
     expect(css).toContain('.mission-desk--active .mission-route { display: flex; flex-direction: column;');
     expect(css).toContain('.mission-route__header :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }');
   });
-  it("gives only the open route sheet usable height on short phones without changing map or SOS", () => {
+  it("docks the route sheet on short phones and scrolls its content without hiding map or SOS", () => {
     expect(page).toContain("'mission-desk--route-open': !!desk.activeMission.value && activeTool === 'route' && routeSection !== 'transport'");
     expect(css).toContain('@media (max-width: 599px) and (max-height: 560px)');
     expect(css).toContain('.mission-desk--route-open .mission-route {');
-    expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
-    expect(css).toContain('bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
-    expect(css).toContain('max-height: none;');
+    expect(css).toContain('.mission-desk--route-open .mission-route {\n    top: auto; bottom: 0;');
+    expect(css).toContain('.mission-desk--active .mission-route:has(.mission-route__route-details[open]) .mission-route__body--plan {\n    overflow-y: auto;');
+    expect(css).toContain('max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem');
     expect(page).not.toContain('mission-desk__map-heading');
     expect(css).toContain('.mission-desk--route-open .mission-desk__guidance { visibility: hidden; }');
     expect(css).toContain('.mission-desk--route-open .mission-route__emblem { display: none; }');
@@ -45,7 +45,7 @@ describe("mission route workspace on a map", () => {
     expect(page).toContain('class="mission-desk__header-actions"');
     expect(page).toContain('<MissionLivePanel :mission="desk.activeMission.value" fullscreen');
     expect(compileStyle({ filename: "UserMissionView.vue", id: "route-workspace", scoped: true, source: css }).errors).toEqual([]);
-    // At 320px with no cutouts, the sheet has 156px rather than a 5rem (80px) sliver.
-    expect(320 - .75 * 16 - 9.5 * 16).toBe(156);
+    // At 320px with no cutouts, the dock retains 112px and a visible map lane.
+    expect(Math.max(7 * 16, 320 - 14 * 16)).toBe(112);
   });
 });

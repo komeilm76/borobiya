@@ -2,6 +2,7 @@
   <main class="mission-desk" :class="{ 'mission-desk--embedded': embedded, 'mission-desk--active': desk.activeMission.value,
     'mission-desk--terminal-hold': !!desk.terminalHold.value,
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
+    'mission-desk--docked-tool': !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint && (activeTool === 'route' || activeTool === 'team'),
     'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint,
     'mission-desk--steps-guidance': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint &&
       (navigation.active.value || !!routing.error.value || !!navigation.error.value || !!routeSaveWarning),
@@ -496,11 +497,12 @@ function toggleLegend(): void {
 }
 watch(activeTool, (tool) => { if (tool === "route" || tool === "team") legendOpen.value = false; });
 watch(() => desk.terminalHold.value, (held) => { if (held) legendOpen.value = false; });
-// Match the Navigate tab's bottom sheet. Its content and legend can grow, so
-// measure their actual viewport height before positioning the external SOS,
-// Search and in-map icon rails. Clear the shared variable on every exit path.
-watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
-  () => desk.terminalHold.value, legendOpen, pickingWaypoint], async (_values, _previous, onCleanup) => {
+const routeSection = ref<RouteWorkspaceSection | "stops">("plan");
+// Measure the visible phone sheet (steps, members or route configuration),
+// including its safe-area inset. Search, SOS and camera rails share one height;
+// never leave a stale measurement when switching tools or leaving Missions.
+watch([() => props.visible, () => desk.activeMission.value?.id, activeTool, routeSection,
+  () => routing.visible.value, () => desk.terminalHold.value, legendOpen, pickingWaypoint], async (_values, _previous, onCleanup) => {
   let disposed = false;
   let observer: ResizeObserver | undefined;
   let onResize: (() => void) | undefined;
@@ -510,13 +512,24 @@ watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
     if (onResize) window.removeEventListener("resize", onResize);
     document.documentElement.style.removeProperty("--bb-map-mission-sheet-height");
   });
-  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || activeTool.value || pickingWaypoint.value) return;
+  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || pickingWaypoint.value || activeTool.value === 'status') return;
+  if (activeTool.value && window.innerWidth >= 600) return;
   await nextTick();
   if (disposed) return;
-  const element = document.getElementById("mission-steps-stack");
+  const sheetId = activeTool.value === 'team' ? 'mission-team-panel' : activeTool.value === 'route'
+    ? routeSection.value === 'transport' ? 'map-point-transport-choices-sheet' : 'mission-route-panel'
+    : 'mission-steps-stack';
+  const element = document.getElementById(sheetId);
   if (!element) return;
-  const update = () => document.documentElement.style.setProperty("--bb-map-mission-sheet-height",
-    `${Math.ceil(window.innerHeight - element.getBoundingClientRect().top)}px`);
+  const update = () => {
+    if (activeTool.value && window.innerWidth >= 600) {
+      document.documentElement.style.removeProperty('--bb-map-mission-sheet-height');
+      return;
+    }
+    const rect = element.getBoundingClientRect();
+    if (rect.height && rect.width) document.documentElement.style.setProperty('--bb-map-mission-sheet-height',
+      `${Math.ceil(window.innerHeight - rect.top)}px`);
+  };
   update();
   observer = new ResizeObserver(update);
   observer.observe(element);
@@ -526,7 +539,6 @@ watch([() => props.visible, () => desk.activeMission.value?.id, activeTool,
 // Like the companion map, planning, transport and alternatives are separate views.
 // The chooser snapshots the selected route: tapping previews, Accept commits, Back restores.
 const routeWorkspace = createMissionRouteWorkspace((index) => routing.selectRoute(index));
-const routeSection = ref<RouteWorkspaceSection | "stops">("plan");
 const routeDeleteConfirmOpen = ref(false);
 function closeRouteSection(restore = true): void {
   if (restore) routeWorkspace.close(); else routeWorkspace.reset();
@@ -603,6 +615,7 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 defineExpose({ addSearchWaypoint, hasOfferPreview: computed(() => offerDetailOpen.value && !desk.activeMission.value),
   hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
+  hasDockedToolSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint.value && (activeTool.value === 'team' || activeTool.value === 'route')),
   hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value),
   hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value && !pickingWaypoint.value &&
     (!activeTool.value || activeTool.value === 'status')) });
@@ -1648,27 +1661,31 @@ onBeforeUnmount(() => {
   .mission-desk--active .mission-route {
     inset-inline: .75rem; width: auto;
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    /* One generous scroll surface, clear of top tabs and guidance above and
-       SOS/camera/dock actions below. */
+    /* The standalone mission card stays clear of tabs and map actions;
+       the route planner is overridden below to dock against the phone edge. */
     max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
-  .mission-desk--active .mission-route {
-    width: auto;
-    max-height: min(48dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-  }
-  .mission-desk--active .mission-route--editor { max-height: min(56dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
-  .mission-route__emblem { display: none; }
-  .mission-desk--active .mission-route:has(.mission-route__route-details[open]) {
-    max-height: min(74dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  /* Route configuration docks exactly where stages dock. Keep the header and
+     decision accessible while long details/alternatives scroll inside. */
+  .mission-desk--active .mission-route,
+  .mission-desk--active .mission-route--editor,
+  .mission-desk--active .mission-route:has(.mission-route__route-details[open]),
   .mission-desk--active .mission-route:has(.mission-route__advanced[open]) {
-    top: calc(.75rem + env(safe-area-inset-top, 0px)); max-height: none; }
-  /* The shared vehicle sheet sits above SOS on the private mission map. */
-  .mission-desk__workspace :deep(.point-transport-choices-shell) {
-    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    z-index: 11;
+    inset: auto 0 0; width: 100%; top: auto;
+    max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    padding: .7rem max(.75rem, env(safe-area-inset-right, 0px)) calc(.7rem + env(safe-area-inset-bottom, 0px)) max(.75rem, env(safe-area-inset-left, 0px));
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
   }
-  /* Bottom sheet fills the map width; camera, info and SOS retain the
-     clear row below it while route stays in the steps header. */
+  .mission-desk--active .mission-route:has(.mission-route__route-details[open]) .mission-route__body--plan {
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  .mission-route__emblem { display: none; }
+  /* Vehicle choice is the next view of the same bottom-anchored planner. */
+  .mission-desk__workspace :deep(.point-transport-choices-shell) {
+    bottom: 0; z-index: 11;
+  }
+  /* The stage and tool sheets fill the map width; camera, Info and SOS move
+     above the active sheet while Route stays in the stages header. */
   .mission-desk__info-action, .mission-desk__legend-action { left: calc(.75rem + env(safe-area-inset-left, 0px)); }
   .mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: min(60dvh, calc(100dvh - 15rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
@@ -1682,6 +1699,17 @@ onBeforeUnmount(() => {
     border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* The tool replaces stages, but the map/Information controls must not sit
+     behind its edge-to-edge sheet. Its measured height includes the home inset. */
+  .mission-desk--docked-tool .mission-desk__info-action {
+    bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
+  }
+  .mission-desk--active.mission-desk--docked-tool .mission-desk__map-focus,
+  .mission-desk--active.mission-desk--docked-tool .mission-desk__map-focus--pair {
+    top: auto; bottom: calc(var(--bb-map-mission-sheet-height, 15rem) + .5rem);
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+  }
+  .mission-desk--active.mission-desk--docked-tool .mission-desk__map-focus--pair :deep(.v-btn:last-child) { bottom: 3.5rem; }
   .mission-desk__bottom-stack--information {
     max-height: min(19rem, 70dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
   .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
@@ -1803,18 +1831,23 @@ onBeforeUnmount(() => {
     top: calc(4.5rem + env(safe-area-inset-top, 0px));
     max-height: max(6rem, calc(100dvh - 10.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
-  .mission-desk--active .mission-desk__card,
-  .mission-desk--active .mission-route {
+  .mission-desk--active .mission-desk__card {
     top: calc(.75rem + env(safe-area-inset-top, 0px));
     bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
     max-height: none;
   }
+  /* A short phone keeps the route dock below the map controls, with internal
+     scrolling instead of lifting the whole sheet away from the bottom. */
+  .mission-desk--active .mission-route,
+  .mission-desk--active .mission-route--editor {
+    top: auto; bottom: 0;
+    max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
   /* The tool's own close header replaces the stage sheet on short screens;
-     the map, SOS and camera actions remain available beneath the sheet. */
+     the map, SOS and camera actions remain available above the sheet. */
   .mission-desk--route-open .mission-route {
-    top: calc(.75rem + env(safe-area-inset-top, 0px));
-    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: none;
+    top: auto; bottom: 0;
+    max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
   }
 
   .mission-desk--route-open .mission-desk__guidance { visibility: hidden; }

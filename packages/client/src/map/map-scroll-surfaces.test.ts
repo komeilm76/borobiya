@@ -74,17 +74,14 @@ describe("map workspace scroll ownership", () => {
     expect(mission).toContain('v-if="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === \'status\')"');
     expect(css).toContain('max-height: calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));\n    max-height: none;');
-    expect(team).toContain('max-height: min(15.5rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));');
-    expect(team).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));\n    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
-    // Tools replace the progress sheet while the camera/SOS strip remains clear.
-    for (const height of [561, 667, 800]) {
-      const panelTop = height - 9.5 * 16 - (height - 19 * 16);
-      expect(panelTop).toBeGreaterThanOrEqual(9 * 16);
-    }
-    for (const height of [320, 360, 560]) {
-      const panelBottom = height - 9.5 * 16;
-      const cameraTop = height - 5.75 * 16 - 48;
-      expect(cameraTop - panelBottom).toBeGreaterThanOrEqual(12);
+    expect(team).toContain('inset: auto 0 0; width: 100%;');
+    expect(team).toContain('max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem');
+    expect(css).toContain('.mission-desk--docked-tool .mission-desk__info-action {');
+    // The edge-to-edge tools use the same bounded map lane as steps;
+    // Search and SOS move above the measured dock rather than sitting beneath it.
+    for (const height of [320, 360, 560, 800]) {
+      const sheet = Math.min(.65 * height, 32 * 16, Math.max(7 * 16, height - 14 * 16));
+      expect(height - sheet).toBeGreaterThanOrEqual(Math.min(height - 7 * 16, 14 * 16));
     }
     expect(team).toContain('.live-panel__member-list { list-style: none;');
     expect(team).toContain('overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;');

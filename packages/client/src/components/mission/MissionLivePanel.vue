@@ -402,18 +402,15 @@ onBeforeUnmount(() => {
   overflow: hidden; backdrop-filter: blur(12px);
 }
 @media (max-width: 599px) {
+  /* The same edge-to-edge phone dock as Mission steps; only the member list
+     scrolls. Keep the home inset inside the sheet, not a dead map strip. */
   .live-panel--fullscreen .live-panel__members {
-    inset-inline: .75rem; width: auto; max-height: min(15.5rem, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    inset: auto 0 0; width: 100%;
+    max-height: min(65dvh, 32rem, max(7rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+    padding: .65rem max(.75rem, env(safe-area-inset-right, 0px)) calc(.65rem + env(safe-area-inset-bottom, 0px)) max(.75rem, env(safe-area-inset-left, 0px));
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0;
   }
-}
-@media (max-width: 599px) and (max-height: 560px) {
-  .live-panel--fullscreen .live-panel__members {
-    top: calc(.75rem + env(safe-area-inset-top, 0px));
-    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: none;
-  }
-  .live-panel--fullscreen .live-panel__member-list { max-height: none; flex: 1 1 auto; }
+  .live-panel--fullscreen .live-panel__member-list { max-height: none; flex: 0 1 auto; }
 }
 
 :global(:root.dark .live-panel__member:not(:disabled):hover) { background: var(--bb-color-inset); }
