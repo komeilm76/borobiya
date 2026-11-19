@@ -23,11 +23,12 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     const desktop = source.split("<style scoped>")[1]!.split("@media (max-width: 1279px)")[0]!;
     expect(desktop).toMatch(/\.map-selected-alert-card \{\s*position: absolute;/);
     expect(desktop).toContain('top: .75rem; left: .75rem; right: auto;');
-    expect(desktop).toMatch(/\.severity-legend \{\s*position: absolute;/);
+    expect(desktop).not.toContain('.severity-legend');
+    expect(desktop).toContain('.dispatch-map-choices { position: absolute;');
     const stacked = source.split("@media (max-width: 1279px) {")[1]!.split("@media (max-width: 599px)")[0]!;
     expect(stacked).toMatch(/\.dispatch-map-wrapper \{[^}]*display: flex;[^}]*height: auto;/);
     expect(stacked).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(17rem, 40dvh, 22rem\);[^}]*min-height: 17rem;/);
-    expect(stacked).toMatch(/\.severity-legend \{[^}]*position: static;/);
+    expect(stacked).toContain('.dispatch-map-choices { position: static;');
     expect(stacked).not.toMatch(/\.map-selected-alert-card \{[^}]*position: static;/);
     expect(source.indexOf('class="map-selected-alert-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
     expect(source).toContain("'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'");

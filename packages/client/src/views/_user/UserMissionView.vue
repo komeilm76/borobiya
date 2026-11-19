@@ -853,7 +853,7 @@ function syncRouteMap(): void {
   // One incident mark also represents route destination B; do not stack two
   // identical-coordinate pins or hide the SOS beneath a second endpoint.
   const incidentPin = createMapPointElement("sos", "مقصد نهایی مسیر؛ باز کردن برنامهٔ مسیر", {
-    onActivate: () => { if (!pickingWaypoint.value) openRouteWorkspace(); }
+    caption: "حادثه", onActivate: () => { if (!pickingWaypoint.value) openRouteWorkspace(); }
   });
   incidentPin.classList.add("mission-desk__incident-pin");
   incidentPin.setAttribute("aria-disabled", String(pickingWaypoint.value));

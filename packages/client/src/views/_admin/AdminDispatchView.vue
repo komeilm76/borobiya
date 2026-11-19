@@ -368,15 +368,6 @@
                   @click="activateMapChoice(choice)">{{ choice.label }}</button>
               </div>
             </div>
-            <details class="severity-legend" aria-label="راهنمای نشانگرهای نقشه">
-              <summary>نقاط نقشه</summary>
-              <MapPointKey :kinds="nearbyFeatures.features.length ? ['sos', 'nearby'] : ['sos']" />
-              <div class="severity-legend__severities" aria-label="شدت حادثه">
-                <span class="legend-item"><span class="legend-dot legend-dot--high" /> بحرانی</span>
-                <span class="legend-item"><span class="legend-dot legend-dot--medium" /> متوسط</span>
-                <span class="legend-item"><span class="legend-dot legend-dot--low" /> کم‌خطر</span>
-              </div>
-            </details>
           </div>
         </v-card>
         <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
@@ -648,7 +639,6 @@ import {
   SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
 import MapCanvas from "@/components/map/MapCanvas.vue";
-import MapPointKey from "@/components/map/MapPointKey.vue";
 import { MAP_POINT_META } from "@/components/map/map-point";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue";
@@ -667,9 +657,11 @@ const SOS_SOURCE_ID = "admin-sos-requests";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
 const SOS_GLYPH_LAYER_ID = "admin-sos-glyph";
+const SOS_TITLE_LAYER_ID = "admin-sos-selected-title";
 const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
+const RESPONDER_NAME_LAYER_ID = "admin-sos-nearby-rescuers-name";
 const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
 const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
 type MapPointChoice = { kind: "sos" | "responder" | "cluster"; id: string; label: string;
@@ -866,6 +858,15 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
       "text-size": 18, "text-allow-overlap": true },
     paint: { "text-color": palette.onPrimary }
   }, before);
+  if (!map.getLayer(RESPONDER_NAME_LAYER_ID)) map.addLayer({
+    id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
+    filter: ["!", ["has", "point_count"]],
+    layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 13, "text-anchor": "left", "text-offset": [1.4, 0],
+      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-max-width": 9,
+      "text-optional": true },
+    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 2 }
+  }, before);
   if (!map.getLayer(RESPONDER_COUNT_LAYER_ID)) map.addLayer({
     id: RESPONDER_COUNT_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["has", "point_count"],
@@ -876,7 +877,14 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
 }
 
 function ensureSosMapLayers(map: MapLibreMap): void {
-  const data = buildSosAlertsGeoJson(adminSos.visibleRequests, adminSos.selectedId);
+  const selected = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+  const alerts = buildSosAlertsGeoJson(adminSos.visibleRequests, adminSos.selectedId);
+  // No repeated "incident"/severity text before selection. Only the selected
+  // SOS carries its actual category title; all others remain colored marks.
+  const data = { ...alerts, features: alerts.features.map((feature) => ({
+    ...feature, properties: { ...feature.properties,
+      mapTitle: selected && feature.id === selected.id ? incidentLabel(selected.incidentTypeId) : "" }
+  })) };
   const existingSource = map.getSource(SOS_SOURCE_ID) as GeoJSONSource | undefined;
   if (!existingSource) {
     map.addSource(SOS_SOURCE_ID, {
@@ -919,6 +927,14 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       "text-size": 16, "text-allow-overlap": true },
     paint: { "text-color": "#ffffff" }
   });
+  if (!map.getLayer(SOS_TITLE_LAYER_ID)) map.addLayer({
+    id: SOS_TITLE_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], true],
+    layout: { "text-field": ["get", "mapTitle"], "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 14, "text-anchor": "left", "text-offset": [1.5, 0],
+      "text-allow-overlap": true, "text-max-width": 10 },
+    paint: { "text-color": "#143038", "text-halo-color": "#ffffff", "text-halo-width": 3 }
+  });
 }
 
 function syncMapData(): void {
@@ -939,8 +955,9 @@ function restoreMapLayers(): void {
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
   }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID],
-  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
-    RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
+  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,
+    RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,
+    RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
   syncMapData();
@@ -1129,6 +1146,7 @@ function onMapReady(map: MapLibreMap): void {
 
 let pendingDeepLinkId: string | null = null;
 
+watch(incidentNameById, syncMapData);
 watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); });
 watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const, () => { mapPointChoices.value = []; });
 // Keep the incident visible when its qualified suggestions arrive; selection
@@ -1462,55 +1480,8 @@ onBeforeUnmount(() => {
 .dispatch-map-choices__items button { display: block; width: 100%; text-align: start;
   padding: .35rem .5rem; font-size: .82rem; }
 .dispatch-map-choices__items button:hover { background: var(--bb-color-inset); }
-.severity-legend {
-  position: absolute;
-  bottom: 12px;
-  inset-inline-start: 12px;
-  z-index: 2;
-  display: block;
-  max-width: min(18rem, calc(100% - 1.5rem));
-  padding: .15rem .7rem;
-  border: 1px solid var(--bb-color-outline);
-  border-radius: var(--bb-radius-nested, 16px);
-  background: rgb(var(--v-theme-surface));
-  color: rgb(var(--v-theme-on-surface));
-  box-shadow: var(--bb-shadow-overlay);
-  font-size: .8rem;
-}
-.severity-legend summary { min-height: 44px; display: flex; align-items: center;
-  font-weight: 800; cursor: pointer; }
-.severity-legend summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
-.severity-legend :deep(.bb-point-key) { padding: .2rem 0 .45rem; }
-.severity-legend__severities { display: flex; flex-wrap: wrap; gap: .45rem .7rem;
-  border-top: 1px solid var(--bb-color-outline); padding: .4rem 0 .45rem; }
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.legend-dot--high {
-  background: #dc2626;
-}
-
-.legend-dot--medium {
-  background: #d97706;
-}
-
-.legend-dot--low {
-  background: #0284c7;
-}
-
 /* Vuetify's lg columns start at 1280px. Below that width the queue and map
- * stack; the compact recenter action stays inside the map and the legend
- * follows the canvas in normal flow. */
+ * stack; the compact recenter action stays inside the map. */
 @media (max-width: 1279px) {
   .dispatch-map-wrapper { display: flex; flex-direction: column; height: auto; min-height: 0; gap: 0.75rem; }
   .dispatch-map-wrapper > :deep(.map-canvas) {
@@ -1520,14 +1491,7 @@ onBeforeUnmount(() => {
   }
   .dispatch-map-choices { position: static; max-height: 12rem; width: calc(100% - 1.5rem);
     align-self: center; }
-  .severity-legend {
-    position: static;
-    z-index: auto;
-    align-self: flex-start;
-    flex-wrap: wrap;
-    margin: 0 0.75rem 0.75rem;
-    border: 0; background: var(--bb-color-inset); box-shadow: none;
-  }
+
 }
 
 @media (max-width: 959px) {

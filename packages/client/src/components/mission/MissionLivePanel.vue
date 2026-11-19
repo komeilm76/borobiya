@@ -237,8 +237,11 @@ function syncMarkers(): void {
     if (op.kind === "remove") continue;
     // Role silhouette and letter are readable without consulting a color key.
     // Freshness remains explicit in the accessible name, not implied by opacity.
+    const caption = role === "rescuer"
+      ? auth.user?.id === props.mission.rescuerId ? "خودم" : "امدادگر"
+      : role === "admin" ? "مرکز" : undefined;
     const element = createMapPointElement(role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester",
-      op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی");
+      op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی", { caption });
     element.style.opacity = op.next.fresh ? "1" : "0.6";
     const marker = new MarkerClass({ element, anchor: "center" })
       .setLngLat([op.next.lon, op.next.lat]).addTo(instance);

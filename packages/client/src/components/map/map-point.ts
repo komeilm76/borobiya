@@ -16,6 +16,8 @@ export const MAP_POINT_META: Record<MapPointKind, { label: string; glyph: string
 /** MapLibre owns the marker DOM. Never mount a second Vue app/canvas per pin. */
 export function createMapPointElement(kind: MapPointKind, detail: string, options: {
   number?: number;
+  /** Short visible name; never place verbose details or status on the map. */
+  caption?: string;
   onActivate?: () => void;
 } = {}): HTMLElement {
   const interactive = Boolean(options.onActivate);
@@ -24,13 +26,21 @@ export function createMapPointElement(kind: MapPointKind, detail: string, option
   element.className = `bb-map-point bb-map-point--${kind}`;
   const name = kind === "stop" && options.number
     ? `${MAP_POINT_META.stop.label} ${options.number.toLocaleString("fa-IR")}` : MAP_POINT_META[kind].label;
-  element.setAttribute("aria-label", detail ? `${name}؛ ${detail}` : name);
+  element.setAttribute("aria-label", `${name}${options.caption ? `، ${options.caption}` : ""}${detail ? `؛ ${detail}` : ""}`);
   if (!interactive) element.setAttribute("role", "img");
   const sign = document.createElement("span");
   sign.className = "bb-map-point__sign";
   sign.textContent = kind === "stop" && options.number ? options.number.toLocaleString("fa-IR") : MAP_POINT_META[kind].glyph;
   sign.setAttribute("aria-hidden", "true");
   element.append(sign);
+  if (options.caption) {
+    const caption = document.createElement("span");
+    caption.className = "bb-map-point__caption";
+    caption.dir = "auto";
+    caption.textContent = options.caption; // Never interpret a username as HTML.
+    caption.setAttribute("aria-hidden", "true"); // The marker's accessible name is complete above.
+    element.append(caption);
+  }
   if (interactive) {
     const tooltip = document.createElement("span");
     tooltip.className = "bb-map-point__tooltip";

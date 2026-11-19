@@ -367,6 +367,8 @@ describe("hold-to-select destination and map navigation", () => {
 
   it("keeps the selected pin, route and private GPS arrow on the full map", () => {
     expect(body("syncDestinationMarker")).toContain('createMapPointElement("end", "نمایش جزئیات مسیر"');
+    expect(body("syncDestinationMarker")).toContain('caption: "مقصد"');
+    expect(body("syncRouteOriginMarker")).toContain('caption: "مبدأ"');
     expect(body("syncDestinationMarker")).toContain('aria-controls');
     expect(body("syncRouteOriginMarker")).toContain('مبدأ مسیر انتخابی');
     expect(body("paintPointRoute")).toContain('type: "line"');

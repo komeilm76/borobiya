@@ -52,13 +52,19 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("[adminSos.nearestRequestId, adminSos.nearestLoaded]");
     expect(viewSource).toContain("if (nearbyFeatures.value.features.length) frameSelectedIncident()");
     expect(viewSource).toContain("[SOS_SOURCE_ID, RESPONDER_SOURCE_ID]");
-    expect(viewSource).toContain("[SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,");
-    expect(viewSource).toContain("RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID]");
+    expect(viewSource).toContain("[SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,");
+    expect(viewSource).toContain("RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,");
     expect(viewSource).toContain("cluster: true, clusterRadius: 42, clusterMaxZoom: 18");
     expect(viewSource).toContain("getClusterExpansionZoom(choice.clusterId)");
     expect(viewSource).toContain('aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه"');
     expect(viewSource).toContain('nearbyFeatures.value.features.some((feature) => feature.id === choice.id)');
-    expect(viewSource).toContain("MapPointKey :kinds=");
+    expect(viewSource).not.toContain('class="severity-legend"');
+    expect(viewSource).toContain('mapTitle: selected && feature.id === selected.id ? incidentLabel(selected.incidentTypeId) : ""');
+    expect(viewSource).toContain('"text-field": ["get", "username"]');
+    expect(viewSource).toContain('"text-field": ["get", "mapTitle"]');
+    expect(viewSource).toContain('filter: ["==", ["get", "isSelected"], true]');
+    expect(viewSource).toContain('filter: ["!", ["has", "point_count"]]');
+    expect(viewSource).not.toContain('راهنمای رنگ شدت حادثه');
     expect(viewSource).toContain("آخرین موقعیت ثبت‌شده‌اند؛ موقعیت زنده نیستند");
     expect(viewSource).toContain("function frameSelectedIncident()");
     expect(viewSource).toContain("shortestLongitudeBounds([incident.location.lon");
@@ -76,8 +82,9 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("toggleSoundMuted");
     expect(viewSource).toContain("testAlertSound");
     expect(viewSource).toContain("#dc2626");
-    expect(viewSource).toContain("#d97706");
-    expect(viewSource).toContain("#0284c7");
+    const severity = readFileSync(new URL("../../admin/sos-alerts.ts", import.meta.url), "utf8");
+    expect(severity).toContain("#d97706");
+    expect(severity).toContain("#0284c7");
 
     // T3.3.4 nearest responder suggestions + multi-select dispatch console
     expect(viewSource).toContain("map-selected-alert-card");

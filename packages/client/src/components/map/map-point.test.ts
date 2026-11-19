@@ -32,8 +32,10 @@ describe("shared semantic map points", () => {
     point.listener?.({ stopPropagation });
     expect(stopPropagation).toHaveBeenCalledOnce();
     expect(activated).toHaveBeenCalledOnce();
-    const origin = createMapPointElement("start", "نه موقعیت زنده") as unknown as FakeElement;
+    const origin = createMapPointElement("start", "نه موقعیت زنده", { caption: "<مبدأ>" }) as unknown as FakeElement;
     expect(origin.tag).toBe("div");
     expect(origin.attrs.role).toBe("img");
+    expect(origin.children[1]?.textContent).toBe("<مبدأ>");
+    expect(origin.children[1]?.attrs["aria-hidden"]).toBe("true");
   });
 });

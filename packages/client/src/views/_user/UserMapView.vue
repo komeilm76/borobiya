@@ -1847,7 +1847,9 @@ function syncDestinationMarker(): void {
   if (!destinationMarker) {
     // The existing amber route pin owns a selected POI; do not stack two pins.
     destinationMarker = new markerConstructor({
-      element: createMapPointElement("end", "نمایش جزئیات مسیر", { onActivate: () => { journey.sheetOpen.value = true; } }),
+      element: createMapPointElement("end", "نمایش جزئیات مسیر", {
+        caption: "مقصد", onActivate: () => { journey.sheetOpen.value = true; }
+      }),
       anchor: "center"
     }).setLngLat([point.lon, point.lat]).addTo(instance);
     const element = destinationMarker.getElement();
@@ -1878,7 +1880,7 @@ function syncRouteOriginMarker(): void {
     routeOriginMarker?.remove(); routeOriginMarker = null; schedulePointSpread(); return;
   }
   if (!routeOriginMarker) {
-    const element = createMapPointElement("start", "مبدأ مسیر انتخابی؛ نه موقعیت زنده");
+    const element = createMapPointElement("start", "مبدأ مسیر انتخابی؛ نه موقعیت زنده", { caption: "مبدأ" });
     element.classList.add("user-map-view__route-origin");
     routeOriginMarker = new markerConstructor({ element, anchor: "center" })
       .setLngLat([origin.lon, origin.lat]).addTo(instance);

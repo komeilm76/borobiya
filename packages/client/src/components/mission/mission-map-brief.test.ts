@@ -30,6 +30,7 @@ describe("default mission map brief", () => {
   });
   it("opens the existing workspace from the incident marker without requesting GPS or adding a waypoint", () => {
     expect(page).toContain('createMapPointElement("sos", "مقصد نهایی مسیر؛ باز کردن برنامهٔ مسیر", {');
+    expect(page).toContain('caption: "حادثه"');
     expect(page).toContain('incidentPin.classList.add("mission-desk__incident-pin")');
     const open = page.slice(page.indexOf('function openRouteWorkspace(): void {'), page.indexOf('function toggleTool('));
     expect(open).toContain('void routing.open()'); // Authorised private incident read only.
@@ -39,7 +40,7 @@ describe("default mission map brief", () => {
     expect(factory).toContain('event.stopPropagation();');
     expect(page).toContain('if (!pickingWaypoint.value) openRouteWorkspace();');
     expect(page).toContain('incidentPin.setAttribute("aria-disabled", String(pickingWaypoint.value))');
-    expect(factory).toContain('element.setAttribute("aria-label", detail ?');
+    expect(factory).toContain('element.setAttribute("aria-label", `${name}');
     expect(page).toContain('watch(pickingWaypoint, (picking) => {');
     expect(page).toContain('incidentMarker?.getElement().setAttribute("aria-disabled", String(picking));');
     expect(page).not.toContain('incidentPin.setAttribute("role", "img")');

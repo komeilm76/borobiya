@@ -29,7 +29,7 @@ describe('dispatch controls match the map Mission and Travel design language', (
     expect(rule('.admin-dispatch__facts > div')).toContain('border-radius: var(--bb-radius-nested, 16px);');
     expect(css).toContain('box-shadow: var(--bb-shadow-overlay);');
     expect(css).toContain('.map-selected-alert-card { box-shadow: var(--bb-shadow-surface); }');
-    expect(css).toContain('border: 0; background: var(--bb-color-inset); box-shadow: none;');
+    expect(css).toContain('.dispatch-map-choices { position: absolute;');
   });
 
   it('uses the same field treatment, segmented selection, action sizes and Persian font', () => {

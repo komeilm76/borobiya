@@ -76,6 +76,8 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(page).toContain('createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده")');
     expect(page).toContain('createMapPointElement("stop", navigation.active.value ? "باز کردن برنامهٔ مسیر" : "باز کردن فهرست ایستگاه‌ها"');
     expect(room).toContain('createMapPointElement(role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester"');
+    expect(room).toContain('auth.user?.id === props.mission.rescuerId ? "خودم" : "امدادگر"');
+    expect(room).toContain('role === "admin" ? "مرکز" : undefined');
     expect(compileTemplate({ source: template!.content, filename: "UserMissionView.vue", id: "map-legend" }).errors).toEqual([]);
     expect(compileStyle({ source: css, filename: "UserMissionView.vue", id: "map-legend", scoped: true }).errors).toEqual([]);
   });
