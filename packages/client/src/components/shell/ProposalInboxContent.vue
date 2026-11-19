@@ -248,6 +248,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
+import { createMapPointElement, positionMapPointLabels } from "@/components/map/map-point";
 import { clearOfferRoute, paintOfferRoute } from "@/map/offer-route-overlay";
 import { attachOfferRouteScreen } from "@/map/offer-route-screen";
 import { offerCameraPadding } from "@/map/offer-camera-padding";
@@ -376,14 +377,25 @@ watch([() => props.map, () => props.markerClass, incident, previewRoute, preview
   let marker: Marker | null = null;
   let originMarker: Marker | null = null;
   if (MarkerClass) try {
-    marker = new MarkerClass({ color: '#cc623f' }).setLngLat([target.lon, target.lat]).addTo(map);
-    marker.getElement().setAttribute('aria-label', 'محل حادثهٔ پیشنهاد انتخاب‌شده');
+    marker = new MarkerClass({
+      element: createMapPointElement('sos', 'محل حادثهٔ پیشنهاد انتخاب‌شده', { caption: 'حادثه' }), anchor: 'center'
+    }).setLngLat([target.lon, target.lat]).addTo(map);
     if (manualOrigin.value) {
-      originMarker = new MarkerClass({ color: '#2563a6' })
-        .setLngLat([manualOrigin.value.lon, manualOrigin.value.lat]).addTo(map);
-      originMarker.getElement().setAttribute('aria-label', 'مبدأ انتخاب‌شده برای پیش‌نمایش؛ نه موقعیت زنده');
+      originMarker = new MarkerClass({
+        element: createMapPointElement('start', 'مبدأ انتخاب‌شده برای پیش‌نمایش؛ نه موقعیت زنده',
+          { caption: 'مبدأ انتخابی' }), anchor: 'center'
+      }).setLngLat([manualOrigin.value.lon, manualOrigin.value.lat]).addTo(map);
     }
+    positionMapPointLabels(map, [marker, originMarker]);
   } catch { /* The map may be changing styles or unmounting. */ }
+  // Marker transforms are updated by MapLibre during camera events. Measure
+  // afterwards so the captions stay beside their real points on pan/zoom/resize.
+  const onCameraFrame = () => queueMicrotask(() => {
+    if (props.map === map && props.visible) positionMapPointLabels(map, [marker, originMarker]);
+  });
+  map.on('move', onCameraFrame);
+  map.on('moveend', onCameraFrame);
+  map.on('resize', onCameraFrame);
   // A DOM/SVG path follows map projection and stays visible above basemap
   // tiles even if the MapLibre style has not yet accepted our source/layer.
   const roadPoints = previewGeometry.value.data.features[0]?.geometry.coordinates;
@@ -412,6 +424,9 @@ watch([() => props.map, () => props.markerClass, incident, previewRoute, preview
   onCleanup(() => {
     map.off('styledata', paint);
     map.off('idle', paint);
+    map.off('move', onCameraFrame);
+    map.off('moveend', onCameraFrame);
+    map.off('resize', onCameraFrame);
     detachScreen?.();
     marker?.remove();
     originMarker?.remove();

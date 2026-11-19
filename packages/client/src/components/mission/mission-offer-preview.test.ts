@@ -29,6 +29,19 @@ describe('pending mission offer map preview', () => {
     expect(inbox).not.toContain('new maplibregl.Map(');
   });
 
+  it('names the incident and optional manual origin beside their real pins through camera changes', () => {
+    expect(inbox).toContain("createMapPointElement('sos', 'محل حادثهٔ پیشنهاد انتخاب‌شده', { caption: 'حادثه' })");
+    expect(inbox).toContain("createMapPointElement('start', 'مبدأ انتخاب‌شده برای پیش‌نمایش؛ نه موقعیت زنده',");
+    expect(inbox).toContain("{ caption: 'مبدأ انتخابی' }");
+    expect(inbox).toContain("anchor: 'center'");
+    expect(inbox).toContain('positionMapPointLabels(map, [marker, originMarker])');
+    for (const event of ['move', 'moveend', 'resize']) {
+      expect(inbox).toContain(`map.on('${event}', onCameraFrame)`);
+      expect(inbox).toContain(`map.off('${event}', onCameraFrame)`);
+    }
+    expect(inbox).not.toContain("new MarkerClass({ color: '#cc623f' })");
+  });
+
   it('shows a road ETA and distance side by side only on a verified route, with honest no-GPS/no-address states', () => {
     expect(inbox).toContain("reversePlace({ lat: target.lat, lon: target.lon }, controller.signal)");
     expect(inbox).toContain("address.value = result?.formattedAddress ?? null");
