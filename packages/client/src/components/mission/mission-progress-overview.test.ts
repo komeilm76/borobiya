@@ -49,7 +49,7 @@ describe("at-a-glance mission progress and information", () => {
     expect(panel).not.toContain('desk.showCancellation()');
     expect(panel).toContain('<MissionBriefDetails :mission-id="desk.activeMission.value?.id ?? \'\'" :visible="visible" />');
     expect(info).toContain('<details class="mission-brief__details">');
-    expect(info).toContain('جزئیات و شناسهٔ مأموریت');
+    expect(info).toContain('شناسه و مختصات حادثه');
     expect(info).toContain('class="mission-brief__identity"');
     expect(info).not.toContain('class="mission-brief__facts"');
     expect(info.match(/{{ brief.requesterName }}/g)).toHaveLength(1);
@@ -68,10 +68,10 @@ describe("at-a-glance mission progress and information", () => {
     expect(template).toContain('aria-label="شناسهٔ کامل مأموریت برای کپی دستی"');
     expect(info).toContain('await navigator.clipboard.writeText(id)');
     expect(info).toContain('current === generation && props.missionId === id');
-    expect(template).toContain('نشانی تقریبی محل حادثه · از مختصات ثبت‌شده');
+    expect(template).toContain('محل حادثه · نشانی تقریبی');
     expect(info).toContain('await reversePlace(mission.incident, controller?.signal)');
     expect(info).toContain('current === generation && props.visible && auth.user?.id === owner');
-    expect(template).toContain('نشانی در دسترس نیست؛ برای راهبری از مختصات ثبت‌شدهٔ حادثه استفاده کنید.');
+    expect(template).toContain('نشانی در دسترس نیست؛ نقطهٔ حادثه روی نقشه ثبت شده است.');
     expect(info).toContain('if (result.hasPhoto) void loadPhoto();');
     expect(template).not.toContain('نمایش تصویر ایمن');
     expect(info).toContain('controller?.abort(); controller = null;');

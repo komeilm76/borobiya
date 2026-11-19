@@ -59,7 +59,10 @@ describe("Mission tab uses Travel's map-card hierarchy", () => {
     const detail = sources.brief.slice(sources.brief.indexOf('<details class="mission-brief__details">'),
       sources.brief.indexOf('</details>'));
     expect(sources.brief).toContain('class="mission-brief__address-preview"');
-    expect(detail).toContain('v-if="address"><span>نشانی تقریبی کامل · از مختصات ثبت‌شده</span><p dir="auto" class="mission-brief__description">{{ address }}</p>');
+    expect(sources.brief.match(/{{ address }}/g)).toHaveLength(1);
+    expect(detail).not.toContain('{{ address }}');
+    expect(detail).not.toContain('brief.description');
+    expect(styles.brief).toContain('.mission-brief:has(.mission-brief__details[open]) .mission-brief__address-preview,');
     expect(detail).toContain('مختصات ثبت‌شدهٔ حادثه');
     expect(rule(styles.brief, '.mission-brief__address')).toContain('border-top: 1px solid var(--bb-color-outline);');
     expect(rule(styles.brief, '.mission-brief__address')).not.toContain('background:');

@@ -26,7 +26,10 @@ describe("responsive Mission Information", () => {
     expect(briefing).toContain('class="mission-brief__photo"');
     expect(briefing).toContain('class="mission-brief__need-preview"');
     expect(briefing).toContain('<details class="mission-brief__details">');
-    expect(briefing).toContain('class="mission-brief__photo-full"');
+    expect(briefing).toContain('class="mission-brief__viewer-content"');
+    expect(briefing).toContain('aria-label="نمایش تصویر حادثه در اندازهٔ بزرگ"');
+    expect(briefing).toContain('object-fit: cover;');
+    expect(briefing).toContain('object-fit: contain;');
     expect(briefing).toContain('مختصات ثبت‌شدهٔ حادثه');
     expect(briefing).toContain('aria-label="کپی شناسهٔ کامل مأموریت"');
     expect(css).toContain('width: 100%; max-height: none; margin: 0;'); // Child fills only its bounded parent.
@@ -52,10 +55,12 @@ describe("responsive Mission Information", () => {
 
   it("preserves the full-width bottom-opening phone layout and focusable close action", () => {
     const phone = css.slice(css.indexOf('@media (max-width: 599px) {'));
-    expect(phone).toContain('.mission-desk__bottom-stack--information {');
-    expect(phone).toContain('max-height: min(19rem, 70dvh, calc(100dvh - 19rem');
-    expect(phone).toContain('.mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {');
-    expect(phone).toContain('.mission-desk__bottom-stack { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(phone).toContain('.mission-desk--active .mission-desk__bottom-stack--information {\n    left: 0; right: 0; bottom: 0; width: 100%;');
+    expect(phone).toContain('max-height: min(42dvh, 19rem, max(8rem, calc(100dvh - 14rem');
+    expect(phone).toContain('.mission-desk--active .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {');
+    expect(phone).toContain('.mission-desk--active .mission-desk__bottom-stack--information #mission-status-panel {');
+    expect(view).toContain('hasDockedToolSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint.value && !!activeTool.value)');
+    expect(view).toContain("if (tool) legendOpen.value = false;");
     expect(detail).toContain('aria-label="بستن اطلاعات مأموریت"');
     const { template: briefTemplate, styles: briefStyles } = parse(briefing).descriptor;
     expect(compileTemplate({ filename: 'MissionBriefDetails.vue', id: 'info-width', source: briefTemplate!.content }).errors).toEqual([]);

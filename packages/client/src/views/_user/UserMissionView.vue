@@ -2,7 +2,7 @@
   <main class="mission-desk" :class="{ 'mission-desk--embedded': embedded, 'mission-desk--active': desk.activeMission.value,
     'mission-desk--terminal-hold': !!desk.terminalHold.value,
     'mission-desk--tool-open': !!desk.activeMission.value && !!activeTool,
-    'mission-desk--docked-tool': !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint && (activeTool === 'route' || activeTool === 'team'),
+    'mission-desk--docked-tool': !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint && !!activeTool,
     'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint,
     'mission-desk--steps-guidance': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint &&
       (navigation.active.value || !!routing.error.value || !!navigation.error.value || !!routeSaveWarning),
@@ -349,7 +349,7 @@
             </div>
           </div>
         </div>
-        <v-btn v-show="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === 'status')"
+        <v-btn v-show="!desk.terminalHold.value && !pickingWaypoint && !activeTool"
           id="mission-tool-legend" class="mission-desk__legend-action" icon="mdi-map-outline"
           :color="legendOpen ? 'primary' : 'surface'" variant="flat"
           :aria-label="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
@@ -495,10 +495,10 @@ function toggleLegend(): void {
   const target = legendOpen.value ? "mission-map-legend" : "mission-tool-legend";
   void nextTick(() => document.getElementById(target)?.focus({ preventScroll: true }));
 }
-watch(activeTool, (tool) => { if (tool === "route" || tool === "team") legendOpen.value = false; });
+watch(activeTool, (tool) => { if (tool) legendOpen.value = false; });
 watch(() => desk.terminalHold.value, (held) => { if (held) legendOpen.value = false; });
 const routeSection = ref<RouteWorkspaceSection | "stops">("plan");
-// Measure the visible phone sheet (steps, members or route configuration),
+// Measure the visible phone sheet (steps, information, members or route tools),
 // including its safe-area inset. Search, SOS and camera rails share one height;
 // never leave a stale measurement when switching tools or leaving Missions.
 watch([() => props.visible, () => desk.activeMission.value?.id, activeTool, routeSection,
@@ -512,7 +512,7 @@ watch([() => props.visible, () => desk.activeMission.value?.id, activeTool, rout
     if (onResize) window.removeEventListener("resize", onResize);
     document.documentElement.style.removeProperty("--bb-map-mission-sheet-height");
   });
-  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || pickingWaypoint.value || activeTool.value === 'status') return;
+  if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || pickingWaypoint.value) return;
   if (activeTool.value && window.innerWidth >= 600) return;
   await nextTick();
   if (disposed) return;
@@ -615,7 +615,7 @@ function addSearchWaypoint(lat: number, lon: number): boolean {
 defineExpose({ addSearchWaypoint, hasOfferPreview: computed(() => offerDetailOpen.value && !desk.activeMission.value),
   hasActiveMission: computed(() => !!desk.activeMission.value),
   hasOpenMapTool: computed(() => !!desk.activeMission.value && !!activeTool.value),
-  hasDockedToolSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint.value && (activeTool.value === 'team' || activeTool.value === 'route')),
+  hasDockedToolSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !pickingWaypoint.value && !!activeTool.value),
   hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value),
   hasMapLegend: computed(() => legendOpen.value && !desk.terminalHold.value && !pickingWaypoint.value &&
     (!activeTool.value || activeTool.value === 'status')) });
@@ -1447,8 +1447,8 @@ onBeforeUnmount(() => {
     width: min(26rem, calc(100% - 34rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
   }
 }
-/* Same centered bottom card as Navigate; only the steps variant docks here.
-   Mission Information is a separate, bounded panel above map controls on wide maps. */
+/* Same centered bottom card as Navigate on wide maps. Phone steps and
+   Information have their own edge-docked rules below. */
 .mission-desk--steps-visible .mission-desk__bottom-stack {
   left: 50%; right: auto; transform: translateX(-50%);
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
@@ -1710,10 +1710,18 @@ onBeforeUnmount(() => {
     right: calc(.75rem + env(safe-area-inset-right, 0px));
   }
   .mission-desk--active.mission-desk--docked-tool .mission-desk__map-focus--pair :deep(.v-btn:last-child) { bottom: 3.5rem; }
-  .mission-desk__bottom-stack--information {
-    max-height: min(19rem, 70dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
-  .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
-    max-height: min(65dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  /* Information now shares the steps dock, but its closed summary has a
+     smaller cap. Disclosure grows only when explicitly requested. */
+  .mission-desk--active .mission-desk__bottom-stack--information {
+    left: 0; right: 0; bottom: 0; width: 100%;
+    max-height: min(42dvh, 19rem, max(8rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk--active .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
+    max-height: min(65dvh, 28rem, max(8rem, calc(100dvh - 14rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))));
+  }
+  .mission-desk--active .mission-desk__bottom-stack--information #mission-status-panel {
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+    padding-bottom: calc(.65rem + env(safe-area-inset-bottom, 0px));
   }
   /* Compact the Travel-style actions without shrinking their 44px targets.
      Both Review and Stop stay visible, including on 320px/landscape phones. */
@@ -1769,9 +1777,6 @@ onBeforeUnmount(() => {
   .mission-desk__bottom-stack {
     max-height: min(60dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
   }
-  .mission-desk__bottom-stack--information {
-    max-height: min(19rem, 70dvh, calc(100dvh - 19rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-  }
   /* Match the embedded selector's specificity: otherwise its 9rem top wins
      even though the short-phone rules appear later in the stylesheet. */
   .mission-desk__guidance.mission-desk__guidance--warning,
@@ -1785,10 +1790,6 @@ onBeforeUnmount(() => {
      At 480px+ the sheet starts at least 11.25rem from the top, leaving a
      1rem gap after guidance; its own scroller keeps the guarded action usable. */
   .mission-desk__bottom-stack { max-height: max(7rem, min(48dvh, calc(100dvh - 20.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)))); }
-  .mission-desk__bottom-stack--information { max-height: min(19rem, calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
-  .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {
-    max-height: calc(100dvh - 10.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  }
   .mission-desk__map-legend { padding: .2rem .6rem; max-height: 4rem; }
   .mission-desk__map-legend h2 { position: absolute; width: 1px; height: 1px; overflow: hidden;
     clip: rect(0, 0, 0, 0); white-space: nowrap; }

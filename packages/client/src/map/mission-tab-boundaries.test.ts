@@ -55,14 +55,15 @@ describe("Missions search, short phones and shared-map tab boundaries", () => {
     // two rows of icon buttons above it even at 480px high.
     const sheetCap = Math.min(480 * .65, 32 * 16, Math.max(4.75 * 16, 480 - 17.5 * 16));
     expect(480 - sheetCap - 4 * 16 - 48).toBeGreaterThan(5.25 * 16 + 5 * 16);
-    expect(short).toContain('.mission-desk__bottom-stack--information { max-height: min(19rem, calc(100dvh - 10.25rem');
-    expect(short).toContain('.mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {\n    max-height: calc(100dvh - 10.25rem');
+    expect(css).toContain('.mission-desk--active .mission-desk__bottom-stack--information {\n    left: 0; right: 0; bottom: 0; width: 100%;');
+    expect(css).toContain('max-height: min(42dvh, 19rem, max(8rem, calc(100dvh - 14rem');
+    expect(css).toContain('.mission-desk--active .mission-desk__bottom-stack--information:has(.mission-brief__details[open]) {');
     expect(css).toContain('left: 0; right: 0; bottom: calc(8.5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('.mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain; pointer-events: auto;');
     expect(short).toContain('.mission-desk__map-legend small { position: absolute;');
-    // Legacy tool panels still clear their 9.5rem control band; only steps
-    // become an edge-docked sheet with the icon rail measured above it.
+    // Stages and information dock at the edge; the remaining floating
+    // status/alert surfaces keep their own upper map lane.
     expect(short).toContain('.mission-desk__bottom-stack { max-height: max(7rem');
     expect(css).toContain('.mission-desk--steps-visible #mission-steps-stack {');
     expect(css).toContain('left: 0; right: 0; transform: none; bottom: 0; width: 100%;');

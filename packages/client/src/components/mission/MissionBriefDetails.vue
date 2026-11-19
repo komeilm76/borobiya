@@ -14,24 +14,24 @@
           </div>
           <div class="mission-brief__address">
             <v-icon icon="mdi-map-marker-outline" size="20" aria-hidden="true" />
-            <div><span>نشانی تقریبی محل حادثه · از مختصات ثبت‌شده</span>
+            <div><span>محل حادثه · نشانی تقریبی</span>
               <p v-if="addressLoading" role="status">در حال یافتن نشانی…</p>
               <strong v-else-if="address" dir="auto" class="mission-brief__address-preview">{{ address }}</strong>
-              <p v-else role="status">نشانی در دسترس نیست؛ برای راهبری از مختصات ثبت‌شدهٔ حادثه استفاده کنید.
+              <p v-else role="status">نشانی در دسترس نیست؛ نقطهٔ حادثه روی نقشه ثبت شده است.
                 <v-btn v-if="addressFailed" size="small" variant="text" color="primary" @click="loadAddress(brief)">تلاش دوباره</v-btn>
               </p>
             </div>
           </div>
           <div class="mission-brief__snapshot">
             <div class="mission-brief__need">
-              <span>شرح نیاز</span>
-              <strong dir="auto" class="mission-brief__need-preview">{{ brief.description }}</strong>
+              <span>شرح حادثه</span>
+              <p dir="auto" class="mission-brief__need-preview">{{ brief.description || 'شرحی ثبت نشده است.' }}</p>
             </div>
-            <div v-if="brief.hasPhoto" class="mission-brief__photo">
-              <img v-if="photoSrc" :src="photoSrc" alt="پیش‌نمایش تصویر حادثه؛ تصویر بزرگ‌تر در جزئیات" referrerpolicy="no-referrer"
-                @error="photoSrc = null; photoError = 'دسترسی به تصویر پایان یافت؛ دوباره دریافت کنید.'" />
-              <span v-else aria-hidden="true"><v-icon icon="mdi-image-outline" size="24" /></span>
-            </div>
+            <button v-if="brief.hasPhoto && photoSrc" ref="photoButton" class="mission-brief__photo" type="button"
+              aria-label="نمایش تصویر حادثه در اندازهٔ بزرگ" :disabled="photoOpening" @click="openPhoto">
+              <img :src="photoSrc" alt="تصویر کوچک حادثه" referrerpolicy="no-referrer" @error="expirePhoto" />
+            </button>
+            <span v-else-if="brief.hasPhoto && photoLoading" class="mission-brief__photo-placeholder" aria-hidden="true"><v-icon icon="mdi-image-outline" size="23" /></span>
           </div>
           <small v-if="photoLoading" role="status">در حال دریافت تصویر…</small>
           <small v-if="photoError" role="alert">{{ photoError }}
@@ -39,7 +39,7 @@
           </small>
         </div>
         <details class="mission-brief__details">
-          <summary>{{ brief.hasPhoto ? 'جزئیات، تصویر و شناسهٔ مأموریت' : 'جزئیات و شناسهٔ مأموریت' }}
+          <summary>شناسه و مختصات حادثه
             <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" />
           </summary>
           <div class="mission-brief__details-body">
@@ -56,22 +56,28 @@
               کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
               <input :value="missionId" readonly dir="ltr" aria-label="شناسهٔ کامل مأموریت برای کپی دستی" @focus="($event.target as HTMLInputElement).select()" />
             </label>
-            <div v-if="address"><span>نشانی تقریبی کامل · از مختصات ثبت‌شده</span><p dir="auto" class="mission-brief__description">{{ address }}</p></div>
-            <div><span>شرح کامل نیاز</span><p dir="auto" class="mission-brief__description">{{ brief.description }}</p></div>
             <div><span>مختصات ثبت‌شدهٔ حادثه</span><bdi dir="ltr">{{ brief.incident.lat.toFixed(5) }}, {{ brief.incident.lon.toFixed(5) }}</bdi></div>
-            <div v-if="photoSrc" class="mission-brief__photo-full">
-              <span>تصویر کامل حادثه</span>
-              <img :src="photoSrc" alt="تصویر ثبت‌شدهٔ حادثه" referrerpolicy="no-referrer" />
-            </div>
           </div>
         </details>
       </template>
     </div>
+    <v-dialog :model-value="photoOpen && !!photoSrc" max-width="960"
+      aria-labelledby="mission-photo-title" @update:model-value="(open: boolean) => { if (!open) closePhoto(); }">
+      <v-card class="mission-brief__viewer" dir="rtl" rounded="xl">
+        <header class="mission-brief__viewer-header">
+          <h2 id="mission-photo-title">تصویر حادثه</h2>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن تصویر حادثه" @click="closePhoto" />
+        </header>
+        <div class="mission-brief__viewer-content">
+          <img v-if="photoSrc" :src="photoSrc" alt="تصویر کامل ثبت‌شدهٔ حادثه" referrerpolicy="no-referrer" @error="expirePhoto" />
+        </div>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { MissionBrief } from "@shared/index";
 import { getMissionBrief } from "@/api/mission";
 import { getSosPhotoSrc } from "@/api/admin-sos";
@@ -92,6 +98,31 @@ const addressFailed = ref(false);
 const photoSrc = ref<string | null>(null);
 const photoLoading = ref(false);
 const photoError = ref<string | null>(null);
+const photoOpen = ref(false);
+const photoOpening = ref(false);
+const photoLoadedAt = ref(0);
+const photoButton = ref<HTMLButtonElement | null>(null);
+async function openPhoto() {
+  if (!photoSrc.value || photoOpening.value) return;
+  const current = generation, missionId = props.missionId;
+  photoOpening.value = true;
+  try {
+    // SOS photo links expire after 60 seconds; refresh before opening a
+    // potentially stale thumbnail instead of showing a broken full-size image.
+    if (Date.now() - photoLoadedAt.value > 45_000) await loadPhoto();
+    if (current === generation && missionId === props.missionId && props.visible &&
+      photoSrc.value && !photoError.value && Date.now() - photoLoadedAt.value <= 45_000) photoOpen.value = true;
+  } finally { if (current === generation) photoOpening.value = false; }
+}
+function closePhoto() {
+  photoOpen.value = false;
+  void nextTick(() => photoButton.value?.focus({ preventScroll: true }));
+}
+function expirePhoto() {
+  photoOpen.value = false;
+  photoSrc.value = null; photoLoadedAt.value = 0;
+  photoError.value = 'دسترسی به تصویر پایان یافت؛ دوباره دریافت کنید.';
+}
 let generation = 0;
 let controller: AbortController | null = null;
 function clear() {
@@ -100,6 +131,7 @@ function clear() {
   brief.value = null; loading.value = false; error.value = null;
   address.value = null; addressLoading.value = false; addressFailed.value = false;
   photoSrc.value = null; photoLoading.value = false; photoError.value = null;
+  photoOpen.value = false; photoOpening.value = false; photoLoadedAt.value = 0;
   copyStatus.value = null;
 }
 async function copyMissionId() {
@@ -157,10 +189,15 @@ async function loadPhoto() {
   photoLoading.value = true; photoError.value = null;
   try {
     const src = await getSosPhotoSrc(id, token);
-    if (current === generation && props.visible && auth.user?.id === owner && auth.accessToken === token && brief.value?.sosRequestId === id)
+    if (current === generation && props.visible && auth.user?.id === owner && auth.accessToken === token && brief.value?.sosRequestId === id) {
       photoSrc.value = src;
+      photoLoadedAt.value = Date.now();
+    }
   } catch {
-    if (current === generation) photoError.value = "دریافت تصویر ممکن نشد.";
+    if (current === generation) {
+      photoSrc.value = null; photoLoadedAt.value = 0;
+      photoError.value = "دریافت تصویر ممکن نشد.";
+    }
   } finally {
     if (current === generation) photoLoading.value = false;
   }
@@ -173,8 +210,8 @@ onBeforeUnmount(clear);
 </script>
 
 <style scoped>
-.mission-brief { flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
-.mission-brief__body { display: grid; gap: .35rem; min-width: 0; font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.mission-brief { flex: 0 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.mission-brief__body { display: grid; gap: .3rem; min-width: 0; font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
 .mission-brief__body span { color: var(--bb-color-muted); font-size: .82rem; font-weight: 700; }
 .mission-brief__body strong { font-weight: 750; }
 .mission-brief__notice { margin: .35rem 0; }
@@ -197,9 +234,20 @@ onBeforeUnmount(clear);
 .mission-brief__need { display: grid; gap: 1px; flex: 1 1 0; min-width: 0; }
 .mission-brief__need-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
   white-space: pre-line; overflow: hidden; overflow-wrap: anywhere; }
-.mission-brief__photo { display: grid; place-items: center; flex: 0 0 3.5rem; height: 3.5rem;
-  border: 1px solid var(--bb-color-outline); border-radius: 12px; background: var(--bb-color-inset); }
-.mission-brief__photo img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 12px; }
+.mission-brief__need-preview { margin: 0; font-weight: 650; }
+.mission-brief__photo, .mission-brief__photo-placeholder { display: grid; place-items: center; flex: 0 0 3.75rem;
+  width: 3.75rem; height: 3.75rem; overflow: hidden; border: 1px solid var(--bb-color-outline);
+  border-radius: 12px; background: var(--bb-color-inset); }
+.mission-brief__photo { padding: 0; cursor: zoom-in; }
+.mission-brief__photo:hover { border-color: rgb(var(--v-theme-primary)); }
+.mission-brief__photo:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.mission-brief__photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* Details reveal the original text in place. Never repeat description/address
+   below the disclosure or consume map space with a second inline photo. */
+.mission-brief:has(.mission-brief__details[open]) .mission-brief__address-preview,
+.mission-brief:has(.mission-brief__details[open]) .mission-brief__need-preview {
+  display: block; -webkit-line-clamp: unset; white-space: pre-wrap; overflow: visible;
+}
 .mission-brief__details-body > .mission-brief__id { display: flex; align-items: center; justify-content: space-between; gap: .5rem; min-width: 0; }
 .mission-brief__id-actions { display: flex; align-items: center; gap: .3rem; min-width: 0; }
 .mission-brief__id-actions bdi { font: 700 .82rem/1.5 monospace; direction: ltr; }
@@ -217,6 +265,14 @@ onBeforeUnmount(clear);
 .mission-brief__details-body { display: grid; gap: .55rem; padding: .45rem .15rem .65rem; }
 .mission-brief__details-body > div { display: grid; gap: .15rem; min-width: 0; }
 .mission-brief__details-body p, .mission-brief__details-body bdi { overflow-wrap: anywhere; }
-.mission-brief__description { white-space: pre-wrap; }
-.mission-brief__photo-full img { display: block; max-width: 100%; max-height: 18rem; object-fit: contain; border-radius: 10px; }
+.mission-brief__viewer { max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; overflow: hidden; color: rgb(var(--v-theme-on-surface)); }
+.mission-brief__viewer-header { display: flex; align-items: center; justify-content: space-between; flex: none;
+  min-height: 52px; padding: .25rem .75rem; border-bottom: 1px solid var(--bb-color-outline); }
+.mission-brief__viewer-header h2 { margin: 0; font-size: 1rem; }
+.mission-brief__viewer-header :deep(.v-btn) { width: 44px; min-width: 44px; height: 44px; }
+.mission-brief__viewer-content { display: grid; place-items: center; min-height: 0; overflow: auto;
+  padding: .65rem; background: var(--bb-color-inset); }
+.mission-brief__viewer-content img { display: block; max-width: 100%; max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  width: auto; height: auto; object-fit: contain; }
 </style>

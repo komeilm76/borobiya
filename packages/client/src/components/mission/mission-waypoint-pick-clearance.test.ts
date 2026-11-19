@@ -12,12 +12,12 @@ describe("waypoint-pick map clearance", () => {
     expect(source).toContain("'mission-desk--steps-visible': !!desk.activeMission.value && !desk.terminalHold.value && !activeTool && !pickingWaypoint");
     expect(source).toContain('v-if="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === \'status\')"');
     expect(source).toContain('v-show="!pickingWaypoint" id="mission-tool-status"');
-    expect(source).toContain('v-show="!desk.terminalHold.value && !pickingWaypoint && (!activeTool || activeTool === \'status\')"');
+    expect(source).toContain('v-show="!desk.terminalHold.value && !pickingWaypoint && !activeTool"');
     expect(source).toContain('hasStepsSheet: computed(() => !!desk.activeMission.value && !desk.terminalHold.value && !activeTool.value && !pickingWaypoint.value)');
     expect(source).toContain('if (pickingWaypoint.value) legendOpen.value = false;');
     expect(source).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
     expect(source).toContain('id="mission-cancel-waypoint" type="button" @click="cancelWaypointPick"');
-    expect(source).toContain("if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || pickingWaypoint.value || activeTool.value === 'status') return;");
+    expect(source).toContain('if (!props.visible || !desk.activeMission.value || desk.terminalHold.value || pickingWaypoint.value) return;');
     expect(source).toContain('() => routing.visible.value, () => desk.terminalHold.value, legendOpen, pickingWaypoint],');
     expect(source).toContain('document.documentElement.style.removeProperty("--bb-map-mission-sheet-height")');
   });
