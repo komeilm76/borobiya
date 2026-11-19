@@ -55,6 +55,12 @@ describe("shared km-api route descriptors", () => {
     expect(route.meta.description).toContain("SHARE_NOT_FOUND");
   });
 
+  it("documents the actual invalid-UUID response of admin SOS detail", () => {
+    const responses = apiRoutes.admin.getSosRequest.schema.responses;
+    expect(responses[400]).toBeDefined();
+    expect(responses[404]).toBeDefined();
+  });
+
   it("scopes remote-session termination to a validated session id", () => {
     const route = apiRoutes.user.revokeDevice;
     expect(route.method).toBe("DELETE");

@@ -437,5 +437,41 @@ describe("T3.1.4 category membership lifecycle against real PostgreSQL (PGlite)"
       await pg.query<{ c: number }>(`SELECT count(*)::int AS c FROM admin_audit_log`)
     ).rows[0]!.c;
     expect(auditCountAfter).toBe(auditCountBefore);
+
+    // Admin user detail must show real missions on both sides of a person's
+    // history, not the obsolete empty array from before the mission table.
+    const firstSos = await db.insert(schema.sosRequests).values({
+      requesterId: unassignedUserId, incidentTypeId: alpineTypeId,
+      severity: "medium", description: "Request for mountain rescue",
+      location: "POINT(51.4 35.7)"
+    }).returning({ id: schema.sosRequests.id });
+    const secondSos = await db.insert(schema.sosRequests).values({
+      requesterId: multiRescuerId, incidentTypeId: roadTypeId,
+      severity: "low", description: "Request for road assistance",
+      location: "POINT(51.5 35.8)"
+    }).returning({ id: schema.sosRequests.id });
+    const firstMission = await db.insert(schema.missions).values({
+      sosRequestId: firstSos[0]!.id, requesterId: unassignedUserId, rescuerId: multiRescuerId,
+      status: "completed"
+    }).returning({ id: schema.missions.id });
+    const secondMission = await db.insert(schema.missions).values({
+      sosRequestId: secondSos[0]!.id, requesterId: multiRescuerId, rescuerId: soloRescuerId,
+      status: "on_the_way"
+    }).returning({ id: schema.missions.id });
+    const missionDetail = await app.inject({
+      method: "GET", url: `/_admin/users/${multiRescuerId}`,
+      headers: { authorization: `Bearer ${adminToken}` }
+    });
+    expect(missionDetail.statusCode).toBe(200);
+    expect(missionDetail.json().missions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: firstMission[0]!.id, rescuerId: multiRescuerId, status: "completed" }),
+      expect.objectContaining({ id: secondMission[0]!.id, requesterId: multiRescuerId, status: "on_the_way" })
+    ]));
+    expect(missionDetail.json().missions).toHaveLength(2);
+    const nonAdminDetail = await app.inject({
+      method: "GET", url: `/_admin/users/${multiRescuerId}`,
+      headers: { authorization: `Bearer ${rescuerToken}` }
+    });
+    expect(nonAdminDetail.statusCode).toBe(403);
   });
 });

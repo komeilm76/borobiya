@@ -1,7 +1,8 @@
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import type { AdminUserListQuery, Mission, UserCategorySummary, UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
-import { adminAuditLog, categories, categoryUsers, userSessions, users } from "./schema";
+import { adminAuditLog, categories, categoryUsers, missions, userSessions, users } from "./schema";
+import { toMission } from "./mission-progress-store";
 
 export interface AdminActorRecord {
   role: UserRole;
@@ -194,6 +195,11 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       readCategoriesByUserIds(this.db, [id])
     ]);
 
+    // This endpoint promises both sides of a person's mission history. The
+    // former placeholder always returned [], even for completed SOS missions.
+    const missionRows = await this.db.select().from(missions)
+      .where(or(eq(missions.requesterId, id), eq(missions.rescuerId, id)))
+      .orderBy(desc(missions.createdAt), desc(missions.id));
     return {
       ...user,
       categories: categoriesByUser.get(id) ?? [],
@@ -201,8 +207,7 @@ export class DrizzleAdminUserStore implements AdminUserStore {
         ...session,
         isCurrentDevice: session.id === currentSessionId
       })),
-      // Missions cannot exist until their SOS domain table is added in T3.5.1.
-      missions: []
+      missions: missionRows.map(toMission)
     };
   }
 

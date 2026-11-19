@@ -5,7 +5,7 @@ import {
   DrizzleAdminUserStore,
   type AdminUserRecord
 } from "./admin-user-store";
-import { adminAuditLog, userSessions, users } from "./schema";
+import { adminAuditLog, missions, userSessions, users } from "./schema";
 
 function makeStore(returnedUsers: unknown[]) {
   let insertedTable: unknown;
@@ -224,7 +224,7 @@ describe("DrizzleAdminUserStore", () => {
       lastActiveAt: createdUser.createdAt,
       isOnline: true
     };
-    const mocks = makeReadStore([[createdUser], [session], []]);
+    const mocks = makeReadStore([[createdUser], [session], [], []]);
     const result = await mocks.store.getUserDetails(createdUser.id, sessionId);
 
     expect(result).toEqual({
@@ -232,7 +232,27 @@ describe("DrizzleAdminUserStore", () => {
       devices: [{ ...session, isCurrentDevice: true }],
       missions: []
     });
-    expect(mocks.select).toHaveBeenCalledTimes(3);
+    expect(mocks.select).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns requester and rescuer missions instead of an empty placeholder", async () => {
+    const mission = (role: "rescuer" | "requester", status: "completed" | "on_the_way") => ({
+      id: role === "rescuer" ? "81e5295a-9381-4bc5-844c-3cf0f52df30e" : "71e5295a-9381-4bc5-844c-3cf0f52df30e",
+      sosRequestId: "61e5295a-9381-4bc5-844c-3cf0f52df30e",
+      requesterId: role === "requester" ? createdUser.id : "51e5295a-9381-4bc5-844c-3cf0f52df30e",
+      rescuerId: role === "rescuer" ? createdUser.id : "41e5295a-9381-4bc5-844c-3cf0f52df30e",
+      status, cancelledBy: null, cancellationReasonId: null, cancellationCustomText: null,
+      cancelledAt: null, createdAt: createdUser.createdAt, updatedAt: createdUser.createdAt
+    });
+    const rows = [mission("rescuer", "completed"), mission("requester", "on_the_way")];
+    const mocks = makeReadStore([[createdUser], [], [], rows]);
+    const detail = await mocks.store.getUserDetails(createdUser.id, createdUser.id);
+    expect(mocks.builders[3]?.from).toHaveBeenCalledWith(missions);
+    expect(mocks.builders[3]?.where).toHaveBeenCalledOnce();
+    expect(mocks.builders[3]?.orderBy).toHaveBeenCalledOnce();
+    expect(detail?.missions).toEqual(rows.map((row) => ({ ...row,
+      cancelledAt: null, createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString()
+    })));
   });
 
   it("returns null without querying device sessions when the user is missing", async () => {

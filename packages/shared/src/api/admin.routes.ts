@@ -260,7 +260,7 @@ export const adminRoutes = {
     url: "/_admin/sos/requests/:id",
     schema: {
       params: uuidPathParamsSchema,
-      responses: { 200: sosRequestDetailSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: sosRequestDetailSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {
       operationId: "adminGetSosRequest",
