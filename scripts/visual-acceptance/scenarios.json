@@ -1164,8 +1164,8 @@
   "steps": [
    {
     "mouseClick": {
-     "x": 196,
-     "y": 300
+     "x": 250,
+     "y": 250
     }
    },
    {
@@ -1214,7 +1214,10 @@
   "dsf": 2,
   "steps": [
    {
-    "click": ".map-canvas"
+    "clickAt": {
+     "x": 250,
+     "y": 250
+    }
    },
    {
     "wait": 700
@@ -1829,5 +1832,105 @@
     "wait": 700
    }
   ]
+ },
+ {
+  "ref": "dark-admin-reports",
+  "route": "/_admin/reports",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-admin-groups",
+  "route": "/_admin/groups",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-admin-users",
+  "route": "/_admin/users",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-profile",
+  "route": "/_user/profile",
+  "darkStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "dark-trips",
+  "route": "/_user/trips",
+  "darkStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2
+ },
+ {
+  "ref": "reduced-motion-sos-sending",
+  "route": "/_user/sos",
+  "reducedMotionStart": true,
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[data-testid=\"sos-submit\"]"
+   },
+   {
+    "wait": 500
+   }
+  ]
+ },
+ {
+  "ref": "admin-narrow-users",
+  "route": "/_admin/users",
+  "persona": "admin",
+  "width": 1000,
+  "height": 900,
+  "dsf": 1
  }
 ]

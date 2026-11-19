@@ -820,3 +820,36 @@ longer claim pixel-level capture/reference comparison; observed-difference notes
 **Branch and PR state (2026-11-16).** Branch `arena/250278b6-borobiya`; PR [#6](https://github.com/komeilm76/borobiya/pull/6)
 **OPEN and unmerged** (MERGEABLE), CI green at `389ffb1`, no release, no tag. This addendum and the
 reconciliation it describes land with the 2026-11-16 evidence-pass commit(s).
+
+## §20 — Addendum (2026-11-19) — regeneration sweep, reproducibility guards, coverage headroom
+
+**Regeneration sweep.** Every scenario in `scripts/visual-acceptance/scenarios.json` was re-run
+against a freshly built preview bundle and pixel-compared with the committed captures
+(`docs/VISUAL_ACCEPTANCE.md`, "The 2026-11-19 regeneration sweep"): 25 captures byte-identical;
+the remainder differ only in volatile regions (status-bar clock, recording-pulse dot, animation
+phase, wall-clock-derived timestamps and relative times). Three real discrepancies were fixed:
+`navigation/03` and `navigation/06` clicked coordinates that predated the quick-chips move out of
+the sheet (the taps landed on a chip / the sheet, so no destination was selected — both now tap
+the canvas at (250, 250) and were regenerated), and `sos/15`, whose committed capture showed the
+size rejection that needs a >15 MB source and cannot be reproduced from a committable fixture
+(the scenario now deterministically produces the format rejection from
+`fixtures/not-an-image.txt`; the capture was regenerated to that variant). The evidence set grew
+to **105 captures**: five more dark-theme aids (admin reports, groups, users, profile, trips), a
+second reduced-motion aid (`reduced-motion-sos-sending`), and a 1000 px narrow-viewport admin aid
+(`admin-narrow-users`). Aids only; nothing flipped; no production code touched by the sweep.
+
+**Guards.** `scripts/check-docs.ts` now fails when (a) the matrix canonical-tally marker disagrees
+with the per-row table, (b) a capture-plan scenario lacks its committed capture or vice versa, and
+(c) a committed capture is cited in neither the matrix nor `docs/VISUAL_ACCEPTANCE.md`, or a
+`superseded` row carries a capture reference. Each guard was negative-tested (mutated row, planted
+orphan capture, planted superseded citation) and fails with a precise message.
+
+**Coverage headroom.** Six error-path tests were added to `tests/mission-teams-edge.test.ts`
+(team view 403/404, member add/remove and leader-designation validation, requirement-line
+validation, team-dispatch eligibility chain, support-request leader/input/state rules), covering
+the validation branches of `src/server/services/teams.ts`. Statement coverage moved
+94.38% → 94.58% and branches 87.28% → 87.53% (thresholds unchanged: 94/83/94/95); the suite is
+1352 tests across 104 files.
+
+**Branch and PR state (2026-11-19).** Branch `arena/250278b6-borobiya`; PR #6 **OPEN and
+unmerged**, no release, no tag. Human P5 visual acceptance remains the only path to `done`.

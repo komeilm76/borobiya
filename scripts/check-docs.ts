@@ -106,6 +106,27 @@ async function checkCapturePlan(fail: (message: string) => void): Promise<void> 
   }
 }
 
+/**
+ * Every committed capture must be cited by name in the design matrix or the visual-acceptance
+ * record (evidence nobody can find is not evidence), and `superseded` matrix rows must carry no
+ * capture references at all (a superseded reference has no implementation to evidence).
+ */
+async function checkCaptureCitations(fail: (message: string) => void): Promise<void> {
+  const matrix = (await read(MATRIX_PATH)) ?? '';
+  const visualAcceptance = (await read('docs/VISUAL_ACCEPTANCE.md')) ?? '';
+  const glob = new Bun.Glob('*.png');
+  for await (const file of glob.scan({ cwd: path.join(ROOT, 'docs/visual-acceptance/screens'), onlyFiles: true })) {
+    if (!matrix.includes(file) && !visualAcceptance.includes(file)) {
+      fail(`committed capture ${file} is cited in neither ${MATRIX_PATH} nor docs/VISUAL_ACCEPTANCE.md`);
+    }
+  }
+  for (const line of matrix.split('\n')) {
+    if (/^\|[^|\n]+\.png\s*\|\s*superseded\s*\|/.test(line) && line.includes('screens/')) {
+      fail(`superseded matrix row carries a capture reference: ${line.slice(0, 80)}...`);
+    }
+  }
+}
+
 /** Counts legacy Python design tests, which must not return. */
 async function countLegacyDesignTests(directory: string): Promise<number> {
   const glob = new Bun.Glob('**/{test_*,*_test}.py');
@@ -150,6 +171,7 @@ async function checkDocs(): Promise<number> {
   if (!(await Bun.file(path.join(ROOT, '.bun-version')).exists())) fail('.bun-version is missing');
   await checkMatrixTally(fail);
   await checkCapturePlan(fail);
+  await checkCaptureCitations(fail);
 
   const designImages = await countDesignImages(path.join(ROOT, 'design'));
   if (designImages < 100) fail(`expected at least 100 canonical design images, found ${designImages}`);

@@ -322,3 +322,109 @@ describe('team endpoints authorization and freeze', () => {
     expect(leaderItem).toMatchObject({ adminNote: 'Internal staffing note.', status: 'rejected' });
   });
 });
+
+describe('teams validation and authorization error paths', () => {
+  async function createBareUser(username: string, role: string, jobTypeId: string | null, ready: boolean): Promise<string> {
+    const created = await apiFetch(server, '/_admin/users', {
+      method: 'POST', cookie: adminCookie,
+      body: { username, password: 'Responder!2026x', role, ...(jobTypeId ? { jobTypeId } : {}) }
+    });
+    expect(created.status, created.text).toBe(201);
+    const userId = created.json.data.userId as string;
+    if (jobTypeId) repo.run('UPDATE users SET job_type_id=? WHERE id=?', jobTypeId, userId);
+    if (ready) repo.run('UPDATE users SET ready_for_mission=1 WHERE id=?', userId);
+    return userId;
+  }
+
+  it('team view: unknown mission 404s and a non-member user is forbidden', async () => {
+    const { missionId } = await setupMission('err');
+    expect((await apiFetch(server, '/_user/missions/mis_missing/team', { cookie: requesterCookie })).status).toBe(404);
+    expect((await apiFetch(server, '/_admin/missions/mis_missing/team', { cookie: adminCookie })).status).toBe(404);
+    expect((await apiFetch(server, `/_user/missions/${missionId}/team`, { cookie: requesterCookie })).status).toBe(403);
+  });
+
+  it('addMembers rejects unknown users, non-responders, inactive and not-ready workers, and finished missions', async () => {
+    const { missionId } = await setupMission('add');
+    const add = (userIds: string[], mission = missionId) =>
+      apiFetch(server, `/_admin/missions/${mission}/members`, { method: 'POST', cookie: adminCookie, body: { userIds } });
+    expect((await add(['usr_missing'], 'mis_missing')).status).toBe(404);
+    expect((await add(['usr_missing'])).status).toBe(400);
+    const plainUser = await createBareUser('add.plainuser', 'user', null, false);
+    expect((await add([plainUser])).status).toBe(400);
+    const inactive = await createResponder('add.inactive', 'job_fire', true);
+    repo.run('UPDATE users SET active=0 WHERE id=?', inactive);
+    expect((await add([inactive])).status).toBe(400);
+    const notReady = await createResponder('add.notready', 'job_maintenance', false);
+    expect((await add([notReady])).status).toBe(400);
+    const fresh = await setupMission('addfin');
+    repo.run("UPDATE missions SET status='completed' WHERE id=?", fresh.missionId);
+    const candidate = await createResponder('add.finished', 'job_fire', true);
+    expect((await add([candidate], fresh.missionId)).status).toBe(409);
+  });
+
+  it('removeMember and designateLeader guard unknown missions, non-members and the sitting leader', async () => {
+    const { missionId, leader } = await setupMission('rm');
+    const outsider = await createResponder('rm.outsider', 'job_fire', true);
+    expect((await apiFetch(server, `/_admin/missions/mis_missing/members/${outsider}`, { method: 'DELETE', cookie: adminCookie, body: {} })).status).toBe(404);
+    expect((await apiFetch(server, `/_admin/missions/${missionId}/members/${outsider}`, { method: 'DELETE', cookie: adminCookie, body: {} })).status).toBe(404);
+    expect((await apiFetch(server, `/_admin/missions/${missionId}/members/${leader}`, { method: 'DELETE', cookie: adminCookie, body: {} })).status).toBe(409);
+    expect((await apiFetch(server, `/_admin/missions/${missionId}/leader`, { method: 'POST', cookie: adminCookie, body: { userId: outsider } })).status).toBe(409);
+    repo.run("UPDATE missions SET status='cancelled' WHERE id=?", missionId);
+    expect((await apiFetch(server, `/_admin/missions/${missionId}/leader`, { method: 'POST', cookie: adminCookie, body: { userId: leader } })).status).toBe(409);
+  });
+
+  it('setRequirements validates quantity bounds, unknown and deactivated job types', async () => {
+    const { missionId } = await setupMission('req');
+    const put = (requirements: unknown) =>
+      apiFetch(server, `/_admin/missions/${missionId}/requirements`, { method: 'PUT', cookie: adminCookie, body: { requirements } });
+    expect((await put([{ jobTypeId: 'job_fire', quantity: 0 }])).status).toBe(400);
+    expect((await put([{ jobTypeId: 'job_fire', quantity: 21 }])).status).toBe(400);
+    expect((await put([{ jobTypeId: 'job_missing', quantity: 1 }])).status).toBe(400);
+    repo.run("INSERT INTO job_types(id,label,offer_policy,rank,active,created_at,updated_at) VALUES('job_covtest','Coverage test','all',99,0,'2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z')");
+    expect((await put([{ jobTypeId: 'job_covtest', quantity: 1 }])).status).toBe(400);
+    expect((await apiFetch(server, '/_admin/missions/mis_missing/requirements', {
+      method: 'PUT', cookie: adminCookie, body: { requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] }
+    })).status).toBe(404);
+  });
+
+  it('teamDispatch validates group, leader eligibility, group membership, readiness and SOS state', async () => {
+    const dispatch = (sosId: string, body: Record<string, unknown>) =>
+      apiFetch(server, `/_admin/sos/${sosId}/team-dispatch`, { method: 'POST', cookie: adminCookie, body });
+    const leader = await createResponder('td.leader', 'job_fire', true);
+    const sosId = await createSosFor(requesterCookie);
+    expect((await dispatch('sos_missing', { groupId: 'grp_medical', leaderId: leader, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(404);
+    expect((await dispatch(sosId, { groupId: 'grp_missing', leaderId: leader, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(400);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: 'usr_missing', requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(400);
+    const plainUser = await createBareUser('td.plainuser', 'user', null, false);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: plainUser, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(400);
+    const noGroup = await createBareUser('td.nogroup', 'responder', 'job_fire', true);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: noGroup, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(400);
+    const notReady = await createResponder('td.notready', 'job_maintenance', false);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: notReady, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(400);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: leader, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }], memberIds: ['usr_missing'] })).status).toBe(400);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: leader, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }], memberIds: [noGroup] })).status).toBe(400);
+    const created = await dispatch(sosId, { groupId: 'grp_medical', leaderId: leader, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] });
+    expect(created.status, created.text).toBe(201);
+    expect((await dispatch(sosId, { groupId: 'grp_medical', leaderId: leader, requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] })).status).toBe(409);
+  });
+
+  it('support request creation and cancellation enforce leader-only, input and state rules', async () => {
+    const { missionId, leaderCookie } = await setupMission('sr');
+    const member = await createResponder('sr.member', 'job_medical', true);
+    await apiFetch(server, `/_admin/missions/${missionId}/members`, { method: 'POST', cookie: adminCookie, body: { userIds: [member] } });
+    const memberCookie = await login(server, 'sr.member', 'Responder!2026x');
+    const create = (cookie: string, body: Record<string, unknown>, mission = missionId) =>
+      apiFetch(server, `/_user/missions/${mission}/support-requests`, { method: 'POST', cookie, body });
+    expect((await create(memberCookie, { items: [{ jobTypeId: 'job_medical', quantity: 1 }], reason: 'Member asking for help here.' })).status).toBe(403);
+    expect((await create(leaderCookie, { items: [{ jobTypeId: 'job_medical', quantity: 1 }], reason: 'short' })).status).toBe(400);
+    expect((await create(leaderCookie, { items: [{ jobTypeId: 'job_missing', quantity: 1 }], reason: 'A perfectly good reason.' })).status).toBe(400);
+    expect((await create(leaderCookie, { items: [{ jobTypeId: 'job_medical', quantity: 1 }], reason: 'A perfectly good reason.' }, 'mis_missing')).status).toBe(404);
+    const created = await create(leaderCookie, { items: [{ jobTypeId: 'job_medical', quantity: 1 }], reason: 'Need another medic for rotation.' });
+    expect(created.status, created.text).toBe(201);
+    const requestId = created.json.data.id as string;
+    expect((await apiFetch(server, `/_user/missions/${missionId}/support-requests/${requestId}/cancel`, { method: 'POST', cookie: memberCookie })).status).toBe(403);
+    expect((await apiFetch(server, `/_user/missions/${missionId}/support-requests/srq_missing/cancel`, { method: 'POST', cookie: leaderCookie })).status).toBe(404);
+    expect((await apiFetch(server, `/_user/missions/${missionId}/support-requests/${requestId}/cancel`, { method: 'POST', cookie: leaderCookie })).status).toBe(200);
+    expect((await apiFetch(server, `/_user/missions/${missionId}/support-requests/${requestId}/cancel`, { method: 'POST', cookie: leaderCookie })).status).toBe(409);
+  });
+});
