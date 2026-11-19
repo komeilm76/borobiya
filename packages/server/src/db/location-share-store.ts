@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
@@ -266,7 +266,9 @@ export function repairStaleSharePinsQuery(db: Database, now: Date) {
     .set({ priorityDeviceId: sql`(select min(${userSessions.deviceId}) ${liveSessionsOfOwner})` })
     .where(and(
       eq(locationShares.isRevoked, false),
-      sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > ${now})`,
+      // Drizzle's timestamp column encoder serializes Date for postgres-js.
+      // A raw sql`${now}` parameter passes Date directly to Bind and crashes the sweep.
+      or(isNull(locationShares.expiresAt), gt(locationShares.expiresAt, now)),
       isNotNull(locationShares.priorityDeviceId),
       // Exactly one live *device* (distinct, so several sessions of one client-supplied device id
       // still count once), which makes re-pointing a certainty rather than a guess between

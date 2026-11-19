@@ -584,7 +584,7 @@ describe("repairStaleSharePinsQuery", () => {
     expect(sql).toContain('"user_sessions"."refresh_token_hash" is not null');
     // Only active shares that actually pin a device are considered.
     expect(sql).toContain('"location_shares"."is_revoked" = $1');
-    expect(sql).toContain('"location_shares"."expires_at" IS NULL OR "location_shares"."expires_at" > $2');
+    expect(sql).toContain('"location_shares"."expires_at" is null or "location_shares"."expires_at" > $2');
     expect(sql).toContain('"location_shares"."priority_device_id" is not null');
     // Exactly one live device, and the pinned one is not live: otherwise the user must choose again.
     // Distinct devices, not sessions: two live sessions of one device id are still one choice.
@@ -592,7 +592,8 @@ describe("repairStaleSharePinsQuery", () => {
     expect(sql).toContain("not exists (select 1");
     expect(sql).toContain('"user_sessions"."device_id" = "location_shares"."priority_device_id"');
     expect(built.params[0]).toBe(false);
-    expect(built.params[1]).toEqual(new Date("2026-10-21T09:00:00.000Z"));
+    // postgres-js cannot bind a raw Date. The column codec must serialize it.
+    expect(built.params[1]).toBe("2026-10-21T09:00:00.000Z");
   });
 });
 
