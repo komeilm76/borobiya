@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -18,6 +19,7 @@ import { parseServerEnv } from "./config/env";
 import * as schema from "./db/schema";
 import type { Database } from "./db/client";
 import { DrizzleAdminUserStore } from "./db/admin-user-store";
+import { DrizzleAdminOperationsStore } from "./db/admin-operations-store";
 import { DrizzleCategoryStore } from "./db/category-store";
 import { DrizzleUserDeviceStore } from "./db/device-store";
 import { DrizzleIncidentTypeStore } from "./db/incident-type-store";
@@ -170,6 +172,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       loginStore: new DrizzleUserLoginStore(db),
       recoveryStore: new DrizzleUserRecoveryStore(db),
       adminUserStore: new DrizzleAdminUserStore(db),
+      adminOperationsStore: new DrizzleAdminOperationsStore(db),
       securityQuestionsStore: new DrizzleUserSecurityQuestionsStore(db),
       userDeviceStore: new DrizzleUserDeviceStore(db),
       locationShareStore: new DrizzleLocationShareStore(db),
@@ -1211,6 +1214,33 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       apiRoutes.user.devices, 200, { url: apiRoutes.user.devices.url, headers: requesterHeaders }
     );
     expect(sessionsAfter.map(row => row.id)).not.toContain(remoteSession.id);
+
+    // Newly mounted admin operations: exercise successful persisted writes and schema-validate every response.
+    const stats = await callContract<{ counts: Record<string, number>; activeMissions: number; onlineUsers: number }>(
+      apiRoutes.admin.stats, 200, { url: apiRoutes.admin.stats.url, headers: adminHeaders });
+    expect(stats.counts).toHaveProperty("pending");
+    expect(stats.activeMissions).toBeGreaterThanOrEqual(0);
+    expect(stats.onlineUsers).toBeGreaterThanOrEqual(0);
+
+    const newReason = await callContract<{ id: string; key: string }>(apiRoutes.admin.createCancellationReason, 201, {
+      url: apiRoutes.admin.createCancellationReason.url, headers: adminHeaders,
+      payload: { type: "rescuer", key: "contract_weather", label: "Weather",
+        labelFa: "آب و هوا", requiresCustomText: false, isActive: false }
+    });
+    const adminReasons = await callContract<Array<{ id: string }>>(apiRoutes.admin.listCancellationReasons, 200, {
+      url: apiRoutes.admin.listCancellationReasons.url, headers: adminHeaders
+    });
+    expect(adminReasons.map((entry) => entry.id)).toContain(newReason.id);
+
+    const [suspended] = await db.insert(schema.users).values({
+      username: "contract_suspended", passwordHash: "test-hash:Suspended1", isSuspended: true
+    }).returning({ id: schema.users.id });
+    await callContract(apiRoutes.admin.unsuspendUser, 200, {
+      url: apiRoutes.admin.unsuspendUser.url.replace(":id", suspended!.id), headers: adminHeaders
+    });
+    const [afterUnsuspend] = await db.select({ isSuspended: schema.users.isSuspended })
+      .from(schema.users).where(eq(schema.users.id, suspended!.id));
+    expect(afterUnsuspend?.isSuspended).toBe(false);
 
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);

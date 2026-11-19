@@ -237,6 +237,9 @@ describe("T3.2.5 realtime sos:new-request broadcast + admin SOS read endpoints (
         },
         async updateUserActiveStatus() {
           return null;
+        },
+        async unsuspendUser() {
+          return "not_found" as const;
         }
       }
     });

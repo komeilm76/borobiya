@@ -59,6 +59,7 @@ export async function registerAdminUserRoutes(
   const detailRoute = apiRoutes.admin.getUser;
   const createRoute = apiRoutes.admin.createUser;
   const statusRoute = apiRoutes.admin.updateUserStatus;
+  const unsuspendRoute = apiRoutes.admin.unsuspendUser;
 
   app.get(listRoute.url, async (request, reply) => {
     const identity = await authorizeAdmin(request, reply, dependencies);
@@ -137,6 +138,17 @@ export async function registerAdminUserRoutes(
       .code(201)
       .header("cache-control", "no-store")
       .send(profilePayload(user));
+  });
+
+  app.patch(unsuspendRoute.url, async (request, reply) => {
+    const identity = await authorizeAdmin(request, reply, dependencies);
+    if (!identity) return;
+    const params = unsuspendRoute.schema.params.safeParse(request.params);
+    if (!params.success) return reply.code(400).send(errorResponse("VALIDATION_ERROR", "Invalid user ID."));
+    const result = await dependencies.store.unsuspendUser({ adminId: identity.userId, userId: params.data.id });
+    if (result === "not_found") return reply.code(404).send(errorResponse("USER_NOT_FOUND", "User not found."));
+    if (result === "updated") disconnectUserSockets(dependencies.io, params.data.id);
+    return reply.code(200).header("cache-control", "no-store").send();
   });
 
   app.patch(statusRoute.url, async (request, reply) => {

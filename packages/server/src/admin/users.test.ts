@@ -70,8 +70,9 @@ function makeStore(options: {
   const getUserDetails = vi.fn<AdminUserStore["getUserDetails"]>(async () => userDetail);
   const createAdminCreatedUser = vi.fn<AdminUserStore["createAdminCreatedUser"]>(async () => createdUser);
   const updateUserActiveStatus = vi.fn<AdminUserStore["updateUserActiveStatus"]>(async () => statusUser);
+  const unsuspendUser = vi.fn<AdminUserStore["unsuspendUser"]>(async () => "updated");
   return {
-    store: { findAdminActorById, hasActiveSession, listUsers, getUserDetails, createAdminCreatedUser, updateUserActiveStatus },
+    store: { findAdminActorById, hasActiveSession, listUsers, getUserDetails, createAdminCreatedUser, updateUserActiveStatus, unsuspendUser },
     findAdminActorById,
     hasActiveSession,
     listUsers,

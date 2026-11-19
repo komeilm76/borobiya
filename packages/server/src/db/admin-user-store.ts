@@ -60,6 +60,7 @@ export interface AdminUserStore {
     userId: string;
     isActive: boolean;
   }): Promise<AdminUserRecord | null>;
+  unsuspendUser(input: { adminId: string; userId: string }): Promise<"not_found" | "unchanged" | "updated">;
 }
 
 const adminUserSelection = {
@@ -279,6 +280,24 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       });
 
       return { ...updatedUser, categories: userCategories };
+    });
+  }
+
+  /** Do not revive a suspended account's old session when clearing the flag. */
+  async unsuspendUser(input: { adminId: string; userId: string }): Promise<"not_found" | "unchanged" | "updated"> {
+    return this.db.transaction(async (tx) => {
+      const [user] = await tx.select({ id: users.id, isSuspended: users.isSuspended })
+        .from(users).where(eq(users.id, input.userId)).for("update").limit(1);
+      if (!user) return "not_found";
+      if (!user.isSuspended) return "unchanged";
+      await tx.update(users).set({ isSuspended: false }).where(eq(users.id, input.userId));
+      await tx.update(userSessions).set({ refreshTokenHash: null, isOnline: false })
+        .where(eq(userSessions.userId, input.userId));
+      await tx.insert(adminAuditLog).values({
+        adminId: input.adminId, action: "user_unsuspended", targetType: "user", targetId: input.userId,
+        meta: { previousIsSuspended: true, isSuspended: false }
+      });
+      return "updated";
     });
   }
 }

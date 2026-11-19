@@ -117,7 +117,7 @@ export const adminRoutes = {
     url: "/_admin/users/:id/unsuspend",
     schema: {
       params: uuidPathParamsSchema,
-      responses: { 200: noContentResponseSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: noContentResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {
       operationId: "adminUnsuspendUser",

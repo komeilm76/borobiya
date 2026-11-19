@@ -23,6 +23,8 @@ import { registerAdminIncidentRoutes } from "./admin/incidents";
 import { DrizzleCategoryStore, type CategoryStore } from "./db/category-store";
 import { registerAdminCategoryRoutes } from "./admin/categories";
 import { registerAdminSosRoutes } from "./admin/sos";
+import { DrizzleAdminOperationsStore, type AdminOperationsStore } from "./db/admin-operations-store";
+import { registerAdminOperationsRoutes } from "./admin/operations";
 import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
 import { registerUserSearchRoute } from "./users/search";
 import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
@@ -82,6 +84,7 @@ export interface FastifyAppDependencies {
   recoveryStore?: UserRecoveryStore;
   /** Override admin user management queries/mutations and current admin-account checks in tests. */
   adminUserStore?: AdminUserStore;
+  adminOperationsStore?: AdminOperationsStore;
   /** Override user authorization/onboarding persistence in tests. */
   securityQuestionsStore?: UserSecurityQuestionsStore;
   /** Override the Active Devices read path in tests. */
@@ -149,6 +152,7 @@ export async function createFastifyApp(
     dependencies.loginStore,
     dependencies.recoveryStore,
     dependencies.adminUserStore,
+    dependencies.adminOperationsStore,
     dependencies.securityQuestionsStore,
     dependencies.userDeviceStore,
     dependencies.locationShareStore,
@@ -164,6 +168,7 @@ export async function createFastifyApp(
   const loginStore = dependencies.loginStore ?? new DrizzleUserLoginStore(database!.db);
   const recoveryStore = dependencies.recoveryStore ?? new DrizzleUserRecoveryStore(database!.db);
   const adminUserStore = dependencies.adminUserStore ?? new DrizzleAdminUserStore(database!.db);
+  const adminOperationsStore = dependencies.adminOperationsStore ?? new DrizzleAdminOperationsStore(database!.db);
   const securityQuestionsStore = dependencies.securityQuestionsStore ?? new DrizzleUserSecurityQuestionsStore(database!.db);
   const userDeviceStore = dependencies.userDeviceStore ?? new DrizzleUserDeviceStore(database!.db);
   const locationShareStore = dependencies.locationShareStore ?? new DrizzleLocationShareStore(database!.db);
@@ -234,6 +239,11 @@ export async function createFastifyApp(
     hashPassword: dependencies.hashPassword,
     verifyAnswer: dependencies.verifySecurityAnswer,
     io: realtime.io
+  });
+  await registerAdminOperationsRoutes(app, {
+    store: adminOperationsStore,
+    adminStore: adminUserStore,
+    jwtSecret: config.jwtSecret
   });
   await registerAdminUserRoutes(app, {
     store: adminUserStore,
