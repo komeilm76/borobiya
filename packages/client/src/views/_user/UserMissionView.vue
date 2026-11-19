@@ -902,13 +902,16 @@ function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
     map.on("idle", onStyleReady);
     map.on("click", onRouteMapClick);
     map.on("movestart", onMissionMapMove);
-    const onCameraFrame = () => {
-      if (props.visible) positionMapPointLabels(map, [rescuerMarker, ...waypointMarkers, incidentMarker]);
-    };
+    const onCameraFrame = () => queueMicrotask(() => {
+      if (props.visible && routeMap === map)
+        positionMapPointLabels(map, [rescuerMarker, ...waypointMarkers, incidentMarker]);
+    });
     map.on("move", onCameraFrame);
+    map.on("moveend", onCameraFrame);
     map.on("resize", onCameraFrame);
     detachRouteMap = () => {
       map.off("move", onCameraFrame);
+      map.off("moveend", onCameraFrame);
       map.off("resize", onCameraFrame);
       map.off("idle", onStyleReady);
       map.off("click", onRouteMapClick);

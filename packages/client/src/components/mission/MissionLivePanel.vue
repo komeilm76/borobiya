@@ -291,13 +291,19 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
     detachCameraGesture?.();
     cameraIntent.reset();
     const onMove = (event: MapMovementEvent) => { if (props.visible && event.originalEvent) cameraIntent.noteGesture(); };
-    const onCameraFrame = () => { if (props.visible) positionMapPointLabels(instance, Object.values(markers)); };
+    // Marker listeners run later in the same map event. Measure after MapLibre
+    // has applied their new transforms, not at the preceding camera position.
+    const onCameraFrame = () => queueMicrotask(() => {
+      if (props.visible && map.value === instance) positionMapPointLabels(instance, Object.values(markers));
+    });
     instance.on("movestart", onMove);
     instance.on("move", onCameraFrame);
+    instance.on("moveend", onCameraFrame);
     instance.on("resize", onCameraFrame);
     detachCameraGesture = () => {
       instance.off("movestart", onMove);
       instance.off("move", onCameraFrame);
+      instance.off("moveend", onCameraFrame);
       instance.off("resize", onCameraFrame);
     };
   }

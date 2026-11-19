@@ -716,7 +716,8 @@ function syncOwnMarker(freshFix = false): void {
     accent.setAttribute("d", "M24 10 L32 30 L24 26 Z");
     arrow.append(body, accent);
     const gpsLabel = document.createElement("span");
-    gpsLabel.className = "user-map-view__own-marker-label";
+    gpsLabel.className = "user-map-view__own-marker-label bb-map-point__caption";
+    gpsLabel.dir = "auto";
     gpsLabel.textContent = "GPS دستگاه"; // Not the mission's consented shared fix.
     gpsLabel.setAttribute("aria-hidden", "true");
     element.append(icon, arrow, gpsLabel);
@@ -1533,6 +1534,12 @@ let profileController: AbortController | null = null;
 let placeController: AbortController | null = null;
 const peerMarkers = new Map<string, Marker>();
 let pointSpreadScheduled = false;
+function positionVisiblePointLabelsAfterMapMove(instance: MapLibreMap): void {
+  // MapLibre updates marker transforms later in the same move/resize event.
+  queueMicrotask(() => {
+    if (map.value === instance) positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);
+  });
+}
 function schedulePointSpread(): void {
   if (pointSpreadScheduled) return;
   pointSpreadScheduled = true;
@@ -1541,7 +1548,7 @@ function schedulePointSpread(): void {
     if (!map.value) return;
     // GPS remains on the exact fix; only coincident route/companion marks move.
     spreadCoincidentPoints([destinationMarker, routeOriginMarker, ...peerMarkers.values()], [ownMarker]);
-    positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker]);
+    positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker, ownMarker]);
     if (destinationMarker && isSelectedSearchDestination.value && !journey.navigating.value)
       positionSelectedPlaceLabel(destinationMarker, map.value);
   });
@@ -2104,13 +2111,14 @@ function markUserCameraMove(event: MapMovementEvent): void {
 }
 
 function onMapMoving(event: MapMovementEvent): void {
-  if (map.value) positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker]);
+  if (map.value) positionVisiblePointLabelsAfterMapMove(map.value);
   if (journey.navigating.value) return; // GPS-follow flights must never trigger a geocoder read.
   if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
   placeSearch.pruneForViewport(!!event.originalEvent || showAllResultsOnMap.value);
 }
 
 function onMapMoveEnd(event: MapMovementEvent): void {
+  if (map.value) positionVisiblePointLabelsAfterMapMove(map.value);
   markUserCameraMove(event); // Also cover gestures whose start preceded this listener.
   // Screen-space collisions change with zoom, pan, fitBounds and flyTo, even
   // when the search snapshot itself did not change.
@@ -2137,6 +2145,7 @@ function onMapCoverageChanged(instance: MapLibreMap): void {
 }
 
 function onMapResize(): void {
+  if (map.value) positionVisiblePointLabelsAfterMapMove(map.value);
   syncResultMarkers();
   positionSelectedPlaceLabels();
   frameCamera();
@@ -2365,6 +2374,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
   top: calc(100% + .45rem); bottom: auto;
 }
+/* The compact Trip pin uses a centered 30px sign; its place callout should
+   sit beside the sign, not beyond the full 44px touch target. The default
+   MapLibre search pin above retains its bottom-tip anchoring. */
+:global(.user-map-view .bb-map-point.user-map-view__selected-place .user-map-view__selected-place-label:not([hidden])) {
+  bottom: calc(50% + 19px);
+}
+:global(.user-map-view .bb-map-point.user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
+  top: calc(50% + 19px); bottom: auto;
+}
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__result-marker),
   :global(.user-map-view .user-map-view__selected-place-label),
@@ -2515,12 +2533,21 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 :global(.user-map-view .user-map-view__own-marker-label) { display: none; }
 :global(.user-map-view .user-map-view__own-marker--mission .user-map-view__own-marker-label) {
-  position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  position: absolute; top: calc(50% + 19px); left: 50%;
+  transform: translateX(calc(-50% + var(--bb-point-label-shift, 0px)));
   display: block; width: max-content; max-width: min(7rem, 34vw); overflow: hidden; text-overflow: ellipsis;
   padding: .18rem .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
   border-radius: .55rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 10px rgba(3, 29, 31, .45); font: 800 .75rem/1.4 var(--bb-font-family, sans-serif);
   white-space: nowrap; pointer-events: none;
+}
+:global(.user-map-view .user-map-view__own-marker--mission.bb-map-point--label-flipped .user-map-view__own-marker-label) {
+  top: auto; bottom: calc(50% + 19px);
+}
+/* MapLibre rotates the entire guidance arrow marker; do not rotate a text
+   caption with it. The GPS arrow and the accessible marker name remain. */
+:global(.user-map-view .user-map-view__own-marker--mission.user-map-view__own-marker--navigating .user-map-view__own-marker-label) {
+  display: none;
 }
 :global(.user-map-view .user-map-view__own-marker-icon) {
   display: grid; place-items: center; width: 32px; height: 32px;

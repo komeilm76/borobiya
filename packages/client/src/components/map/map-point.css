@@ -1,6 +1,7 @@
 /* Shared DOM pins on the User map. Dispatch uses its own WebGL label policy.
-   The transparent 44px target leaves tile detail visible and remains tappable. */
-.bb-map-point { position: relative; display: grid; place-items: center; width: 44px; height: 44px;
+   This element IS the MapLibre marker, not a child of it: it must stay absolute
+   at (0, 0) so MapLibre's coordinate transform anchors the 44px hit target. */
+.bb-map-point { position: absolute; top: 0; left: 0; display: grid; place-items: center; width: 44px; height: 44px;
   padding: 0; border: 0; background: transparent; color: #fff; font: 800 13px/1 var(--bb-font-family, sans-serif);
   cursor: default; appearance: none; touch-action: manipulation; }
 button.bb-map-point { cursor: pointer; }
@@ -15,9 +16,10 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point--nearby .bb-map-point__sign { background: #0e6666; border-radius: 50%; font-size: 19px; }
 .bb-map-point--requester .bb-map-point__sign { background: #a9422a; border-radius: 12px 12px 3px 12px; }
 .bb-map-point--director .bb-map-point__sign { background: #5151a1; border-radius: 4px; }
-/* Fixed, opaque text surfaces: a translucent map tile behind a pill is not a
-   reliable contrast background. Alternate vertical sides for crowded rooms. */
-.bb-map-point__caption { position: absolute; top: calc(100% + 2px); left: 50%;
+/* Opaque text surfaces with a 4px sign-to-caption gap. Position from the
+   centered 30px sign, not the outer 44px touch target; labels stay attached
+   visually while the geographical anchor remains the sign's center. */
+.bb-map-point__caption { position: absolute; top: calc(50% + 19px); left: 50%;
   transform: translateX(calc(-50% + var(--bb-point-label-shift, 0px))); box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
   max-width: min(8rem, 36vw); min-height: 25px; padding: .17rem .46rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .3); border-radius: .55rem;
@@ -29,19 +31,19 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point--helper .bb-map-point__caption,
 .bb-map-point--start .bb-map-point__caption,
 .bb-map-point--stop .bb-map-point__caption,
-.bb-map-point--director .bb-map-point__caption { top: auto; bottom: calc(100% + 2px); }
-.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption { top: auto; bottom: calc(100% + 2px); }
+.bb-map-point--director .bb-map-point__caption { top: auto; bottom: calc(50% + 19px); }
+.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption { top: auto; bottom: calc(50% + 19px); }
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--sos .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--helper .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--start .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--stop .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--director .bb-map-point__caption {
-  top: calc(100% + 2px); bottom: auto;
+  top: calc(50% + 19px); bottom: auto;
 }
 .bb-map-point--stale .bb-map-point__sign { border-style: dashed; }
 .bb-map-point__age { flex: none; padding-inline-start: .3rem; border-inline-start: 1px solid currentColor;
   font-size: .67rem; font-weight: 700; }
-.bb-map-point__tooltip { position: absolute; bottom: calc(100% + 5px); left: 50%; z-index: 2;
+.bb-map-point__tooltip { position: absolute; bottom: calc(50% + 19px); left: 50%; z-index: 2;
   transform: translateX(-50%); display: block; max-width: min(13rem, calc(100vw - 1.5rem));
   width: max-content; padding: .35rem .55rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
   border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));

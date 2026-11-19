@@ -34,6 +34,20 @@ describe("on-map labels for each user-workspace point state", () => {
     expect(css).toContain('.bb-map-point.user-map-view__selected-place--named .bb-map-point__caption { display: none; }');
   });
 
+  it("keeps the actual MapLibre marker absolute and places captions beside the 30px sign", () => {
+    // MapLibre applies a translate(...) to this exact element; relative positioning
+    // would place the geographic anchor at a flow-dependent, wrong coordinate.
+    expect(css).toMatch(/\.bb-map-point \{ position: absolute; top: 0; left: 0;/);
+    expect(css).not.toMatch(/\.bb-map-point \{ position: relative/);
+    expect(css).toContain('.bb-map-point__caption { position: absolute; top: calc(50% + 19px); left: 50%;');
+    expect(css).toContain('bottom: calc(50% + 19px);');
+    expect(room).toContain('queueMicrotask(() => {');
+    expect(mission).toContain('queueMicrotask(() => {');
+    expect(userMap).toContain('if (map.value === instance) positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);');
+    expect(userMap).toContain('if (map.value) positionVisiblePointLabelsAfterMapMove(map.value);');
+    expect(userMap).toContain('.user-map-view__own-marker--mission.bb-map-point--label-flipped');
+  });
+
   it("does not turn the Dispatch map into a repeated user-map incident label layer", () => {
     expect(dispatch).not.toContain('positionMapPointLabels(');
     expect(dispatch).not.toContain('createMapPointElement(');
