@@ -1,6 +1,16 @@
 import type { MissionLocationEvent } from "@shared/index";
 
 type Role = MissionLocationEvent["role"];
+
+/** Only the room's authorised entries are rendered. Never infer a participant's
+ * name from a coordinate or from a different (public) sharing session. */
+export function missionMemberCaption(role: Role, viewerId: string | null, mission: {
+  requesterId: string; rescuerId: string;
+}, names?: { requester?: string; rescuer?: string }): string {
+  if (role === "admin") return "مرکز";
+  if (viewerId && viewerId === mission[role === "rescuer" ? "rescuerId" : "requesterId"]) return "خودم";
+  return names?.[role]?.trim() || (role === "rescuer" ? "امدادگر" : "درخواست‌کننده");
+}
 export type MissionMarkerSnapshot = { lat: number; lon: number; fresh: boolean };
 export type MissionMarkerStatus = { role: Role; entry: { lat: number; lon: number } | null | undefined; fresh: boolean };
 export type MissionMarkerOp =

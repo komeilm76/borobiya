@@ -151,8 +151,10 @@ export type MissionBrief = z.infer<typeof missionBriefSchema>;
 /** Transport presence only. Neither value implies the person is sharing GPS or physically safe. */
 export const missionPresenceSchema = z.strictObject({
   missionId: idSchema,
-  requester: z.strictObject({ online: z.boolean(), lastSeenAt: timestampSchema.nullable() }),
-  rescuer: z.strictObject({ online: z.boolean(), lastSeenAt: timestampSchema.nullable() })
+  // Names are available only in the already participant/admin-scoped active
+  // mission response. Optional so older installations still show role labels.
+  requester: z.strictObject({ online: z.boolean(), lastSeenAt: timestampSchema.nullable(), username: usernameSchema.optional() }),
+  rescuer: z.strictObject({ online: z.boolean(), lastSeenAt: timestampSchema.nullable(), username: usernameSchema.optional() })
 });
 export type MissionPresence = z.infer<typeof missionPresenceSchema>;
 

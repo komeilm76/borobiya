@@ -39,7 +39,8 @@ describe("three-role mission live UI (T3.5.7)", () => {
     const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
     expect(panel).toContain('instance.on("movestart", onMove);');
     expect(panel).toContain('if (props.visible && event.originalEvent) cameraIntent.noteGesture();');
-    expect(panel).toContain('detachCameraGesture = () => instance.off("movestart", onMove);');
+    expect(panel).toContain('instance.off("movestart", onMove);');
+    expect(panel).toContain('instance.off("move", onCameraFrame);');
     expect(panel).toContain('detachCameraGesture?.();\n  detachCameraGesture = null;');
     expect(panel).toContain('cameraIntent.shouldAutoFrame(props.routeActive)');
     expect(panel).toContain('if (next === "" && previous && !props.routeActive) {');

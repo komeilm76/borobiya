@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { computed, ref, shallowRef, watch } from "vue";
 import { describe, expect, it, vi } from "vitest";
-import { planMissionMarkerSync, type MissionMarkerSnapshot } from "./live-marker-sync";
+import { missionMemberCaption, planMissionMarkerSync, type MissionMarkerSnapshot } from "./live-marker-sync";
 
 const panel = readFileSync(new URL("../components/mission/MissionLivePanel.vue", import.meta.url), "utf8");
 const status = (role: "requester" | "rescuer" | "admin", lat: number | null, fresh = true) => ({
@@ -9,6 +9,22 @@ const status = (role: "requester" | "rescuer" | "admin", lat: number | null, fre
 });
 
 describe("mission map marker work is proportional to visible changes", () => {
+  it("labels each authorised member without assuming another participant's identity", () => {
+    const mission = { requesterId: "r", rescuerId: "h" };
+    expect(["requester", "rescuer", "admin"].map((role) =>
+      missionMemberCaption(role as "requester" | "rescuer" | "admin", "h", mission)))
+      .toEqual(["درخواست‌کننده", "خودم", "مرکز"]);
+    expect(missionMemberCaption("requester", "r", mission)).toBe("خودم");
+    expect(missionMemberCaption("rescuer", "r", mission)).toBe("امدادگر");
+    expect(missionMemberCaption("admin", null, mission)).toBe("مرکز");
+    const names = { requester: "requester_01", rescuer: "rescuer_02" };
+    expect(missionMemberCaption("rescuer", "r", mission, names)).toBe("rescuer_02");
+    expect(missionMemberCaption("requester", "h", mission, names)).toBe("requester_01");
+    expect(missionMemberCaption("rescuer", "h", mission, names)).toBe("خودم");
+    expect(missionMemberCaption("admin", "h", mission, names)).toBe("مرکز");
+    expect(panel).toContain('text.textContent = caption;');
+    expect(panel).not.toContain("element.style.opacity");
+  });
   it("does not rebuild unchanged peers, but moves fixes and replaces only a marker whose stale scale changes", () => {
     const previous: Partial<Record<"requester" | "rescuer" | "admin", MissionMarkerSnapshot>> = {
       requester: { lat: 35.7, lon: 51.4, fresh: true },

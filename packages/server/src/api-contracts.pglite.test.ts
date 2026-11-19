@@ -980,10 +980,12 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect((await app.inject({ method: "GET", url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(new Date().toISOString())}`,
       headers: adminHeaders })).statusCode).toBe(403);
     const presenceUrl = apiRoutes.sos.getMissionPresence.url.replace(":id", accepted.missionId);
-    const presence = await callContract<{ missionId: string; requester: { online: boolean }; rescuer: { online: boolean } }>(
+    const presence = await callContract<{ missionId: string; requester: { online: boolean; username: string };
+      rescuer: { online: boolean; username: string } }>(
       apiRoutes.sos.getMissionPresence, 200, { url: presenceUrl, headers: requesterHeaders });
     expect(presence).toMatchObject({ missionId: accepted.missionId,
-      requester: { online: false }, rescuer: { online: true } });
+      requester: { online: false, username: "field_requester" },
+      rescuer: { online: true, username: "mountain_rescuer" } });
     expect((await app.inject({ method: "GET", url: presenceUrl, headers: adminHeaders })).statusCode).toBe(200);
     expect((await callContract<{ code: string }>(apiRoutes.sos.getMissionPresence, 404, {
       url: apiRoutes.sos.getMissionPresence.url.replace(":id", "00000000-0000-4000-8000-000000000099"),

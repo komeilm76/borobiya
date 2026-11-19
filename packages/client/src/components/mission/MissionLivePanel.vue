@@ -110,12 +110,12 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
-import { createMapPointElement } from "@/components/map/map-point";
+import { createMapPointElement, MAP_POINT_META, positionMapPointLabels } from "@/components/map/map-point";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
 import { freshMissionMemberCamera } from "@/mission/member-focus";
 import { createLiveCameraIntent } from "@/mission/live-camera-intent";
-import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
+import { missionMemberCaption, planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
 import { getMissionLocationPolicy, putMissionLocationPolicy, type MissionLocationPolicy } from "@/api/mission";
 import { accountSessionKey } from "@/composables/device-identity";
@@ -224,6 +224,8 @@ function syncMarkers(): void {
   const instance = map.value;
   const MarkerClass = markerConstructor;
   if (!instance || !MarkerClass) return;
+  const names = { requester: presence.snapshot.value?.requester.username,
+    rescuer: presence.snapshot.value?.rescuer.username };
   for (const op of planMissionMarkerSync(paintedMarkers, live.participantStatus.value)) {
     const { role } = op;
     if (op.kind === "move") {
@@ -235,19 +237,29 @@ function syncMarkers(): void {
     delete markers[role];
     delete paintedMarkers[role];
     if (op.kind === "remove") continue;
-    // Role silhouette and letter are readable without consulting a color key.
-    // Freshness remains explicit in the accessible name, not implied by opacity.
-    const caption = role === "rescuer"
-      ? auth.user?.id === props.mission.rescuerId ? "خودم" : "امدادگر"
-      : role === "admin" ? "مرکز" : undefined;
+    // A stale fix remains legible: a dashed sign and an explicit age tag,
+    // never reduced opacity on the text. The live store already enforces access.
+    const caption = missionMemberCaption(role, auth.user?.id ?? null, props.mission, names);
     const element = createMapPointElement(role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester",
-      op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی", { caption });
-    element.style.opacity = op.next.fresh ? "1" : "0.6";
+      op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی", { caption, stale: !op.next.fresh });
     const marker = new MarkerClass({ element, anchor: "center" })
       .setLngLat([op.next.lon, op.next.lat]).addTo(instance);
     markers[role] = marker;
     paintedMarkers[role] = op.next;
   }
+  // A later authorised presence read may supply a username. Change only text,
+  // not the pin or GPS coordinates; remove/reset still happens synchronously.
+  for (const role of ["requester", "rescuer", "admin"] as const) {
+    const element = markers[role]?.getElement();
+    const status = paintedMarkers[role];
+    const caption = missionMemberCaption(role, auth.user?.id ?? null, props.mission, names);
+    const text = element?.querySelector<HTMLElement>(".bb-map-point__caption-name");
+    if (!element || !status || !text || text.textContent === caption) continue;
+    text.textContent = caption;
+    const kind = role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester";
+    element.setAttribute("aria-label", `${MAP_POINT_META[kind].label}، ${caption}؛ موقعیت ${status.fresh ? "تازه" : "قدیمی"}`);
+  }
+  positionMapPointLabels(instance, Object.values(markers));
 }
 function focusMembers(userInitiated = false) {
   if (!props.visible || !map.value) return;
@@ -279,8 +291,15 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
     detachCameraGesture?.();
     cameraIntent.reset();
     const onMove = (event: MapMovementEvent) => { if (props.visible && event.originalEvent) cameraIntent.noteGesture(); };
+    const onCameraFrame = () => { if (props.visible) positionMapPointLabels(instance, Object.values(markers)); };
     instance.on("movestart", onMove);
-    detachCameraGesture = () => instance.off("movestart", onMove);
+    instance.on("move", onCameraFrame);
+    instance.on("resize", onCameraFrame);
+    detachCameraGesture = () => {
+      instance.off("movestart", onMove);
+      instance.off("move", onCameraFrame);
+      instance.off("resize", onCameraFrame);
+    };
   }
   markerConstructor = MarkerClass;
   map.value = instance;
@@ -325,7 +344,8 @@ watch(() => props.routeActive, (active) => {
 // The age clock ticks every second; a new array literal would rebuild three DOM-backed
 // markers per tick even when no fix or stale state changed. Sync-flush clears private
 // markers on the same call stack as a mission/account/logout boundary.
-watch([() => live.locations.value, () => live.participantStatus.value.map((member) => member.fresh).join(",")],
+watch([() => live.locations.value, () => live.participantStatus.value.map((member) => member.fresh).join(","),
+  () => `${presence.snapshot.value?.requester.username ?? ""}|${presence.snapshot.value?.rescuer.username ?? ""}`],
   syncMarkers, { flush: "sync" });
 onBeforeUnmount(() => {
   detachCameraGesture?.();

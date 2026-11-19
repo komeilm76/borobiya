@@ -1,5 +1,5 @@
-/* One map-point grammar across dispatch and user map. The 44px hit area is
-   transparent; the 30px sign leaves tile context visible even on a phone. */
+/* Shared DOM pins on the User map. Dispatch uses its own WebGL label policy.
+   The transparent 44px target leaves tile detail visible and remains tappable. */
 .bb-map-point { position: relative; display: grid; place-items: center; width: 44px; height: 44px;
   padding: 0; border: 0; background: transparent; color: #fff; font: 800 13px/1 var(--bb-font-family, sans-serif);
   cursor: default; appearance: none; touch-action: manipulation; }
@@ -15,15 +15,35 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point--nearby .bb-map-point__sign { background: #0e6666; border-radius: 50%; font-size: 19px; }
 .bb-map-point--requester .bb-map-point__sign { background: #a9422a; border-radius: 12px 12px 3px 12px; }
 .bb-map-point--director .bb-map-point__sign { background: #5151a1; border-radius: 4px; }
-.bb-map-point__caption { position: absolute; left: calc(100% - 3px); top: 50%;
-  transform: translateY(-50%); max-width: min(9rem, 32vw); overflow: hidden;
-  padding: .2rem .4rem; border: 1px solid var(--bb-color-outline);
-  border-radius: .55rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: 0 2px 8px rgba(12, 31, 38, .28); font: 700 .82rem/1.4 var(--bb-font-family, sans-serif);
-  white-space: nowrap; text-overflow: ellipsis; pointer-events: none; }
-.bb-map-point__tooltip { position: absolute; bottom: calc(100% + 2px); left: 50%; z-index: 2;
+/* Fixed, opaque text surfaces: a translucent map tile behind a pill is not a
+   reliable contrast background. Alternate vertical sides for crowded rooms. */
+.bb-map-point__caption { position: absolute; top: calc(100% + 2px); left: 50%;
+  transform: translateX(calc(-50% + var(--bb-point-label-shift, 0px))); box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
+  max-width: min(8rem, 36vw); min-height: 25px; padding: .17rem .46rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .3); border-radius: .55rem;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 3px 10px rgba(3, 29, 31, .45); font: 800 .78rem/1.45 var(--bb-font-family, sans-serif);
+  white-space: nowrap; pointer-events: none; }
+.bb-map-point__caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bb-map-point--sos .bb-map-point__caption,
+.bb-map-point--helper .bb-map-point__caption,
+.bb-map-point--start .bb-map-point__caption,
+.bb-map-point--stop .bb-map-point__caption,
+.bb-map-point--director .bb-map-point__caption { top: auto; bottom: calc(100% + 2px); }
+.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption { top: auto; bottom: calc(100% + 2px); }
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--sos .bb-map-point__caption,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--helper .bb-map-point__caption,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--start .bb-map-point__caption,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--stop .bb-map-point__caption,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--director .bb-map-point__caption {
+  top: calc(100% + 2px); bottom: auto;
+}
+.bb-map-point--stale .bb-map-point__sign { border-style: dashed; }
+.bb-map-point__age { flex: none; padding-inline-start: .3rem; border-inline-start: 1px solid currentColor;
+  font-size: .67rem; font-weight: 700; }
+.bb-map-point__tooltip { position: absolute; bottom: calc(100% + 5px); left: 50%; z-index: 2;
   transform: translateX(-50%); display: block; max-width: min(13rem, calc(100vw - 1.5rem));
-  width: max-content; padding: .35rem .55rem; border: 1px solid var(--bb-color-outline);
+  width: max-content; padding: .35rem .55rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
   border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); font: 700 .78rem/1.4 var(--bb-font-family, sans-serif);
   white-space: normal; overflow-wrap: anywhere; visibility: hidden; pointer-events: none; }
@@ -32,6 +52,9 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point:focus-visible { z-index: 6; outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 1px; border-radius: 12px; }
 .bb-map-point:focus-visible .bb-map-point__tooltip { visibility: visible; }
 .bb-map-point.mission-desk__selected-stop .bb-map-point__sign { outline: 3px solid #fbbf24; outline-offset: 2px; }
+/* The selected Trip place already has a full-name callout above the pin. */
+.bb-map-point.user-map-view__selected-place--named .bb-map-point__caption { display: none; }
 @media (forced-colors: active) { .bb-map-point__sign { border-color: CanvasText !important;
     color: CanvasText !important; background: Canvas !important; box-shadow: none; }
-  .bb-map-point__caption { background: Canvas; color: CanvasText; border-color: CanvasText; box-shadow: none; } }
+  .bb-map-point__caption, .bb-map-point__tooltip { background: Canvas; color: CanvasText;
+    border-color: CanvasText; box-shadow: none; } }

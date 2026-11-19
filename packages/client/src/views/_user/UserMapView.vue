@@ -343,7 +343,7 @@ import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
-import { createMapPointElement } from "@/components/map/map-point";
+import { createMapPointElement, positionMapPointLabels } from "@/components/map/map-point";
 import { spreadCoincidentPoints } from "@/components/map/coincident-points";
 import { clusterAppearance, matchesSelectedSearchDestination, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
@@ -715,7 +715,11 @@ function syncOwnMarker(freshFix = false): void {
     accent.classList.add("user-map-view__direction-arrow__accent");
     accent.setAttribute("d", "M24 10 L32 30 L24 26 Z");
     arrow.append(body, accent);
-    element.append(icon, arrow);
+    const gpsLabel = document.createElement("span");
+    gpsLabel.className = "user-map-view__own-marker-label";
+    gpsLabel.textContent = "GPS دستگاه"; // Not the mission's consented shared fix.
+    gpsLabel.setAttribute("aria-hidden", "true");
+    element.append(icon, arrow, gpsLabel);
     element.addEventListener("click", (event) => event.stopPropagation());
     ownMarker = new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })
       .setLngLat([fix.lon, fix.lat]).addTo(instance);
@@ -1537,6 +1541,7 @@ function schedulePointSpread(): void {
     if (!map.value) return;
     // GPS remains on the exact fix; only coincident route/companion marks move.
     spreadCoincidentPoints([destinationMarker, routeOriginMarker, ...peerMarkers.values()], [ownMarker]);
+    positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker]);
     if (destinationMarker && isSelectedSearchDestination.value && !journey.navigating.value)
       positionSelectedPlaceLabel(destinationMarker, map.value);
   });
@@ -1867,6 +1872,7 @@ function syncDestinationMarker(): void {
   const label = element.querySelector<HTMLElement>(".user-map-view__selected-place-label");
   const namedSearch = isSelectedSearchDestination.value && !journey.navigating.value;
   if (label) { label.hidden = !namedSearch; label.textContent = namedSearch ? journey.title.value : ""; }
+  element.classList.toggle("user-map-view__selected-place--named", namedSearch);
   if (namedSearch) positionSelectedPlaceLabel(destinationMarker, instance);
   // No native hover tooltip on a selected search result.
   if (namedSearch) element.removeAttribute("title");
@@ -2098,6 +2104,7 @@ function markUserCameraMove(event: MapMovementEvent): void {
 }
 
 function onMapMoving(event: MapMovementEvent): void {
+  if (map.value) positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker]);
   if (journey.navigating.value) return; // GPS-follow flights must never trigger a geocoder read.
   if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
   placeSearch.pruneForViewport(!!event.originalEvent || showAllResultsOnMap.value);
@@ -2505,6 +2512,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 :global(.user-map-view .user-map-view__own-marker--mission) {
   border: 2px dashed rgb(var(--v-theme-primary)); background: rgb(var(--v-theme-surface));
+}
+:global(.user-map-view .user-map-view__own-marker-label) { display: none; }
+:global(.user-map-view .user-map-view__own-marker--mission .user-map-view__own-marker-label) {
+  position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  display: block; width: max-content; max-width: min(7rem, 34vw); overflow: hidden; text-overflow: ellipsis;
+  padding: .18rem .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
+  border-radius: .55rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 3px 10px rgba(3, 29, 31, .45); font: 800 .75rem/1.4 var(--bb-font-family, sans-serif);
+  white-space: nowrap; pointer-events: none;
 }
 :global(.user-map-view .user-map-view__own-marker-icon) {
   display: grid; place-items: center; width: 32px; height: 32px;

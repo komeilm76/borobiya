@@ -414,7 +414,7 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouteNavigation } from "@/composables/use-route-navigation";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
-import { createMapPointElement } from "@/components/map/map-point";
+import { createMapPointElement, positionMapPointLabels } from "@/components/map/map-point";
 import { spreadCoincidentPoints } from "@/components/map/coincident-points";
 import MapPointKey from "@/components/map/MapPointKey.vue";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
@@ -844,7 +844,7 @@ function syncRouteMap(): void {
   if (!map || !incident || !MarkerClass) return;
   waypointMarkers = routing.via.value.map((point, index) => new MarkerClass({
     element: createMapPointElement("stop", navigation.active.value ? "باز کردن برنامهٔ مسیر" : "باز کردن فهرست ایستگاه‌ها", {
-      number: index + 1, onActivate: () => {
+      number: index + 1, caption: `ایستگاه ${(index + 1).toLocaleString("fa-IR")}`, onActivate: () => {
         openRouteWorkspace();
         if (!navigation.active.value && activeTool.value === "route") openStopsSection();
       }
@@ -861,9 +861,10 @@ function syncRouteMap(): void {
     .setLngLat([incident.lon, incident.lat]).addTo(map);
   // A planned origin is a snapshot, not the rescuer's live/consented location.
   rescuerMarker = routing.from.value ? new MarkerClass({
-    element: createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده"), anchor: "center"
+    element: createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده", { caption: "مبدأ مسیر" }), anchor: "center"
   }).setLngLat([routing.from.value.lon, routing.from.value.lat]).addTo(map) : null;
   spreadCoincidentPoints([rescuerMarker, ...waypointMarkers, incidentMarker]);
+  positionMapPointLabels(map, [rescuerMarker, ...waypointMarkers, incidentMarker]);
   highlightRouteStop();
   // Route changes frame the plan, but updates must not interrupt active GPS guidance.
   if (!navigation.active.value) frameMissionRoute();
@@ -901,7 +902,14 @@ function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
     map.on("idle", onStyleReady);
     map.on("click", onRouteMapClick);
     map.on("movestart", onMissionMapMove);
+    const onCameraFrame = () => {
+      if (props.visible) positionMapPointLabels(map, [rescuerMarker, ...waypointMarkers, incidentMarker]);
+    };
+    map.on("move", onCameraFrame);
+    map.on("resize", onCameraFrame);
     detachRouteMap = () => {
+      map.off("move", onCameraFrame);
+      map.off("resize", onCameraFrame);
       map.off("idle", onStyleReady);
       map.off("click", onRouteMapClick);
       map.off("movestart", onMissionMapMove);

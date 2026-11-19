@@ -90,6 +90,9 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
         role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId))))
       .limit(1);
     if (!row) return null;
+    const memberIds = [row.requesterId, row.rescuerId];
+    const names = await this.db.select({ id: users.id, username: users.username }).from(users)
+      .where(inArray(users.id, memberIds));
     const sessions = await this.db.select({ userId: userSessions.userId,
       isOnline: userSessions.isOnline, lastActiveAt: userSessions.lastActiveAt })
       .from(userSessions).where(and(inArray(userSessions.userId, [row.requesterId, row.rescuerId]),
@@ -101,7 +104,8 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
         !latest || entry.lastActiveAt > latest ? entry.lastActiveAt : latest, null);
       return { online: entries.some((entry) => entry.isOnline &&
         now - entry.lastActiveAt.getTime() <= PRESENCE_STALE_MS && entry.lastActiveAt.getTime() <= now + 10_000),
-        lastSeenAt: last?.toISOString() ?? null };
+        lastSeenAt: last?.toISOString() ?? null,
+        username: names.find((person) => person.id === id)?.username };
     };
     return { missionId: id, requester: describe(row.requesterId), rescuer: describe(row.rescuerId) };
   }

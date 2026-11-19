@@ -73,11 +73,11 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(stack.indexOf('<MissionStatusPanel v-if="activeTool === \'status\'"')).toBeGreaterThan(stack.indexOf('class="mission-desk__map-legend bb-floating-card"'));
     expect(stack.match(/id="mission-map-legend-title"/g)).toHaveLength(1);
     expect(css).toContain('.mission-desk--active .mission-desk__bottom-stack #mission-status-panel {\n  position: relative; inset: auto;');
-    expect(page).toContain('createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده")');
+    expect(page).toContain('createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده", { caption: "مبدأ مسیر" })');
     expect(page).toContain('createMapPointElement("stop", navigation.active.value ? "باز کردن برنامهٔ مسیر" : "باز کردن فهرست ایستگاه‌ها"');
     expect(room).toContain('createMapPointElement(role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester"');
-    expect(room).toContain('auth.user?.id === props.mission.rescuerId ? "خودم" : "امدادگر"');
-    expect(room).toContain('role === "admin" ? "مرکز" : undefined');
+    expect(room).toContain('missionMemberCaption(role, auth.user?.id ?? null, props.mission, names)');
+    expect(room).toContain('stale: !op.next.fresh');
     expect(compileTemplate({ source: template!.content, filename: "UserMissionView.vue", id: "map-legend" }).errors).toEqual([]);
     expect(compileStyle({ source: css, filename: "UserMissionView.vue", id: "map-legend", scoped: true }).errors).toEqual([]);
   });
