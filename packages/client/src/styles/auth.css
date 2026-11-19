@@ -394,6 +394,12 @@
   direction: ltr;
   text-align: left;
 }
+/* A real button rather than a clickable decorative input icon: keyboard and
+   touch users can reveal the password without losing the RTL field label. */
+.auth-password-reveal.v-btn { min-width: 44px; width: 44px; height: 44px; }
+.auth-password-reveal.v-btn:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px;
+}
 
 .auth-show-password {
   margin-top: -0.85rem;

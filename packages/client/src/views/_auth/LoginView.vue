@@ -66,14 +66,20 @@
               autocomplete="current-password"
               :type="showPassword ? 'text' : 'password'"
               prepend-inner-icon="mdi-lock-outline"
-              :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
               variant="outlined"
               rounded="lg"
               density="comfortable"
               hide-details="auto"
               :disabled="submitting"
-              @click:append-inner="showPassword = !showPassword"
-            />
+            >
+              <template #append-inner>
+                <v-btn class="auth-password-reveal" type="button" variant="text"
+                  :icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                  :aria-label="showPassword ? 'پنهان کردن گذرواژه' : 'نمایش گذرواژه'"
+                  :aria-pressed="showPassword" :disabled="submitting"
+                  @click="showPassword = !showPassword" />
+              </template>
+            </v-text-field>
 
             <div class="auth-form-options">
               <RouterLink class="text-link" to="/_auth/forgot-password">گذرواژه را فراموش کرده‌اید؟</RouterLink>

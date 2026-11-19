@@ -23,6 +23,12 @@ describe("global shell at narrow widths", () => {
     expect(phone).toContain(".app-topbar .v-toolbar__content { padding-inline:");
   });
 
+  it("lets phone users scroll the last workspace action past the Broadcast/SOS rail without padding fullscreen maps", () => {
+    expect(app).toContain("'app-shell--floating-actions': showGeneralShareButton && !isMapRoute");
+    expect(shell).toContain('.app-shell--floating-actions .app-main {\n    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)) !important;');
+    expect(shell).toContain('.app-shell--map .app-main {\n  min-height: 100dvh;\n  padding-top: 0 !important;\n  padding-bottom: 0 !important;');
+  });
+
   it("keeps the logout action reachable on short, narrow screens without changing the confirmation lock", () => {
     expect(app).toMatch(/<v-dialog[\s\S]*?:model-value="logoutConfirmation\.open\.value"[\s\S]*?scrollable[\s\S]*?:persistent="logoutConfirmation\.submitting\.value"/);
     expect(app).toContain('<v-card-actions class="logout-confirm-actions">');

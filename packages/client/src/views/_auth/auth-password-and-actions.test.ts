@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { compileTemplate, parse } from "vue/compiler-sfc";
 
 // Source-level: docs/TASKS.md prohibits mounting Vue SFCs in unit tests.
 const css = readFileSync(new URL("../../styles/auth.css", import.meta.url), "utf8");
@@ -21,6 +22,18 @@ describe("auth actions and password direction", () => {
     }
     expect(css).toContain('.auth-password-field .v-field__input {\n  direction: ltr;\n  text-align: left;');
     expect(login).toContain('dir="ltr"'); // Existing username direction stays unchanged.
+  });
+
+  it("makes Login's password reveal a labeled keyboard button with a 44px touch target", () => {
+    expect(login).toContain('<template #append-inner>');
+    expect(login).toContain('class="auth-password-reveal" type="button" variant="text"');
+    expect(login).toContain(":aria-label=\"showPassword ? 'پنهان کردن گذرواژه' : 'نمایش گذرواژه'\"");
+    expect(login).toContain(':aria-pressed="showPassword" :disabled="submitting"');
+    expect(login).not.toContain('@click:append-inner');
+    expect(css).toContain('.auth-password-reveal.v-btn { min-width: 44px; width: 44px; height: 44px; }');
+    expect(css).toContain('.auth-password-reveal.v-btn:focus-visible');
+    expect(compileTemplate({ filename: 'LoginView.vue', id: 'auth-reveal',
+      source: parse(login).descriptor.template!.content }).errors).toEqual([]);
   });
 
   it("balances Back and Restart with the submit action in both recovery steps", () => {

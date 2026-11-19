@@ -567,6 +567,12 @@ a {
 }
 
 @media (max-width: 599px) {
+  /* On scrollable pages the Broadcast/SOS rail sits above the bottom corner.
+     Reserve room to scroll the last button completely clear of both actions.
+     Fullscreen map workspaces retain their own zero-padding layout. */
+  .app-shell--floating-actions .app-main {
+    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
   /* Until ResizeObserver measures the current Trips card, cap the fallback to
      the same clearance as the card. The measured root inline value takes over
      immediately; a short phone never briefly loses SOS behind the top tabs. */
