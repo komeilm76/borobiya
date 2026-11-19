@@ -20,9 +20,11 @@ describe("dispatch surface and type hierarchy", () => {
     expect((template.match(/<v-card\b[^>]*class="[^"]*admin-dispatch__surface[^"]*"[^>]*>/g) ?? []).length).toBe(4);
     expect(template).not.toMatch(/<v-card\b[^>]*variant="outlined"/);
     expect(template.match(/<v-card\b[^>]*admin-dispatch__surface[^>]*elevation="0"[^>]*rounded="xl"/g)).toHaveLength(4);
-    expect(cssRule(".admin-dispatch__surface")).toContain("border: 1px solid rgba(var(--v-theme-on-surface), 0.12);");
-    expect(cssRule(".admin-dispatch__surface")).toContain("background: rgb(var(--v-theme-surface));");
-    expect(template.match(/bb-surface-card/g)).toHaveLength(4);
+    expect(cssRule(".admin-dispatch__surface")).toBe('.admin-dispatch__surface { min-width: 0; }');
+    expect(template.match(/bb-map-navigation-card bb-surface-card/g)).toHaveLength(4);
+    const shared = readFileSync(new URL('../../styles/tailwind.css', import.meta.url), 'utf8');
+    expect(shared).toContain('.v-card.bb-map-navigation-card {\n  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);');
+    expect(shared).toContain('background: rgba(var(--v-theme-surface), 0.95);');
     expect(radii.card).toBe(24);
     expect(shadows.light.surface).not.toBe(shadows.dark.surface);
   });

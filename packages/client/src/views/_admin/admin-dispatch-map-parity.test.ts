@@ -1,0 +1,53 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { compileStyle, compileTemplate, parse } from 'vue/compiler-sfc';
+
+// Source-level contracts only: docs/TASKS.md forbids mounting .vue files in unit tests.
+const dispatch = readFileSync(new URL('./AdminDispatchView.vue', import.meta.url), 'utf8');
+const { template, styles } = parse(dispatch).descriptor;
+const css = styles[0]!.content;
+const mapTokens = readFileSync(new URL('../../styles/tailwind.css', import.meta.url), 'utf8');
+const travel = readFileSync(new URL('../../components/map/PointRouteSheet.vue', import.meta.url), 'utf8');
+
+const rule = (selector: string) => {
+  const start = css.indexOf(`${selector} {`);
+  expect(start, selector).toBeGreaterThan(-1);
+  return css.slice(start, css.indexOf('}', start) + 1);
+};
+
+describe('dispatch controls match the map Mission and Travel design language', () => {
+  it('shares the map widget card, corner and depth tiers without flattening dialogs', () => {
+    expect(mapTokens).toContain('.v-card.bb-map-navigation-card {');
+    expect(travel).toContain('bb-floating-card bb-map-navigation-card');
+    expect(template!.content.match(/admin-dispatch__surface[^"\n]*bb-map-navigation-card bb-surface-card/g)).toHaveLength(4);
+    expect(rule('.admin-dispatch__surface')).toBe('.admin-dispatch__surface { min-width: 0; }');
+    expect(mapTokens).toContain('border-radius: var(--bb-radius-card, 24px) !important;');
+    expect(mapTokens).toContain('background: rgba(var(--v-theme-surface), 0.95);');
+    expect(mapTokens).toContain('backdrop-filter: blur(12px);');
+    expect(mapTokens).toContain('.v-card.bb-surface-card {\n  box-shadow: var(--bb-shadow-surface) !important;');
+    expect(rule('.dispatch-request-row, .dispatch-responder-row')).toContain('border-radius: var(--bb-radius-nested, 16px);');
+    expect(rule('.admin-dispatch__facts > div')).toContain('border-radius: var(--bb-radius-nested, 16px);');
+    expect(css).toContain('box-shadow: var(--bb-shadow-overlay);');
+    expect(css).toContain('.map-selected-alert-card { box-shadow: var(--bb-shadow-surface); }');
+    expect(css).toContain('border: 0; background: var(--bb-color-inset); box-shadow: none;');
+  });
+
+  it('uses the same field treatment, segmented selection, action sizes and Persian font', () => {
+    expect(template!.content).toContain('class="admin-dispatch__filter-select d-md-none"');
+    expect(template!.content).toContain('rounded="lg"\n            color="primary"\n            hide-details');
+    expect(template!.content).toContain('variant="text"\n            @update:model-value="onFilterChange"');
+    expect(template!.content).toContain('variant="outlined" rounded="lg" color="primary" density="compact"');
+    expect(template!.content).toContain('type="submit" color="primary" variant="flat" rounded="lg"');
+    expect(css).toContain('.admin-dispatch__filter-toggle :deep(.v-btn--active)');
+    expect(css).toContain('min-width: 44px; min-height: 44px; height: auto;');
+    expect(css).toContain('font-family: var(--bb-font-family); letter-spacing: normal;');
+    expect(css).toContain('.admin-dispatch__sender-id summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }');
+    expect(css).toContain('.admin-dispatch__search-help summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }');
+    expect(template!.content).toContain('class="admin-dispatch__confirmation" rounded="xl"');
+    expect(template!.content).toContain('color="error" variant="flat" rounded="lg"');
+    expect(compileTemplate({ filename: 'AdminDispatchView.vue', id: 'dispatch-parity', source: template!.content }).errors).toEqual([]);
+    const compiled = compileStyle({ filename: 'AdminDispatchView.vue', id: 'dispatch-parity', scoped: true, source: css });
+    expect(compiled.errors).toEqual([]);
+    expect(compiled.code).toContain('.admin-dispatch__surface[data-v-dispatch-parity]');
+  });
+});

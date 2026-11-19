@@ -29,6 +29,8 @@
             item-value="value"
             density="compact"
             variant="outlined"
+            rounded="lg"
+            color="primary"
             hide-details
             @update:model-value="onFilterChange"
           />
@@ -39,7 +41,8 @@
             density="compact"
             mandatory
             rounded="lg"
-            variant="outlined"
+            color="primary"
+            variant="text"
             @update:model-value="onFilterChange"
           >
             <v-btn value="pending">
@@ -150,7 +153,7 @@
     <v-row class="admin-dispatch__workspace">
       <v-col cols="12" lg="5" class="admin-dispatch__queue">
         <p class="admin-dispatch__section-label">۰۱ / بررسی درخواست‌ها</p>
-        <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-surface-card mb-4" elevation="0" rounded="xl">
+        <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
             <v-chip v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
@@ -232,7 +235,7 @@
           </v-list>
         </v-card>
 
-        <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-surface-card" elevation="0" rounded="xl">
+        <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="admin-dispatch__detail-heading">
             <div class="admin-dispatch__detail-title">
               <small>درخواست انتخاب‌شده</small>
@@ -344,7 +347,7 @@
           <v-icon icon="mdi-cursor-default-click-outline" size="20" aria-hidden="true" />
           برای بررسی حادثه و انتخاب امدادگر، یکی از درخواست‌های صف را انتخاب کنید.
         </p>
-        <v-card id="dispatch-map" class="admin-dispatch__surface bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
+        <v-card id="dispatch-map" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
             <MapCanvas
               aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
@@ -381,7 +384,7 @@
           اعزام فوری به امدادگران جدید
         </v-btn>
         <v-card v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"
-          class="admin-dispatch__surface admin-dispatch__responders bb-surface-card" elevation="0" rounded="xl">
+          class="admin-dispatch__surface admin-dispatch__responders bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <div class="d-flex align-center ga-2">
               <v-icon color="primary" icon="mdi-account-group-outline" />
@@ -425,9 +428,9 @@
           <form class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
             <v-text-field v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
               placeholder="حداقل ۲ حرف؛ جست‌وجوی دستی حتی بدون موقعیت یا تخصص مرتبط"
-              variant="outlined" density="compact" hide-details autocomplete="off" maxlength="64"
+              variant="outlined" rounded="lg" color="primary" density="compact" hide-details autocomplete="off" maxlength="64"
               aria-label="جست‌وجوی امدادگر با نام کاربری" />
-            <v-btn type="submit" color="primary" variant="tonal" :disabled="responderSearchInput.trim().length === 1"
+            <v-btn type="submit" color="primary" variant="flat" rounded="lg" :disabled="responderSearchInput.trim().length === 1"
               :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
           </form>
           <p v-if="adminSos.responderSearch" class="admin-dispatch__manual-warning" role="note">
@@ -587,7 +590,7 @@
           </template>
         </section>
         <v-dialog v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
-          <v-card title="تأیید اعزام دستی" rounded="xl">
+          <v-card title="تأیید اعزام دستی" class="admin-dispatch__confirmation" rounded="xl">
             <v-card-text>
               موقعیت یا تخصص مرتبط برای افراد زیر تأیید نشده است. پیش از ارسال پیشنهاد مأموریت، صلاحیت و دسترسی آن‌ها را بررسی کنید:
               <ul class="mt-2 ps-6">
@@ -598,8 +601,8 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer />
-              <v-btn variant="text" :disabled="adminSos.dispatchSubmitting" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
-              <v-btn color="error" :loading="adminSos.dispatchSubmitting" :disabled="!adminSos.canDispatchSelected"
+              <v-btn variant="text" rounded="lg" :disabled="adminSos.dispatchSubmitting" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
+              <v-btn color="error" variant="flat" rounded="lg" :loading="adminSos.dispatchSubmitting" :disabled="!adminSos.canDispatchSelected"
                 @click="confirmManualDispatch">ارسال با آگاهی از محدودیت‌ها</v-btn>
             </v-card-actions>
           </v-card>
@@ -1048,11 +1051,25 @@ onBeforeUnmount(() => {
 .admin-dispatch__toolbar-actions { justify-content: flex-end; flex-wrap: wrap; }
 .admin-dispatch__toolbar-label { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; }
 .admin-dispatch__filter-select { max-width: 15rem; min-width: 0; }
-.admin-dispatch__toolbar :deep(.v-btn) {
-  min-width: 44px; min-height: 44px; height: 44px; padding-inline: .7rem;
-  font-size: .8rem; letter-spacing: normal;
+/* Match Map Search's outlined 44px fields and the Travel action rhythm.
+   Emergency dispatch remains the sole error-coloured primary action. */
+.admin-dispatch :deep(.v-btn) { min-width: 44px; min-height: 44px; height: auto;
+  border-radius: 14px !important; font-family: var(--bb-font-family); font-weight: 700; letter-spacing: normal; }
+.admin-dispatch :deep(.v-btn:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.admin-dispatch :deep(.v-field), .admin-dispatch :deep(.v-field__input),
+.admin-dispatch :deep(.v-label), .admin-dispatch :deep(.v-chip),
+.admin-dispatch :deep(.v-list-item), .admin-dispatch :deep(.v-card-title),
+.admin-dispatch :deep(.v-alert) {
+  font-family: var(--bb-font-family); letter-spacing: normal;
 }
-.admin-dispatch__filter-toggle :deep(.v-btn) { padding-inline: .65rem; }
+.admin-dispatch__filter-toggle { border: 1px solid rgba(var(--v-theme-on-surface), .12);
+  border-radius: var(--bb-radius-nested, 16px) !important; background: rgba(var(--v-theme-surface), .95); overflow: hidden; }
+.admin-dispatch__filter-toggle :deep(.v-btn) { padding-inline: .65rem; border-radius: 0 !important; }
+.admin-dispatch__filter-toggle :deep(.v-btn:focus-visible) { outline-offset: -3px; }
+.admin-dispatch__filter-toggle :deep(.v-btn--active) { color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), .12); font-weight: 800; }
+.admin-dispatch__toolbar :deep(.v-btn) { height: 44px; padding-inline: .7rem; font-size: .82rem; }
 .admin-dispatch__toolbar :deep(.v-btn--icon) { width: 44px; padding: 0; }
 .admin-dispatch__workspace { margin-inline: -clamp(.75rem, 1.25vw, 1.25rem); }
 .admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(.75rem, 1.25vw, 1.25rem); }
@@ -1080,11 +1097,9 @@ onBeforeUnmount(() => {
   line-height: 1.7;
 }
 
-/* One tier for the four primary cards, matching the other admin screens. */
-.admin-dispatch__surface {
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  background: rgb(var(--v-theme-surface));
-}
+/* The shared map-navigation-card defines colour, blur, border and 24px radius;
+   surface-card supplies the quieter depth for cards in normal page flow. */
+.admin-dispatch__surface { min-width: 0; }
 
 .admin-dispatch__surface :deep(.v-card-title) {
   font-size: 1.08rem !important;
@@ -1097,12 +1112,15 @@ onBeforeUnmount(() => {
 .admin-dispatch__card-heading { display: inline-flex; align-items: center; gap: .5rem;
   min-width: 0; white-space: normal; }
 .dispatch-request-row, .dispatch-responder-row {
-  border: 1px solid transparent; border-radius: var(--bb-radius-nested, 16px);
-  background: var(--bb-color-inset); margin-bottom: .4rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .12);
+  border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-surface), .75); margin-bottom: .4rem;
+  transition: background-color .15s, border-color .15s;
 }
 .dispatch-request-row:last-child, .dispatch-responder-row:last-child { margin-bottom: 0; }
+.dispatch-request-row:hover, .dispatch-responder-row:hover { background: rgba(var(--v-theme-primary), .07); }
 .dispatch-request-row.v-list-item--active, .dispatch-responder-row.v-list-item--active {
-  border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .1);
+  border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12);
 }
 .dispatch-request-row:focus-visible, .dispatch-responder-row:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
@@ -1119,12 +1137,13 @@ onBeforeUnmount(() => {
 .admin-dispatch__detail-badges { display: flex; flex-wrap: wrap; gap: .35rem; }
 .admin-dispatch__detail-body { display: grid; gap: .75rem; font-size: .87rem; line-height: 1.6; }
 .admin-dispatch__detail-body h3 { margin: 0 0 .25rem; font-size: .88rem; }
-.admin-dispatch__description { padding: .75rem .85rem; border-radius: var(--bb-radius-nested, 16px);
-  background: var(--bb-color-inset); }
+.admin-dispatch__description { padding: .2rem .1rem .7rem;
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .admin-dispatch__description p, .admin-dispatch__proposal-note { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .admin-dispatch__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: 0; }
-.admin-dispatch__facts > div { min-width: 0; padding: .55rem .7rem; border-radius: .8rem;
-  background: var(--bb-color-inset); }
+.admin-dispatch__facts > div { min-width: 0; padding: .55rem .7rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); }
 .admin-dispatch__facts dt { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-dispatch__facts dd { margin: .1rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
 .admin-dispatch__facts bdi { unicode-bidi: isolate; }
@@ -1147,16 +1166,25 @@ onBeforeUnmount(() => {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }
 .admin-dispatch__photo-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
-.admin-dispatch__photo-dialog :deep(.v-card-title) { flex: none; white-space: normal; }
+.admin-dispatch__photo-dialog, .admin-dispatch__confirmation { font-family: var(--bb-font-family); color: rgb(var(--v-theme-on-surface)); }
+.admin-dispatch__photo-dialog :deep(.v-card-title) { flex: none; white-space: normal; font-family: var(--bb-font-family); font-weight: 800; }
+.admin-dispatch__photo-dialog :deep(.v-btn), .admin-dispatch__confirmation :deep(.v-btn) {
+  min-height: 44px; min-width: 44px; border-radius: 14px; font-family: var(--bb-font-family); font-weight: 800; letter-spacing: normal; }
+.admin-dispatch__photo-dialog :deep(.v-btn:focus-visible), .admin-dispatch__confirmation :deep(.v-btn:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.admin-dispatch__confirmation :deep(.v-card-title) { font-family: var(--bb-font-family); font-weight: 800; }
+.admin-dispatch__confirmation :deep(.v-card-actions) { flex-wrap: wrap; gap: .4rem;
+  padding: .6rem .85rem calc(.85rem + env(safe-area-inset-bottom, 0px)); }
+.admin-dispatch__confirmation :deep(.v-card-actions .v-btn) { height: auto; white-space: normal; }
+.admin-dispatch__confirmation :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .admin-dispatch__photo-dialog :deep(.v-card-text) { min-height: 0; overflow: auto; display: grid; place-items: center; }
 .admin-dispatch__photo-dialog img { display: block; max-width: 100%; max-height: calc(100dvh - 7rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   width: auto; height: auto; object-fit: contain; }
 .admin-dispatch__proposal-note { color: var(--bb-color-muted); }
 .admin-dispatch__next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem;
-  padding: .65rem .75rem; border-radius: var(--bb-radius-nested, 16px);
-  background: var(--bb-color-inset); }
+  padding: .65rem .1rem 0; border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .admin-dispatch__next span { font-weight: 700; }
-.admin-dispatch__next :deep(.v-btn) { min-height: 44px; max-width: 100%; height: auto; white-space: normal; }
+.admin-dispatch__next :deep(.v-btn) { min-height: 46px; max-width: 100%; height: auto; white-space: normal; font-weight: 800; }
 .admin-dispatch__next :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .admin-dispatch__selection-hint { display: flex; align-items: center; gap: .5rem; margin: 0 0 .75rem;
   padding: .7rem .9rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
@@ -1165,13 +1193,14 @@ onBeforeUnmount(() => {
 .admin-dispatch__responders:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 .admin-dispatch__sender { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem;
   margin: .85rem 1rem 0; padding: .65rem .8rem;
-  border-radius: var(--bb-radius-nested, 16px); background: var(--bb-color-inset); }
+  border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); }
 .admin-dispatch__sender-icon { display: grid; flex: none; place-items: center; width: 42px; height: 42px;
   border-radius: 50%; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
 .admin-dispatch__sender-copy { display: grid; flex: 1 1 10rem; min-width: 0; gap: .12rem; }
 .admin-dispatch__sender-copy strong { font-size: .9rem; }
 .admin-dispatch__sender-id { color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__sender-id summary { cursor: pointer; min-height: 24px; }
+.admin-dispatch__sender-id summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }
 .admin-dispatch__sender-id bdi { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
 .admin-dispatch__sender-action { flex: none; min-height: 44px; }
 
@@ -1225,10 +1254,11 @@ onBeforeUnmount(() => {
   color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.5; }
 .admin-dispatch__manual-warning .v-icon { flex: none; color: rgb(var(--v-theme-error)); }
 .admin-dispatch__search-help { margin: .45rem 1rem .65rem; color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__search-help summary { cursor: pointer; min-height: 32px; }
+.admin-dispatch__search-help summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }
 .admin-dispatch__search-help p { margin: .3rem 0; line-height: 1.65; }
 .admin-dispatch__submit { position: sticky; bottom: 0; z-index: 1;
-  background: rgb(var(--v-theme-surface)); border-top: 1px solid var(--bb-color-outline); }
+  background: rgb(var(--v-theme-surface)); border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
+.admin-dispatch__submit :deep(.v-btn) { min-height: 46px; font-weight: 800; }
 .admin-dispatch__mission-header { display: flex; flex-wrap: wrap; align-items: center;
   justify-content: space-between; gap: .5rem; margin-bottom: .65rem; }
 .admin-dispatch__mission-header h2 { margin: 0; font-size: .95rem; font-weight: 800; }
@@ -1301,7 +1331,7 @@ onBeforeUnmount(() => {
     align-self: flex-start;
     flex-wrap: wrap;
     margin: 0 0.75rem 0.75rem;
-    border-radius: 0.75rem;
+    border: 0; background: var(--bb-color-inset); box-shadow: none;
   }
 }
 
@@ -1365,9 +1395,9 @@ onBeforeUnmount(() => {
   }
 }
 .mission-timeline-select {
-  width: 100%;
+  width: 100%; min-height: 44px;
   padding: 0.65rem 0.75rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+  border: 1px solid rgba(var(--v-theme-on-surface), .12);
   border-radius: var(--bb-radius-nested, 16px);
   background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface));
@@ -1376,11 +1406,10 @@ onBeforeUnmount(() => {
 }
 
 .mission-timeline-select:focus-visible {
-  outline: 2px solid var(--bb-color-primary);
+  outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: 2px;
 }
 
-:global(:root.dark .admin-dispatch__surface),
 :global(:root.dark .dispatch-mission-timeline),
 :global(:root.dark .map-selected-alert-card),
 :global(:root.dark .mission-timeline-select) {
@@ -1388,7 +1417,7 @@ onBeforeUnmount(() => {
 }
 :global(:root.dark .dispatch-request-row.v-list-item--active),
 :global(:root.dark .dispatch-responder-row.v-list-item--active) {
-  background: var(--bb-color-inset); border-color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), .12); border-color: rgb(var(--v-theme-primary));
 }
 :global(:root.dark .mission-timeline-select) { background: var(--bb-color-inset); }
 </style>
