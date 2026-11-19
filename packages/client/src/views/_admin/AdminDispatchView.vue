@@ -345,7 +345,7 @@
         <v-card id="dispatch-map" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
             <MapCanvas
-              aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
+              aria-label="نقشهٔ درخواست‌های SOS و آخرین موقعیت ثبت‌شدهٔ امدادگران نزدیک"
               :style-url="mapStyleUrl"
               :constrain-bounds="false"
               :zoom="12"
@@ -354,8 +354,8 @@
 
             <v-btn v-if="adminSos.selectedRequest" class="map-selected-alert-card"
               color="surface" variant="flat" rounded="xl" prepend-icon="mdi-crosshairs-gps"
-              aria-label="بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه"
-              @click="focusRequest(adminSos.selectedRequest)">نمایش محل حادثه</v-btn>
+              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'"
+              @click="frameSelectedIncident">{{ nearbyFeatures.features.length ? 'حادثه و امدادگران' : 'نمایش محل حادثه' }}</v-btn>
 
             <div class="severity-legend" role="note" aria-label="راهنمای رنگ شدت حادثه">
               <span class="legend-item">
@@ -367,9 +367,20 @@
               <span class="legend-item">
                 <span class="legend-dot legend-dot--low" /> کم‌خطر
               </span>
+              <span v-if="nearbyFeatures.features.length" class="legend-item">
+                <span class="legend-dot legend-dot--responder" /> امدادگر نزدیک
+              </span>
             </div>
           </div>
         </v-card>
+        <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
+          (adminSos.nearestLoading || adminSos.nearestError || adminSos.nearestLoaded)"
+          class="admin-dispatch__map-note" role="status">
+          {{ adminSos.nearestLoading ? 'در حال بررسی امدادگران نزدیک…'
+            : adminSos.nearestError ? 'موقعیت امدادگران تأیید نشد؛ فهرست را بازخوانی کنید.'
+              : nearbyFeatures.features.length ? `نقاط ${nearbyFeatures.features.length.toLocaleString('fa-IR')} امدادگر واجد شرایط، آخرین موقعیت ثبت‌شده‌اند؛ موقعیت زنده نیستند.`
+                : adminSos.nearestLoaded ? 'موقعیت ثبت‌شده‌ای از امدادگران واجد شرایط در دسترس نیست.' : '' }}
+        </p>
 
         <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer' &&
           adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
@@ -522,6 +533,11 @@
                   <span>•</span>
                   <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
                 </v-list-item-subtitle>
+                <template v-if="!adminSos.responderSearch && nearbyFeatures.features.some((feature) => feature.id === responder.userId)" #append>
+                  <v-btn icon="mdi-map-marker-radius-outline" variant="text" color="primary"
+                    :aria-label="`نمایش آخرین موقعیت ثبت‌شدهٔ ${responder.username} روی نقشه`"
+                    :title="`نمایش ${responder.username} روی نقشه`" @click.stop="focusNearbyResponder(responder.userId)" />
+                </template>
               </v-list-item>
           </v-list>
           <v-card-text v-else class="py-6 text-center text-medium-emphasis" role="status">
@@ -620,6 +636,7 @@ import { getSosPhotoSrc } from "@/api/admin-sos";
 import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
 import {
   buildSosAlertsGeoJson,
+  buildEligibleResponderGeoJson,
   formatResponderDistance,
   SOS_SEVERITY_PRESENTATION,
   SOS_STATUS_PRESENTATION
@@ -630,6 +647,8 @@ import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue"
 import { statusLabel } from "@/mission/timeline-presentation";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { needsOverlayRestore } from "@/map/overlay-restore";
+import { shortestLongitudeBounds } from "@/map/longitude-bounds";
+import { palettes } from "@/styles/tokens";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -639,6 +658,9 @@ import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
 const SOS_SOURCE_ID = "admin-sos-requests";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
+const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
+const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
+const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
 
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
@@ -723,6 +745,13 @@ const incidentNameById = computed(
 const proposedRescuerIdSet = computed(
   () => new Set(adminSos.selectedRequestProposals.map((proposal) => proposal.rescuerId))
 );
+// Manual username lookup is not a location search. Use only the verified,
+// incident-matched nearest list, never arbitrary account coordinates.
+const nearbyFeatures = computed(() => buildEligibleResponderGeoJson(
+  adminSos.selectedRequest && adminSos.nearestRequestId === adminSos.selectedRequest.id &&
+    adminSos.nearestLoaded && !adminSos.responderSearch
+    ? adminSos.nearestResponders : [], adminSos.selectedResponderIds
+));
 const responderSearchInput = ref("");
 const soundTestError = ref<string | null>(null);
 async function testSound(): Promise<void> {
@@ -792,6 +821,32 @@ function onFilterChange(value: unknown): void {
 
 type GeoJsonSourceData = Parameters<GeoJSONSource["setData"]>[0];
 
+function ensureResponderMapLayers(map: MapLibreMap): void {
+  const data = nearbyFeatures.value as unknown as GeoJsonSourceData;
+  const existing = map.getSource(RESPONDER_SOURCE_ID) as GeoJSONSource | undefined;
+  if (existing) existing.setData(data);
+  else map.addSource(RESPONDER_SOURCE_ID, { type: "geojson", data });
+  const palette = palettes[themeStore.isDark ? "dark" : "light"];
+  if (!map.getLayer(RESPONDER_DOT_LAYER_ID)) map.addLayer({
+    id: RESPONDER_DOT_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
+    paint: {
+      "circle-color": palette.primary,
+      "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 11, 8],
+      "circle-stroke-color": palette.surface,
+      "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3, 2]
+    }
+  }, map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined);
+  if (!map.getLayer(RESPONDER_LABEL_LAYER_ID)) map.addLayer({
+    id: RESPONDER_LABEL_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
+    layout: {
+      "text-field": ["concat", "@", ["get", "username"]],
+      "text-size": 12, "text-anchor": "top", "text-offset": [0, 1],
+      "text-optional": true
+    },
+    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 1.5 }
+  }, map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined);
+}
+
 function ensureSosMapLayers(map: MapLibreMap): void {
   const data = buildSosAlertsGeoJson(adminSos.visibleRequests, adminSos.selectedId);
   const existingSource = map.getSource(SOS_SOURCE_ID) as GeoJSONSource | undefined;
@@ -836,7 +891,8 @@ function syncMapData(): void {
   const map = mapInstance;
   if (!map || !map.getStyle()) return;
   try {
-    ensureSosMapLayers(map);
+    ensureResponderMapLayers(map);
+    ensureSosMapLayers(map); // SOS remains above rescuers at coincident points.
   } catch {
     // If a new style JSON is still mid-fetch, the `styledata` / `idle` listener below applies the data immediately once ready.
   }
@@ -848,7 +904,8 @@ function restoreMapLayers(): void {
     styleLoaded: Boolean(map.isStyleLoaded()),
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
-  }, [SOS_SOURCE_ID], [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID])) return;
+  }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID],
+  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID])) return;
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
   syncMapData();
@@ -911,6 +968,36 @@ function focusRequest(item: SosRequestRecord): void {
   });
 }
 
+function frameSelectedIncident(): void {
+  const incident = adminSos.selectedRequest;
+  const map = mapInstance;
+  if (!incident || !map) return;
+  const points = nearbyFeatures.value.features.map((feature) => feature.geometry.coordinates);
+  if (!points.length) {
+    map.flyTo({ center: [incident.location.lon, incident.location.lat], zoom: Math.max(map.getZoom(), 14) });
+    return;
+  }
+  const [west, east] = shortestLongitudeBounds([incident.location.lon, ...points.map(([lon]) => lon)]);
+  let south = incident.location.lat, north = south;
+  for (const [, lat] of points) {
+    south = Math.min(south, lat); north = Math.max(north, lat);
+  }
+  map.fitBounds([[west, south], [east, north]], {
+    padding: { top: 56, bottom: 56, left: 48, right: 48 }, maxZoom: 14,
+    duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
+  });
+}
+
+function focusNearbyResponder(userId: string): void {
+  const position = nearbyFeatures.value.features.find((feature) => feature.id === userId)?.geometry.coordinates;
+  if (!position || !mapInstance) return;
+  mapInstance.flyTo({ center: position, zoom: Math.max(mapInstance.getZoom(), 14) });
+  document.getElementById("dispatch-map")?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "center"
+  });
+}
+
 function focusResponders(): void {
   if (!adminSos.selectedRequest) return;
   const target = document.getElementById("dispatch-responders");
@@ -925,7 +1012,7 @@ function focusResponders(): void {
 function onMapReady(map: MapLibreMap): void {
   detachMapEvents?.();
   mapInstance = map;
-  ensureSosMapLayers(map);
+  syncMapData();
   startPulseLoop();
 
   if (adminSos.selectedRequest) {
@@ -936,6 +1023,7 @@ function onMapReady(map: MapLibreMap): void {
       ],
       zoom: 13
     });
+    if (nearbyFeatures.value.features.length) frameSelectedIncident();
   }
 
   const onStyleData = () => {
@@ -966,6 +1054,15 @@ function onMapReady(map: MapLibreMap): void {
 }
 
 let pendingDeepLinkId: string | null = null;
+
+watch(nearbyFeatures, syncMapData);
+// Keep the incident visible when its qualified suggestions arrive; selection
+// still focuses the incident immediately, before the nearest read completes.
+watch(() => [adminSos.nearestRequestId, adminSos.nearestLoaded] as const,
+  ([requestId, loaded]) => {
+    if (loaded && requestId && requestId === adminSos.selectedId && !adminSos.responderSearch &&
+      nearbyFeatures.value.features.length) frameSelectedIncident();
+  });
 
 watch(
   () => [adminSos.visibleRequests, adminSos.selectedId] as const,
@@ -1224,6 +1321,8 @@ onBeforeUnmount(() => {
   height: clamp(18rem, 37dvh, 23rem);
   min-height: 18rem;
 }
+.admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);
+  font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }
 
 .map-selected-alert-card {
   position: absolute; z-index: 2;
@@ -1311,6 +1410,7 @@ onBeforeUnmount(() => {
 .legend-dot--low {
   background: #0284c7;
 }
+.legend-dot--responder { background: rgb(var(--v-theme-primary)); border: 2px solid rgb(var(--v-theme-on-primary)); }
 
 /* Vuetify's lg columns start at 1280px. Below that width the queue and map
  * stack; the compact recenter action stays inside the map and the legend

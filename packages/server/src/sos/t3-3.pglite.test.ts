@@ -374,9 +374,10 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     // This mode must not allow a caller to infer the saved GPS position from distance or ordering.
     const exactId = "78000000-0000-4000-8000-000000000007";
     await seedUser({ id: exactId, username: "manual", lat: 35.7, lon: 51.4 });
+    await pg.query(`INSERT INTO category_users (category_id,user_id) VALUES ($1,$2)`, [CAT_MEDICAL_ALPHA_ID, exactId]);
     const exact = nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual")).json()).responders;
     expect(exact[0]?.userId).toBe(exactId);
-    expect(exact.every((item) => item.distance === null)).toBe(true);
+    expect(exact.every((item) => item.distance === null && item.position === null)).toBe(true);
     const invalidAssignment = await app.inject({ method: "POST", url: `/_admin/sos/requests/${sosId}/dispatch`, headers,
       payload: { rescuerIds: [noLocation, adminCandidate] } });
     expect(invalidAssignment.statusCode).toBe(400);
@@ -497,6 +498,9 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     expect(responders[0]?.lastActiveAt).toBe("2026-10-23T13:30:00.000Z");
     expect(responders[0]?.distance).toBeGreaterThan(390);
     expect(responders[0]?.distance).toBeLessThan(410);
+    expect(responders[0]?.position?.lat).toBeCloseTo(35.7033, 4);
+    expect(responders[0]?.position?.lon).toBeCloseTo(51.338, 4);
+    expect(responders.every((row) => row.position && Number.isFinite(row.position.lat) && Number.isFinite(row.position.lon))).toBe(true);
 
     expect(responders[1]?.username).toBe("medic_rookie");
     expect(responders[1]?.avgRating).toBe(3.4);

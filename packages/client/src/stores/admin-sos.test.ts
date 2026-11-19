@@ -711,14 +711,17 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
     await vi.waitFor(() => expect(store.nearestResponders).toEqual([firstRescuer]));
+    expect(store.nearestRequestId).toBe(first.id);
 
     store.selectRequest(second.id);
     await nextTick();
     expect(store.nearestLoading).toBe(true);
     expect(store.nearestResponders).toEqual([]);
+    expect(store.nearestRequestId).toBeNull();
     expect(store.canDispatchSelected).toBe(false);
     finishSecond({ responders: [] });
     await secondNearest;
+    await vi.waitFor(() => expect(store.nearestRequestId).toBe(second.id));
   });
 
   it("searches beyond the nearest ten without dropping previously selected rescuers", async () => {

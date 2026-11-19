@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SosRequestRecord } from "@shared/index";
 import {
   buildSosAlertsGeoJson,
+  buildEligibleResponderGeoJson,
   formatResponderDistance,
   isDispatchableSosStatus,
   mergeSosAlertSnapshot,
@@ -38,6 +39,21 @@ function sampleSos(overrides: Partial<SosRequestRecord> = {}): SosRequestRecord 
 }
 
 describe("admin SOS alert helpers (T3.2.5)", () => {
+  it("maps only qualified nearest responders with recorded coordinates, never manual accounts", () => {
+    const eligible = { userId: "44444444-4444-4444-8444-444444444441", username: "medic_near",
+      distance: 400, position: { lat: 35.7, lon: 51.4 }, avgRating: 4.8,
+      categoryName: "امداد شهری", lastActiveAt: "2026-10-23T12:00:00.000Z" };
+    expect(buildEligibleResponderGeoJson([eligible], [eligible.userId])).toEqual({ type: "FeatureCollection", features: [{
+      type: "Feature", id: eligible.userId, geometry: { type: "Point", coordinates: [51.4, 35.7] },
+      properties: { id: eligible.userId, username: "medic_near", distance: 400, isSelected: true }
+    }] });
+    expect(buildEligibleResponderGeoJson([
+      { ...eligible, position: null, distance: null },
+      { ...eligible, position: { lat: 35.7, lon: 51.4 }, distance: null },
+      { ...eligible, position: { lat: 35.7, lon: 51.4 }, categoryName: null },
+      { ...eligible, position: { lat: 200, lon: 51.4 } }
+    ])).toEqual({ type: "FeatureCollection", features: [] });
+  });
   it("validates sos:new-request socket payloads strictly", () => {
     const valid = sampleSos();
     expect(parseSosNewRequestPayload({ sosRequest: valid })).toEqual(valid);

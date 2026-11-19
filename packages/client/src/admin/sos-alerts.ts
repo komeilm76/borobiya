@@ -3,7 +3,8 @@ import {
   sosNewRequestEventSchema,
   type RescuerCancellationEvent,
   type Severity,
-  type SosRequestRecord
+  type SosRequestRecord,
+  type NearestResponder
 } from "@shared/index";
 
 export interface SeverityAlertPresentation {
@@ -220,6 +221,24 @@ export function buildSosAlertsGeoJson(
         status: req.status
       }
     }))
+  };
+}
+
+/** Only qualified nearest suggestions with a recorded point belong on the
+ * dispatch map. A manual username search must never turn into a GPS lookup. */
+export function buildEligibleResponderGeoJson(responders: readonly NearestResponder[], selectedIds: readonly string[] = []) {
+  const selected = new Set(selectedIds);
+  return {
+    type: "FeatureCollection" as const,
+    features: responders.filter((row) => row.distance !== null && row.categoryName !== null &&
+      row.position && Number.isFinite(row.position.lat) && Number.isFinite(row.position.lon) &&
+      Math.abs(row.position.lat) <= 90 && Math.abs(row.position.lon) <= 180)
+      .map((row) => ({
+        type: "Feature" as const,
+        id: row.userId,
+        geometry: { type: "Point" as const, coordinates: [row.position!.lon, row.position!.lat] as [number, number] },
+        properties: { id: row.userId, username: row.username, distance: row.distance, isSelected: selected.has(row.userId) }
+      }))
   };
 }
 

@@ -236,6 +236,9 @@ export const nearestResponderSchema = z.strictObject({
   username: usernameSchema,
   // Null only for a manually searched account with no recorded position; never treat it as 0m.
   distance: z.number().finite().nonnegative().nullable(),
+  // Privileged qualified-nearest suggestions only. Manual username lookups
+  // must return null, never the account's stored GPS point.
+  position: coordinatesSchema.pick({ lat: true, lon: true }).nullable().optional(),
   avgRating: z.number().finite().min(0).max(5).nullable(),
   categoryName: z.string().nullable(),
   lastActiveAt: timestampSchema

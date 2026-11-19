@@ -96,6 +96,9 @@ describe("SOS and admin schemas", () => {
     };
     expect(nearestResponderSchema.safeParse(responder).success).toBe(true);
     expect(nearestResponderSchema.safeParse({ ...responder, distance: -1 }).success).toBe(false);
+    expect(nearestResponderSchema.safeParse({ ...responder, position: { lat: 35.7, lon: 51.4 } }).success).toBe(true);
+    expect(nearestResponderSchema.safeParse({ ...responder, position: null, distance: null }).success).toBe(true);
+    expect(nearestResponderSchema.safeParse({ ...responder, position: { lat: 120, lon: 51.4 } }).success).toBe(false);
     expect(nearestResponderSchema.safeParse({ ...responder, avgRating: 5.5 }).success).toBe(false);
     expect(nearestRespondersResponseSchema.safeParse({ responders: [responder] }).success).toBe(true);
 

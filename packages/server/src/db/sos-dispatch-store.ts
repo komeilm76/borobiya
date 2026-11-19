@@ -179,6 +179,12 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         // A manual lookup must not disclose the stored position of arbitrary accounts.
         // Only qualified nearest suggestions may project their SOS distance.
         distance: manual ? sql<number | null>`NULL::double precision` : distanceExpr,
+        // Manual lookup must never project a saved GPS point, even for an
+        // account which happens to have an incident-matching category.
+        lat: manual ? sql<number | null>`NULL::double precision`
+          : sql<number | null>`ST_Y(${users.lastLocation}::geometry)::double precision`,
+        lon: manual ? sql<number | null>`NULL::double precision`
+          : sql<number | null>`ST_X(${users.lastLocation}::geometry)::double precision`,
         avgRating: users.avgRating,
         categoryName: categoryNameExpr,
         lastActiveAt: lastActiveAtExpr
@@ -232,6 +238,9 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         userId: row.userId,
         username: row.username,
         distance: row.distance === null ? null : Number(row.distance),
+        position: !manual && row.lat !== null && row.lon !== null &&
+          Number.isFinite(Number(row.lat)) && Number.isFinite(Number(row.lon))
+          ? { lat: Number(row.lat), lon: Number(row.lon) } : null,
         avgRating: row.avgRating === null ? null : Number(row.avgRating),
         categoryName: row.categoryName ?? null,
         lastActiveAt: toValidDate(row.lastActiveAt).toISOString()

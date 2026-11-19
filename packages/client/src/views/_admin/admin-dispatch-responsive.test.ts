@@ -30,8 +30,9 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(stacked).toMatch(/\.severity-legend \{[^}]*position: static;/);
     expect(stacked).not.toMatch(/\.map-selected-alert-card \{[^}]*position: static;/);
     expect(source.indexOf('class="map-selected-alert-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
-    expect(source).toContain('aria-label="بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه"');
-    expect(source).toContain('@click="focusRequest(adminSos.selectedRequest)"');
+    expect(source).toContain("'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'");
+    expect(source).toContain("'نمایش حادثه و امدادگران نزدیک روی نقشه'");
+    expect(source).toContain('@click="frameSelectedIncident"');
     expect(source).toContain('@click="focusRequest(item)"');
   });
 
