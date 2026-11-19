@@ -112,6 +112,26 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(listRequests.mock.calls[1]?.[1]).toMatchObject({ status: "dispatched" });
   });
 
+  it("clears a selected request when switching to a queue that hides it", async () => {
+    const pending = makeSosRecord();
+    const dispatched = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "dispatched" });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [pending, dispatched], total: 2 }) });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    store.selectRequest(pending.id);
+    store.setFilterStatus("dispatched");
+    expect(store.selectedRequest).toBeNull();
+    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(dispatched.id));
+    store.setFilterStatus("pending");
+    expect(store.selectedRequest).toBeNull();
+    expect(store.canDispatchSelected).toBe(false);
+    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(pending.id));
+  });
+
   it("does not verify socket/retained rows missing from the latest successful list", async () => {
     const row = makeSosRecord();
     const live = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });

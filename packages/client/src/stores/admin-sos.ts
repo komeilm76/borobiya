@@ -674,6 +674,11 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   function setFilterStatus(next: AdminSosFilterStatus): void {
     if (filterStatus.value === next) return;
     filterStatus.value = next;
+    // A hidden selection must not keep a dispatchable incident in the detail
+    // panel while the operator is looking at a different queue.
+    if (selectedId.value && !visibleRequests.value.some((item) => item.id === selectedId.value)) {
+      selectedId.value = null;
+    }
     void refreshRequests(next);
   }
 
