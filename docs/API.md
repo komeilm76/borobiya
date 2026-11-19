@@ -366,7 +366,7 @@ GET   /_admin/users?q=&isActive=&hasCategory=&page=&limit=   → paginated list
 GET   /_admin/users/:id                                       → detail + devices + missions
 POST  /_admin/users           { username, password, isActive? } → 201 userProfile
 PATCH /_admin/users/:id/status { isActive: boolean }
-PATCH /_admin/users/:id/unsuspend
+PATCH /_admin/users/:id/unsuspend  // contract-only: no mounted handler (404)
 // NO DELETE — must not exist
 ```
 
@@ -374,7 +374,7 @@ PATCH /_admin/users/:id/unsuspend
 
 `PATCH /_admin/users/:id/status` accepts only the strict body `{ isActive: boolean }` and applies the same current-admin and unrevoked-session authorization checks. It returns the updated user profile with `200`, `400 VALIDATION_ERROR` for an invalid UUID/body, `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` (including a revoked session), `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED`, or `404 USER_NOT_FOUND`. The status change, audit entry, and (on deactivation) refresh-session revocation run in one database transaction. The audit entry records `user_activated` or `user_deactivated`, target type/id, and prior/new active state; repeated requests for the existing state are idempotent and do not create duplicate events. Deactivation clears every stored refresh-token hash and marks sessions offline; both `/_user` and `/_admin` authorization checks require a matching session with a non-null refresh-token hash, so outstanding access JWTs are invalidated immediately. Reactivation does not restore those sessions, so the user must sign in again. The route returns `Cache-Control: no-store`.
 
-The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles with assigned `categories[]`, never password hashes. `GET /_admin/users/:id` returns the profile, `categories[]`, and device-session records — the same `deviceSchema` rows as `GET /_user/devices`, `deviceId` included, so a pinned priority device is identifiable from either view — where `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty until mission read endpoints land in T3.5. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
+The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles with assigned `categories[]`, never password hashes. `GET /_admin/users/:id` returns the profile, `categories[]`, and device-session records — the same `deviceSchema` rows as `GET /_user/devices`, `deviceId` included, so a pinned priority device is identifiable from either view — where `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array now contains both requester and rescuer missions, newest first, serialized from the durable mission records (not a placeholder). The detail route is not paginated, so very large histories may make this response expensive; use dedicated paginated mission-history endpoints for history screens. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
 
 ### 6.2 Incidents & Categories
 
@@ -434,11 +434,11 @@ Private mission location endpoints inherit the `/_user` account/session/onboardi
 ### 6.4 Cancellation Reasons (admin config)
 
 ```
-GET   /_admin/cancellation-reasons
-POST  /_admin/cancellation-reasons { type:"requester"|"rescuer", key, label, labelFa, requiresCustomText, isActive }
+GET   /_admin/cancellation-reasons  // contract-only: 404
+POST  /_admin/cancellation-reasons { type:"requester"|"rescuer", key, label, labelFa, requiresCustomText, isActive }  // contract-only: 404
 ```
 
-Populated by T1.1.3; the table is introduced in a follow-up migration rather than the initial auth-table migration (see SECURITY.md for the reason list).
+The database has seeded reasons and the separate `GET /_user/sos/cancellation-reasons` read is live, but **neither admin catalog route is mounted**. Do not use these descriptors to manage the catalog until the admin persistence and audit flow are implemented. See [the admin API audit](ADMIN_API_AUDIT.md).
 
 ---
 

@@ -95,6 +95,28 @@ describe("Fastify server skeleton", () => {
     } finally { controller.abort(); }
   });
 
+  it("keeps every admin descriptor's runtime status honest and rejects unauthenticated mounted routes", async () => {
+    const app = await makeApp();
+    const document = (await app.inject({ method: "GET", url: "/docs/json" })).json();
+    const contractOnly = new Set([
+      "adminUnsuspendUser", "adminGetStats", "adminListCancellationReasons", "adminCreateCancellationReason"
+    ]);
+    const adminRoutes = Object.values(apiRoutes.admin);
+    expect(adminRoutes).toHaveLength(22);
+    for (const route of adminRoutes) {
+      const path = route.url.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g,
+        "00000000-0000-4000-8000-000000000001");
+      const mounted = !contractOnly.has(route.meta.operationId);
+      const response = await app.inject({ method: route.method, url: path,
+        ...(route.method === "POST" || route.method === "PATCH" ? { payload: {} } : {}) });
+      expect(app.hasRoute({ method: route.method, url: route.url }), route.meta.operationId).toBe(mounted);
+      expect(response.statusCode, route.meta.operationId).toBe(mounted ? 401 : 404);
+      const openApiPath = route.url.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, "{$1}");
+      expect(document.paths[openApiPath]?.[route.method.toLowerCase()]?.["x-borobiya-runtime-status"],
+        route.meta.operationId).toBe(mounted ? "implemented" : "contract-only");
+    }
+  });
+
   it("registers the admin catalog routes, so they answer 401 rather than the contract-only 404", async () => {
     // The whole point of T3.1.2/T3.1.3 landing: these URLs used to fall through to the 404 that unregistered
     // descriptors return. A 401 here is proof the handler is mounted and its authorization runs.
