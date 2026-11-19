@@ -269,8 +269,11 @@ describe('route guards', () => {
     expect(wrapper.text()).toContain('کد خطا');
     expect(wrapper.text()).toContain('کاربر');
     await wrapper.find('[data-testid="forbidden-back"]').trigger('click');
-    await flushPromises();
-    expect(appRouter.currentRoute.value.name).toBe(ROUTE_NAMES.map);
+    // The map route is lazy-loaded: flushPromises alone does not wait out the dynamic
+    // import when no earlier test has cached the component, so wait for the landing.
+    await vi.waitFor(() => {
+      expect(appRouter.currentRoute.value.name).toBe(ROUTE_NAMES.map);
+    }, { timeout: 2_000, interval: 20 });
     wrapper.unmount();
   });
 

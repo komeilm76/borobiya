@@ -318,7 +318,11 @@ describe('mobile shell', () => {
     await button.trigger('pointerdown');
     for (let step = 0; step < 20; step++) await shell.advance(100);
     expect(shell.navigations).toHaveBeenCalledWith({ name: ROUTE_NAMES.sos });
-    // And that destination really is reachable from this shell.
+    // And that destination really is reachable from this shell. Whether the component's
+    // own push has already settled depends on timer scheduling, so first move elsewhere:
+    // a push back to the map is redundant (a resolved failure) when already there, which
+    // is fine — only the SOS push below is asserted.
+    await shell.router.push({ name: ROUTE_NAMES.map });
     expect(await shell.router.push({ name: ROUTE_NAMES.sos })).toBeUndefined();
     expect(shell.router.currentRoute.value.name).toBe(ROUTE_NAMES.sos);
     shell.wrapper.unmount();

@@ -210,3 +210,44 @@ describe('support-request queue', () => {
     wrapper.unmount();
   });
 });
+
+describe('review drawer edge behaviour', () => {
+  it('closes the drawer when the same request is opened twice', async () => {
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="open-support-srq_1"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="support-review-panel"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="open-support-srq_1"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="support-review-panel"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('clamps the approved quantity and posts a partial approval when a line is short', async () => {
+    const { wrapper, calls } = await render();
+    await wrapper.find('[data-testid="open-support-srq_1"]').trigger('click');
+    await flushPromises();
+    const qty = wrapper.find('[data-testid="approve-qty-job_medical"]');
+    await qty.setValue('99');
+    // setApproved clamps to the requested quantity (1) and the input re-renders clamped.
+    expect((qty.element as HTMLInputElement).value).toBe('1');
+    await qty.setValue('0');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="review-partial"]').attributes('disabled')).toBeUndefined();
+    await wrapper.find('[data-testid="review-partial"]').trigger('click');
+    await flushPromises();
+    const review = calls.find((call) => call.method === 'POST' && call.path === '/_admin/support-requests/srq_1/review');
+    expect(review?.body?.decision).toBe('partially_approved');
+    expect(review?.body?.items).toEqual([{ jobTypeId: 'job_medical', approvedQuantity: 0 }]);
+    wrapper.unmount();
+  });
+
+  it('refetches the queue when the status filter changes', async () => {
+    const { wrapper, calls } = await render();
+    const before = calls.filter((call) => call.path === '/_admin/support-requests' && call.method === 'GET').length;
+    await wrapper.find('[data-testid="support-filter-approved"]').trigger('click');
+    await flushPromises();
+    expect(calls.filter((call) => call.path === '/_admin/support-requests' && call.method === 'GET').length).toBeGreaterThan(before);
+    wrapper.unmount();
+  });
+});

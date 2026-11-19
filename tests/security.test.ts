@@ -33,7 +33,10 @@ describe('security headers and request hardening', () => {
     expect(shell.headers.get('x-frame-options')).toBe('DENY');
     expect(shell.headers.get('x-content-type-options')).toBe('nosniff');
     expect(String(shell.headers.get('x-request-id'))).toMatch(/^req_/);
-    const me = await apiFetch(server, '/_user/me', { cookie: userCookie });
+    // A dedicated session: the session-revocation test below disables saeed.k, which is
+    // what userCookie belongs to, so this check must not borrow that cookie.
+    const meCookie = await login(server, 'maryam.a', 'DemoPass!2026');
+    const me = await apiFetch(server, '/_user/me', { cookie: meCookie });
     expect(String(me.headers.get('cache-control'))).toMatch(/no-store/);
     expect(me.json.ok).toBe(true);
   });
@@ -52,11 +55,13 @@ describe('security headers and request hardening', () => {
     });
     expect(rejected.status).toBe(403);
     expect(rejected.json.error.code).toBe('FORBIDDEN');
+    // The successful-login leg uses maryam.a: saeed.k is disabled by the session-revocation
+    // test below, and a disabled account's login is refused before it can prove this point.
     const crossSite = await apiFetch(server, '/_auth/login', {
       method: 'POST',
       origin: server.origin,
       headers: { 'Sec-Fetch-Site': 'cross-site' },
-      body: { username: 'saeed.k', password: 'DemoPass!2026' }
+      body: { username: 'maryam.a', password: 'DemoPass!2026' }
     });
     expect(crossSite.status).toBe(200);
   });

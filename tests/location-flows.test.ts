@@ -146,9 +146,24 @@ describe('live fix publishing', () => {
     expect(snapshot.json.data.items[0].speed).toBeNull();
     expect(typeof snapshot.json.data.items[0].recordedAt).toBe('number');
 
-    const history = await apiFetch(server, '/_user/location/history/usr_requester', { cookie: adminCookie });
+    // Oldest-first with a cap: scope to a narrow window around this fix (identified by its
+    // unique accuracy), or track-generating tests running earlier would bury the row.
+    const window = `from=${Date.now() - 120_000}&to=${Date.now() + 120_000}`;
+    const history = await apiFetch(server, `/_user/location/history/usr_requester?${window}&limit=200`, { cookie: adminCookie });
     expect(history.status, history.text).toBe(200);
-    const headingless = history.json.data.items.find((item: any) => item.heading === null && item.speed === null);
+    // History persistence is throttled to one stored row per user per five seconds and a
+    // too-soon fix is dropped (not deferred), so re-publish until one lands in history.
+    let headingless: any;
+    for (let attempt = 0; attempt < 12 && !headingless; attempt++) {
+      if (attempt > 0) {
+        const retryAck = waitForMessage(ws, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.LOCATION_UPDATE);
+        sendJson(ws, { type: WS_EVENTS.LOCATION_UPDATE, latitude: 35.7219, longitude: 51.3347, accuracy: 11 });
+        expect((await retryAck).accepted).toBe(true);
+      }
+      const page = attempt === 0 ? history : await apiFetch(server, `/_user/location/history/usr_requester?${window}&limit=200`, { cookie: adminCookie });
+      headingless = page.json.data.items.find((item: any) => item.accuracy === 11 && item.heading === null && item.speed === null);
+      if (!headingless) await new Promise((resolve) => setTimeout(resolve, 700));
+    }
     expect(headingless).toBeTruthy();
   });
 
@@ -220,7 +235,14 @@ describe('share without an expiry', () => {
 
 describe('publish with no audience', () => {
   it('acknowledges with zero recipients when nobody shares with the publisher', async () => {
-    const cookie = await login(server, 'maryam.a', 'DemoPass!2026');
+    // A fresh dedicated account: the seeded users' share graph grows across this file, so
+    // the no-audience publisher must be someone no earlier test can have shared with.
+    const created = await apiFetch(server, '/_admin/users', {
+      method: 'POST', cookie: adminCookie,
+      body: { username: 'silent.publisher', password: 'Responder!2026x', role: 'user' }
+    });
+    expect(created.status, created.text).toBe(201);
+    const cookie = await login(server, 'silent.publisher', 'Responder!2026x');
     const { socket } = await openSocketWithHello(websocketUrl(server, (await issueTicket(server, cookie)).ticket));
     try {
       const ack = waitForMessage(socket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.LOCATION_UPDATE);

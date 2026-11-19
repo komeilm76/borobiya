@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { apiFetch, createTestServer, login, type TestServer } from './helpers.ts';
 
 /**
@@ -7,8 +7,9 @@ import { apiFetch, createTestServer, login, type TestServer } from './helpers.ts
  *
  * Each assertion pins a specific refusal — the service must reject the operation, leave persisted
  * state untouched, and answer the status code the client renders for. The SOS creation route is
- * rate-limited (10 per address per minute), so the file shares fixture incidents between tests
- * rather than creating one per test.
+ * rate-limited (10 per address per minute); fixtures are shared between tests and the buckets are
+ * reset per test, so how many incidents a shuffled run creates before any given test cannot
+ * starve it. The limiter itself is covered by the security and realtime suites.
  */
 
 let server: TestServer;
@@ -23,6 +24,10 @@ beforeAll(async () => {
   companionCookie = await login(server, 'maryam.a', 'DemoPass!2026');
   responderCookie = await login(server, 'reza.m', 'DemoPass!2026');
   adminCookie = await login(server, 'admin', 'AdminPass!2026');
+});
+
+beforeEach(() => {
+  server.app.context.limiters.clear();
 });
 
 afterAll(async () => {
@@ -58,8 +63,27 @@ async function dispatchAndAccept(sosId: string): Promise<string> {
 
 /** The first SOS created; shared by the read-only and refusal tests that must not mutate it. */
 let sharedSos: string;
+/** Lazily create the shared SOS once, wherever a shuffled run reaches a reader first. */
+async function ensureSharedSos(): Promise<string> {
+  if (!sharedSos) sharedSos = await createSos();
+  return sharedSos;
+}
 /** Mission created for the progress/rating guards; J survives both describes on purpose. */
 let progressFixture: { sosId: string; missionId: string } | null = null;
+/** Lazily build the arrived-state fixture so a shuffled run reaching the rating matrix first still works. */
+async function ensureProgressFixture(): Promise<{ sosId: string; missionId: string }> {
+  if (!progressFixture) {
+    const sosId = await createSos();
+    const missionId = await dispatchAndAccept(sosId);
+    progressFixture = { sosId, missionId };
+    const arrived = await apiFetch(server, `/_user/missions/${missionId}/progress`, {
+      method: 'POST', cookie: responderCookie,
+      body: { action: 'arrive' }
+    });
+    expect(arrived.status).toBe(200);
+  }
+  return progressFixture;
+}
 
 describe('SOS creation guards', () => {
   it('rejects an unknown incident type with 400', async () => {
@@ -78,8 +102,7 @@ describe('SOS visibility', () => {
   });
 
   it('answers 404 — not 403 — when a bystander asks for someone else’s SOS', async () => {
-    sharedSos = await createSos();
-    const sosId = sharedSos;
+    const sosId = await ensureSharedSos();
     // Answering 403 would confirm that the id exists; 404 keeps the request invisible.
     const response = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: companionCookie });
     expect(response.status).toBe(404);
@@ -114,7 +137,7 @@ describe('SOS cancellation guards', () => {
   });
 
   it('forbids a bystander to cancel someone else’s request', async () => {
-    const sosId = sharedSos;
+    const sosId = await ensureSharedSos();
     const response = await apiFetch(server, `/_user/sos/${sosId}/cancel`, {
       method: 'POST', cookie: companionCookie,
       body: { reasonId: 'cancel_mistake' }
@@ -123,7 +146,7 @@ describe('SOS cancellation guards', () => {
   });
 
   it('rejects an unknown cancellation reason', async () => {
-    const sosId = sharedSos;
+    const sosId = await ensureSharedSos();
     const response = await apiFetch(server, `/_user/sos/${sosId}/cancel`, {
       method: 'POST', cookie: requesterCookie,
       body: { reasonId: 'cancel_nope' }
@@ -132,7 +155,7 @@ describe('SOS cancellation guards', () => {
   });
 
   it('requires a real explanation for the reasons that demand one', async () => {
-    const sosId = sharedSos;
+    const sosId = await ensureSharedSos();
     const response = await apiFetch(server, `/_user/sos/${sosId}/cancel`, {
       method: 'POST', cookie: requesterCookie,
       body: { reasonId: 'cancel_other', detail: 'short' }
@@ -147,9 +170,10 @@ describe('SOS cancellation guards', () => {
 describe('dispatch guards', () => {
   it('refuses a non-administrator at the service layer', async () => {
     // The route already requires the admin role, so this exercises the defense in depth below it.
+    const sosId = await ensureSharedSos();
     expect(() => server.app.context.services.sos.dispatch(
       { userId: 'usr_requester', sessionId: 'sess_x', username: 'saeed.k', role: 'user', deviceId: 'dev', ip: '127.0.0.1' },
-      sharedSos,
+      sosId,
       { groupId: 'grp_medical', responderIds: ['usr_responder'] }
     )).toThrow('Administrator permission is required.');
   });
@@ -298,7 +322,7 @@ describe('mission rating guards', () => {
 
   it('runs the whole rating matrix on the progress fixture: 409 early, 403 responder, 200 requester, 409 re-rate', async () => {
     // The progress fixture is left in the arrived state — the matrix continues from there.
-    const missionId = progressFixture!.missionId;
+    const missionId = (await ensureProgressFixture()).missionId;
     // Not completed yet.
     const early = await apiFetch(server, `/_user/missions/${missionId}/rating`, {
       method: 'POST', cookie: requesterCookie,
@@ -349,7 +373,7 @@ describe('nearby responder search', () => {
     expect(added.status, added.text).toBe(200);
 
     // The nearest endpoint derives the search point from the SOS record itself.
-    const response = await apiFetch(server, `/_admin/sos/${sharedSos}/nearest?limit=10`, { cookie: adminCookie });
+    const response = await apiFetch(server, `/_admin/sos/${await ensureSharedSos()}/nearest?limit=10`, { cookie: adminCookie });
     expect(response.status, response.text).toBe(200);
     expect(response.json.data.items.length).toBeGreaterThanOrEqual(2);
     const usernames = response.json.data.items.map((item: any) => item.username);
@@ -362,7 +386,7 @@ describe('nearby responder search', () => {
 describe('admin SOS reads', () => {
   it('serves the filtered admin list and the single-request detail', async () => {
     // The shared fixture keeps the emergency-creation budget intact.
-    const sosId = sharedSos;
+    const sosId = await ensureSharedSos();
     const list = await apiFetch(server, '/_admin/sos?status=pending&limit=5', { cookie: adminCookie });
     expect(list.status).toBe(200);
     expect(list.json.data.items.some((item: any) => item.id === sosId)).toBe(true);

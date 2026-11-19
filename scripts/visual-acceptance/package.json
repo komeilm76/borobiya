@@ -5,10 +5,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "capture": "node capture.mjs scenarios.json"
+    "capture": "node capture.mjs scenarios.json",
+    "diff": "node diff.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium": "^153.0.0",
     "puppeteer-core": "^25.17.0"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
   }
 }

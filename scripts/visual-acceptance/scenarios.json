@@ -1932,5 +1932,370 @@
   "width": 1000,
   "height": 900,
   "dsf": 1
+ },
+ {
+  "ref": "history-09-history-loading",
+  "route": "/_user/history?slow=/_user/trips,/_user/missions,/_user/location,/_user/sos",
+  "waitUntil": "load",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "admin-states-01-loading",
+  "route": "/_admin/overview?slow=/_admin/overview",
+  "persona": "admin",
+  "waitUntil": "load",
+  "width": 1280,
+  "height": 900,
+  "dsf": 1,
+  "steps": [
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "auth-12-onboarding-loading",
+  "route": "/_auth/onboarding?slow=/_public/security-questions",
+  "persona": "onboarding",
+  "waitUntil": "load",
+  "width": 1440,
+  "height": 1000,
+  "dsf": 1,
+  "steps": [
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "navigation-04-bookmark-saved",
+  "route": "/_user/map",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickAt": {
+     "x": 250,
+     "y": 250
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "click": "[data-testid=\"open-save-place\"]"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "type": {
+     "selector": "input[placeholder=\"مثلاً خانه مادر\"]",
+     "text": "خانه مادر"
+    }
+   },
+   {
+    "type": {
+     "selector": "input[placeholder=\"مثلاً خانه\"]",
+     "text": "خانه"
+    }
+   },
+   {
+    "type": {
+     "selector": "input[placeholder^=\"خیابان\"]",
+     "text": "خیابان ولیعصر، پلاک ۱۲"
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ذخیره"
+    }
+   },
+   {
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "ref": "mission-04-mission-offer-details",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "scrollInto": "[data-testid=\"mission-offer\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "mission-16-mission-report",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "رسیدم"
+    }
+   },
+   {
+    "wait": 800
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "شروع رسیدگی"
+    }
+   },
+   {
+    "wait": 800
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "پایان"
+    }
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "scrollInto": "[data-testid=\"mission-next-actions\"]"
+   },
+   {
+    "scrollInto": "[data-testid=\"mission-completed\"]"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "companions-03-companions-live",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "wait": 400
+   },
+   {
+    "scroll": 500
+   },
+   {
+    "wait": 300
+   }
+  ]
+ },
+ {
+  "ref": "companions-05-companion-status",
+  "route": "/_user/sharing",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "sos-09-sos-dispatched",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"mission-offer-accept\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "click": "[data-testid=\"accept-confirm-accept\"]"
+   }
+  ]
+ },
+ {
+  "ref": "sos-10-sos-rescuer-en-route",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "click": "[data-testid=\"mission-offer-accept\"]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "click": "[data-testid=\"accept-confirm-accept\"]"
+   },
+   {
+    "wait": 900
+   },
+   {
+    "scrollInto": ".rail-block"
+   },
+   {
+    "wait": 400
+   }
+  ]
+ },
+ {
+  "ref": "sos-11-sos-rescuer-arrived",
+  "route": "/_user/mission",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "رسیدم"
+    }
+   },
+   {
+    "wait": 900
+   },
+   {
+    "scrollInto": ".rail-block"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "wait": 2200
+   }
+  ]
+ },
+ {
+  "ref": "users-03-roles",
+  "route": "/_admin/users",
+  "persona": "admin",
+  "width": 1440,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "navigation-18-sos-confirmation",
+  "route": "/_user/sos",
+  "width": 393,
+  "height": 852,
+  "dsf": 2,
+  "steps": [
+   {
+    "type": {
+     "selector": ".v-textarea textarea",
+     "text": "آتش‌سوزی کوچک در انبار چوب فروشگاه؛ دو نفر در طبقه بالا گیر افتاده‌اند."
+    }
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   },
+   {
+    "clickText": {
+     "tag": "button",
+     "contains": "ادامه"
+    }
+   },
+   {
+    "wait": 700
+   }
+  ]
+ },
+ {
+  "ref": "dark-admin-dispatch",
+  "route": "/_admin/dispatch",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-admin-audit",
+  "route": "/_admin/audit",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-admin-incidents",
+  "route": "/_admin/incidents",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-admin-jobtypes",
+  "route": "/_admin/job-types",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "dark-admin-alerts",
+  "route": "/_admin/alerts",
+  "persona": "admin",
+  "darkStart": true,
+  "width": 1280,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "admin-narrow-reports",
+  "route": "/_admin/reports",
+  "persona": "admin",
+  "width": 1000,
+  "height": 900,
+  "dsf": 1
+ },
+ {
+  "ref": "admin-narrow-groups",
+  "route": "/_admin/groups",
+  "persona": "admin",
+  "width": 1000,
+  "height": 900,
+  "dsf": 1
  }
 ]

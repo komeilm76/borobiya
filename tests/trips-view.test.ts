@@ -513,3 +513,132 @@ describe('trip creation details', () => {
     wrapper.unmount();
   });
 });
+
+describe('create panel stop editing', () => {
+  function stubCreate(postFails = false) {
+    return stubFetch((path, method) => {
+      if (path === '/_user/trips' && method === 'GET') return { items: [TRIP], total: 1 };
+      if (path === '/_user/trips/invitations') return { items: [], total: 0 };
+      if (path === '/_public/map/config') return { pois: [] };
+      if (path === '/_user/places') return { items: [] };
+      if (path === '/_user/trips' && method === 'POST') {
+        if (postFails) throw new Error('stubbed');
+        return { ...DETAIL, id: 'trp_new', name: 'سفر تازه' };
+      }
+      return { items: [] };
+    });
+  }
+
+  it('adds, removes and centre/place-based stops, and gates submit on valid coordinates', async () => {
+    stubCreate();
+    const { wrapper } = await render();
+    const { useMapStore } = await import('../src/client/stores/map.ts');
+    useMapStore().$patch({ places: [{ id: 'plc_1', label: 'خانه', address: 'تهران', latitude: 35.7192, longitude: 51.3314, icon: 'home', rank: 1 }] as any });
+    await wrapper.find('[data-testid="trips-create-toggle"]').trigger('click');
+    expect(wrapper.find('[data-testid="trips-submit"]').attributes('disabled')).toBeDefined();
+
+    await wrapper.find('[data-testid="trips-add-stop"]').trigger('click');
+    expect(wrapper.find('[data-testid="trips-stop-label-1"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="trips-stop-remove-1"]').trigger('click');
+    expect(wrapper.find('[data-testid="trips-stop-label-1"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="trips-stop-remove-0"]').attributes('disabled')).toBeDefined();
+
+    await wrapper.find('[data-testid="trips-add-center-stop"]').trigger('click');
+    expect(wrapper.find('[data-testid="trips-stop-label-1"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="trips-stop-remove-1"]').trigger('click');
+
+    await wrapper.find('[data-testid="trips-place-pick"]').setValue('plc_1');
+    expect((wrapper.find('[data-testid="trips-stop-label-1"]').element as HTMLInputElement).value).toBe('خانه');
+    await wrapper.find('[data-testid="trips-stop-remove-1"]').trigger('click');
+
+    await wrapper.find('[data-testid="trips-name"]').setValue('سفر تست');
+    await wrapper.find('[data-testid="trips-stop-label-0"]').setValue('مقصد');
+    await wrapper.find('[data-testid="trips-stop-lat-0"]').setValue('999');
+    expect(wrapper.find('[data-testid="trips-submit"]').attributes('disabled')).toBeDefined();
+    await wrapper.find('[data-testid="trips-stop-lat-0"]').setValue('35.72');
+    expect(wrapper.find('[data-testid="trips-submit"]').attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('creates the trip, resets the form and selects the new trip', async () => {
+    const { calls } = stubCreate();
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="trips-name"]').setValue('  سفر تست  ');
+    await wrapper.find('[data-testid="trips-stop-label-0"]').setValue('مقصد');
+    await wrapper.find('[data-testid="trips-submit"]').trigger('click');
+    await flushPromises();
+    const post = calls.find((call) => call.method === 'POST' && call.path === '/_user/trips');
+    expect(post?.body?.name).toBe('سفر تست');
+    expect(post?.body?.stops).toHaveLength(1);
+    expect(wrapper.find('[data-testid="trips-create-panel"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe('leader/member actions and invitations', () => {
+  function stubActions(detail: Record<string, unknown>, inbox: unknown[] = []) {
+    return stubFetch((path, method) => {
+      if (path === '/_user/trips' && method === 'GET') return { items: [TRIP], total: 1 };
+      if (path === '/_user/trips/invitations' && method === 'GET') return { items: inbox, total: inbox.length };
+      if (path === '/_public/map/config') return { pois: [] };
+      if (path === '/_user/places') return { items: [] };
+      if (path === '/_user/trips/trp_1' && method === 'GET') return detail;
+      if (path.startsWith('/_user/trips/trp_1/')) return detail;
+      if (path === '/_user/users/search') return { items: [{ id: 'usr_companion', username: 'maryam.a', role: 'user', online: true }] };
+      return { items: [] };
+    });
+  }
+
+  it('runs start, complete and cancel for the leader', async () => {
+    const { calls } = stubActions({ ...DETAIL, status: 'active' });
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-row-trp_1"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="trips-complete"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="trips-cancel"]').trigger('click');
+    await flushPromises();
+    const paths = calls.filter((c) => c.method === 'POST').map((c) => c.path);
+    expect(paths).toContain('/_user/trips/trp_1/complete');
+    expect(paths).toContain('/_user/trips/trp_1/cancel');
+    wrapper.unmount();
+  });
+
+  it('searches invitees, sends and cancels invitations', async () => {
+    const detail = { ...DETAIL, invitations: [{ id: 'inv_1', inviteeUsername: 'nima.t', status: 'pending' }] };
+    const { calls } = stubActions(detail);
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-row-trp_1"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="trips-invite-search"]').setValue('maryam');
+    await wrapper.find('[data-testid="trips-invite-form"]').trigger('submit');
+    await flushPromises();
+    await wrapper.find('[data-testid="trips-invite-result-maryam.a"]').trigger('click');
+    await flushPromises();
+    const invite = calls.find((c) => c.method === 'POST' && c.path === '/_user/trips/trp_1/invitations');
+    expect(invite?.body).toEqual({ inviteeId: 'usr_companion' });
+    await wrapper.find('[data-testid="trips-invitation-cancel-inv_1"]').trigger('click');
+    await flushPromises();
+    expect(calls.some((c) => c.method === 'DELETE' && c.path === '/_user/trips/invitations/inv_1')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('answers inbox invitations and lets a member leave', async () => {
+    const inbox = [{ id: 'inv_9', tripName: 'سفر گروهی', inviterUsername: 'reza.m', createdAt: 1794100000000 }];
+    const { calls } = stubActions(MEMBER_DETAIL, inbox);
+    const { wrapper } = await render();
+    await wrapper.find('[data-testid="trips-inbox-accept-inv_9"]').trigger('click');
+    await flushPromises();
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/_user/trips/invitations/inv_9/accept')).toBe(true);
+    await wrapper.find('[data-testid="trips-inbox-decline-inv_9"]').trigger('click');
+    await flushPromises();
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/_user/trips/invitations/inv_9/decline')).toBe(true);
+    await wrapper.find('[data-testid="trips-row-trp_1"]').trigger('click');
+    await flushPromises();
+    await wrapper.find('[data-testid="trips-leave"]').trigger('click');
+    await flushPromises();
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/_user/trips/trp_1/leave')).toBe(true);
+    wrapper.unmount();
+  });
+});

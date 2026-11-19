@@ -11,7 +11,7 @@ import App from './App.vue';
 import { router } from './router/index.ts';
 import { vuetify } from './plugins/vuetify.ts';
 import { useSettingsStore } from './stores/settings.ts';
-import { installDemoFetch, setPreviewFailures, setPreviewPersona, setPreviewSections, setPreviewSession } from './preview/demo-fetch.ts';
+import { installDemoFetch, setPreviewFailures, setPreviewPersona, setPreviewSections, setPreviewSession, setPreviewSlow } from './preview/demo-fetch.ts';
 import './styles/tailwind.css';
 
 const params = new URLSearchParams(window.location.search);
@@ -28,6 +28,8 @@ if (params.get('missions') === 'empty' || params.get('offers') === 'empty' || pa
 }
 const fail = params.get('fail');
 if (fail === 'history' || fail === 'admin') setPreviewFailures({ history: fail === 'history', admin: fail === 'admin' });
+const slow = params.get('slow');
+if (slow) setPreviewSlow(slow.split(','));
 installDemoFetch();
 
 const app = createApp(App);

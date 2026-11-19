@@ -307,7 +307,9 @@ describe('room authorization', () => {
   let sosId: string;
   let missionId: string;
 
-  it('creates, dispatches and accepts a request (fixture for the room checks)', async () => {
+  /** Builds the SOS → dispatch → accept fixture once, wherever a shuffled run needs it first. */
+  async function ensureRoomFixture(): Promise<void> {
+    if (missionId) return;
     const created = await apiFetch(server, '/_user/sos', {
       method: 'POST', cookie: ownerCookie,
       body: {
@@ -327,9 +329,14 @@ describe('room authorization', () => {
     expect(accepted.status, accepted.text).toBe(200);
     missionId = accepted.json.data.missionId;
     expect(missionId).toBeTruthy();
+  }
+
+  it('creates, dispatches and accepts a request (fixture for the room checks)', async () => {
+    await ensureRoomFixture();
   });
 
   it('lets the requester and the assigned responder join the sos room, but not a bystander', async () => {
+    await ensureRoomFixture();
     const ownerAck = waitForMessage(ownerSocket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.SUBSCRIBE && message.requestId === 'sos-sub-owner');
     sendJson(ownerSocket, { type: WS_EVENTS.SUBSCRIBE, requestId: 'sos-sub-owner', room: `sos:${sosId}` });
     expect((await ownerAck).accepted).toBe(true);
@@ -344,6 +351,7 @@ describe('room authorization', () => {
   });
 
   it('lets the mission parties join the mission room, but not a bystander', async () => {
+    await ensureRoomFixture();
     const responderAck = waitForMessage(responderSocket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.SUBSCRIBE && message.requestId === 'mis-sub-responder');
     sendJson(responderSocket, { type: WS_EVENTS.SUBSCRIBE, requestId: 'mis-sub-responder', room: `mission:${missionId}` });
     expect((await responderAck).accepted).toBe(true);
@@ -358,9 +366,16 @@ describe('room authorization', () => {
   });
 
   it('lets an administrator join any alarm or mission room by role', async () => {
-    const ack = waitForMessage(adminSocket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.SUBSCRIBE && message.requestId === 'admin-sub-anywhere');
-    sendJson(adminSocket, { type: WS_EVENTS.SUBSCRIBE, requestId: 'admin-sub-anywhere', room: 'mission:unrelated-mission-id' });
-    expect((await ack).accepted).toBe(true);
+    // A fresh connection: the room-capacity test deliberately exhausts the shared admin
+    // peer's 32-room budget, and this join must not depend on how much of it remains.
+    const connection = await openSocketWithHello(websocketUrl(server, (await issueTicket(server, adminCookie)).ticket));
+    try {
+      const ack = waitForMessage(connection.socket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.SUBSCRIBE && message.requestId === 'admin-sub-anywhere');
+      sendJson(connection.socket, { type: WS_EVENTS.SUBSCRIBE, requestId: 'admin-sub-anywhere', room: 'mission:unrelated-mission-id' });
+      expect((await ack).accepted).toBe(true);
+    } finally {
+      await closeSocket(connection.socket);
+    }
   });
 
   it('lets the talk parties join the talk room, but not an outsider', async () => {

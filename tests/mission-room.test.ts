@@ -82,12 +82,34 @@ describe('F3 — mission room authorization', () => {
 
   beforeEach(() => { server.app.context.limiters.clear(); });
 
+  // Shuffled runs reach these tests in any order, and several tests mutate membership or
+  // leadership. Both admin operations are idempotent (re-adding an active member is a
+  // 200 skip; re-designating the current leader is a no-op), so each test arranges the
+  // exact state it needs instead of inheriting a predecessor's.
+  async function ensureMember(userId: string): Promise<void> {
+    const added = await apiFetch(server, `/_admin/missions/${missionId}/members`, {
+      method: 'POST', cookie: adminCookie, body: { userIds: [userId] }
+    });
+    expect(added.status, added.text).toBe(200);
+  }
+
+  async function ensureLeader(userId: string): Promise<void> {
+    await ensureMember(userId);
+    const designated = await apiFetch(server, `/_admin/missions/${missionId}/leader`, {
+      method: 'POST', cookie: adminCookie, body: { userId }
+    });
+    expect(designated.status, designated.text).toBe(200);
+  }
+
   afterAll(async () => {
     for (const socket of sockets) await closeSocket(socket);
     await server?.close();
   });
 
   it('an active ordinary member can subscribe to the mission room and receives support-request events', async () => {
+    // Needs the member active and the leader still leading (only the leader files support).
+    await ensureMember(memberAgent.id);
+    await ensureLeader(leaderAgent.id);
     const connection = await connect(memberAgent.cookie);
     const acknowledged = waitForMessage(connection.socket,
       (m: any) => m.type === WS_EVENTS.ACK && m.kind === WS_EVENTS.SUBSCRIBE && m.requestId === 'room-sub-m');
@@ -106,6 +128,7 @@ describe('F3 — mission room authorization', () => {
   });
 
   it('the active leader can subscribe to the mission room', async () => {
+    await ensureLeader(leaderAgent.id);
     const connection = await connect(leaderAgent.cookie);
     const acknowledged = waitForMessage(connection.socket,
       (m: any) => m.type === WS_EVENTS.ACK && m.kind === WS_EVENTS.SUBSCRIBE && m.requestId === 'room-sub-l');
@@ -130,6 +153,9 @@ describe('F3 — mission room authorization', () => {
   });
 
   it('a removed member loses room access for fresh subscriptions', async () => {
+    // The removal needs an active member who is not the current leader (the leader 409s).
+    await ensureMember(memberAgent.id);
+    await ensureLeader(leaderAgent.id);
     const removed = await apiFetch(server, `/_admin/missions/${missionId}/members/${memberAgent.id}`, {
       method: 'DELETE', cookie: adminCookie, body: { reason: 'rotated out of the team' }
     });

@@ -238,3 +238,76 @@ describe('preview demo mock — every handler answers deterministically', () => 
     expect(body.error.code).toBe('PREVIEW_UNMOCKED');
   });
 });
+
+describe('preview capture knobs (sections and failures)', () => {
+  it('empty-section knobs empty the missions, offers, history and shares lists', async () => {
+    const { setPreviewSections } = await import('../src/client/preview/demo-fetch.ts');
+    setPreviewSections({ missions: true, offers: true, history: true, shares: true });
+    for (const path of ['/_user/missions', '/_user/mission-offers', '/_user/trips', '/_user/location/shares']) {
+      const payload = await (await call('GET', path)).json();
+      expect(payload.data.items, path).toEqual([]);
+      expect(payload.data.total, path).toBe(0);
+    }
+    resetPreviewState();
+    const restored = await (await call('GET', '/_user/missions')).json();
+    expect(restored.data.items.length).toBeGreaterThan(0);
+  });
+
+  it('history failure knob fails list loads with the preview envelope but not writes', async () => {
+    const { setPreviewFailures } = await import('../src/client/preview/demo-fetch.ts');
+    setPreviewFailures({ history: true });
+    for (const path of ['/_user/missions', '/_user/trips', '/_user/location/shares']) {
+      const response = await call('GET', path);
+      expect(response.status, path).toBe(500);
+      const payload = await response.json();
+      expect(payload.error.code).toBe('PREVIEW_FAIL');
+    }
+    resetPreviewState();
+    expect((await call('GET', '/_user/missions')).status).toBe(200);
+  });
+
+  it('admin failure knob fails admin GETs only', async () => {
+    const { setPreviewFailures } = await import('../src/client/preview/demo-fetch.ts');
+    setPreviewFailures({ admin: true });
+    const failed = await call('GET', '/_admin/overview');
+    expect(failed.status).toBe(500);
+    expect((await failed.json()).error.code).toBe('PREVIEW_FAIL');
+    expect((await call('POST', '/_admin/users', { username: 'x' })).status).toBe(200);
+    expect((await call('GET', '/_user/me')).status).toBe(200);
+    resetPreviewState();
+    expect((await call('GET', '/_admin/overview')).status).toBe(200);
+  });
+
+  it('track endpoints answer only for the fixture ids', async () => {
+    expect((await call('GET', '/_user/missions/mis_hist/track')).status).toBe(200);
+    expect((await call('GET', '/_user/missions/mis_other/track')).status).toBe(404);
+    expect((await call('GET', '/_admin/tracks/trip/trp_target')).status).toBe(200);
+    expect((await call('GET', '/_admin/tracks/trip/trp_other')).status).toBe(404);
+  });
+
+  it('admin support-request list filters by status and mission', async () => {
+    const all = await (await call('GET', '/_admin/support-requests')).json();
+    expect(all.data.total).toBeGreaterThan(0);
+    const pending = await (await call('GET', '/_admin/support-requests?status=pending')).json();
+    expect(pending.data.items.every((row: { status: string }) => row.status === 'pending')).toBe(true);
+    const none = await (await call('GET', '/_admin/support-requests?missionId=mis_missing')).json();
+    expect(none.data.items).toEqual([]);
+  });
+});
+
+describe('preview slow knob', () => {
+  it('delays only matching endpoints by ~2500 ms', async () => {
+    const { setPreviewSlow } = await import('../src/client/preview/demo-fetch.ts');
+    setPreviewSlow(['/_admin/overview']);
+    const started = Date.now();
+    await call('GET', '/_admin/overview');
+    expect(Date.now() - started).toBeGreaterThanOrEqual(2400);
+    const fastStart = Date.now();
+    await call('GET', '/_user/me');
+    expect(Date.now() - fastStart).toBeLessThan(1000);
+    resetPreviewState();
+    const resetStart = Date.now();
+    await call('GET', '/_admin/overview');
+    expect(Date.now() - resetStart).toBeLessThan(1000);
+  });
+});

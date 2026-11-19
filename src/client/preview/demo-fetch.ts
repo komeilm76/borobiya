@@ -32,7 +32,10 @@ const state = {
   emptyHistory: false,
   emptyShares: false,
   failHistory: false,
-  failAdmin: false
+  failAdmin: false,
+  // Endpoint substrings whose responses are delayed by 2500 ms so first-load skeletons and
+  // loading compositions can be captured deterministically (the session check is not matched).
+  slowPatterns: [] as string[]
 };
 
 /** Selects which demo account `/_user/me` resolves to. */
@@ -59,6 +62,11 @@ export function setPreviewFailures(failures: { history?: boolean; admin?: boolea
   if (failures.admin !== undefined) state.failAdmin = failures.admin;
 }
 
+/** Delays responses whose path contains any of the given substrings by 2500 ms (loading-state captures). */
+export function setPreviewSlow(patterns: string[]): void {
+  state.slowPatterns = patterns.filter((pattern) => pattern.length > 0);
+}
+
 /** Restores the pristine demo state; used by the smoke test between pages. */
 export function resetPreviewState(): void {
   state.persona = 'user';
@@ -70,6 +78,7 @@ export function resetPreviewState(): void {
   state.emptyShares = false;
   state.failHistory = false;
   state.failAdmin = false;
+  state.slowPatterns = [];
 }
 
 const envelope = (data: unknown, init?: ResponseInit): Response =>
@@ -446,6 +455,9 @@ export function installDemoFetch(): void {
     }
     if (state.failAdmin && method === 'GET' && parsed.pathname.startsWith('/_admin')) {
       return failure(500, 'PREVIEW_FAIL', 'پیش‌نمایش: خطای عمدی برای بازتولید سطح خطای پنل مدیریت.');
+    }
+    if (state.slowPatterns.some((pattern) => parsed.pathname.includes(pattern))) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
     }
     for (const [routeMethod, pattern, handler] of routes) {
       if (routeMethod !== method) continue;

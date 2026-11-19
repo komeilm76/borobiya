@@ -258,6 +258,17 @@ describe('service group membership', () => {
 });
 
 describe('audit log filters', () => {
+  // Self-seed: the filters need at least one `user.create` audit row, which must not
+  // depend on another test having created an account earlier in this file.
+  beforeAll(async () => {
+    const created = await apiFetch(server, '/_admin/users', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { username: 'audit.seed', password: 'Responder!2026x', role: 'user' }
+    });
+    expect(created.status).toBe(201);
+  });
+
   it('returns only the requested action', async () => {
     const response = await apiFetch(server, '/_admin/audit?action=user.create&limit=50', { cookie: adminCookie });
     expect(response.status).toBe(200);

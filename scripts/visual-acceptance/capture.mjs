@@ -3,6 +3,7 @@
 // Scenario shape:
 // { ref, route, persona?, anon?, width, height, dsf?,
 //   steps?: [ {click?, clickText?, type?, wait?, scroll?, offline?, dark?, light?, reducedMotion?, hold?, hover?} ... ], darkStart?, reducedMotionStart?,
+//   latencyStart? (ms of network latency applied before navigation), waitUntil? (goto waitUntil, default 'networkidle0'; the loading-state scenarios use 'load' together with the preview's `?slow=` route knob, because network latency also delays the session check and CDP interception never sees the in-page demo fetch),
 //   shots?: [{name, steps?}]   // multiple screenshots from one page session
 // }
 import chromiumPkg from '@sparticuz/chromium';
@@ -107,7 +108,8 @@ for (const scenario of scenarios) {
     page.setDefaultTimeout(9000);
     if (scenario.darkStart) await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
   if (scenario.reducedMotionStart) await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
-    const resp = await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+    if (scenario.latencyStart) await page.emulateNetworkConditions({ offline: false, latency: scenario.latencyStart, downloadThroughput: -1, uploadThroughput: -1 });
+    const resp = await page.goto(url, { waitUntil: scenario.waitUntil ?? 'networkidle0', timeout: 60000 });
     const baseStatus = resp?.status() ?? 0;
     const outBase = `${outDir}/${scenario.ref}`;
     if (scenario.shots && scenario.shots.length) {

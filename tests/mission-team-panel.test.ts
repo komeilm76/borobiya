@@ -39,7 +39,7 @@ function makeProjection() {
   return { state, projection };
 }
 
-function stubApi(options: { removeFails?: boolean } = {}) {
+function stubApi(options: { removeFails?: boolean; searchFails?: boolean; addFails?: boolean; jobTypesFail?: boolean; requirementsFail?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   const { state, projection } = makeProjection();
   vi.stubGlobal(
@@ -53,12 +53,14 @@ function stubApi(options: { removeFails?: boolean } = {}) {
 
       if (path === '/_admin/missions/mis_1/team' && method === 'GET') return json(projection());
       if (path === '/_admin/users' && method === 'GET') {
+        if (options.searchFails) return new Response(JSON.stringify({ ok: false, requestId: 'r', error: { code: 'BOOM', message: 'search down' } }), { status: 500, headers: { 'content-type': 'application/json' } });
         return json({
           items: [{ id: 'usr_new', username: 'newest.p', role: 'responder', active: true, jobTypeId: 'job_medical', jobTypeLabel: 'پزشکی', securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: true, averageRating: 4.3, sessionCount: 1, online: true, createdAt: 0, updatedAt: 0 }],
           page: 1, limit: 6, total: 1
         });
       }
       if (path === '/_admin/missions/mis_1/members' && method === 'POST') {
+        if (options.addFails) return new Response(JSON.stringify({ ok: false, requestId: 'r', error: { code: 'BAD_REQUEST', message: 'worker not eligible' } }), { status: 400, headers: { 'content-type': 'application/json' } });
         return json({ ...projection(), memberCount: 3 });
       }
       if (path === '/_admin/missions/mis_1/members/usr_medic' && method === 'DELETE') {
@@ -73,11 +75,15 @@ function stubApi(options: { removeFails?: boolean } = {}) {
         return json(projection());
       }
       if (path === '/_admin/missions/mis_1/leader' && method === 'POST') return json(projection());
+      if (path === '/_admin/missions/mis_1/requirements' && method === 'PUT' && options.requirementsFail) {
+        return new Response(JSON.stringify({ ok: false, requestId: 'r', error: { code: 'CONFLICT', message: 'frozen' } }), { status: 409, headers: { 'content-type': 'application/json' } });
+      }
       if (path === '/_admin/missions/mis_1/requirements' && method === 'PUT') {
         state.requirements = (body?.requirements ?? []).map((line: any) => ({ ...line, jobTypeLabel: 'آتش‌نشانی', filled: 0 }));
         return json(projection());
       }
       if (path === '/_admin/job-types' && method === 'GET') {
+        if (options.jobTypesFail) return new Response(JSON.stringify({ ok: false, requestId: 'r', error: { code: 'BOOM', message: 'catalog down' } }), { status: 500, headers: { 'content-type': 'application/json' } });
         return json({ items: [
           { id: 'job_fire', label: 'آتش‌نشانی', offerPolicy: 'all', rank: 1, active: true, memberCount: 5, createdAt: 0, updatedAt: 0 },
           { id: 'job_medical', label: 'پزشکی', offerPolicy: 'ready_only', rank: 2, active: true, memberCount: 8, createdAt: 0, updatedAt: 0 }
@@ -228,6 +234,63 @@ describe('administrator roster management', () => {
     await flushPromises();
     const save = calls.find((call) => call.path === '/_admin/missions/mis_1/requirements' && call.method === 'PUT');
     expect(save?.body).toEqual({ requirements: [{ jobTypeId: 'job_medical', quantity: 1 }] });
+    wrapper.unmount();
+  });
+});
+
+describe('team panel failure paths', () => {
+  it('ignores one-character searches and clears results when the search fails', async () => {
+    const { wrapper, calls } = await render();
+    const search = wrapper.find('[data-testid="team-add-search"]');
+    await search.setValue('a');
+    await flushPromises();
+    expect(calls.some((call) => call.path === '/_admin/users')).toBe(false);
+    wrapper.unmount();
+
+    const failing = await render({ searchFails: true });
+    await failing.wrapper.find('[data-testid="team-add-search"]').setValue('newest');
+    await flushPromises();
+    expect(failing.wrapper.find('[data-testid="add-member-usr_new"]').exists()).toBe(false);
+    failing.wrapper.unmount();
+  });
+
+  it('keeps the pick list honest when adding fails and reloads the projection', async () => {
+    const { wrapper, calls } = await render({ addFails: true });
+    await wrapper.find('[data-testid="team-add-search"]').setValue('newest');
+    await flushPromises();
+    const teamLoadsBefore = calls.filter((call) => call.path === '/_admin/missions/mis_1/team').length;
+    await wrapper.find('[data-testid="add-member-usr_new"]').trigger('click');
+    await flushPromises();
+    expect(useToast().messages.value.some((message) => message.tone === 'error')).toBe(true);
+    expect(calls.filter((call) => call.path === '/_admin/missions/mis_1/team').length).toBeGreaterThan(teamLoadsBefore);
+    wrapper.unmount();
+  });
+
+  it('opens the requirements editor with an empty catalog when job types fail to load', async () => {
+    // The admin store's guard swallows the failure and returns an empty catalog, so the
+    // editor opens with only the placeholder option instead of crashing.
+    const { wrapper } = await render({ jobTypesFail: true });
+    await wrapper.find('[data-testid="open-requirements-editor"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="requirements-editor"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="requirements-editor"] select').findAll('option')).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('blocks a zero-quantity line and stays open when saving requirements fails', async () => {
+    const { wrapper } = await render({ requirementsFail: true });
+    await wrapper.find('[data-testid="open-requirements-editor"]').trigger('click');
+    await flushPromises();
+    const quantity = wrapper.find('[aria-label="تعداد خط 1"]');
+    await quantity.setValue('0');
+    expect(wrapper.find('[data-testid="save-requirements"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.text()).toContain('هر خط باید یک نوع شغل یکتا');
+    await quantity.setValue('2');
+    expect(wrapper.find('[data-testid="save-requirements"]').attributes('disabled')).toBeUndefined();
+    await wrapper.find('[data-testid="save-requirements"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="requirements-editor"]').exists()).toBe(true);
+    expect(useToast().messages.value.some((message) => message.tone === 'error')).toBe(true);
     wrapper.unmount();
   });
 });

@@ -104,6 +104,22 @@ async function checkCapturePlan(fail: (message: string) => void): Promise<void> 
   for (const file of screens) {
     if (!refs.some((ref) => file.startsWith(`${ref}-`))) fail(`committed capture ${file} has no scenario in ${planPath}`);
   }
+  // Every scenario route must exist in the preview registry, or the capture silently
+  // screenshots the wrong page (a redirect or the catalog) instead of the screen.
+  const registry = (await read('src/client/preview/registry.ts')) ?? '';
+  const registryRoutes = new Set([...registry.matchAll(/route: '([^']+)'/g)].map((match) => match[1]));
+  let plan: Array<{ ref?: unknown; route?: unknown }> = [];
+  try {
+    plan = JSON.parse(planText) as Array<{ ref?: unknown; route?: unknown }>;
+  } catch {
+    return;
+  }
+  for (const scenario of plan) {
+    const base = String(scenario.route ?? '').split('?')[0];
+    if (base && !registryRoutes.has(base)) {
+      fail(`capture scenario ${String(scenario.ref ?? '?')} routes to ${base}, which is not in the preview registry`);
+    }
+  }
 }
 
 /**
