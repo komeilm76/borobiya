@@ -32,10 +32,10 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(mapLegend).toContain('class="mission-desk__map-legend bb-floating-card"');
     expect(mapLegend).toContain('aria-labelledby="mission-map-legend-title"');
     expect(mapLegend).toContain('<h2 id="mission-map-legend-title">راهنمای نقشه</h2>');
-    expect(mapLegend).toContain('مبدأ مسیر');
-    expect(mapLegend).toContain('درخواست‌کننده');
-    expect(mapLegend).toContain('امدادگر');
-    expect(mapLegend).toContain('مدیر مرکز');
+    expect(mapLegend).toContain('<MapPointKey :kinds="[\'sos\', \'start\', \'stop\', \'helper\', \'requester\', \'director\']"');
+    const pointMeta = readFileSync(new URL('../map/map-point.ts', import.meta.url), 'utf8');
+    for (const label of ['مبدأ مسیر', 'درخواست‌کننده', 'امدادگر نزدیک', 'مدیر مرکز', 'ایستگاه میانی'])
+      expect(pointMeta).toContain(label);
     expect(mapLegend).not.toContain('toFixed(5)');
     expect(info).toContain('مختصات ثبت‌شدهٔ حادثه');
     expect(mapLegend).not.toContain('<details');
@@ -67,16 +67,15 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(css).toContain('.mission-desk__map-legend { flex: none; min-width: 0;');
     expect(css).toContain('border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);');
     expect(css).toContain('background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));');
-    expect(css).toContain('.mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3,');
+    expect(css).toContain('.mission-desk__map-legend :deep(.bb-point-key) { display: grid;\n  grid-template-columns: repeat(3,');
     const stack = page.slice(page.indexOf('class="mission-desk__bottom-stack"'), page.indexOf('class="mission-desk__bottom-panel"'));
     expect(stack.indexOf('class="mission-desk__map-legend bb-floating-card"')).toBeGreaterThan(0);
     expect(stack.indexOf('<MissionStatusPanel v-if="activeTool === \'status\'"')).toBeGreaterThan(stack.indexOf('class="mission-desk__map-legend bb-floating-card"'));
     expect(stack.match(/id="mission-map-legend-title"/g)).toHaveLength(1);
     expect(css).toContain('.mission-desk--active .mission-desk__bottom-stack #mission-status-panel {\n  position: relative; inset: auto;');
-    expect(page).toContain('new MarkerClass({ color: "#2563a6" })');
-    expect(page).toContain('new MarkerClass({ color: "#c27c14" })');
-    for (const color of ["#dc593b", "#16826c", "#5555ae"])
-      expect(room).toContain(color);
+    expect(page).toContain('createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده")');
+    expect(page).toContain('createMapPointElement("stop", navigation.active.value ? "باز کردن برنامهٔ مسیر" : "باز کردن فهرست ایستگاه‌ها"');
+    expect(room).toContain('createMapPointElement(role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester"');
     expect(compileTemplate({ source: template!.content, filename: "UserMissionView.vue", id: "map-legend" }).errors).toEqual([]);
     expect(compileStyle({ source: css, filename: "UserMissionView.vue", id: "map-legend", scoped: true }).errors).toEqual([]);
   });

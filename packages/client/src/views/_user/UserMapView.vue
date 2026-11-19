@@ -343,6 +343,8 @@ import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
+import { createMapPointElement } from "@/components/map/map-point";
+import { spreadCoincidentPoints } from "@/components/map/coincident-points";
 import { clusterAppearance, matchesSelectedSearchDestination, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
@@ -686,7 +688,7 @@ function syncOwnMarker(freshFix = false): void {
   const instance = map.value;
   const fix = own.position.value;
   if (!instance || !fix || !markerConstructor) {
-    ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null; return;
+    ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null; schedulePointSpread(); return;
   }
   const wasGuiding = ownMarker?.getElement().classList.contains("user-map-view__own-marker--navigating") ?? false;
   if (!ownMarker) {
@@ -735,6 +737,7 @@ function syncOwnMarker(freshFix = false): void {
   element.setAttribute("aria-label", mode.value === "missions" ? "موقعیت من روی این دستگاه؛ مستقل از نشانگر اشتراک مأموریت" :
     reliableHeading ? "موقعیت زندهٔ من؛ جهت راهبری" :
       journey.navigating.value ? "موقعیت من؛ در انتظار مسیر و GPS دقیق" : "موقعیت زندهٔ من");
+  schedulePointSpread();
 }
 function centerOnOwnLocation(initiatedByUser = true): void {
   const instance = map.value;
@@ -1525,6 +1528,19 @@ const placeFailed = ref(false);
 let profileController: AbortController | null = null;
 let placeController: AbortController | null = null;
 const peerMarkers = new Map<string, Marker>();
+let pointSpreadScheduled = false;
+function schedulePointSpread(): void {
+  if (pointSpreadScheduled) return;
+  pointSpreadScheduled = true;
+  queueMicrotask(() => {
+    pointSpreadScheduled = false;
+    if (!map.value) return;
+    // GPS remains on the exact fix; only coincident route/companion marks move.
+    spreadCoincidentPoints([destinationMarker, routeOriginMarker, ...peerMarkers.values()], [ownMarker]);
+    if (destinationMarker && isSelectedSearchDestination.value && !journey.navigating.value)
+      positionSelectedPlaceLabel(destinationMarker, map.value);
+  });
+}
 
 function removeSelectedCompanion(): void {
   selectedCompanionId.value = null;
@@ -1663,6 +1679,7 @@ function syncPeerAvatars(): void {
     const current = marker.getLngLat();
     if (current.lng !== peer.position[0] || current.lat !== peer.position[1]) marker.setLngLat(peer.position);
   }
+  schedulePointSpread();
 }
 
 function selectCompanion(userId: string, centerMap = true): void {
@@ -1826,10 +1843,13 @@ function repaintOverlays(): void {
 
 function syncDestinationMarker(): void {
   const instance = map.value, point = journey.point.value;
-  if (!instance || !markerConstructor || !point || mode.value === "missions" || missionActive.value) { destinationMarker?.remove(); destinationMarker = null; return; }
+  if (!instance || !markerConstructor || !point || mode.value === "missions" || missionActive.value) { destinationMarker?.remove(); destinationMarker = null; schedulePointSpread(); return; }
   if (!destinationMarker) {
     // The existing amber route pin owns a selected POI; do not stack two pins.
-    destinationMarker = new markerConstructor({ color: "#d97706" }).setLngLat([point.lon, point.lat]).addTo(instance);
+    destinationMarker = new markerConstructor({
+      element: createMapPointElement("end", "نمایش جزئیات مسیر", { onActivate: () => { journey.sheetOpen.value = true; } }),
+      anchor: "center"
+    }).setLngLat([point.lon, point.lat]).addTo(instance);
     const element = destinationMarker.getElement();
     element.classList.add("user-map-view__destination-marker");
     element.setAttribute("role", "button"); element.setAttribute("tabindex", "0");
@@ -1839,11 +1859,6 @@ function syncDestinationMarker(): void {
     label.className = "user-map-view__selected-place-label";
     label.dir = "auto";
     element.append(label);
-    element.addEventListener("click", (event) => { event.stopPropagation(); journey.sheetOpen.value = true; });
-    element.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault(); event.stopPropagation(); journey.sheetOpen.value = true;
-    });
   } else destinationMarker.setLngLat([point.lon, point.lat]);
   destinationMarker.getElement().setAttribute("aria-label", `مقصد انتخاب‌شده: ${journey.title.value}؛ نمایش جزئیات مسیر`);
   const element = destinationMarker.getElement();
@@ -1854,21 +1869,21 @@ function syncDestinationMarker(): void {
   // No native hover tooltip on a selected search result.
   if (namedSearch) element.removeAttribute("title");
   else element.setAttribute("title", journey.title.value);
+  schedulePointSpread();
 }
 function syncRouteOriginMarker(): void {
   const instance = map.value, origin = journey.plannedFrom.value;
   if (!instance || !markerConstructor || !origin || mode.value === "missions" || missionActive.value || !journey.selectedRoute.value || !journey.routesVisible.value ||
     journey.navigating.value || journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value) {
-    routeOriginMarker?.remove(); routeOriginMarker = null; return;
+    routeOriginMarker?.remove(); routeOriginMarker = null; schedulePointSpread(); return;
   }
   if (!routeOriginMarker) {
-    const element = document.createElement("div");
-    element.className = "user-map-view__route-origin";
-    element.setAttribute("role", "img"); element.setAttribute("aria-label", "مبدأ مسیر انتخابی");
-    const label = document.createElement("span"); label.textContent = "A"; element.append(label);
+    const element = createMapPointElement("start", "مبدأ مسیر انتخابی؛ نه موقعیت زنده");
+    element.classList.add("user-map-view__route-origin");
     routeOriginMarker = new markerConstructor({ element, anchor: "center" })
       .setLngLat([origin.lon, origin.lat]).addTo(instance);
   } else routeOriginMarker.setLngLat([origin.lon, origin.lat]);
+  schedulePointSpread();
 }
 function paintPointRoute(): void {
   const instance = map.value;
@@ -2285,11 +2300,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
 /* Compact category pins leave the map visible; the selected pin alone has a
    persistent name. Photon names and addresses remain in each button's aria-label. */
-:global(.user-map-view .user-map-view__route-origin) {
-  display: grid; place-items: center; width: 32px; height: 32px; border: 3px solid #fff;
-  border-radius: 50%; color: #fff;
-  background: #2563eb; box-shadow: 0 2px 9px rgba(4, 24, 40, .5); font-weight: 900;
-}
 :global(.user-map-view .user-map-view__result-marker) {
   display: grid; place-items: center; width: 48px; height: 48px; padding: 0;
   border: 3px solid #fff; border-radius: 16px 16px 16px 5px;

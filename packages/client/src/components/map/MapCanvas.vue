@@ -29,6 +29,7 @@
 import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "./map-point.css";
 import { getMapConfig } from "@/api/map-config";
 import { createMapStartupAttempt, prepareMapRuntime, registerMapCacheWorker } from "@/services/map-cache";
 import { canRenderWebGL2, isWebGL2InitializationError } from "./webgl-support";

@@ -66,7 +66,7 @@ describe("dark surfaces and widget boundaries", () => {
     const files = ["App.vue", "views/PlaceholderPage.vue", ...directories.flatMap((directory) =>
       readdirSync(join(root, directory)).filter((file) => file.endsWith(".vue"))
         .map((name) => `${directory}/${name}`))];
-    expect(files).toHaveLength(55); // Includes the admin sender-profile dialog and completed-mission trace.
+    expect(files).toHaveLength(56); // Includes the shared map-point key, sender-profile dialog and mission trace.
     for (const path of files) {
       expect(source(path), path).not.toMatch(/rgba?\(27,\s*41,\s*42(?:,|\))/);
     }

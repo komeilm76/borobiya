@@ -314,14 +314,7 @@
           <section v-if="legendOpen" id="mission-map-legend" class="mission-desk__map-legend bb-floating-card"
             aria-labelledby="mission-map-legend-title" dir="rtl" tabindex="-1">
             <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
-            <ul class="mission-desk__map-legend-body" aria-label="راهنمای نشانگرها">
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--incident" aria-hidden="true">!</i> حادثه</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--origin" aria-hidden="true" /> مبدأ مسیر</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--stop" aria-hidden="true" /> ایستگاه</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--requester" aria-hidden="true" /> درخواست‌کننده</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--rescuer" aria-hidden="true" /> امدادگر</li>
-              <li><i class="mission-desk__legend-symbol mission-desk__legend-symbol--admin" aria-hidden="true" /> مدیر مرکز</li>
-            </ul>
+            <MapPointKey :kinds="['sos', 'start', 'stop', 'helper', 'requester', 'director']" />
             <small>مبدأ مسیر زنده نیست؛ تازگی موقعیت‌های اشتراکی را بررسی کنید.</small>
           </section>
           <MissionStatusPanel v-if="activeTool === 'status'" :desk="desk" :visible="visible"
@@ -421,6 +414,9 @@
 import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouteNavigation } from "@/composables/use-route-navigation";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
+import { createMapPointElement } from "@/components/map/map-point";
+import { spreadCoincidentPoints } from "@/components/map/coincident-points";
+import MapPointKey from "@/components/map/MapPointKey.vue";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionStatusPanel from "@/components/mission/MissionStatusPanel.vue";
 import MissionMapCards from "@/components/mission/MissionMapCards.vue";
@@ -846,28 +842,28 @@ function syncRouteMap(): void {
   const incident = props.visible && routing.visible.value ? routing.target.value?.incident : null;
   clearRouteOverlays(!incident);
   if (!map || !incident || !MarkerClass) return;
-  waypointMarkers = routing.via.value.map((point, index) => {
-    const marker = new MarkerClass({ color: "#c27c14" }).setLngLat([point.lon, point.lat]).addTo(map);
-    marker.getElement().setAttribute("aria-label", `ایستگاه ${index + 1}`);
-    return marker;
+  waypointMarkers = routing.via.value.map((point, index) => new MarkerClass({
+    element: createMapPointElement("stop", navigation.active.value ? "باز کردن برنامهٔ مسیر" : "باز کردن فهرست ایستگاه‌ها", {
+      number: index + 1, onActivate: () => {
+        openRouteWorkspace();
+        if (!navigation.active.value && activeTool.value === "route") openStopsSection();
+      }
+    }), anchor: "center"
+  }).setLngLat([point.lon, point.lat]).addTo(map));
+  // One incident mark also represents route destination B; do not stack two
+  // identical-coordinate pins or hide the SOS beneath a second endpoint.
+  const incidentPin = createMapPointElement("sos", "مقصد نهایی مسیر؛ باز کردن برنامهٔ مسیر", {
+    onActivate: () => { if (!pickingWaypoint.value) openRouteWorkspace(); }
   });
-  // A square ! pin cannot be mistaken for the requester's orange live-location marker.
-  const incidentPin = document.createElement("button");
-  incidentPin.type = "button";
-  incidentPin.className = "mission-desk__incident-pin";
-  incidentPin.textContent = "!";
-  incidentPin.setAttribute("aria-label", "محل حادثه؛ باز کردن برنامهٔ مسیر");
+  incidentPin.classList.add("mission-desk__incident-pin");
   incidentPin.setAttribute("aria-disabled", String(pickingWaypoint.value));
-  incidentPin.addEventListener("click", (event) => {
-    event.stopPropagation(); // A marker tap must not also insert a waypoint through the map.
-    if (!pickingWaypoint.value) openRouteWorkspace();
-  });
-  incidentMarker = new MarkerClass({ element: incidentPin, anchor: "bottom" })
+  incidentMarker = new MarkerClass({ element: incidentPin, anchor: "center" })
     .setLngLat([incident.lon, incident.lat]).addTo(map);
   // A planned origin is a snapshot, not the rescuer's live/consented location.
-  rescuerMarker = routing.from.value ? new MarkerClass({ color: "#2563a6" })
-    .setLngLat([routing.from.value.lon, routing.from.value.lat]).addTo(map) : null;
-  rescuerMarker?.getElement().setAttribute("aria-label", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده");
+  rescuerMarker = routing.from.value ? new MarkerClass({
+    element: createMapPointElement("start", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده"), anchor: "center"
+  }).setLngLat([routing.from.value.lon, routing.from.value.lat]).addTo(map) : null;
+  spreadCoincidentPoints([rescuerMarker, ...waypointMarkers, incidentMarker]);
   highlightRouteStop();
   // Route changes frame the plan, but updates must not interrupt active GPS guidance.
   if (!navigation.active.value) frameMissionRoute();
@@ -1023,11 +1019,7 @@ onBeforeUnmount(() => {
   border: 0; border-radius: 12px; background: var(--bb-color-inset); color: rgb(var(--v-theme-primary));
   cursor: pointer; font: inherit; font-weight: 800; }
 .mission-desk__map-hint [role="alert"] { grid-column: 1 / -1; }
-:global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; cursor: pointer; }
-:global(.mission-desk__incident-pin:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 :global(.mission-desk__incident-pin[aria-disabled="true"]) { cursor: default; }
-:global(.mission-desk__incident-pin::after) { content: ''; position: absolute; top: 100%; border-inline: 6px solid transparent; border-top: 8px solid #b91c1c; }
-:global(.mission-desk__selected-stop) { outline: 3px solid #fbbf24; outline-offset: 4px; border-radius: 50%; }
 .mission-route__header { position: relative; z-index: 1; top: auto; display: flex; align-items: center;
   gap: .5rem; margin: -.85rem -.85rem .75rem; padding: .5rem .85rem;
   border-bottom: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface)); }
@@ -1578,19 +1570,10 @@ onBeforeUnmount(() => {
   background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
 .mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: 1rem; font-weight: 800; }
-.mission-desk__map-legend-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .2rem .35rem;
-  margin: 0; padding: 0; list-style: none; font-size: .875rem; line-height: 1.35; }
-.mission-desk__map-legend-body li { display: flex; align-items: center; min-width: 0; gap: .25rem; overflow-wrap: anywhere; }
+.mission-desk__map-legend :deep(.bb-point-key) { display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem .45rem; }
+.mission-desk__map-legend :deep(.bb-point-key li) { min-width: 0; overflow-wrap: anywhere; }
 .mission-desk__map-legend small { display: block; margin-top: .3rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.35; }
-.mission-desk__legend-symbol { display: inline-grid; place-items: center; flex: none;
-  width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;
-  box-shadow: 0 0 0 1px var(--bb-color-outline); }
-.mission-desk__legend-symbol--incident { background: #b91c1c; border-radius: 3px; color: white; font: 900 9px/1 sans-serif; }
-.mission-desk__legend-symbol--origin { background: #2563a6; }
-.mission-desk__legend-symbol--stop { background: #c27c14; }
-.mission-desk__legend-symbol--requester { background: #dc593b; }
-.mission-desk__legend-symbol--rescuer { background: #16826c; }
-.mission-desk__legend-symbol--admin { background: #5555ae; }
 /* One scroll surface for the steps and guarded action within the docked card.
    No individual stage has a nested scroller. */
 .mission-desk__map-cards { flex: 1 1 auto; min-height: 0; width: 100%;

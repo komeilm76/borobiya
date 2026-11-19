@@ -110,6 +110,7 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import { createMapPointElement } from "@/components/map/map-point";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
 import { freshMissionMemberCamera } from "@/mission/member-focus";
@@ -234,11 +235,13 @@ function syncMarkers(): void {
     delete markers[role];
     delete paintedMarkers[role];
     if (op.kind === "remove") continue;
-    // A freshness transition changes both marker scale and accessible label.
-    const marker = new MarkerClass({ color: role === "rescuer" ? "#16826c" : role === "admin" ? "#5555ae" : "#dc593b",
-      scale: op.next.fresh ? 1 : 0.8 }).setLngLat([op.next.lon, op.next.lat]).addTo(instance);
-    marker.getElement().setAttribute("aria-label", `${role === "rescuer" ? "امدادگر" : role === "admin" ? "مدیر مرکز" : "درخواست‌کننده"}، ${op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی"}`);
-    marker.getElement().style.opacity = op.next.fresh ? "1" : "0.55";
+    // Role silhouette and letter are readable without consulting a color key.
+    // Freshness remains explicit in the accessible name, not implied by opacity.
+    const element = createMapPointElement(role === "rescuer" ? "helper" : role === "admin" ? "director" : "requester",
+      op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی");
+    element.style.opacity = op.next.fresh ? "1" : "0.6";
+    const marker = new MarkerClass({ element, anchor: "center" })
+      .setLngLat([op.next.lon, op.next.lat]).addTo(instance);
     markers[role] = marker;
     paintedMarkers[role] = op.next;
   }

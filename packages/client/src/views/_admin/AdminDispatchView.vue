@@ -357,20 +357,26 @@
               :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'"
               @click="frameSelectedIncident">{{ nearbyFeatures.features.length ? 'حادثه و امدادگران' : 'نمایش محل حادثه' }}</v-btn>
 
-            <div class="severity-legend" role="note" aria-label="راهنمای رنگ شدت حادثه">
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--high" /> بحرانی
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--medium" /> متوسط
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--low" /> کم‌خطر
-              </span>
-              <span v-if="nearbyFeatures.features.length" class="legend-item">
-                <span class="legend-dot legend-dot--responder" /> امدادگر نزدیک
-              </span>
+            <div v-if="mapPointChoices.length" class="dispatch-map-choices" role="group"
+              aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه" dir="rtl">
+              <div class="dispatch-map-choices__heading">
+                <strong>نقاط این مکان</strong>
+                <button type="button" aria-label="بستن فهرست نقاط" @click="mapPointChoices = []">×</button>
+              </div>
+              <div class="dispatch-map-choices__items">
+                <button v-for="choice in mapPointChoices" :key="`${choice.kind}-${choice.id}`" type="button"
+                  @click="activateMapChoice(choice)">{{ choice.label }}</button>
+              </div>
             </div>
+            <details class="severity-legend" aria-label="راهنمای نشانگرهای نقشه">
+              <summary>نقاط نقشه</summary>
+              <MapPointKey :kinds="nearbyFeatures.features.length ? ['sos', 'nearby'] : ['sos']" />
+              <div class="severity-legend__severities" aria-label="شدت حادثه">
+                <span class="legend-item"><span class="legend-dot legend-dot--high" /> بحرانی</span>
+                <span class="legend-item"><span class="legend-dot legend-dot--medium" /> متوسط</span>
+                <span class="legend-item"><span class="legend-dot legend-dot--low" /> کم‌خطر</span>
+              </div>
+            </details>
           </div>
         </v-card>
         <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
@@ -642,6 +648,8 @@ import {
   SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import MapPointKey from "@/components/map/MapPointKey.vue";
+import { MAP_POINT_META } from "@/components/map/map-point";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue";
 import { statusLabel } from "@/mission/timeline-presentation";
@@ -658,9 +666,15 @@ import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
 const SOS_SOURCE_ID = "admin-sos-requests";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
+const SOS_GLYPH_LAYER_ID = "admin-sos-glyph";
 const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
+const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
+const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
+type MapPointChoice = { kind: "sos" | "responder" | "cluster"; id: string; label: string;
+  clusterId?: number; coordinates?: [number, number] };
+const mapPointChoices = ref<MapPointChoice[]>([]);
 
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
@@ -825,26 +839,40 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   const data = nearbyFeatures.value as unknown as GeoJsonSourceData;
   const existing = map.getSource(RESPONDER_SOURCE_ID) as GeoJSONSource | undefined;
   if (existing) existing.setData(data);
-  else map.addSource(RESPONDER_SOURCE_ID, { type: "geojson", data });
+  else map.addSource(RESPONDER_SOURCE_ID, { type: "geojson", data,
+    cluster: true, clusterRadius: 42, clusterMaxZoom: 18 });
   const palette = palettes[themeStore.isDark ? "dark" : "light"];
+  const before = map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined;
   if (!map.getLayer(RESPONDER_DOT_LAYER_ID)) map.addLayer({
     id: RESPONDER_DOT_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
+    filter: ["!", ["has", "point_count"]],
     paint: {
       "circle-color": palette.primary,
-      "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 11, 8],
+      "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 14, 12],
       "circle-stroke-color": palette.surface,
       "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3, 2]
     }
-  }, map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined);
+  }, before);
+  if (!map.getLayer(RESPONDER_CLUSTER_LAYER_ID)) map.addLayer({
+    id: RESPONDER_CLUSTER_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
+    filter: ["has", "point_count"],
+    paint: { "circle-color": palette.primary, "circle-radius": 18,
+      "circle-stroke-color": palette.surface, "circle-stroke-width": 3 }
+  }, before);
   if (!map.getLayer(RESPONDER_LABEL_LAYER_ID)) map.addLayer({
     id: RESPONDER_LABEL_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
-    layout: {
-      "text-field": ["concat", "@", ["get", "username"]],
-      "text-size": 12, "text-anchor": "top", "text-offset": [0, 1],
-      "text-optional": true
-    },
-    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 1.5 }
-  }, map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined);
+    filter: ["!", ["has", "point_count"]],
+    layout: { "text-field": MAP_POINT_META.nearby.glyph, "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 18, "text-allow-overlap": true },
+    paint: { "text-color": palette.onPrimary }
+  }, before);
+  if (!map.getLayer(RESPONDER_COUNT_LAYER_ID)) map.addLayer({
+    id: RESPONDER_COUNT_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
+    filter: ["has", "point_count"],
+    layout: { "text-field": ["to-string", ["get", "point_count"]],
+      "text-font": ["Borobiya Vazirmatn"], "text-size": 13, "text-allow-overlap": true },
+    paint: { "text-color": palette.onPrimary }
+  }, before);
 }
 
 function ensureSosMapLayers(map: MapLibreMap): void {
@@ -879,12 +907,18 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       source: SOS_SOURCE_ID,
       paint: {
         "circle-color": ["get", "color"],
-        "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 10, 8],
+        "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 14, 12],
         "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3.5, 2],
         "circle-stroke-color": "#ffffff"
       }
     });
   }
+  if (!map.getLayer(SOS_GLYPH_LAYER_ID)) map.addLayer({
+    id: SOS_GLYPH_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    layout: { "text-field": MAP_POINT_META.sos.glyph, "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 16, "text-allow-overlap": true },
+    paint: { "text-color": "#ffffff" }
+  });
 }
 
 function syncMapData(): void {
@@ -905,7 +939,8 @@ function restoreMapLayers(): void {
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
   }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID],
-  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID])) return;
+  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
+    RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
   syncMapData();
@@ -1009,8 +1044,30 @@ function focusResponders(): void {
   });
 }
 
+function activateMapChoice(choice: MapPointChoice): void {
+  mapPointChoices.value = [];
+  if (choice.kind === "sos") { adminSos.selectRequest(choice.id); return; }
+  if (choice.kind === "responder") {
+    // This is only a qualified, currently visible suggestion; manual lookup
+    // and stale results never become a map-based dispatch selection.
+    if (nearbyFeatures.value.features.some((feature) => feature.id === choice.id))
+      adminSos.toggleResponderSelection(choice.id);
+    return;
+  }
+  const map = mapInstance;
+  const source = map?.getSource(RESPONDER_SOURCE_ID) as GeoJSONSource | undefined;
+  if (!map || !source || choice.clusterId === undefined) return;
+  void source.getClusterExpansionZoom(choice.clusterId).then((zoom) => {
+    if (mapInstance !== map) return;
+    if (zoom > map.getZoom() + .05 && zoom <= map.getMaxZoom() && choice.coordinates)
+      map.easeTo({ center: choice.coordinates, zoom });
+    else focusResponders(); // Coincident positions at maximum zoom remain individually selectable in the list.
+  }).catch(() => { if (mapInstance === map) focusResponders(); });
+}
+
 function onMapReady(map: MapLibreMap): void {
   detachMapEvents?.();
+  mapPointChoices.value = [];
   mapInstance = map;
   syncMapData();
   startPulseLoop();
@@ -1033,14 +1090,31 @@ function onMapReady(map: MapLibreMap): void {
     restoreMapLayers();
   };
   const onMarkerClick = (event: MapMouseEvent) => {
-    if (!map.getLayer(SOS_CORE_LAYER_ID) && !map.getLayer(SOS_PULSE_LAYER_ID)) return;
-    const features = map.queryRenderedFeatures(event.point, {
-      layers: [SOS_CORE_LAYER_ID, SOS_PULSE_LAYER_ID].filter((id) => Boolean(map.getLayer(id)))
-    });
-    const clickedId = features[0]?.properties?.id;
-    if (typeof clickedId === "string") {
-      adminSos.selectRequest(clickedId);
+    const layers = [SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
+      .filter((id) => Boolean(map.getLayer(id)));
+    const choices = new Map<string, MapPointChoice>();
+    if (layers.length) for (const feature of map.queryRenderedFeatures(event.point, { layers })) {
+      const props = feature.properties;
+      const id = props?.id;
+      if (feature.layer.id === SOS_CORE_LAYER_ID && typeof id === "string") {
+        const request = adminSos.visibleRequests.find((item) => item.id === id);
+        if (request) choices.set(`sos-${id}`, { kind: "sos", id,
+          label: `حادثه SOS · ${incidentLabel(request.incidentTypeId)}` });
+      } else if (feature.layer.id === RESPONDER_DOT_LAYER_ID && typeof id === "string" &&
+        nearbyFeatures.value.features.some((item) => item.id === id)) {
+        choices.set(`responder-${id}`, { kind: "responder", id,
+          label: `امدادگر نزدیک · ${String(props?.username ?? "")}` });
+      } else if (feature.layer.id === RESPONDER_CLUSTER_LAYER_ID &&
+        typeof props?.cluster_id === "number" && feature.geometry.type === "Point") {
+        const clusterId = props.cluster_id as number;
+        choices.set(`cluster-${clusterId}`, { kind: "cluster", id: String(clusterId), clusterId,
+          coordinates: feature.geometry.coordinates as [number, number],
+          label: `${Number(props.point_count).toLocaleString("fa-IR")} امدادگر نزدیک · بزرگ‌نمایی` });
+      }
     }
+    const found = [...choices.values()];
+    if (found.length === 1) activateMapChoice(found[0]!);
+    else mapPointChoices.value = found; // Empty tap closes the choice tray.
   };
 
   map.on("styledata", onStyleData);
@@ -1055,7 +1129,8 @@ function onMapReady(map: MapLibreMap): void {
 
 let pendingDeepLinkId: string | null = null;
 
-watch(nearbyFeatures, syncMapData);
+watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); });
+watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const, () => { mapPointChoices.value = []; });
 // Keep the incident visible when its qualified suggestions arrive; selection
 // still focuses the incident immediately, before the nearest read completes.
 watch(() => [adminSos.nearestRequestId, adminSos.nearestLoaded] as const,
@@ -1371,14 +1446,30 @@ onBeforeUnmount(() => {
 .dispatch-mission-timeline[open] summary { margin-bottom: .5rem; }
 .admin-dispatch__followup-toggle[aria-expanded="true"] { margin-bottom: .75rem; }
 
+.dispatch-map-choices { position: absolute; z-index: 5; bottom: 12px; inset-inline-end: 12px;
+  width: min(17rem, calc(100% - 1.5rem)); max-height: min(15rem, 50%);
+  display: flex; flex-direction: column; padding: .35rem;
+  border: 1px solid var(--bb-color-outline); border-radius: 16px;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); }
+.dispatch-map-choices__heading { display: flex; justify-content: space-between; align-items: center;
+  padding-inline-start: .4rem; font-size: .82rem; }
+.dispatch-map-choices button { font: inherit; color: inherit; background: transparent; border: 0;
+  min-height: 44px; cursor: pointer; border-radius: 9px; }
+.dispatch-map-choices button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
+.dispatch-map-choices__heading button { min-width: 44px; font-size: 1.3rem; }
+.dispatch-map-choices__items { overflow-y: auto; min-height: 0; }
+.dispatch-map-choices__items button { display: block; width: 100%; text-align: start;
+  padding: .35rem .5rem; font-size: .82rem; }
+.dispatch-map-choices__items button:hover { background: var(--bb-color-inset); }
 .severity-legend {
   position: absolute;
   bottom: 12px;
   inset-inline-start: 12px;
   z-index: 2;
-  display: flex;
-  gap: .7rem;
-  padding: .45rem .7rem;
+  display: block;
+  max-width: min(18rem, calc(100% - 1.5rem));
+  padding: .15rem .7rem;
   border: 1px solid var(--bb-color-outline);
   border-radius: var(--bb-radius-nested, 16px);
   background: rgb(var(--v-theme-surface));
@@ -1386,6 +1477,12 @@ onBeforeUnmount(() => {
   box-shadow: var(--bb-shadow-overlay);
   font-size: .8rem;
 }
+.severity-legend summary { min-height: 44px; display: flex; align-items: center;
+  font-weight: 800; cursor: pointer; }
+.severity-legend summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
+.severity-legend :deep(.bb-point-key) { padding: .2rem 0 .45rem; }
+.severity-legend__severities { display: flex; flex-wrap: wrap; gap: .45rem .7rem;
+  border-top: 1px solid var(--bb-color-outline); padding: .4rem 0 .45rem; }
 
 .legend-item {
   display: inline-flex;
@@ -1410,7 +1507,6 @@ onBeforeUnmount(() => {
 .legend-dot--low {
   background: #0284c7;
 }
-.legend-dot--responder { background: rgb(var(--v-theme-primary)); border: 2px solid rgb(var(--v-theme-on-primary)); }
 
 /* Vuetify's lg columns start at 1280px. Below that width the queue and map
  * stack; the compact recenter action stays inside the map and the legend
@@ -1422,6 +1518,8 @@ onBeforeUnmount(() => {
     height: clamp(17rem, 40dvh, 22rem);
     min-height: 17rem;
   }
+  .dispatch-map-choices { position: static; max-height: 12rem; width: calc(100% - 1.5rem);
+    align-self: center; }
   .severity-legend {
     position: static;
     z-index: auto;
