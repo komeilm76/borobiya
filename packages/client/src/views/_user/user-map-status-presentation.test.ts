@@ -26,6 +26,16 @@ function ratio(first: string, second: string): number {
 
 // Source/compiled-style contracts; don't mount Vue SFCs in unit tests.
 describe("map visual status and compass", () => {
+  it("keeps WebGL2 failures visible inside the map instead of misreporting them as connection errors", () => {
+    expect(canvas).toContain('v-if="webglUnavailable" class="map-canvas__gpu-fallback" role="alert"');
+    expect(canvas).toContain("این نقشه به WebGL2 نیاز دارد");
+    expect(canvas).toContain('@click="retryMap">بررسی دوبارهٔ نقشه');
+    expect(canvas).toContain("if (isWebGL2InitializationError(value))");
+    expect(canvas).toContain("startWhenGraphicsAvailable();");
+    expect(canvas).toContain("container.value?.replaceChildren()");
+    expect(canvasCss.errors).toEqual([]);
+  });
+
   it("puts the broadcast error inside the companions card instead of plain map text", () => {
     expect(view).not.toContain('<p v-if="broadcast.view.tone === \'warn\' || broadcast.view.tone === \'error\'"');
     expect(view).toContain(':broadcast-status="broadcast.view.tone === \'warn\' || broadcast.view.tone === \'error\' ? broadcast.view : null"');

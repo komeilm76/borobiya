@@ -394,7 +394,8 @@ The current server does **not** automatically expire a pending SOS after 24 hour
 
 | Symptom | What to do |
 |---------|-----------|
-| Map blank | Check internet/LAN to `map server`; reload; if offline, wait for tiles cache |
+| Map reports **WebGL2 is required** or **GPUInitializationError** | This is browser/device graphics support, **not a map-server or tile-cache error**. Update the browser and GPU drivers, enable browser hardware acceleration, restart the browser, then use **بررسی دوبارهٔ نقشه**. On a remote desktop or VM, verify that its browser session exposes WebGL2 (in Chrome/Chromium, check `chrome://gpu`). A device/session without WebGL2 cannot render this vector map; the app does not provide a raster fallback. Do not make location-dependent dispatch/navigation decisions from a blank map. |
+| Map reports tile/style network failure | Check LAN to the map server; reload or use Retry; if offline, previously cached tiles may be available. |
 | Location not sharing | Allow Location permission; check priority device; ensure GPS on |
 | Cannot login, inactive | Ask an administrator to reactivate the account; then sign in again |
 | Cannot login, suspended | Contact the service operator; reactivation in Users does not remove suspension, and there is no automatic 24-hour release or admin unsuspend screen |

@@ -1,6 +1,14 @@
 <template>
   <section class="map-canvas" :class="{ 'map-canvas--action-compass': compassAction }" role="region" :aria-label="ariaLabel">
     <div ref="container" class="map-canvas__viewport" />
+    <div v-if="webglUnavailable" class="map-canvas__gpu-fallback" role="alert">
+      <div class="map-canvas__gpu-message">
+        <v-icon icon="mdi-map-marker-off-outline" size="32" color="warning" aria-hidden="true" />
+        <strong>نمایش نقشه در این مرورگر ممکن نیست</strong>
+        <p>این نقشه به WebGL2 نیاز دارد، اما مرورگر یا دستگاه شما فعلاً آن را در اختیار نمی‌گذارد. مرورگر را به‌روز کنید، شتاب‌دهی سخت‌افزاری را فعال کنید و صفحه را دوباره باز کنید. در محیط دسکتاپ راه دور یا ماشین مجازی، پشتیبانی گرافیکی WebGL2 را نیز بررسی کنید.</p>
+        <v-btn color="primary" variant="tonal" @click="retryMap">بررسی دوبارهٔ نقشه</v-btn>
+      </div>
+    </div>
     <v-snackbar
       v-model="showMapNotice"
       color="warning"
@@ -23,6 +31,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMapConfig } from "@/api/map-config";
 import { createMapStartupAttempt, prepareMapRuntime, registerMapCacheWorker } from "@/services/map-cache";
+import { canRenderWebGL2, isWebGL2InitializationError } from "./webgl-support";
 import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
@@ -67,6 +76,7 @@ const container = ref<HTMLDivElement | null>(null);
 const map = shallowRef<MapLibreMap | null>(null);
 const showMapNotice = ref(false);
 const mapNoticeMessage = ref("");
+const webglUnavailable = ref(false);
 let configRequest: AbortController | null = null;
 let configPending = false;
 let configFailed = false;
@@ -92,7 +102,12 @@ function reportMapError(value: unknown): void {
   // The toast stays user-friendly; the console keeps the actionable detail
   // (failed style/tile URLs, WebGL initialization failures, ...).
   console.error("[borobiya:map] map error", value);
-  showNotice(MAP_FAILURE_NOTICE);
+  if (isWebGL2InitializationError(value)) {
+    showMapNotice.value = false;
+    webglUnavailable.value = true;
+  } else {
+    showNotice(MAP_FAILURE_NOTICE);
+  }
   emit("map-error", toError(value, "The map could not be loaded."));
 }
 
@@ -120,6 +135,15 @@ function updateStyle(styleUrl: string): void {
   }
 }
 
+function startWhenGraphicsAvailable(): void {
+  if (!canRenderWebGL2()) {
+    reportMapError(new Error("WebGL2 is required to display this map."));
+    return;
+  }
+  webglUnavailable.value = false;
+  startMap?.();
+}
+
 function retryMap(): void {
   const instance = map.value;
   if (!instance && !startMap) return;
@@ -127,7 +151,8 @@ function retryMap(): void {
   showMapNotice.value = false;
   lastNoticeAt = Number.NEGATIVE_INFINITY;
   if (!instance) {
-    startMap?.(); // The lazy library or Map constructor may have failed before a map existed.
+    // A missing GPU context cannot be fixed by reloading tiles or the style.
+    startWhenGraphicsAvailable();
     return;
   }
 
@@ -201,15 +226,23 @@ function initializeMap(controller: AbortController, maplibre: typeof import("map
   setWorkerUrl("/maplibre-gl-worker.mjs");
   const initialStyleUrl = pendingStyleUrl ?? props.styleUrl;
 
-  const instance = new MapLibre({
-    container: container.value,
-    ...createMapCanvasOptions(null, {
-      styleUrl: initialStyleUrl,
-      center: props.center,
-      zoom: props.zoom,
-      constrainBounds: props.constrainBounds
-    })
-  });
+  let instance: MapLibreMap;
+  try {
+    instance = new MapLibre({
+      container: container.value,
+      ...createMapCanvasOptions(null, {
+        styleUrl: initialStyleUrl,
+        center: props.center,
+        zoom: props.zoom,
+        constrainBounds: props.constrainBounds
+      })
+    });
+  } catch (error) {
+    // MapLibre can append partial DOM before GPU initialization throws. Remove
+    // it so the explicit retry starts with one clean viewport, not stacked canvases.
+    container.value?.replaceChildren();
+    throw error;
+  }
   try {
     instance.addControl(new NavigationControl({
       showCompass: true,
@@ -223,6 +256,7 @@ function initializeMap(controller: AbortController, maplibre: typeof import("map
     instance.on("load", () => emit("ready", instance, Marker));
     instance.on("error", (event) => reportMapError(event.error));
     map.value = instance;
+    webglUnavailable.value = false;
     activeStyleUrl = resolveMapStyleUrl(initialStyleUrl);
     pendingStyleUrl = null;
     fetchRuntimeConfig(controller);
@@ -250,7 +284,7 @@ onMounted(() => {
     reportMapError,
     () => !controller.signal.aborted && !!container.value && !map.value
   );
-  startMap();
+  startWhenGraphicsAvailable();
 });
 
 onBeforeUnmount(() => {
@@ -286,6 +320,24 @@ defineExpose({ map, setStyle: updateStyle });
   inset: 0;
   min-height: inherit;
 }
+
+.map-canvas__gpu-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 1rem;
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
+}
+.map-canvas__gpu-message { display: grid; justify-items: start; gap: .7rem; max-width: 32rem;
+  font-family: var(--bb-font-family); line-height: 1.6; }
+.map-canvas__gpu-message strong { font-size: 1rem; }
+.map-canvas__gpu-message p { margin: 0; font-size: .88rem; }
+.map-canvas__gpu-message .v-btn { min-height: 44px; font-family: var(--bb-font-family); }
+.map-canvas__gpu-message .v-btn:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 
 :deep(.maplibregl-ctrl-group:not(:empty)) {
   border: 1px solid rgba(25, 53, 54, 0.12);

@@ -154,7 +154,9 @@ describe("map startup cache budget", () => {
   it("wires Retry to startup when no map exists and re-fetches failed configuration", () => {
     const retry = canvas.slice(canvas.indexOf("function retryMap()"), canvas.indexOf("function handleServiceWorkerMessage"));
     expect(retry).toContain("if (!instance)");
-    expect(retry).toContain("startMap?.()");
+    expect(retry).toContain("startWhenGraphicsAvailable()");
+    expect(canvas.slice(canvas.indexOf("function startWhenGraphicsAvailable()"), canvas.indexOf("function retryMap()")))
+      .toContain("startMap?.()");
     expect(retry).toContain("configFailed");
     expect(retry).toContain("fetchRuntimeConfig");
     expect(retry).toContain("lastNoticeAt = Number.NEGATIVE_INFINITY");
