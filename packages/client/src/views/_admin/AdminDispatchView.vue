@@ -352,6 +352,16 @@
               @ready="onMapReady"
             />
 
+            <div v-if="mapEdgeCues.length" class="dispatch-map-edge-cues" aria-label="نقاط بیرون از قاب نقشه">
+              <button v-for="cue in mapEdgeCues" :key="`${cue.kind}-${cue.id}`" type="button"
+                class="dispatch-map-edge-cue" :class="`dispatch-map-edge-cue--${cue.kind}`"
+                :style="{ left: `${cue.x}px`, top: `${cue.y}px` }"
+                :aria-label="`${cue.kind === 'sos' ? 'حادثهٔ انتخاب‌شده' : 'امدادگر نزدیک'} ${cue.label}، بیرون از قاب نقشه، نمایش روی نقشه`"
+                @click="focusEdgeCue(cue)">
+                <span aria-hidden="true">{{ edgeArrow(cue.edge) }}</span><bdi dir="auto">{{ cue.label }}</bdi>
+              </button>
+            </div>
+
             <v-btn v-if="adminSos.selectedRequest" class="map-selected-alert-card"
               color="surface" variant="flat" rounded="xl" prepend-icon="mdi-crosshairs-gps"
               :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'"
@@ -647,6 +657,7 @@ import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { palettes } from "@/styles/tokens";
+import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -662,6 +673,7 @@ const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
 const RESPONDER_NAME_LAYER_ID = "admin-sos-nearby-rescuers-name";
+const RESPONDER_SELECTED_NAME_LAYER_ID = "admin-sos-selected-rescuers-name";
 const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
 const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
 type MapPointChoice = { kind: "sos" | "responder" | "cluster"; id: string; label: string;
@@ -797,6 +809,34 @@ let mapInstance: MapLibreMap | null = null;
 let pulseAnimationFrame: number | null = null;
 let lastPulseUpdateAt = 0;
 let detachMapEvents: (() => void) | null = null;
+const mapEdgeCues = ref<DispatchEdgeCue[]>([]);
+function edgeArrow(edge: DispatchEdgeCue["edge"]): string {
+  return { top: "↑", bottom: "↓", left: "←", right: "→" }[edge];
+}
+function updateMapEdgeCues(): void {
+  const map = mapInstance;
+  if (!map) { mapEdgeCues.value = []; return; }
+  const canvas = map.getCanvas();
+  const incident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+  const points = [
+    ...(incident ? [{ kind: "sos" as const, id: incident.id, label: incidentLabel(incident.incidentTypeId),
+      coordinates: [incident.location.lon, incident.location.lat] as [number, number], selected: true }] : []),
+    ...nearbyFeatures.value.features.map((feature) => ({ kind: "responder" as const, id: String(feature.id),
+      label: feature.properties.username, coordinates: feature.geometry.coordinates,
+      selected: feature.properties.isSelected }))
+  ];
+  mapEdgeCues.value = dispatchMapEdgeCues(canvas.clientWidth, canvas.clientHeight, points.map((point) => {
+    const pixel = map.project(point.coordinates);
+    return { kind: point.kind, id: point.id, label: point.label,
+      selected: point.selected, x: pixel.x, y: pixel.y };
+  }));
+}
+function focusEdgeCue(cue: DispatchEdgeCue): void {
+  if (cue.kind === "sos") {
+    const selected = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+    if (selected?.id === cue.id) focusRequest(selected);
+  } else if (nearbyFeatures.value.features.some((feature) => feature.id === cue.id)) focusNearbyResponder(cue.id);
+}
 
 function severityMeta(severity: Severity) {
   return SOS_SEVERITY_PRESENTATION[severity];
@@ -860,12 +900,20 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   }, before);
   if (!map.getLayer(RESPONDER_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
-    filter: ["!", ["has", "point_count"]],
+    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "isSelected"], false]],
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 13, "text-anchor": "left", "text-offset": [1.4, 0],
-      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-max-width": 9,
-      "text-optional": true },
+      "text-size": 13, "text-anchor": "left", "text-radial-offset": 1.5,
+      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto", "text-max-width": 9 },
     paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 2 }
+  }, before);
+  if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
+    id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
+    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "isSelected"], true]],
+    layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 14, "text-anchor": "top", "text-radial-offset": 1.5,
+      "text-variable-anchor": ["top", "bottom", "left", "right"], "text-justify": "auto",
+      "text-max-width": 9, "text-allow-overlap": true },
+    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 3 }
   }, before);
   if (!map.getLayer(RESPONDER_COUNT_LAYER_ID)) map.addLayer({
     id: RESPONDER_COUNT_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
@@ -931,9 +979,11 @@ function ensureSosMapLayers(map: MapLibreMap): void {
     id: SOS_TITLE_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
     filter: ["==", ["get", "isSelected"], true],
     layout: { "text-field": ["get", "mapTitle"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-anchor": "left", "text-offset": [1.5, 0],
+      "text-size": 14, "text-anchor": "left", "text-radial-offset": 1.5,
+      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto",
       "text-allow-overlap": true, "text-max-width": 10 },
-    paint: { "text-color": "#143038", "text-halo-color": "#ffffff", "text-halo-width": 3 }
+    paint: { "text-color": palettes[themeStore.isDark ? "dark" : "light"].text,
+      "text-halo-color": palettes[themeStore.isDark ? "dark" : "light"].surface, "text-halo-width": 3 }
   });
 }
 
@@ -957,7 +1007,7 @@ function restoreMapLayers(): void {
   }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID],
   [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,
     RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,
-    RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
+    RESPONDER_SELECTED_NAME_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
   syncMapData();
@@ -1087,6 +1137,7 @@ function onMapReady(map: MapLibreMap): void {
   mapPointChoices.value = [];
   mapInstance = map;
   syncMapData();
+  updateMapEdgeCues();
   startPulseLoop();
 
   if (adminSos.selectedRequest) {
@@ -1136,19 +1187,25 @@ function onMapReady(map: MapLibreMap): void {
 
   map.on("styledata", onStyleData);
   map.on("idle", onIdle);
+  map.on("move", updateMapEdgeCues);
+  map.on("resize", updateMapEdgeCues);
   map.on("click", onMarkerClick);
   detachMapEvents = () => {
     map.off("styledata", onStyleData);
     map.off("idle", onIdle);
+    map.off("move", updateMapEdgeCues);
+    map.off("resize", updateMapEdgeCues);
     map.off("click", onMarkerClick);
+    mapEdgeCues.value = [];
   };
 }
 
 let pendingDeepLinkId: string | null = null;
 
-watch(incidentNameById, syncMapData);
-watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); });
-watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const, () => { mapPointChoices.value = []; });
+watch(incidentNameById, () => { syncMapData(); updateMapEdgeCues(); });
+watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
+watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const,
+  () => { mapPointChoices.value = []; updateMapEdgeCues(); }, { flush: "sync" });
 // Keep the incident visible when its qualified suggestions arrive; selection
 // still focuses the incident immediately, before the nearest read completes.
 watch(() => [adminSos.nearestRequestId, adminSos.nearestLoaded] as const,
@@ -1413,6 +1470,25 @@ onBeforeUnmount(() => {
   position: relative;
   height: clamp(18rem, 37dvh, 23rem);
   min-height: 18rem;
+}
+/* Screen-space edge cues are never geographic pins: their buttons bring the
+ * operator back to the real point. Keep them above map tiles, below choice tray. */
+.dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.dispatch-map-edge-cue { position: absolute; display: inline-flex; align-items: center; justify-content: center;
+  gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
+  max-width: 8rem; min-height: 44px; padding: .25rem .55rem;
+  border: 2px solid rgb(var(--v-theme-primary)); border-radius: .75rem;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.35 var(--bb-font-family);
+  cursor: pointer; pointer-events: auto; }
+.dispatch-map-edge-cue--sos { border-color: rgb(var(--v-theme-error)); }
+.dispatch-map-edge-cue > span { flex: none; color: rgb(var(--v-theme-primary)); font-size: 1.15rem; }
+.dispatch-map-edge-cue--sos > span { color: rgb(var(--v-theme-error)); }
+.dispatch-map-edge-cue bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dispatch-map-edge-cue:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+@media (forced-colors: active) {
+  .dispatch-map-edge-cue { background: Canvas; color: CanvasText; border-color: CanvasText !important; box-shadow: none; }
+  .dispatch-map-edge-cue > span { color: CanvasText !important; }
 }
 .admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);
   font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }

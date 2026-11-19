@@ -343,7 +343,7 @@ import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
-import { createMapPointElement, positionMapPointLabels } from "@/components/map/map-point";
+import { createMapPointElement, pointLabelPlacement, positionMapPointLabels } from "@/components/map/map-point";
 import { spreadCoincidentPoints } from "@/components/map/coincident-points";
 import { clusterAppearance, matchesSelectedSearchDestination, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
@@ -1199,10 +1199,15 @@ function positionSelectedPlaceLabel(marker: Marker | null, instance: MapLibreMap
   element.style.setProperty("--selected-label-map-width", `${Math.max(44, canvas.width - 16)}px`);
   element.classList.remove("user-map-view__selected-place--label-below");
   element.style.removeProperty("--selected-label-shift");
+  element.style.removeProperty("--selected-label-y");
   if (label.getBoundingClientRect().top < canvas.top + 8)
     element.classList.add("user-map-view__selected-place--label-below");
   const rect = label.getBoundingClientRect();
+  const { y, edge } = pointLabelPlacement(canvas, element.getBoundingClientRect(), rect);
   element.style.setProperty("--selected-label-shift", `${mapLabelShift(rect.left, rect.right, canvas.left, canvas.right)}px`);
+  element.style.setProperty("--selected-label-y", `${Math.round(y)}px`);
+  if (edge) element.setAttribute("data-bb-point-edge", edge);
+  else element.removeAttribute("data-bb-point-edge");
 }
 function positionSelectedPlaceLabels(): void {
   const instance = map.value;
@@ -1537,7 +1542,10 @@ let pointSpreadScheduled = false;
 function positionVisiblePointLabelsAfterMapMove(instance: MapLibreMap): void {
   // MapLibre updates marker transforms later in the same move/resize event.
   queueMicrotask(() => {
-    if (map.value === instance) positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);
+    if (map.value === instance) {
+      positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);
+      positionSelectedPlaceLabels();
+    }
   });
 }
 function schedulePointSpread(): void {
@@ -2362,7 +2370,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__selected-place) { cursor: pointer; z-index: 3; }
 :global(.user-map-view .user-map-view__selected-place-label:not([hidden])) {
   position: absolute; bottom: calc(100% + .45rem); left: 50%;
-  transform: translateX(calc(-50% + var(--selected-label-shift, 0px)));
+  transform: translate(calc(-50% + var(--selected-label-shift, 0px)), var(--selected-label-y, 0px));
   display: block; width: max-content;
   max-width: min(15rem, calc(100vw - 2rem), var(--selected-label-map-width, 15rem));
   padding: .45rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -2383,10 +2391,22 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .bb-map-point.user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
   top: calc(50% + 19px); bottom: auto;
 }
+:global(.user-map-view .user-map-view__selected-place[data-bb-point-edge] .user-map-view__selected-place-label:not([hidden])) {
+  border-color: rgb(var(--v-theme-primary));
+}
+:global(.user-map-view .user-map-view__selected-place[data-bb-point-edge] .user-map-view__selected-place-label:not([hidden])::before) {
+  content: "";
+  color: rgb(var(--v-theme-primary)); margin-inline-end: .35rem;
+}
+:global(.user-map-view .user-map-view__selected-place[data-bb-point-edge="top"] .user-map-view__selected-place-label:not([hidden])::before) { content: "↑"; }
+:global(.user-map-view .user-map-view__selected-place[data-bb-point-edge="bottom"] .user-map-view__selected-place-label:not([hidden])::before) { content: "↓"; }
+:global(.user-map-view .user-map-view__selected-place[data-bb-point-edge="left"] .user-map-view__selected-place-label:not([hidden])::before) { content: "←"; }
+:global(.user-map-view .user-map-view__selected-place[data-bb-point-edge="right"] .user-map-view__selected-place-label:not([hidden])::before) { content: "→"; }
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__result-marker),
   :global(.user-map-view .user-map-view__selected-place-label),
-  :global(.user-map-view .user-map-view__result-marker__tooltip) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
+  :global(.user-map-view .user-map-view__result-marker__tooltip) { border-color: CanvasText !important; background: Canvas; color: CanvasText; box-shadow: none; }
+  :global(.user-map-view .user-map-view__selected-place[data-bb-point-edge] .user-map-view__selected-place-label::before) { color: CanvasText; }
 }
 
 /* Count bubbles correspond to actual overlapping hits. The chooser retains
@@ -2534,7 +2554,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__own-marker-label) { display: none; }
 :global(.user-map-view .user-map-view__own-marker--mission .user-map-view__own-marker-label) {
   position: absolute; top: calc(50% + 19px); left: 50%;
-  transform: translateX(calc(-50% + var(--bb-point-label-shift, 0px)));
+  transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
   display: block; width: max-content; max-width: min(7rem, 34vw); overflow: hidden; text-overflow: ellipsis;
   padding: .18rem .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
   border-radius: .55rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
@@ -2544,6 +2564,16 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__own-marker--mission.bb-map-point--label-flipped .user-map-view__own-marker-label) {
   top: auto; bottom: calc(50% + 19px);
 }
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label) {
+  border-color: rgb(var(--v-theme-primary));
+}
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label::before) {
+  content: ""; color: rgb(var(--v-theme-primary)); margin-inline-end: .3rem;
+}
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge="top"] .user-map-view__own-marker-label::before) { content: "↑"; }
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge="bottom"] .user-map-view__own-marker-label::before) { content: "↓"; }
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge="left"] .user-map-view__own-marker-label::before) { content: "←"; }
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge="right"] .user-map-view__own-marker-label::before) { content: "→"; }
 /* MapLibre rotates the entire guidance arrow marker; do not rotate a text
    caption with it. The GPS arrow and the accessible marker name remain. */
 :global(.user-map-view .user-map-view__own-marker--mission.user-map-view__own-marker--navigating .user-map-view__own-marker-label) {

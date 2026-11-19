@@ -20,13 +20,22 @@ button.bb-map-point { cursor: pointer; }
    centered 30px sign, not the outer 44px touch target; labels stay attached
    visually while the geographical anchor remains the sign's center. */
 .bb-map-point__caption { position: absolute; top: calc(50% + 19px); left: 50%;
-  transform: translateX(calc(-50% + var(--bb-point-label-shift, 0px))); box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
+  transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
+  box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
   max-width: min(8rem, 36vw); min-height: 25px; padding: .17rem .46rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .3); border-radius: .55rem;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 10px rgba(3, 29, 31, .45); font: 800 .78rem/1.45 var(--bb-font-family, sans-serif);
   white-space: nowrap; pointer-events: none; }
 .bb-map-point__caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Off-screen points get a small directional edge cue; the sign itself is never
+   displaced from its geographic location. Hidden/selected-place captions stay hidden. */
+.bb-map-point[data-bb-point-edge] .bb-map-point__caption { border-color: rgb(var(--v-theme-primary)); }
+.bb-map-point[data-bb-point-edge] .bb-map-point__caption::before { flex: none; color: rgb(var(--v-theme-primary)); }
+.bb-map-point[data-bb-point-edge="top"] .bb-map-point__caption::before { content: "↑"; }
+.bb-map-point[data-bb-point-edge="bottom"] .bb-map-point__caption::before { content: "↓"; }
+.bb-map-point[data-bb-point-edge="left"] .bb-map-point__caption::before { content: "←"; }
+.bb-map-point[data-bb-point-edge="right"] .bb-map-point__caption::before { content: "→"; }
 .bb-map-point--sos .bb-map-point__caption,
 .bb-map-point--helper .bb-map-point__caption,
 .bb-map-point--start .bb-map-point__caption,
@@ -59,4 +68,5 @@ button.bb-map-point { cursor: pointer; }
 @media (forced-colors: active) { .bb-map-point__sign { border-color: CanvasText !important;
     color: CanvasText !important; background: Canvas !important; box-shadow: none; }
   .bb-map-point__caption, .bb-map-point__tooltip { background: Canvas; color: CanvasText;
-    border-color: CanvasText; box-shadow: none; } }
+    border-color: CanvasText !important; box-shadow: none; }
+  .bb-map-point[data-bb-point-edge] .bb-map-point__caption::before { color: CanvasText; } }

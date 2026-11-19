@@ -63,27 +63,53 @@ export function createMapPointElement(kind: MapPointKind, detail: string, option
   return element;
 }
 
-/** Keep short captions inside the actual map viewport during camera gestures.
- * The marker's geographical position and hit target remain unchanged. */
+type PointRect = Pick<DOMRect, "left" | "right" | "top" | "bottom">;
+
+/** The glyph stays on its real coordinate. Only the caption becomes a screen-edge
+ * direction cue when its point leaves the viewport (including above/below). */
+export function pointLabelPlacement(viewport: PointRect, anchor: PointRect, label: PointRect): {
+  x: number; y: number; edge: "top" | "bottom" | "left" | "right" | null;
+} {
+  const margin = 8;
+  const centerX = (anchor.left + anchor.right) / 2;
+  const centerY = (anchor.top + anchor.bottom) / 2;
+  const vertical = centerY < viewport.top ? viewport.top - centerY : centerY > viewport.bottom ? centerY - viewport.bottom : 0;
+  const horizontal = centerX < viewport.left ? viewport.left - centerX : centerX > viewport.right ? centerX - viewport.right : 0;
+  const edge = vertical && vertical / Math.max(1, viewport.bottom - viewport.top) >=
+    horizontal / Math.max(1, viewport.right - viewport.left)
+    ? centerY < viewport.top ? "top" : "bottom"
+    : horizontal ? centerX < viewport.left ? "left" : "right" : null;
+  return {
+    x: Math.min(viewport.right - margin - label.right, Math.max(viewport.left + margin - label.left, 0)),
+    y: Math.min(viewport.bottom - margin - label.bottom, Math.max(viewport.top + margin - label.top, 0)),
+    edge
+  };
+}
+
+/** Keep labels within the map frame even when the icon is offscreen. Never move
+ * the MapLibre marker, change its coordinates, or expand its tappable area. */
 export function positionMapPointLabels(map: { getCanvas(): HTMLElement }, markers: readonly ({ getElement(): HTMLElement } | null)[]): void {
   const viewport = map.getCanvas().getBoundingClientRect();
+  const verticalOverflow = (rect: PointRect) =>
+    Math.max(0, viewport.top + 8 - rect.top) + Math.max(0, rect.bottom - viewport.bottom + 8);
   for (const marker of markers) {
     const element = marker?.getElement();
     const label = element?.querySelector<HTMLElement>(".bb-map-point__caption");
     if (!element || !label || label.offsetParent === null) continue;
     element.classList.remove("bb-map-point--label-flipped");
     element.style.removeProperty("--bb-point-label-shift");
+    element.style.removeProperty("--bb-point-label-y");
     let rect = label.getBoundingClientRect();
-    const roomAbove = element.getBoundingClientRect().top - viewport.top;
-    const roomBelow = viewport.bottom - element.getBoundingClientRect().bottom;
-    if (rect.top < viewport.top + 8 || rect.bottom > viewport.bottom - 8) {
-      const currentlyAbove = rect.bottom <= element.getBoundingClientRect().top;
-      if ((currentlyAbove && roomBelow > roomAbove) || (!currentlyAbove && roomAbove > roomBelow)) {
-        element.classList.add("bb-map-point--label-flipped");
-        rect = label.getBoundingClientRect();
-      }
+    if (verticalOverflow(rect)) {
+      element.classList.add("bb-map-point--label-flipped");
+      const alternative = label.getBoundingClientRect();
+      if (verticalOverflow(alternative) < verticalOverflow(rect)) rect = alternative;
+      else element.classList.remove("bb-map-point--label-flipped");
     }
-    const shift = Math.min(viewport.right - 8 - rect.right, Math.max(viewport.left + 8 - rect.left, 0));
-    element.style.setProperty("--bb-point-label-shift", `${Math.round(shift)}px`);
+    const { x, y, edge } = pointLabelPlacement(viewport, element.getBoundingClientRect(), rect);
+    element.style.setProperty("--bb-point-label-shift", `${Math.round(x)}px`);
+    element.style.setProperty("--bb-point-label-y", `${Math.round(y)}px`);
+    if (edge) element.setAttribute("data-bb-point-edge", edge);
+    else element.removeAttribute("data-bb-point-edge");
   }
 }

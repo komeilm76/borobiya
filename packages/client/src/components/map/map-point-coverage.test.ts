@@ -41,9 +41,13 @@ describe("on-map labels for each user-workspace point state", () => {
     expect(css).not.toMatch(/\.bb-map-point \{ position: relative/);
     expect(css).toContain('.bb-map-point__caption { position: absolute; top: calc(50% + 19px); left: 50%;');
     expect(css).toContain('bottom: calc(50% + 19px);');
+    expect(css).toContain('var(--bb-point-label-y, 0px)');
+    expect(css).toContain('[data-bb-point-edge="top"]');
+    expect(css).toContain('[data-bb-point-edge="bottom"]');
+    expect(userMap).toContain('--selected-label-y');
     expect(room).toContain('queueMicrotask(() => {');
     expect(mission).toContain('queueMicrotask(() => {');
-    expect(userMap).toContain('if (map.value === instance) positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);');
+    expect(userMap).toContain('positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);');
     expect(userMap).toContain('if (map.value) positionVisiblePointLabelsAfterMapMove(map.value);');
     expect(userMap).toContain('.user-map-view__own-marker--mission.bb-map-point--label-flipped');
   });
