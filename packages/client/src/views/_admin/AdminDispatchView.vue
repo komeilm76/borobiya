@@ -19,7 +19,6 @@
 
       <div class="admin-dispatch__toolbar">
         <div class="admin-dispatch__filter-group" role="group" aria-label="فیلتر وضعیت درخواست‌ها">
-          <span class="admin-dispatch__toolbar-label d-none d-md-inline">نمایش</span>
           <v-select
             :model-value="adminSos.filterStatus"
             :items="dispatchFilters"
@@ -220,11 +219,7 @@
                   </div>
                 </v-list-item-title>
 
-                <v-list-item-subtitle class="dispatch-request-row__summary mt-1">
-                  {{ item.description }}
-                </v-list-item-subtitle>
-
-                <div class="d-flex flex-wrap align-center ga-2 mt-2 text-caption text-medium-emphasis">
+                <div class="d-flex flex-wrap align-center ga-2 mt-1 text-caption text-medium-emphasis">
                   <span>{{ formatTimestamp(item.createdAt) }}</span>
                   <span>•</span>
                   <span><v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="15" aria-hidden="true" />
@@ -1049,7 +1044,6 @@ onBeforeUnmount(() => {
   display: flex; align-items: center; gap: .5rem; min-width: 0;
 }
 .admin-dispatch__toolbar-actions { justify-content: flex-end; flex-wrap: wrap; }
-.admin-dispatch__toolbar-label { color: var(--bb-color-muted); font-size: .8rem; font-weight: 700; }
 .admin-dispatch__filter-select { max-width: 15rem; min-width: 0; }
 /* Match Map Search's outlined 44px fields and the Travel action rhythm.
    Emergency dispatch remains the sole error-coloured primary action. */
@@ -1063,14 +1057,20 @@ onBeforeUnmount(() => {
 .admin-dispatch :deep(.v-alert) {
   font-family: var(--bb-font-family); letter-spacing: normal;
 }
-.admin-dispatch__filter-toggle { border: 1px solid rgba(var(--v-theme-on-surface), .12);
+/* Vuetify's compact toggle is shorter than its neighbouring sound actions.
+   The 46px outer group includes its border and holds 44px touch targets. */
+.admin-dispatch__filter-toggle { height: 46px; min-height: 46px;
+  border: 1px solid rgba(var(--v-theme-on-surface), .12);
   border-radius: var(--bb-radius-nested, 16px) !important; background: rgba(var(--v-theme-surface), .95); overflow: hidden; }
-.admin-dispatch__filter-toggle :deep(.v-btn) { padding-inline: .65rem; border-radius: 0 !important; }
+.admin-dispatch__toolbar .admin-dispatch__filter-toggle :deep(.v-btn) { display: flex; align-items: center; justify-content: center;
+  height: 44px; min-height: 44px; padding-inline: .75rem; border-radius: 0 !important; text-align: center; }
+.admin-dispatch__filter-toggle :deep(.v-btn__content) { display: flex; align-items: center; justify-content: center;
+  width: 100%; line-height: 1.3; text-align: center; white-space: nowrap; }
 .admin-dispatch__filter-toggle :deep(.v-btn:focus-visible) { outline-offset: -3px; }
 .admin-dispatch__filter-toggle :deep(.v-btn--active) { color: rgb(var(--v-theme-primary));
   background: rgba(var(--v-theme-primary), .12); font-weight: 800; }
-.admin-dispatch__toolbar :deep(.v-btn) { height: 44px; padding-inline: .7rem; font-size: .82rem; }
-.admin-dispatch__toolbar :deep(.v-btn--icon) { width: 44px; padding: 0; }
+.admin-dispatch__toolbar :deep(.v-btn) { height: 46px; min-height: 46px; padding-inline: .7rem; font-size: .82rem; }
+.admin-dispatch__toolbar :deep(.v-btn--icon) { width: 46px; padding: 0; }
 .admin-dispatch__workspace { margin-inline: -clamp(.75rem, 1.25vw, 1.25rem); }
 .admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(.75rem, 1.25vw, 1.25rem); }
 .admin-dispatch__section-label {
@@ -1127,9 +1127,6 @@ onBeforeUnmount(() => {
 }
 .dispatch-request-list, .responder-list { padding: .55rem; }
 .dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }
-.dispatch-request-row__summary { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1;
-  white-space: normal; overflow: hidden; overflow-wrap: anywhere; line-height: 1.5; }
-.dispatch-request-row.v-list-item--active .dispatch-request-row__summary { -webkit-line-clamp: 2; }
 .admin-dispatch__detail-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
 .admin-dispatch__detail-title { min-width: 0; }
 .admin-dispatch__detail-title small { display: block; color: var(--bb-color-muted); font-size: .8rem; }

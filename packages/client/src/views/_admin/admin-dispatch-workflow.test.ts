@@ -54,6 +54,7 @@ describe("admin SOS triage flow", () => {
     const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-incident"'));
     expect(queue).toContain('item.location.isManual');
     expect(queue).toContain('item.photoUrl');
+    expect(queue).not.toContain('item.description'); // Full incident description belongs in the selected-request card.
     expect(queue).not.toContain('item.location.lat.toFixed'); // Coordinates live in incident facts and on the map.
     expect(template).toContain('adminSos.selectedRequest.location.lat.toFixed(6)');
     expect(template).toContain('<details :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">');
@@ -89,8 +90,9 @@ describe("admin SOS triage flow", () => {
   });
 
   it("preserves a readable mobile map and full-width actions without an overlapping floating card", () => {
-    expect(css).toContain('.dispatch-request-row__summary { display: -webkit-box;');
-    expect(css).toContain('-webkit-line-clamp: 2;');
+    expect(css).not.toContain('.dispatch-request-row__summary');
+    expect(template).toContain('<h3>شرح حادثه</h3>');
+    expect(template).toContain('{{ adminSos.selectedRequest.description }}');
     expect(css).toContain('.admin-dispatch__detail-body { display: grid; gap: .75rem;');
     expect(css).toContain('.admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(css).toContain('.admin-dispatch__responders:focus-visible');

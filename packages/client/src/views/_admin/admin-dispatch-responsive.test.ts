@@ -47,7 +47,11 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(toolbar.match(/size="small"/g)).toHaveLength(3);
     expect(toolbar).toContain('aria-label="بازخوانی فهرست درخواست‌های اضطراری"');
     expect(source).toContain('min-width: 44px; min-height: 44px; height: auto;');
-    expect(source).toContain('.admin-dispatch__toolbar :deep(.v-btn) { height: 44px;');
+    expect(source).toContain('.admin-dispatch__toolbar :deep(.v-btn) { height: 46px; min-height: 46px;');
+    expect(source).toContain('.admin-dispatch__filter-toggle { height: 46px; min-height: 46px;');
+    expect(source).toContain('.admin-dispatch__toolbar .admin-dispatch__filter-toggle :deep(.v-btn) { display: flex; align-items: center; justify-content: center;');
+    expect(source).toContain('.admin-dispatch__filter-toggle :deep(.v-btn__content) { display: flex; align-items: center; justify-content: center;');
+    expect(source).not.toContain('admin-dispatch__toolbar-label');
     expect(source).toContain('.dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }');
     expect(source).toContain('d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold');
     expect(source).not.toContain('admin-dispatch__overview');
