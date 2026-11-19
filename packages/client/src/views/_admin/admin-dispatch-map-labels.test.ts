@@ -16,6 +16,14 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('"text-variable-anchor": ["left", "right", "top", "bottom"]');
     expect(source).toContain('"text-halo-color": palettes[themeStore.isDark ? "dark" : "light"].surface');
     expect(source).toContain('!adminSos.responderSearch');
+    // Selection alone (before/without a nearest fetch) updates the WebGL SOS title.
+    expect(source).toMatch(/watch\(\(\) => \[adminSos\.visibleRequests, adminSos\.selectedId\][\s\S]*?syncMapData\(\); updateMapEdgeCues\(\)/);
+    // Clustered responders otherwise lose both their pin and username at low zoom.
+    expect(source).toContain('features: nearbyFeatures.value.features.filter((feature) => feature.properties.isSelected)');
+    expect(source).toContain('id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID');
+    expect(source).toContain('id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID');
+    expect(source).toContain('feature.layer.id === RESPONDER_SELECTED_DOT_LAYER_ID');
+    expect(source).toContain('RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,');
     expect(source).toContain('adminSos.nearestRequestId === adminSos.selectedRequest.id');
     expect(source).not.toContain('createMapPointElement('); // Dispatch keeps its own WebGL grammar.
   });

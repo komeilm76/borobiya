@@ -51,7 +51,7 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain('watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });');
     expect(viewSource).toContain("[adminSos.nearestRequestId, adminSos.nearestLoaded]");
     expect(viewSource).toContain("if (nearbyFeatures.value.features.length) frameSelectedIncident()");
-    expect(viewSource).toContain("[SOS_SOURCE_ID, RESPONDER_SOURCE_ID]");
+    expect(viewSource).toContain("[SOS_SOURCE_ID, RESPONDER_SOURCE_ID, RESPONDER_SELECTED_SOURCE_ID]");
     expect(viewSource).toContain("[SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,");
     expect(viewSource).toContain("RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,");
     expect(viewSource).toContain("cluster: true, clusterRadius: 42, clusterMaxZoom: 18");

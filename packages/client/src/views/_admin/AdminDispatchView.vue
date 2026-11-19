@@ -673,6 +673,9 @@ const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
 const RESPONDER_NAME_LAYER_ID = "admin-sos-nearby-rescuers-name";
+const RESPONDER_SELECTED_SOURCE_ID = "admin-sos-selected-rescuers";
+const RESPONDER_SELECTED_DOT_LAYER_ID = "admin-sos-selected-rescuers-dot";
+const RESPONDER_SELECTED_GLYPH_LAYER_ID = "admin-sos-selected-rescuers-glyph";
 const RESPONDER_SELECTED_NAME_LAYER_ID = "admin-sos-selected-rescuers-name";
 const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
 const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
@@ -873,6 +876,16 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   if (existing) existing.setData(data);
   else map.addSource(RESPONDER_SOURCE_ID, { type: "geojson", data,
     cluster: true, clusterRadius: 42, clusterMaxZoom: 18 });
+  // A selected rescuer must remain individually visible and named even when
+  // the nearby source clusters several fixes at the same zoom. Only currently
+  // qualified responders enter this unclustered source, never manual search.
+  const selectedData = { type: "FeatureCollection" as const,
+    features: nearbyFeatures.value.features.filter((feature) => feature.properties.isSelected) };
+  const selectedSource = map.getSource(RESPONDER_SELECTED_SOURCE_ID) as GeoJSONSource | undefined;
+  if (selectedSource) selectedSource.setData(selectedData as unknown as GeoJsonSourceData);
+  else map.addSource(RESPONDER_SELECTED_SOURCE_ID, {
+    type: "geojson", data: selectedData as unknown as GeoJsonSourceData
+  });
   const palette = palettes[themeStore.isDark ? "dark" : "light"];
   const before = map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined;
   if (!map.getLayer(RESPONDER_DOT_LAYER_ID)) map.addLayer({
@@ -906,21 +919,33 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto", "text-max-width": 9 },
     paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 2 }
   }, before);
-  if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
-    id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
-    filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "isSelected"], true]],
-    layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-anchor": "top", "text-radial-offset": 1.5,
-      "text-variable-anchor": ["top", "bottom", "left", "right"], "text-justify": "auto",
-      "text-max-width": 9, "text-allow-overlap": true },
-    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 3 }
-  }, before);
   if (!map.getLayer(RESPONDER_COUNT_LAYER_ID)) map.addLayer({
     id: RESPONDER_COUNT_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["has", "point_count"],
     layout: { "text-field": ["to-string", ["get", "point_count"]],
       "text-font": ["Borobiya Vazirmatn"], "text-size": 13, "text-allow-overlap": true },
     paint: { "text-color": palette.onPrimary }
+  }, before);
+  // Keep the selected fix above the cluster count while SOS icons retain
+  // priority at coincident incident coordinates.
+  if (!map.getLayer(RESPONDER_SELECTED_DOT_LAYER_ID)) map.addLayer({
+    id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID,
+    paint: { "circle-color": palette.primary, "circle-radius": 14,
+      "circle-stroke-color": palette.surface, "circle-stroke-width": 3 }
+  }, before);
+  if (!map.getLayer(RESPONDER_SELECTED_GLYPH_LAYER_ID)) map.addLayer({
+    id: RESPONDER_SELECTED_GLYPH_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
+    layout: { "text-field": MAP_POINT_META.nearby.glyph, "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 18, "text-allow-overlap": true },
+    paint: { "text-color": palette.onPrimary }
+  }, before);
+  if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
+    id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
+    layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 14, "text-anchor": "top", "text-radial-offset": 1.5,
+      "text-variable-anchor": ["top", "bottom", "left", "right"], "text-justify": "auto",
+      "text-max-width": 9, "text-allow-overlap": true },
+    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 3 }
   }, before);
 }
 
@@ -1004,9 +1029,10 @@ function restoreMapLayers(): void {
     styleLoaded: Boolean(map.isStyleLoaded()),
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
-  }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID],
+  }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID, RESPONDER_SELECTED_SOURCE_ID],
   [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,
     RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,
+    RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
     RESPONDER_SELECTED_NAME_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
@@ -1158,7 +1184,7 @@ function onMapReady(map: MapLibreMap): void {
     restoreMapLayers();
   };
   const onMarkerClick = (event: MapMouseEvent) => {
-    const layers = [SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
+    const layers = [SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
       .filter((id) => Boolean(map.getLayer(id)));
     const choices = new Map<string, MapPointChoice>();
     if (layers.length) for (const feature of map.queryRenderedFeatures(event.point, { layers })) {
@@ -1168,7 +1194,8 @@ function onMapReady(map: MapLibreMap): void {
         const request = adminSos.visibleRequests.find((item) => item.id === id);
         if (request) choices.set(`sos-${id}`, { kind: "sos", id,
           label: `حادثه SOS · ${incidentLabel(request.incidentTypeId)}` });
-      } else if (feature.layer.id === RESPONDER_DOT_LAYER_ID && typeof id === "string" &&
+      } else if ((feature.layer.id === RESPONDER_DOT_LAYER_ID ||
+        feature.layer.id === RESPONDER_SELECTED_DOT_LAYER_ID) && typeof id === "string" &&
         nearbyFeatures.value.features.some((item) => item.id === id)) {
         choices.set(`responder-${id}`, { kind: "responder", id,
           label: `امدادگر نزدیک · ${String(props?.username ?? "")}` });
@@ -1205,7 +1232,7 @@ let pendingDeepLinkId: string | null = null;
 watch(incidentNameById, () => { syncMapData(); updateMapEdgeCues(); });
 watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
 watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const,
-  () => { mapPointChoices.value = []; updateMapEdgeCues(); }, { flush: "sync" });
+  () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
 // Keep the incident visible when its qualified suggestions arrive; selection
 // still focuses the incident immediately, before the nearest read completes.
 watch(() => [adminSos.nearestRequestId, adminSos.nearestLoaded] as const,
