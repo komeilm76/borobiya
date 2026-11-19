@@ -213,9 +213,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       listFailed.value = false;
       listTruncated.value = response.total > response.items.length;
       lastSnapshotIds.value = new Set(response.items.map((item) => item.id));
-      if (!selectedId.value && requests.value.length > 0) {
-        selectedId.value = (visibleRequests.value[0] ?? requests.value[0])!.id;
-      }
+      // Keep the overview unselected until the operator explicitly chooses an SOS.
     } catch (err) {
       if (gen !== refreshGeneration) return;
       listFailed.value = true;
@@ -393,10 +391,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     const { items, isNew, record } = upsertSosAlert(requests.value, parsed);
     requests.value = items;
 
-    if (!selectedId.value) {
-      selectedId.value = record.id;
-    }
-
+    // An incoming alert appears in the queue/map, but does not silently select
+    // it or expose its nearby responders before an operator opens it.
     if (isNew) {
       latestAlert.value = record;
       void playSosAlertSound(record.severity, {

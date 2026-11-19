@@ -77,6 +77,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     answerFirst({ items: [row], total: 1 });
     await vi.waitFor(() => expect(store.queueVerified).toBe(true));
     expect(store.visibleRequests).toEqual([row]);
+    expect(store.selectedId).toBeNull(); // The map stays incident-only until an explicit click.
     await store.refreshRequests();
     expect(store.errorMessage).toBeTruthy();
     expect(store.visibleRequests).toEqual([row]);
@@ -125,11 +126,14 @@ describe("useAdminSosStore (T3.2.5)", () => {
     store.selectRequest(pending.id);
     store.setFilterStatus("dispatched");
     expect(store.selectedRequest).toBeNull();
-    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(dispatched.id));
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    expect(store.selectedRequest).toBeNull();
+    store.selectRequest(dispatched.id);
     store.setFilterStatus("pending");
     expect(store.selectedRequest).toBeNull();
     expect(store.canDispatchSelected).toBe(false);
-    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(pending.id));
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    expect(store.selectedRequest).toBeNull();
   });
 
   it("does not verify socket/retained rows missing from the latest successful list", async () => {
@@ -272,6 +276,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(cancelled.id);
     await vi.waitFor(() => expect(listRequests).toHaveBeenCalledOnce());
     await vi.waitFor(() => expect(socketEmitter.listenerCount(MISSION_CANCELLED_BY_RESCUER_EVENT)).toBe(1));
     socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, cancelledEvent(cancelled.id));
@@ -301,6 +306,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(pendingRow.id);
     await vi.waitFor(() => expect(store.queueVerified).toBe(true));
     const outdatedRead = store.refreshRequests();
     expect(store.loading).toBe(true);
@@ -335,6 +341,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(cancelled.id);
     await vi.waitFor(() => expect(store.queueVerified).toBe(true));
     const outdatedRead = store.refreshRequests();
     expect(store.loading).toBe(true);
@@ -373,7 +380,8 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
-    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
+    await vi.waitFor(() => expect(store.requests.some((item) => item.id === row.id)).toBe(true));
+    store.selectRequest(row.id);
     expect(await store.redispatchNearest(row.id)).toBe(true); // works after reload without a socket alert
     expect(listRequestMissions).toHaveBeenCalledWith("admin-jwt", row.id, true);
     expect(getNearestResponders).toHaveBeenCalledWith(row.id, "admin-jwt", undefined, true);
@@ -397,7 +405,8 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
-    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
+    await vi.waitFor(() => expect(store.requests.some((item) => item.id === row.id)).toBe(true));
+    store.selectRequest(row.id);
     expect(await store.redispatchNearest(row.id)).toBe(false);
     expect(store.selectedRequest?.status).toBe("accepted");
     expect(dispatchResponders).not.toHaveBeenCalled();
@@ -432,7 +441,8 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
-    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
+    await vi.waitFor(() => expect(store.requests.some((item) => item.id === row.id)).toBe(true));
+    store.selectRequest(row.id);
     await vi.waitFor(() => expect(socketEmitter.listenerCount(MISSION_CANCELLED_BY_RESCUER_EVENT)).toBe(1));
     socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, cancelledEvent(row.id));
     expect(store.selectedRequest?.status).toBe("accepted");
@@ -495,6 +505,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
       expect(socketEmitter.connected).toBe(true);
     });
     expect(store.pendingCount).toBe(1);
+    expect(store.selectedId).toBeNull();
     expect(playedCount).toBe(0);
 
     // Live socket event arrives -> plays high severity 3-note chime and opens alert banner.
@@ -513,6 +524,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     });
     expect(store.pendingCount).toBe(2);
     expect(store.latestAlert?.id).toBe(liveId);
+    expect(store.selectedId).toBeNull(); // An alert must not steal map selection.
 
     // Follow-up broadcast attaching photo updates record & banner WITHOUT re-playing chime!
     socketEmitter.emit(SOS_NEW_REQUEST_EVENT, {
@@ -634,6 +646,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(request.id);
     await vi.waitFor(() => expect(getNearestResponders).toHaveBeenCalledOnce());
     store.selectRequest(null);
     await nextTick();
@@ -667,6 +680,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(request.id);
     await vi.waitFor(() => expect(getNearestResponders).toHaveBeenCalledOnce());
     expect(store.nearestLoaded).toBe(false);
     rejectInitial(new Error("offline"));
@@ -710,6 +724,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(first.id);
     await vi.waitFor(() => expect(store.nearestResponders).toEqual([firstRescuer]));
     expect(store.nearestRequestId).toBe(first.id);
 
@@ -740,6 +755,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(request.id);
     await vi.waitFor(() => expect(store.nearestResponders).toEqual([near]));
     store.selectAllNearestResponders();
     store.setResponderSearch(" rescuer_far ");
@@ -779,6 +795,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
+    store.selectRequest(request.id);
     await vi.waitFor(() => expect(getNearestResponders).toHaveBeenCalledOnce());
     store.setResponderSearch("rescuer_far");
     await store.loadNearestResponders();
@@ -874,7 +891,8 @@ describe("useAdminSosStore (T3.2.5)", () => {
     auth.accessToken = "admin-jwt";
     auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
     const store = useAdminSosStore();
-    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(request.id));
+    await vi.waitFor(() => expect(store.requests.some((item) => item.id === request.id)).toBe(true));
+    store.selectRequest(request.id);
     store.selectedResponderIds = ["44444444-4444-4444-8444-444444444441"];
     const dispatch = store.dispatchSelectedResponders();
     auth.accessToken = null;
@@ -936,6 +954,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     };
 
     const store = useAdminSosStore();
+    store.selectRequest(reqRow.id);
     await vi.waitFor(() => {
       expect(store.nearestResponders).toHaveLength(2);
     });

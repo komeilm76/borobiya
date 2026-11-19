@@ -412,6 +412,8 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     expect(store.dispatchedCount).toBe(1);
     expect(store.requests).toHaveLength(3);
     expect(store.visibleRequests).toHaveLength(1);
+    expect(store.selectedId).toBeNull(); // Initial overview contains incidents only.
+    store.selectRequest(store.visibleRequests[0]!.id);
     expect(store.selectedId).toBe("66666666-6666-4666-8666-666666666662");
     store.resetState();
   });
@@ -521,6 +523,8 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     });
 
     const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.visibleRequests).toHaveLength(1));
+    store.selectRequest(store.visibleRequests[0]!.id);
     await vi.waitFor(() => expect(store.nearestResponders).toHaveLength(1));
     store.toggleResponderSelection("77777777-7777-4777-8777-777777777771");
     const dispatched = await store.dispatchSelectedResponders();
