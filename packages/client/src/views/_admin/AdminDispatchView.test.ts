@@ -39,7 +39,7 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(view).toContain('در حال دریافت مأموریت‌های این درخواست');
     expect(view).toContain('بازخوانی مأموریت‌ها');
   });
-  it("renders pulsing MapLibre circle layers, floating map alert card, nearest responder list, multi-select dispatch controls, and global admin alert banner", () => {
+  it("renders pulsing MapLibre circles, compact map recenter control, responder list, guarded dispatch controls, and admin alerts", () => {
     const viewSource = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
     expect(viewSource).toContain("admin-sos-pulse");
     expect(viewSource).toContain("admin-sos-core");

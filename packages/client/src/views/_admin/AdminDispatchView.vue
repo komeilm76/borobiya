@@ -146,17 +146,6 @@
       </div>
     </v-alert>
 
-    <nav class="admin-dispatch__overview" aria-label="دسترسی سریع به صف‌ها">
-      <button type="button" :aria-pressed="adminSos.filterStatus === 'pending'" @click="onFilterChange('pending')">
-        <v-icon icon="mdi-alert-circle-outline" size="20" aria-hidden="true" />
-        <span>در انتظار رسیدگی</span><strong>{{ adminSos.queueVerified && adminSos.filterStatus !== 'dispatched' ? adminSos.pendingCount.toLocaleString('fa-IR') : 'نامشخص' }}</strong>
-      </button>
-      <button type="button" :aria-pressed="adminSos.filterStatus === 'dispatched'" @click="onFilterChange('dispatched')">
-        <v-icon icon="mdi-send-check-outline" size="20" aria-hidden="true" />
-        <span>اعزام‌شده</span><strong>{{ adminSos.queueVerified && adminSos.filterStatus !== 'pending' ? adminSos.dispatchedCount.toLocaleString('fa-IR') : 'نامشخص' }}</strong>
-      </button>
-    </nav>
-
     <!-- Triage queue stays first in DOM and visual order when the columns stack. -->
     <v-row class="admin-dispatch__workspace">
       <v-col cols="12" lg="5" class="admin-dispatch__queue">
@@ -165,7 +154,7 @@
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
             <v-chip v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
-              {{ adminSos.visibleRequests.length }} مورد در این نما
+              {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
             </v-chip>
             <v-chip v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
           </v-card-title>
@@ -271,7 +260,8 @@
               class="admin-dispatch__sender-action" @click="senderProfileOpen = true">مشاهدهٔ پروفایل</v-btn>
           </div>
           <v-alert
-            v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer'"
+            v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer' &&
+              adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
             class="ma-4 mb-0 replacement-flash"
             color="error"
             icon="mdi-alert-octagon"
@@ -301,22 +291,26 @@
                 <dt>روش ثبت موقعیت</dt>
                 <dd>{{ adminSos.selectedRequest.location.isManual ? "انتخاب دستی روی نقشه" : "GPS دستگاه" }}</dd>
               </div>
-              <div class="admin-dispatch__fact-location">
-                <dt>مختصات ثبت‌شدهٔ حادثه</dt>
-                <dd><bdi dir="ltr">{{ adminSos.selectedRequest.location.lat.toFixed(6) }}, {{ adminSos.selectedRequest.location.lon.toFixed(6) }}</bdi></dd>
-              </div>
-              <div v-if="adminSos.selectedRequest.location.accuracy !== undefined">
-                <dt>دقت گزارش‌شده</dt>
-                <dd>±{{ Math.round(adminSos.selectedRequest.location.accuracy) }} متر</dd>
-              </div>
             </dl>
+            <details :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">
+              <summary>جزئیات موقعیت و مختصات <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
+              <dl class="admin-dispatch__facts">
+                <div>
+                  <dt>مختصات ثبت‌شدهٔ حادثه</dt>
+                  <dd><bdi dir="ltr">{{ adminSos.selectedRequest.location.lat.toFixed(6) }}, {{ adminSos.selectedRequest.location.lon.toFixed(6) }}</bdi></dd>
+                </div>
+                <div v-if="adminSos.selectedRequest.location.accuracy !== undefined">
+                  <dt>دقت گزارش‌شده</dt>
+                  <dd>±{{ Math.round(adminSos.selectedRequest.location.accuracy) }} متر</dd>
+                </div>
+              </dl>
+            </details>
             <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
               <h3>تصویر پیوست حادثه</h3>
               <button v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
                 :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
                 <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
                   class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
-                <span>نمایش تصویر کامل <v-icon icon="mdi-open-in-new" size="17" aria-hidden="true" /></span>
               </button>
               <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
               <v-btn v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
@@ -360,21 +354,10 @@
               @ready="onMapReady"
             />
 
-            <v-card
-              v-if="adminSos.selectedRequest"
-              class="map-selected-alert-card bb-floating-card"
-              elevation="4"
-              rounded="xl"
-            >
-              <v-card-text class="pa-3">
-                <div class="admin-dispatch__map-caption">
-                  <span><v-icon icon="mdi-map-marker-radius" color="error" size="20" aria-hidden="true" />
-                    {{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</span>
-                  <v-btn color="primary" density="compact" prepend-icon="mdi-crosshairs-gps"
-                    size="small" variant="text" @click="focusRequest(adminSos.selectedRequest)">نمایش محل</v-btn>
-                </div>
-              </v-card-text>
-            </v-card>
+            <v-btn v-if="adminSos.selectedRequest" class="map-selected-alert-card"
+              color="surface" variant="flat" rounded="xl" prepend-icon="mdi-crosshairs-gps"
+              aria-label="بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه"
+              @click="focusRequest(adminSos.selectedRequest)">نمایش محل حادثه</v-btn>
 
             <div class="severity-legend" role="note" aria-label="راهنمای رنگ شدت حادثه">
               <span class="legend-item">
@@ -1048,20 +1031,8 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: .75rem 1.5rem; }
 .admin-dispatch__intro-note { margin: .35rem 0 0; color: var(--bb-color-muted); font-size: .85rem; }
-.admin-dispatch__overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .5rem; margin-bottom: 1rem; }
-.admin-dispatch__overview button { display: flex; align-items: center; gap: .45rem; min-width: 0;
-  padding: .65rem .9rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  font: inherit; cursor: pointer; text-align: start; }
-.admin-dispatch__overview button[aria-pressed="true"] { border-color: rgb(var(--v-theme-primary));
-  background: var(--bb-color-inset); }
-.admin-dispatch__overview button:focus-visible, .admin-dispatch__followup-toggle:focus-visible {
+.admin-dispatch__followup-toggle:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.admin-dispatch__overview .v-icon { flex: none; color: rgb(var(--v-theme-primary)); }
-.admin-dispatch__overview span { color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__overview strong { margin-inline-start: auto; font-size: .9rem;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-dispatch__intro { min-width: 0; flex: 1 1 22rem; }
 .admin-dispatch__eyebrow { display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .35rem;
   color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
@@ -1156,23 +1127,30 @@ onBeforeUnmount(() => {
   background: var(--bb-color-inset); }
 .admin-dispatch__facts dt { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-dispatch__facts dd { margin: .1rem 0 0; font-weight: 700; overflow-wrap: anywhere; }
-.admin-dispatch__fact-location { grid-column: 1 / -1; }
 .admin-dispatch__facts bdi { unicode-bidi: isolate; }
+.admin-dispatch__location-details { border-top: 1px solid var(--bb-color-outline); }
+.admin-dispatch__location-details summary { display: flex; align-items: center; gap: .4rem;
+  min-height: 44px; color: rgb(var(--v-theme-primary)); font-weight: 800; cursor: pointer; }
+.admin-dispatch__location-details summary .v-icon { margin-inline-start: auto; transition: transform .2s; }
+.admin-dispatch__location-details[open] summary .v-icon { transform: rotate(180deg); }
+.admin-dispatch__location-details .admin-dispatch__facts { padding-bottom: .35rem; }
 .admin-dispatch__photo { min-width: 0; }
-.admin-dispatch__photo-open { display: inline-grid; gap: .35rem; margin-top: .4rem; padding: .35rem;
-  color: rgb(var(--v-theme-primary)); background: var(--bb-color-inset); border: 0;
-  border-radius: var(--bb-radius-nested, 16px); cursor: pointer; text-align: start; }
+.admin-dispatch__photo-open { display: block; width: 4rem; height: 4rem; margin-top: .4rem; padding: 0;
+  overflow: hidden; border: 1px solid var(--bb-color-outline); background: var(--bb-color-inset);
+  border-radius: .75rem; cursor: zoom-in; }
+.admin-dispatch__photo-open:hover { border-color: rgb(var(--v-theme-primary)); }
 .admin-dispatch__photo-open:disabled { opacity: .65; cursor: progress; }
 .admin-dispatch__photo-error { margin: .4rem 0 0; color: rgb(var(--v-theme-error)); font-size: .82rem; }
-.admin-dispatch__photo-open:focus-visible, .admin-dispatch__sender-id summary:focus-visible,
-.admin-dispatch__search-help summary:focus-visible, .dispatch-mission-timeline summary:focus-visible {
+.admin-dispatch__photo-open:focus-visible, .admin-dispatch__location-details summary:focus-visible,
+.admin-dispatch__sender-id summary:focus-visible, .admin-dispatch__search-help summary:focus-visible,
+.dispatch-mission-timeline summary:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.admin-dispatch__photo-open span { display: flex; align-items: center; gap: .3rem; font-size: .8rem; font-weight: 700; }
-.admin-dispatch__photo-image { display: block; max-width: 100%; max-height: 9rem;
-  border-radius: .75rem; object-fit: contain; }
-.admin-dispatch__photo-dialog img { display: block; max-width: 100%; max-height: 75dvh;
-  margin: auto; object-fit: contain; }
-.admin-dispatch__photo-dialog :deep(.v-card-title) { white-space: normal; }
+.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.admin-dispatch__photo-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+.admin-dispatch__photo-dialog :deep(.v-card-title) { flex: none; white-space: normal; }
+.admin-dispatch__photo-dialog :deep(.v-card-text) { min-height: 0; overflow: auto; display: grid; place-items: center; }
+.admin-dispatch__photo-dialog img { display: block; max-width: 100%; max-height: calc(100dvh - 7rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  width: auto; height: auto; object-fit: contain; }
 .admin-dispatch__proposal-note { color: var(--bb-color-muted); }
 .admin-dispatch__next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem;
   padding: .65rem .75rem; border-radius: var(--bb-radius-nested, 16px);
@@ -1222,18 +1200,18 @@ onBeforeUnmount(() => {
 }
 
 .map-selected-alert-card {
-  position: absolute;
-  top: .75rem;
-  left: .75rem; right: auto; /* Do not cover MapLibre's top-right zoom/compass. */
-  z-index: 2;
-  width: min(17rem, calc(100% - 1.5rem));
+  position: absolute; z-index: 2;
+  top: .75rem; left: .75rem; right: auto; /* Clear MapLibre's top-right controls. */
+  min-height: 44px; max-width: calc(100% - 1.5rem);
   border: 1px solid var(--bb-color-outline);
-  background: rgb(var(--v-theme-surface));
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  font-family: var(--bb-font-family); letter-spacing: normal;
+  box-shadow: var(--bb-shadow-overlay);
 }
-.admin-dispatch__map-caption { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .5rem;
-  justify-content: space-between; }
-.admin-dispatch__map-caption span { display: flex; align-items: center; gap: .4rem;
-  min-width: 0; font-size: .83rem; font-weight: 800; }
+.map-selected-alert-card:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+@media (max-width: 1023px) {
+  .map-selected-alert-card { box-shadow: var(--bb-shadow-surface); }
+}
 
 .dispatch-request-list {
   max-height: min(42dvh, 24rem);
@@ -1308,25 +1286,14 @@ onBeforeUnmount(() => {
 }
 
 /* Vuetify's lg columns start at 1280px. Below that width the queue and map
- * stack; keep the selected SOS and legend *after* the definite-height canvas
- * in normal flow so they cannot cover markers, gestures or zoom controls. */
+ * stack; the compact recenter action stays inside the map and the legend
+ * follows the canvas in normal flow. */
 @media (max-width: 1279px) {
   .dispatch-map-wrapper { display: flex; flex-direction: column; height: auto; min-height: 0; gap: 0.75rem; }
   .dispatch-map-wrapper > :deep(.map-canvas) {
     flex: 0 0 auto;
     height: clamp(17rem, 40dvh, 22rem);
     min-height: 17rem;
-  }
-  .map-selected-alert-card {
-    position: static;
-    z-index: auto;
-    width: auto;
-    margin-inline: 0.75rem;
-    overflow-wrap: anywhere;
-  }
-  .map-selected-alert-card.bb-floating-card {
-    border: 0; background: var(--bb-color-inset);
-    box-shadow: none !important;
   }
   .severity-legend {
     position: static;

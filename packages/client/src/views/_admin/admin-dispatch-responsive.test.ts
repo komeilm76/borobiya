@@ -13,7 +13,7 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).toContain('title: "اعزام‌شده", value: "dispatched"');
   });
 
-  it("presents the SOS queue first and removes map overlays at every stacked width", () => {
+  it("presents the SOS queue first and keeps map controls clear at stacked widths", () => {
     const mapColumn = '<v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">';
     const queueColumn = '<v-col cols="12" lg="5" class="admin-dispatch__queue">';
     expect(source).toContain(mapColumn);
@@ -22,14 +22,15 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).not.toMatch(/\.admin-dispatch__queue \{ order:/); // no visual/keyboard order mismatch
     const desktop = source.split("<style scoped>")[1]!.split("@media (max-width: 1279px)")[0]!;
     expect(desktop).toMatch(/\.map-selected-alert-card \{\s*position: absolute;/);
+    expect(desktop).toContain('top: .75rem; left: .75rem; right: auto;');
     expect(desktop).toMatch(/\.severity-legend \{\s*position: absolute;/);
     const stacked = source.split("@media (max-width: 1279px) {")[1]!.split("@media (max-width: 599px)")[0]!;
     expect(stacked).toMatch(/\.dispatch-map-wrapper \{[^}]*display: flex;[^}]*height: auto;/);
     expect(stacked).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(17rem, 40dvh, 22rem\);[^}]*min-height: 17rem;/);
-    for (const element of ["map-selected-alert-card", "severity-legend"]) {
-      expect(stacked).toMatch(new RegExp(`\\.${element} \\{[^}]*position: static;`));
-    }
-    expect(source.indexOf('class="map-selected-alert-card bb-floating-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
+    expect(stacked).toMatch(/\.severity-legend \{[^}]*position: static;/);
+    expect(stacked).not.toMatch(/\.map-selected-alert-card \{[^}]*position: static;/);
+    expect(source.indexOf('class="map-selected-alert-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
+    expect(source).toContain('aria-label="بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه"');
     expect(source).toContain('@click="focusRequest(adminSos.selectedRequest)"');
     expect(source).toContain('@click="focusRequest(item)"');
   });
@@ -48,8 +49,8 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).toContain('min-width: 44px; min-height: 44px; height: 44px;');
     expect(source).toContain('.dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }');
     expect(source).toContain('d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold');
-    expect(source).toContain('.admin-dispatch__overview button[aria-pressed="true"]');
-    expect(source).toContain('.admin-dispatch__overview button:focus-visible');
+    expect(source).not.toContain('admin-dispatch__overview');
+    expect(source).toContain('.map-selected-alert-card:focus-visible');
     expect(source).toContain('@media (max-width: 699px) {');
   });
 

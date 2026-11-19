@@ -45,18 +45,18 @@ describe("admin SOS triage flow", () => {
   });
 
   it("scans verified workload honestly and keeps complete incident evidence available on demand", () => {
-    expect(template).toContain('<nav class="admin-dispatch__overview" aria-label="دسترسی سریع به صف‌ها">');
-    expect(template).toContain(':aria-pressed="adminSos.filterStatus === \'pending\'" @click="onFilterChange(\'pending\')"');
-    expect(template).toContain(':aria-pressed="adminSos.filterStatus === \'dispatched\'" @click="onFilterChange(\'dispatched\')"');
-    expect(template).not.toContain('در حال بررسی</span><strong>');
-    expect(template).toContain("adminSos.queueVerified && adminSos.filterStatus !== 'dispatched'");
-    expect(template).toContain("adminSos.queueVerified && adminSos.filterStatus !== 'pending'");
+    expect(template).not.toContain('admin-dispatch__overview'); // One filter control per breakpoint, not a second navigation row.
+    expect(template).toContain('class="admin-dispatch__filter-select d-md-none"');
+    expect(template).toContain('class="admin-dispatch__filter-toggle d-none d-md-inline-flex"');
+    expect(template).toContain('v-if="adminSos.queueVerified" color="error"');
+    expect(template).toContain("adminSos.visibleRequests.length.toLocaleString('fa-IR')");
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
     const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-incident"'));
     expect(queue).toContain('item.location.isManual');
     expect(queue).toContain('item.photoUrl');
     expect(queue).not.toContain('item.location.lat.toFixed'); // Coordinates live in incident facts and on the map.
     expect(template).toContain('adminSos.selectedRequest.location.lat.toFixed(6)');
+    expect(template).toContain('<details :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">');
     expect(template).toContain('class="admin-dispatch__sender-id"');
     expect(template).toContain('class="admin-dispatch__photo-open"');
     expect(template).toContain('v-model="photoDialogOpen"');
@@ -80,7 +80,7 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('<template v-if="showLivePanel">');
     expect(template).toContain('v-for="mission in activeMissions"');
     expect(template).toContain('@click="loadActiveMissions()"');
-    expect(template).toContain('adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id');
+    expect(template).toContain("adminSos.selectedRequest.status === 'cancelled_by_rescuer' &&\n              adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id");
     expect(source).toContain('showLivePanel.value = false;');
     expect(source).toContain('if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;');
     expect(template).toContain('@click="testSound"');
@@ -95,7 +95,9 @@ describe("admin SOS triage flow", () => {
     expect(css).toContain('.admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(css).toContain('.admin-dispatch__responders:focus-visible');
     expect(css).toContain('.admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }');
-    expect(css).toContain('.map-selected-alert-card {\n    position: static;');
+    expect(css).toContain('min-height: 44px; max-width: calc(100% - 1.5rem);');
+    expect(css).toContain('.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }');
+    expect(css).toContain('width: auto; height: auto; object-fit: contain;');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: template }).errors).toEqual([]);
     expect(compileStyle({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: css, scoped: true }).errors).toEqual([]);
   });
