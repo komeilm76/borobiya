@@ -20,11 +20,13 @@ export function spreadCoincidentPoints(markers: readonly (Marker | null)[], rese
     movable.forEach((marker, index) => {
       const count = group.length;
       const spaced = movable.length;
-      // Six controls on a 44px ring have >=44px center spacing. Additional
-      // rings keep larger groups selectable rather than stacking hit targets.
+      // Every 44px control needs at least 44px center spacing, including
+      // against a reserved GPS fix. Four points at radius 30 were only 42px
+      // apart. Allow 2px for rounded offsets; additional rings stay farther out.
       const ring = Math.floor(index / 6);
       const ringCount = Math.min(6, spaced - ring * 6);
-      const radius = Math.max(30, ringCount * 7.5) + ring * 64;
+      const neighborRadius = ringCount > 1 ? Math.ceil(23 / Math.sin(Math.PI / ringCount)) : 0;
+      const radius = Math.max(group.some((point) => locked.has(point)) ? 44 : 30, neighborRadius) + ring * 64;
       const angle = -Math.PI / 2 + 2 * Math.PI * (index % 6) / ringCount;
       marker.setOffset(count === 1 ? [0, 0] :
         [Math.round(Math.cos(angle) * radius), Math.round(Math.sin(angle) * radius)]);

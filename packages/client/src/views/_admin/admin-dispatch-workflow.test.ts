@@ -36,7 +36,17 @@ describe("admin SOS triage flow", () => {
     expect(detail).toContain('adminSos.selectedRequest.location.accuracy !== undefined');
     expect(detail).toContain('adminSos.selectedRequest.photoUrl');
     expect(detail).toContain('aria-controls="dispatch-responders" @click="focusResponders"');
+    expect(detail).toContain('aria-controls="dispatch-map" @click="focusSelectedIncidentMap"');
     expect(detail).not.toContain('@click="requestDispatch"');
+    // On stacked layouts the map is below a long queue; an explicit jump must
+    // reveal it, keep the selected incident framed, and hand off keyboard focus.
+    const mapJump = source.slice(source.indexOf('function focusSelectedIncidentMap(): void {'),
+      source.indexOf('function focusNearbyResponder(userId: string): void {'));
+    expect(mapJump).toContain('frameSelectedIncident();');
+    expect(mapJump).toContain('document.getElementById("dispatch-map")');
+    expect(mapJump).toContain('scrollIntoView({');
+    expect(mapJump).toContain('querySelector<HTMLButtonElement>(".map-selected-alert-card")?.focus({ preventScroll: true });');
+    expect(css).toContain('#dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(source).toMatch(/function focusResponders\(\): void \{\s*if \(!adminSos\.selectedRequest\) return;/);
     expect(source).toContain('target.focus({ preventScroll: true });');
     expect(source).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');

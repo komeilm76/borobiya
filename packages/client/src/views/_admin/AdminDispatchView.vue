@@ -320,6 +320,8 @@
             </p>
             <div class="admin-dispatch__next">
               <span>گام بعدی: بررسی امدادگران واجد شرایط</span>
+              <v-btn color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-map-marker-outline"
+                aria-controls="dispatch-map" @click="focusSelectedIncidentMap">نمایش حادثه روی نقشه</v-btn>
               <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-search-outline"
                 aria-controls="dispatch-responders" @click="focusResponders">انتخاب امدادگر و اعزام</v-btn>
             </div>
@@ -1116,6 +1118,18 @@ function frameSelectedIncident(): void {
   });
 }
 
+function focusSelectedIncidentMap(): void {
+  if (!adminSos.selectedRequest) return;
+  frameSelectedIncident();
+  const target = document.getElementById("dispatch-map");
+  target?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start"
+  });
+  // The map card is not focusable; hand keyboard users to its recenter action.
+  target?.querySelector<HTMLButtonElement>(".map-selected-alert-card")?.focus({ preventScroll: true });
+}
+
 function focusNearbyResponder(userId: string): void {
   const position = nearbyFeatures.value.features.find((feature) => feature.id === userId)?.geometry.coordinates;
   if (!position || !mapInstance) return;
@@ -1460,6 +1474,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__selection-hint { display: flex; align-items: center; gap: .5rem; margin: 0 0 .75rem;
   padding: .7rem .9rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
   color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); }
+#dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
 .admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
 .admin-dispatch__responders:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 .admin-dispatch__sender { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem;
