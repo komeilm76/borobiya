@@ -1,4 +1,6 @@
-FROM oven/bun:1.4.3
+# Match the API's verified Bun base when Docker Hub is blocked on the VM.
+ARG BOROBIYA_BUN_BASE_IMAGE=oven/bun:1.4.3
+FROM ${BOROBIYA_BUN_BASE_IMAGE}
 
 WORKDIR /app
 COPY map-config.mjs geocoding.mjs elevation.mjs routing.mjs server.mjs upstream.mjs ./

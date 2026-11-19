@@ -12,6 +12,9 @@ Start with **`python3 scripts/vm.py doctor`** from the repo root. It changes not
 | `vm-install.sh --check` says `Docker volume inspection UNAVAILABLE` despite `Docker daemon access OK` | `docker info` alone does not prove that `vm-env.py` may list volumes. Run `docker volume ls -q --filter label=com.docker.compose.volume=postgres-data` **locally** to see the error; fix volume-list permissions/daemon policy before running `vm-env.py`. Do not generate credentials over an unverified volume, use `sudo` on the Python scripts, or reinstall Docker just for this failure. |
 | Docker daemon unreachable for other reasons | Check `docker info` and `systemctl status docker` **locally**, then socket owner/group via `stat -c '%A %U:%G %n' /var/run/docker.sock`. If group access is already effective but the daemon is down, repair the service rather than changing permissions; check disk/inodes via `df -h` / `df -i`. Do not prune other projects' volumes. |
 | Compose invalid or subnet conflict | `docker compose -f docker-compose.yml -f docker-compose.vm.yml -f docker-compose.production.yml --profile production config --quiet`; inspect port/subnet conflicts. If changing the pinned network `172.30.0.0/24`, also change `TRUSTED_PROXY_IPS` (see long runbook). Do not post full `compose config` (it includes credentials). |
+| `docker compose run --rm --build api …` fails resolving `oven/bun:1.4.3` (`registry-1.docker.io` 403 on HEAD) | Docker **daemon/BuildKit**, not Postgres or migrations, cannot fetch the pinned Bun base. Check `docker pull oven/bun:1.4.3` (it may fail the same way), `./scripts/enable-proxy.sh --status`, and [runbook §5.2–5.3](./UBUNTU_VM_RUNBOOK.md#5-network-proxy-only-if-downloads-fail) for daemon versus shell proxy routing. No database reset or TLS bypass. If Hub remains blocked, [import the verified image and use the optional Compose base override](#docker-hub-403-while-building-the-api); other services' base images may also need access. A successful **host** `dev-lan.sh` preflight (`Database schema ready`) means that host API already has the required schema; its location-share sweep warning below is unrelated to this Docker pull. |
+| VM log dates differ from the real current date (for example, weeks in the future) | Check `timedatectl status` and NTP synchronization on the VM before diagnosing TLS, access-token expiry or location freshness. A clock correction is independent of migrations; do not alter application rows or wipe data. |
+| API logs `location share state sweep failed` with `Received an instance of Date` | The raw sweep parameter in releases through `ff35954` bypassed Drizzle's timestamp encoder. Checkout a revision containing `fda3686` or later and restart the **host** API (`dev-lan.sh` watch restart) or rebuild/recreate only the container API if using Docker. Schema readiness and migration do **not** fix this runtime bug. The sweep retries; location-sharing priority-device repair may not run until fixed. Never edit or truncate share rows to silence the warning. |
 | Database unhealthy / auth error `28P01` | `docker compose ps postgres`; `.env` password, container environment and volume role must agree. Restore the *original* volume password or use [runbook §9.3](./UBUNTU_VM_RUNBOOK.md#93-step-12-containers) for the interactive role-recovery probe; `vm.py launch` intentionally cannot approve a password change. Never print `docker inspect` secrets, regenerate a password over a populated volume or `down -v`. Back up with `python3 scripts/vm.py backup /safe/place/new.dump` before any deliberate deletion. |
 | `GET /health` succeeds but `GET /api/_public/health` fails | `/health` only tests Nginx; API health proves the API process, **not database queries** (`doctor` runs its Postgres `SELECT 1` separately). Check `docker compose ps api postgres`; then `docker compose logs --tail 40 api postgres` **locally** (logs might contain sensitive data). Re-run launch for migration/seed; do not truncate the database. |
 | `/map-config` fails, tiles/routing/geocoding missing | `docker compose --profile routing --profile geocoding ps`; verify `.env` map selection and library paths. `./map-server/scripts/verify-tiles.sh AREA`, `verify-routing.sh AREA`, `verify-geocoding.sh AREA`; rerun `python3 scripts/vm.py launch` to rebuild missing artifacts. `.env` + `current.json` must describe the same selection. |
@@ -25,6 +28,47 @@ Start with **`python3 scripts/vm.py doctor`** from the repo root. It changes not
 | Login works but browser location is blocked | Production must be visited over Caddy's HTTPS origin; remote plain HTTP is not a secure browser context. Development: SSH-tunnel `5173` (HMR) or `8080` (built UI) to localhost. |
 | Offline restart fails | Pre-cache all Docker images, source/reference files, Photon/Planetiler JARs, compiled UI and active dataset online. Use `python3 scripts/vm.py launch --serve-only` after `stop`; this command never pulls or builds. An unresolved `latest`, a `pinned` selection whose active date is not the repository pin, or a disagreement among the saved selection, `.env` snapshot and `MAP_DATA_VERSION` is refused until full launch fixes it; `doctor` warns about the mismatch. The active `current.json` must be a JSON object matching the selected date, dataset and numeric `MAP_BBOX`; a stale bbox would advertise the wrong map bounds. `--serve-only` refuses symlinked library paths and artifacts rather than following them outside the configured library. Successful setup saves its resolved date to `.vm-map.json`. The full `--offline` build forbids online map sources but can still need Docker/npm build dependencies. |
 | Port 8080 not responding | `docker compose -f docker-compose.yml -f docker-compose.vm.yml --profile routing --profile geocoding ps`; check `NGINX_PORT`, `ss -ltn`, and container health. The development gateway binds loopback; use an SSH tunnel or production Caddy HTTPS. |
+
+### Docker Hub 403 while building the API
+
+A 403 from `registry-1.docker.io/v2/oven/bun/manifests/1.4.3` occurs **before** the
+migration command enters the container. The host's `dev-lan.sh` uses the host Bun binary
+instead; its successful `db:check:runtime` is an independent check that the required schema
+is already present. Do not run migrations again merely to address this image-fetch error.
+
+On the VM, inspect Docker's network path separately from the host shell (do not publish
+proxy credentials or raw Docker config):
+
+```bash
+docker pull oven/bun:1.4.3
+./scripts/enable-proxy.sh --status
+# If the pull fails while ordinary curl works, follow runbook §5.3 for the Docker daemon proxy.
+```
+
+If the VM cannot reach Hub, on a **trusted machine with access** pull the same official
+`oven/bun:1.4.3` image for the VM's architecture, `docker save` it to a tar file, record its
+`sha256sum`, transfer it securely, verify that checksum on the VM, and `docker load` it.
+For example, after you have verified and loaded the image on the VM:
+
+```bash
+docker tag oven/bun:1.4.3 borobiya-bun:1.4.3
+docker run --rm --pull never borobiya-bun:1.4.3 bun --version  # must print 1.4.3
+BOROBIYA_BUN_BASE_IMAGE=borobiya-bun:1.4.3 docker compose build --pull=false api routing-gateway
+```
+
+Once the API image is available, an actually needed container migration can run as
+`docker compose run --rm api bun src/db/migrate.ts` **without** `--build` (review the
+host/Compose database target first). The posted `Database schema ready (0022_…)`
+message already confirms the host-side required schema, so no rerun is indicated there.
+
+The image override applies **only at build time** to the API and routing gateway; it does
+not change their database volumes or the host development server. To keep the override for
+subsequent Compose rebuilds, add `BOROBIYA_BUN_BASE_IMAGE=borobiya-bun:1.4.3` to the VM's
+local `.env` (never commit it). If BuildKit still requests remote metadata, use a reviewed
+reachable registry/mirror with the same verified Bun 1.4.3 image for that override and
+investigate Docker daemon proxy/cache settings; do not use an arbitrary image, remove TLS
+verification, disable authentication, or delete volumes. Other Dockerfile bases can fail
+independently if the VM cannot reach their registries.
 
 ### Browser root serves the base gateway instead of the built app
 

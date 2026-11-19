@@ -14,6 +14,7 @@
 | `CORS_ORIGINS` | API comma-separated exact HTTP(S) origins (scheme + host + optional port, no wildcard/path); for browsers outside localhost configure approved HTTPS origins through the VM helper. |
 | `PUBLIC_DOMAIN` | VM/Caddy production edge hostname without scheme; VM helper derives it from the validated HTTPS `CORS_ORIGINS`. Blank for development; not an API setting. |
 | `TRUSTED_PROXY_IPS` | API comma-separated trusted reverse-proxy peer IPs/CIDRs; blank on a direct host API. Compose supplies its pinned private subnet; never trust `0.0.0.0/0`. |
+| `BOROBIYA_BUN_BASE_IMAGE` | Optional Compose build image for API and routing gateway; blank uses `oven/bun:1.4.3`. Use only a verified copy of Bun 1.4.3 when Docker Hub blocks the VM. Does not affect the host `dev-lan.sh` API or production tagged-image deployment. |
 | `POSTGRES_USER` | Compose database role; used to build the container API URL and DB healthcheck. No effect on a host API's `DATABASE_URL`. |
 | `POSTGRES_PASSWORD` | Compose Postgres role password. Change before first start; use URL-safe characters. Changing `.env` later does **not** rotate a populated database role. |
 | `POSTGRES_DB` | Compose database name; used by API URL and healthcheck. |

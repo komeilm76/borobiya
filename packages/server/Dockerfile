@@ -1,4 +1,6 @@
-FROM oven/bun:1.4.3
+# Override only with the same verified Bun 1.4.3 image when Docker Hub is blocked.
+ARG BOROBIYA_BUN_BASE_IMAGE=oven/bun:1.4.3
+FROM ${BOROBIYA_BUN_BASE_IMAGE}
 
 WORKDIR /app
 ENV NODE_ENV=production
