@@ -17,11 +17,27 @@ describe("selected Dispatch SOS label placement", () => {
     });
   });
 
+  it("chooses above the pin near the bottom on a normal-width map, then returns to a side when panned", () => {
+    // Both horizontal sides fit. Previously they always won, making "above"
+    // reachable only on an exceptionally narrow map.
+    expect(dispatchSosLabelPlacement(190, 211, 400, 240, 95, 30)).toEqual({
+      side: "above", belowPin: false, visible: true
+    });
+    expect(dispatchSosLabelPlacement(370, 211, 400, 240, 95, 30).side).toBe("above");
+    expect(dispatchSosLabelPlacement(190, 130, 400, 240, 95, 30).side).toBe("right");
+    expect(dispatchSosLabelPlacement(190, 20, 400, 240, 95, 30).side).toBe("below");
+    // On a shallow map, never choose an above chip that would clip past its top.
+    expect(dispatchSosLabelPlacement(190, 70, 400, 90, 95, 30).side).toBe("right");
+  });
+
   it("attaches the same chip to a coordinate-centered circle if canvas pins are unavailable", () => {
     expect(dispatchSosLabelPlacement(100, 20, 400, 240, 95, 30, 0)).toMatchObject({
       side: "below", belowPin: true, visible: true
     });
     expect(dispatchSosLabelPlacement(370, 110, 400, 240, 95, 30, 0).side).toBe("left");
+    expect(dispatchSosLabelPlacement(190, 204, 400, 240, 95, 30, 0)).toMatchObject({
+      side: "above", belowPin: false, visible: true
+    });
   });
 
   it("uses a bounded center fallback on narrow maps and hides offscreen labels", () => {

@@ -37,6 +37,10 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(labelCss).toContain('border-right: 3px solid var(--dispatch-label-color');
     expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--center .dispatch-sos-label::after)');
     expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label::after)');
+    expect(labelCss).toMatch(/--center\.dispatch-sos-label-anchor--above \.dispatch-sos-label\) \{[^}]*top: auto; bottom: 51px;[^}]*border-bottom: 3px/);
+    expect(labelCss).toMatch(/--center\.dispatch-sos-label-anchor--above \.dispatch-sos-label::after\) \{[^}]*top: auto; bottom: -8px/);
+    expect(labelCss).toContain('top: auto; bottom: 18px;'); // Circle fallback stays attached above too.
+    expect(source).toContain('element.classList.toggle("dispatch-sos-label-anchor--above", placement.side === "above")');
     expect(source).toContain('filter: ["==", ["get", "isSelected"], false]');
     expect(source).toContain('"circle-color": SELECTED_SOS_COLOR, "circle-radius": 23');
     // Clustered responders otherwise lose both their pin and username at low zoom.

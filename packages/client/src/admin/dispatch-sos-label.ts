@@ -11,14 +11,26 @@ export function dispatchSosLabelPlacement(
   x: number, y: number, width: number, height: number, labelWidth: number, labelHeight: number,
   pinHeadOffset = -35
 ): DispatchSosLabelPlacement {
+  const margin = 8;
   const gap = 16; // The label border touches the painted head (~17px from center).
-  const belowOffset = pinHeadOffset === 0 ? 18 : 0; // Circle fallback is centered on the coordinate.
-  const belowCrown = y + pinHeadOffset - labelHeight / 2 < 8;
-  const fitsRight = x + gap + labelWidth <= width - 8;
-  const fitsLeft = x - gap - labelWidth >= 8;
-  const side = belowCrown && y + belowOffset + labelHeight <= height - 8 ? "below" :
-    fitsRight ? "right" : fitsLeft ? "left" :
-      y + belowOffset + labelHeight <= height - 8 ? "below" : "above";
+  const circle = pinHeadOffset === 0;
+  const belowOffset = circle ? 18 : 0;
+  const aboveOffset = circle ? 18 : 51; // Circle rim or painted teardrop crown.
+  const sideTop = y + pinHeadOffset - labelHeight / 2;
+  const sideFitsVertically = sideTop >= margin && sideTop + labelHeight <= height - margin;
+  const fitsBelow = y + belowOffset + labelHeight <= height - margin;
+  const fitsAbove = y - aboveOffset - labelHeight >= margin;
+  const fitsRight = x + gap + labelWidth <= width - margin;
+  const fitsLeft = x - gap - labelWidth >= margin;
+  // Top edge: tuck below the tip. Bottom edge: put the title above the crown
+  // even when a horizontal side would fit; otherwise it never selects above
+  // on a normal-width map. The side positions must also fit vertically.
+  const side = sideTop < margin && fitsBelow ? "below" :
+    !fitsBelow && fitsAbove ? "above" :
+      sideFitsVertically && fitsRight ? "right" :
+        sideFitsVertically && fitsLeft ? "left" :
+          fitsBelow ? "below" : fitsAbove ? "above" :
+            fitsRight ? "right" : fitsLeft ? "left" : "above";
   return {
     side,
     belowPin: side === "below",
