@@ -314,7 +314,7 @@
           <section v-if="legendOpen" id="mission-map-legend" class="mission-desk__map-legend bb-floating-card"
             aria-labelledby="mission-map-legend-title" dir="rtl" tabindex="-1">
             <h2 id="mission-map-legend-title">راهنمای نقشه</h2>
-            <MapPointKey :kinds="['sos', 'start', 'stop', 'helper', 'requester', 'director']" />
+            <MapPointKey :kinds="['sos', 'start', 'stop', 'helper', 'requester', 'director']" show-gps />
             <small>مبدأ مسیر زنده نیست؛ تازگی موقعیت‌های اشتراکی را بررسی کنید.</small>
           </section>
           <MissionStatusPanel v-if="activeTool === 'status'" :desk="desk" :visible="visible"
@@ -1568,7 +1568,7 @@ onBeforeUnmount(() => {
 }
 /* The key uses Mission Information's card treatment, not an inset strip in
    the steps widget. The two surfaces stay in normal flex flow, never overlap. */
-.mission-desk__map-legend { flex: none; min-width: 0; max-height: min(8rem, 25dvh);
+.mission-desk__map-legend { flex: none; min-width: 0; max-height: min(10.5rem, 33dvh);
   padding: .55rem max(.75rem, env(safe-area-inset-right, 0px)) .55rem max(.75rem, env(safe-area-inset-left, 0px));
   overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);
