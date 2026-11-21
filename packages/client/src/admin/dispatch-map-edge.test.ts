@@ -13,9 +13,9 @@ describe("dispatch map edge cues", () => {
       { ...rescuer, edge: "bottom", x: 220, y: 253 }
     ]);
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0])
-      .toMatchObject({ edge: "left", x: 81, y: 140 });
+      .toMatchObject({ edge: "left", x: 12, y: 140 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 340, y: 140 }])[0])
-      .toMatchObject({ edge: "right", x: 239, y: 140 });
+      .toMatchObject({ edge: "right", x: 308, y: 140 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 160, y: 140 }])).toEqual([]);
   });
 
@@ -23,15 +23,16 @@ describe("dispatch map edge cues", () => {
     const narrow = dispatchMapEdgeCues(160, 272, [
       { ...rescuer, x: -10, y: 160 }
     ]);
-    expect(narrow[0]).toMatchObject({ edge: "left", x: 80, y: 160 });
-    // The 136px-wide button at x=80 spans x=12..148, not outside the map.
-    expect(narrow[0]!.x - (160 - 24) / 2).toBe(12);
+    expect(narrow[0]).toMatchObject({ edge: "left", x: 12, y: 160 });
+    // Even the widest 136px cue grows inward from x=12, not outside the map.
+    expect(narrow[0]!.x + (160 - 24)).toBe(148);
     const topRight = dispatchMapEdgeCues(320, 280, [{ ...rescuer, x: 300, y: -10 }]);
     expect(topRight[0]).toMatchObject({ edge: "top", x: 239, y: 126 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...rescuer, x: 330, y: 15 }])[0])
       .toMatchObject({ edge: "right", y: 126 });
-    // At 320px wide the 138px cue stays 12px from either horizontal edge.
-    expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0]!.x - 138 / 2).toBe(12);
+    // At 320px wide, side cues stay pinned 12px inside either edge.
+    expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0]!.x).toBe(12);
+    expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 330, y: 140 }])[0]!.x).toBe(308);
     expect(dispatchMapEdgeCues(320, 170, [{ ...sos, x: 160, y: -20 }])).toEqual([]);
   });
 
@@ -43,6 +44,14 @@ describe("dispatch map edge cues", () => {
       { ...rescuer, id: "far", x: -15, y: 150 }
     ]);
     expect(cues.map((cue) => cue.id)).toEqual(["selected", "picked", "far"]);
+    // A side cue's x is its edge anchor, not its center. Compare real maximum
+    // bounds against top/other-side cues so long names never overlap.
+    expect(dispatchMapEdgeCues(320, 280, [
+      { ...sos, x: -10, y: 86 }, { ...rescuer, x: 160, y: -10 }
+    ]).map((cue) => cue.id)).toEqual(["selected"]);
+    expect(dispatchMapEdgeCues(160, 272, [
+      { ...sos, x: -10, y: 160 }, { ...rescuer, x: 170, y: 160 }
+    ]).map((cue) => cue.id)).toEqual(["selected"]);
     expect(dispatchMapEdgeCues(100, 80, [{ ...sos, x: 150, y: -20 }])).toEqual([]);
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: Number.NaN, y: -20 }])).toEqual([]);
   });

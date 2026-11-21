@@ -358,9 +358,9 @@
 
             <div v-if="mapEdgeCues.length" class="dispatch-map-edge-cues" aria-label="نقاط بیرون از قاب نقشه">
               <button v-for="cue in mapEdgeCues" :key="`${cue.kind}-${cue.id}`" type="button"
-                class="dispatch-map-edge-cue" :class="`dispatch-map-edge-cue--${cue.kind}`"
+                class="dispatch-map-edge-cue" :class="[`dispatch-map-edge-cue--${cue.kind}`, `dispatch-map-edge-cue--${cue.edge}`]"
                 :style="{ left: `${cue.x}px`, top: `${cue.y}px`, '--dispatch-edge-color': edgeCueColor(cue) }"
-                :aria-label="`${cue.kind === 'sos' ? 'حادثهٔ انتخاب‌شده' : 'امدادگر نزدیک'} ${cue.label}، بیرون از قاب نقشه، نمایش روی نقشه`"
+                :aria-label="`${cue.kind === 'sos' ? 'حادثهٔ انتخاب‌شده' : 'امدادگر نزدیک'} ${cue.label}، بیرون از قاب نقشه در سمت ${edgeCueDirectionLabel[cue.edge]}، نمایش روی نقشه`"
                 :title="cue.label"
                 @click="focusEdgeCue(cue)">
                 <span class="dispatch-map-edge-cue__arrow" aria-hidden="true">
@@ -868,6 +868,7 @@ let pulseAnimationFrame: number | null = null;
 let lastPulseUpdateAt = 0;
 let detachMapEvents: (() => void) | null = null;
 const mapEdgeCues = ref<DispatchEdgeCue[]>([]);
+const edgeCueDirectionLabel = { top: "بالا", bottom: "پایین", left: "چپ", right: "راست" } as const;
 
 type DispatchLabelSide = DispatchSosLabelPlacement["side"];
 
@@ -1980,29 +1981,39 @@ onBeforeUnmount(() => {
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */
 .dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 30px minmax(0, 1fr);
-  align-items: center; gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
-  width: min(138px, calc(100% - 24px)); height: 30px; padding: 0;
-  padding-inline-end: .4rem;
-  border: 0; border-radius: .7rem;
+.dispatch-map-edge-cue { position: absolute; display: inline-flex; align-items: center; gap: .35rem;
+  transform: translate(-50%, -50%); box-sizing: border-box;
+  width: max-content; max-width: min(138px, calc(100% - 24px)); height: 30px;
+  padding: 0; padding-inline-end: .4rem; border: 0; border-radius: .7rem;
   overflow: hidden; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 12px rgba(8, 21, 38, .28), 0 1px 3px rgba(8, 21, 38, .14);
-  font: 800 .78rem/1.1 var(--bb-font-family);
-  text-align: start; cursor: pointer; pointer-events: auto; }
-/* The arrow's width matches the cue's height. Its left corners are gently
-   rounded; the other edge stays flush against the card, without a border gap. */
-.dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 30px; height: 100%;
-  border-radius: .65rem 0 0 .65rem; color: #fff; background: var(--dispatch-edge-color, #0868c8); }
+  font: 800 .78rem/1.25 var(--bb-font-family);
+  text-align: start; cursor: pointer; pointer-events: auto;
+  transition: box-shadow .15s ease; }
+/* Side cues grow inward from the viewport edge, so short names don't float
+   into the map. Put the arrow on the side that points toward the target. */
+.dispatch-map-edge-cue--left { direction: ltr; transform: translateY(-50%); }
+.dispatch-map-edge-cue--right { transform: translate(-100%, -50%); }
+.dispatch-map-edge-cue:hover { box-shadow: 0 5px 16px rgba(8, 21, 38, .32), 0 2px 5px rgba(8, 21, 38, .16); }
+/* The arrow is square and integrated with the card, not a second floating pin. */
+.dispatch-map-edge-cue__arrow { display: grid; place-items: center; flex: 0 0 30px;
+  width: 30px; height: 100%; border-radius: .65rem 0 0 .65rem;
+  color: #fff; background: var(--dispatch-edge-color, #0868c8); }
+.dispatch-map-edge-cue--left .dispatch-map-edge-cue__arrow { border-radius: 0 .65rem .65rem 0; }
 .dispatch-map-edge-cue__arrow svg { display: block; width: 17px; height: 17px; }
 .dispatch-map-edge-cue__arrow--bottom { transform: rotate(180deg); }
 .dispatch-map-edge-cue__arrow--left { transform: rotate(-90deg); }
 .dispatch-map-edge-cue__arrow--right { transform: rotate(90deg); }
-.dispatch-map-edge-cue bdi { display: -webkit-box; min-width: 0; max-height: 2.5em; overflow: hidden;
-  -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.dispatch-map-edge-cue bdi { display: block; flex: 0 1 auto; min-width: 0;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .dispatch-map-edge-cue:focus-visible { outline: 3px solid var(--dispatch-edge-color, #0868c8); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .dispatch-map-edge-cue { transition: none; }
+}
 @media (forced-colors: active) {
   .dispatch-map-edge-cue { background: Canvas; color: CanvasText; outline: 1px solid CanvasText;
     outline-offset: -1px; box-shadow: none; }
+  .dispatch-map-edge-cue:hover { box-shadow: none; }
   .dispatch-map-edge-cue__arrow { background: CanvasText; color: Canvas; }
 }
 .admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);

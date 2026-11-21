@@ -11,11 +11,15 @@ export function dispatchMapEdgeCues(width: number, height: number,
   candidates: readonly DispatchEdgeCandidate[]): DispatchEdgeCue[] {
   if (width < 160 || height < 180) return [];
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-  // Match the borderless 138px by 30px CSS cue, with a 12px gap to the viewport.
-  // Narrow maps shrink the cue to width - 24px rather than cropping it.
-  const cueWidth = Math.min(138, width - 24);
-  const insetX = cueWidth / 2 + 12;
+  // Match the CSS cue's maximum 138px width and 30px height. Shorter names
+  // render narrower; side cues anchor to the edge, not their variable center.
+  const edgeGap = 12;
+  const cueWidth = Math.min(138, width - 2 * edgeGap);
+  const insetX = cueWidth / 2 + edgeGap;
   const bottomY = height - 27;
+  const horizontalBounds = (edge: DispatchEdge, x: number): readonly [number, number] =>
+    edge === "left" ? [x, x + cueWidth] : edge === "right" ? [x - cueWidth, x] :
+      [x - cueWidth / 2, x + cueWidth / 2];
   const outside = candidates.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y) &&
     (point.x < 0 || point.x > width || point.y < 0 || point.y > height));
   // The selected incident always wins; selected responders precede nearby ones.
@@ -34,14 +38,20 @@ export function dispatchMapEdgeCues(width: number, height: number,
       { edge: "right" as const, distance: Math.max(0, point.x - width) / width }
     ];
     const edge = distances.reduce((best, next) => next.distance > best.distance ? next : best).edge;
-    const x = edge === "left" ? insetX : edge === "right" ? width - insetX :
+    const x = edge === "left" ? edgeGap : edge === "right" ? width - edgeGap :
       clamp(point.x, insetX, width - insetX);
     // Left/top clears the recenter button. Right/top also clears MapLibre's
     // zoom/compass controls (which occupy the map's upper-right corner).
     const topY = edge === "right" || (edge === "top" && x > width - 132) ? 126 : 86;
     const yMin = Math.min(topY, bottomY);
     const y = edge === "top" ? yMin : edge === "bottom" ? bottomY : clamp(point.y, yMin, bottomY);
-    if (cues.some((cue) => Math.abs(cue.x - x) < cueWidth + 8 && Math.abs(cue.y - y) < 34)) continue;
+    // Compare the *maximum* rectangles; short chips may leave more room, but
+    // never let two long labels collide as the map moves or names change.
+    const [left, right] = horizontalBounds(edge, x);
+    if (cues.some((cue) => {
+      const [usedLeft, usedRight] = horizontalBounds(cue.edge, cue.x);
+      return usedLeft < right + 8 && left < usedRight + 8 && Math.abs(cue.y - y) < 34;
+    })) continue;
     cues.push({ ...point, edge, x, y });
     if (cues.length === 3) break; // Avoid covering the map; the responder list remains complete.
   }
