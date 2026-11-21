@@ -1197,17 +1197,24 @@ function positionSelectedPlaceLabel(marker: Marker | null, instance: MapLibreMap
   if (!label || label.hidden) return;
   const canvas = instance.getCanvas().getBoundingClientRect();
   element.style.setProperty("--selected-label-map-width", `${Math.max(44, canvas.width - 16)}px`);
+  element.style.setProperty("--bb-point-edge-map-width", `${Math.max(44, canvas.width - 24)}px`);
   element.classList.remove("user-map-view__selected-place--label-below");
+  element.removeAttribute("data-bb-point-edge"); // Re-measure its on-map form before applying the edge chip.
   element.style.removeProperty("--selected-label-shift");
   element.style.removeProperty("--selected-label-y");
   if (label.getBoundingClientRect().top < canvas.top + 8)
     element.classList.add("user-map-view__selected-place--label-below");
   const rect = label.getBoundingClientRect();
-  const { y, edge } = pointLabelPlacement(canvas, element.getBoundingClientRect(), rect);
-  element.style.setProperty("--selected-label-shift", `${mapLabelShift(rect.left, rect.right, canvas.left, canvas.right)}px`);
+  const anchor = element.getBoundingClientRect();
+  let { y, edge } = pointLabelPlacement(canvas, anchor, rect);
+  if (edge) {
+    element.setAttribute("data-bb-point-edge", edge);
+    // Edge styling changes the label's width/height, not the pin's position.
+    ({ y } = pointLabelPlacement(canvas, anchor, label.getBoundingClientRect()));
+  }
+  const edgeRect = edge ? label.getBoundingClientRect() : rect;
+  element.style.setProperty("--selected-label-shift", `${mapLabelShift(edgeRect.left, edgeRect.right, canvas.left, canvas.right)}px`);
   element.style.setProperty("--selected-label-y", `${Math.round(y)}px`);
-  if (edge) element.setAttribute("data-bb-point-edge", edge);
-  else element.removeAttribute("data-bb-point-edge");
 }
 function positionSelectedPlaceLabels(): void {
   const instance = map.value;
@@ -3238,5 +3245,48 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
    unused persistent Search panel (including keyboard stops); Back restores it. */
 @media (min-width: 600px) {
   .user-map-view--mission-offer-preview .user-map-view__search { display: none !important; }
+}
+
+/* Only the user's *offscreen* captions adopt Dispatch's compact directional
+   chip. The on-map signs, attached labels and geographic coordinates stay put. */
+:global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) {
+  --bb-edge-arrow: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20viewBox=%270%200%2024%2024%27%3E%3Cpath%20d=%27M12%2020V4%20M5%2011l7-7%207%207%27%20fill=%27none%27%20stroke=%27black%27%20stroke-width=%273.5%27%20stroke-linecap=%27round%27%20stroke-linejoin=%27round%27/%3E%3C/svg%3E");
+  --bb-edge-color: var(--bb-pin, #0868c8);
+  box-sizing: border-box; display: block; width: max-content;
+  max-width: min(138px, var(--bb-point-edge-map-width, calc(100vw - 24px)));
+  height: 30px; min-height: 30px; padding: 0;
+  padding-inline-start: calc(30px + .35rem); padding-inline-end: .4rem;
+  border: 0; border-radius: .7rem; direction: rtl; text-align: start;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 3px 12px rgba(8, 21, 38, .28), 0 1px 3px rgba(8, 21, 38, .14);
+  font: 800 .78rem/30px var(--bb-font-family, sans-serif);
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden; pointer-events: none;
+}
+:global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label) {
+  --bb-edge-color: rgb(var(--v-theme-primary));
+}
+:global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))::before) {
+  content: ""; display: block; position: absolute; inset-block: 0; inset-inline-start: 0;
+  width: 30px; height: 100%; margin: 0; border-radius: .65rem 0 0 .65rem;
+  background: var(--bb-edge-color); color: transparent;
+}
+:global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))::after) {
+  content: ""; display: block; position: absolute; z-index: 1;
+  top: calc(50% - 8.5px); inset-inline-start: 6.5px; width: 17px; height: 17px;
+  background: #fff; transform: rotate(var(--bb-edge-arrow-rotation, 0deg));
+  -webkit-mask: var(--bb-edge-arrow) center / contain no-repeat;
+  mask: var(--bb-edge-arrow) center / contain no-repeat;
+}
+:global(.user-map-view [data-bb-point-edge="bottom"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) { --bb-edge-arrow-rotation: 180deg; }
+:global(.user-map-view [data-bb-point-edge="left"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) { --bb-edge-arrow-rotation: -90deg; direction: ltr; }
+:global(.user-map-view [data-bb-point-edge="right"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) { --bb-edge-arrow-rotation: 90deg; }
+:global(.user-map-view [data-bb-point-edge="left"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))::before) { border-radius: 0 .65rem .65rem 0; }
+@media (forced-colors: active) {
+  :global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) {
+    background: Canvas; color: CanvasText; outline: 1px solid CanvasText;
+    outline-offset: -1px; box-shadow: none;
+  }
+  :global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))::before) { background: CanvasText; }
+  :global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))::after) { background: Canvas; }
 }
 </style>

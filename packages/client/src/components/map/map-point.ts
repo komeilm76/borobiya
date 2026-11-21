@@ -111,8 +111,10 @@ export function positionMapPointLabels(map: { getCanvas(): HTMLElement }, marker
     const label = element?.querySelector<HTMLElement>(".bb-map-point__caption");
     if (!element || !label || label.offsetParent === null) continue;
     element.classList.remove("bb-map-point--label-flipped");
+    element.removeAttribute("data-bb-point-edge"); // Measure the on-map caption before trying its edge variant.
     element.style.removeProperty("--bb-point-label-shift");
     element.style.removeProperty("--bb-point-label-y");
+    element.style.setProperty("--bb-point-edge-map-width", `${Math.max(44, viewport.right - viewport.left - 24)}px`);
     let rect = label.getBoundingClientRect();
     if (verticalOverflow(rect)) {
       element.classList.add("bb-map-point--label-flipped");
@@ -120,10 +122,15 @@ export function positionMapPointLabels(map: { getCanvas(): HTMLElement }, marker
       if (verticalOverflow(alternative) < verticalOverflow(rect)) rect = alternative;
       else element.classList.remove("bb-map-point--label-flipped");
     }
-    const { x, y, edge } = pointLabelPlacement(viewport, element.getBoundingClientRect(), rect);
+    const anchor = element.getBoundingClientRect();
+    let { x, y, edge } = pointLabelPlacement(viewport, anchor, rect);
+    if (edge) {
+      element.setAttribute("data-bb-point-edge", edge);
+      // The edge chip has a different size from the attached on-map caption.
+      // Recheck its real box before clamping; never displace the geographic pin.
+      ({ x, y } = pointLabelPlacement(viewport, anchor, label.getBoundingClientRect()));
+    }
     element.style.setProperty("--bb-point-label-shift", `${Math.round(x)}px`);
     element.style.setProperty("--bb-point-label-y", `${Math.round(y)}px`);
-    if (edge) element.setAttribute("data-bb-point-edge", edge);
-    else element.removeAttribute("data-bb-point-edge");
   }
 }

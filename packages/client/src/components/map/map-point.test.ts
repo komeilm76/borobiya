@@ -99,6 +99,28 @@ describe("shared semantic map points", () => {
     expect(classes.has("bb-map-point--label-flipped")).toBe(false);
   });
 
+  it("remeasures a wider offscreen chip after toggling its edge style", () => {
+    const properties = new Map<string, string>();
+    let edge: string | null = "right"; // A previous frame may still have an edge style.
+    const label = { offsetParent: {}, getBoundingClientRect: () => ({
+      left: 280, right: edge ? 380 : 355, top: 100, bottom: edge ? 130 : 125
+    }) };
+    const element = {
+      getBoundingClientRect: () => ({ left: 318, right: 362, top: 95, bottom: 139 }),
+      querySelector: () => label,
+      classList: { add() {}, remove() {} },
+      style: { setProperty: (name: string, value: string) => properties.set(name, value),
+        removeProperty: (name: string) => properties.delete(name) },
+      setAttribute: (name: string, value: string) => { if (name === "data-bb-point-edge") edge = value; },
+      removeAttribute: (name: string) => { if (name === "data-bb-point-edge") edge = null; }
+    };
+    const canvas = { getBoundingClientRect: () => ({ left: 0, right: 300, top: 0, bottom: 200 }) };
+    positionMapPointLabels({ getCanvas: () => canvas } as never, [{ getElement: () => element } as never]);
+    expect(edge).toBe("right");
+    expect(properties.get("--bb-point-label-shift")).toBe("-88px"); // 300 - 8 - 380
+    expect(properties.get("--bb-point-edge-map-width")).toBe("276px");
+  });
+
   it("shows top and bottom edge cues for offscreen points without moving their coordinates", () => {
     const viewport = { left: 0, right: 300, top: 0, bottom: 200 };
     expect(pointLabelPlacement(viewport, { left: 120, right: 164, top: -130, bottom: -86 },
