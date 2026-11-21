@@ -1,3 +1,5 @@
+import type { Map as MapLibreMap, Marker as MapLibreMarker } from "maplibre-gl";
+
 // Semantic map vocabulary for the user workspaces. Dispatch has separate
 // cluster-aware labels beside its WebGL pins. Color and the key are secondary.
 export type MapPointKind = "sos" | "start" | "end" | "helper" | "nearby" | "stop" | "requester" | "director";
@@ -100,16 +102,106 @@ export function pointLabelPlacement(viewport: PointRect, anchor: PointRect, labe
   };
 }
 
+type EdgeCueMap = Pick<MapLibreMap, "getCanvas" | "getZoom" | "flyTo">;
+type EdgeCueMarker = Pick<MapLibreMarker, "getElement" | "getLngLat">;
+type Edge = "top" | "bottom" | "left" | "right";
+const edgeNames: Record<Edge, string> = { top: "بالا", bottom: "پایین", left: "چپ", right: "راست" };
+const edgeCueStates = new WeakMap<HTMLElement, {
+  map: EdgeCueMap; marker: EdgeCueMarker; element: HTMLElement; interactive: boolean;
+  originalAriaLabel: string | null; originalRole: string | null;
+  originalLabelHidden: string | null; edgeAriaLabel: string | null; active: boolean;
+}>();
+
+/** An offscreen caption in the user map is a real camera action, not a dead
+ * decorative chip. Keep marker-button semantics when present; for noninteractive
+ * image markers expose just the caption as a keyboard button. */
+export function syncUserMapEdgeCue(map: EdgeCueMap, marker: EdgeCueMarker, label: HTMLElement, edge: Edge | null): void {
+  // A shared MapCanvas can also be used by mission/inbox previews elsewhere.
+  // Only the user workspace opts its edge labels into camera actions.
+  if (!map.getCanvas().closest?.(".user-map-view")) return;
+  const element = marker.getElement();
+  let state = edgeCueStates.get(label);
+  if (!state) {
+    state = { map, marker, element, interactive: element.tagName === "BUTTON" || element.getAttribute("role") === "button",
+      originalAriaLabel: element.getAttribute("aria-label"), originalRole: element.getAttribute("role"),
+      originalLabelHidden: label.getAttribute("aria-hidden"), edgeAriaLabel: null, active: false };
+    edgeCueStates.set(label, state);
+    const activate = (event: Event, keyboard: boolean) => {
+      if (!state!.element.hasAttribute("data-bb-point-edge")) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      const { lng, lat } = state!.marker.getLngLat();
+      state!.map.flyTo({ center: [lng, lat], zoom: Math.max(state!.map.getZoom(), 14),
+        duration: typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 650 });
+      if (keyboard) state!.map.getCanvas().focus({ preventScroll: true });
+    };
+    element.addEventListener("click", (event) => {
+      if (event.target === label || label.contains(event.target as Node) || (state!.interactive && event.detail === 0))
+        activate(event, event.detail === 0);
+    }, true);
+    element.addEventListener("keydown", (event) => {
+      if (state!.interactive && event.target === element && (event.key === "Enter" || event.key === " "))
+        activate(event, true);
+    }, true);
+    label.addEventListener("keydown", (event) => {
+      if (!state!.interactive && (event.key === "Enter" || event.key === " ")) activate(event, true);
+    });
+    // A chip gesture should not start a MapLibre drag or map-tap action.
+    for (const type of ["pointerdown", "mousedown", "touchstart"])
+      label.addEventListener(type, (event) => {
+        if (state!.element.hasAttribute("data-bb-point-edge")) event.stopPropagation();
+      });
+  }
+  state.map = map; state.marker = marker;
+  if (edge) {
+    if (!state.active || !state.interactive || element.getAttribute("aria-label") !== state.edgeAriaLabel)
+      state.originalAriaLabel = element.getAttribute("aria-label"); // Names can update while offscreen.
+    const actionLabel = `${state.originalAriaLabel || label.querySelector(".bb-map-point__caption-name")?.textContent?.trim() || label.textContent?.trim() || "نقطه"}، بیرون از قاب نقشه در سمت ${edgeNames[edge]}، نمایش روی نقشه`;
+    if (state.interactive) {
+      element.setAttribute("aria-label", actionLabel);
+      state.edgeAriaLabel = actionLabel;
+    } else {
+      element.setAttribute("role", "group");
+      label.setAttribute("role", "button"); label.setAttribute("tabindex", "0");
+      label.removeAttribute("aria-hidden"); label.setAttribute("aria-label", actionLabel);
+    }
+    state.active = true;
+  } else if (state.active) {
+    if (state.interactive) {
+      // A reactive marker update may already have replaced the cue name.
+      if (element.getAttribute("aria-label") === state.edgeAriaLabel) {
+        if (state.originalAriaLabel === null) element.removeAttribute("aria-label");
+        else element.setAttribute("aria-label", state.originalAriaLabel);
+      }
+    } else {
+      if (state.originalRole === null) element.removeAttribute("role");
+      else element.setAttribute("role", state.originalRole);
+      label.removeAttribute("role"); label.removeAttribute("tabindex"); label.removeAttribute("aria-label");
+      if (state.originalLabelHidden === null) label.removeAttribute("aria-hidden");
+      else label.setAttribute("aria-hidden", state.originalLabelHidden);
+    }
+    state.active = false; state.edgeAriaLabel = null;
+  }
+}
+
 /** Keep labels within the map frame even when the icon is offscreen. Never move
- * the MapLibre marker, change its coordinates, or expand its tappable area. */
-export function positionMapPointLabels(map: { getCanvas(): HTMLElement }, markers: readonly ({ getElement(): HTMLElement } | null)[]): void {
+ * the MapLibre marker or change its coordinates. */
+export function positionMapPointLabels(map: EdgeCueMap, markers: readonly (EdgeCueMarker | null)[]): void {
   const viewport = map.getCanvas().getBoundingClientRect();
   const verticalOverflow = (rect: PointRect) =>
     Math.max(0, viewport.top + 8 - rect.top) + Math.max(0, rect.bottom - viewport.bottom + 8);
   for (const marker of markers) {
     const element = marker?.getElement();
     const label = element?.querySelector<HTMLElement>(".bb-map-point__caption");
-    if (!element || !label || label.offsetParent === null) continue;
+    if (!marker || !element || !label) continue;
+    if (label.offsetParent === null) {
+      // A named destination hides the generic caption; it owns a single
+      // separate callout, which is positioned by the user map instead.
+      if (map.getCanvas().closest?.(".user-map-view")) {
+        element.removeAttribute("data-bb-point-edge");
+        syncUserMapEdgeCue(map, marker, label, null);
+      }
+      continue;
+    }
     element.classList.remove("bb-map-point--label-flipped");
     element.removeAttribute("data-bb-point-edge"); // Measure the on-map caption before trying its edge variant.
     element.style.removeProperty("--bb-point-label-shift");
@@ -132,5 +224,6 @@ export function positionMapPointLabels(map: { getCanvas(): HTMLElement }, marker
     }
     element.style.setProperty("--bb-point-label-shift", `${Math.round(x)}px`);
     element.style.setProperty("--bb-point-label-y", `${Math.round(y)}px`);
+    syncUserMapEdgeCue(map, marker, label, edge);
   }
 }

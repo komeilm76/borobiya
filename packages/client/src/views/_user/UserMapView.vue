@@ -343,7 +343,7 @@ import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
-import { createMapPointElement, pointLabelPlacement, positionMapPointLabels } from "@/components/map/map-point";
+import { createMapPointElement, pointLabelPlacement, positionMapPointLabels, syncUserMapEdgeCue } from "@/components/map/map-point";
 import { spreadCoincidentPoints } from "@/components/map/coincident-points";
 import { clusterAppearance, matchesSelectedSearchDestination, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
@@ -1194,7 +1194,8 @@ function positionSelectedPlaceLabel(marker: Marker | null, instance: MapLibreMap
   if (!marker) return;
   const element = marker.getElement();
   const label = element.querySelector<HTMLElement>(".user-map-view__selected-place-label");
-  if (!label || label.hidden) return;
+  if (!label) return;
+  if (label.hidden) { syncUserMapEdgeCue(instance, marker, label, null); return; }
   const canvas = instance.getCanvas().getBoundingClientRect();
   element.style.setProperty("--selected-label-map-width", `${Math.max(44, canvas.width - 16)}px`);
   element.style.setProperty("--bb-point-edge-map-width", `${Math.max(44, canvas.width - 24)}px`);
@@ -1215,6 +1216,7 @@ function positionSelectedPlaceLabel(marker: Marker | null, instance: MapLibreMap
   const edgeRect = edge ? label.getBoundingClientRect() : rect;
   element.style.setProperty("--selected-label-shift", `${mapLabelShift(edgeRect.left, edgeRect.right, canvas.left, canvas.right)}px`);
   element.style.setProperty("--selected-label-y", `${Math.round(y)}px`);
+  syncUserMapEdgeCue(instance, marker, label, edge);
 }
 function positionSelectedPlaceLabels(): void {
   const instance = map.value;
@@ -3260,7 +3262,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 12px rgba(8, 21, 38, .28), 0 1px 3px rgba(8, 21, 38, .14);
   font: 800 .78rem/30px var(--bb-font-family, sans-serif);
-  white-space: nowrap; text-overflow: ellipsis; overflow: hidden; pointer-events: none;
+  white-space: nowrap; text-overflow: ellipsis; overflow: hidden;
+  pointer-events: auto; cursor: pointer; touch-action: manipulation;
+}
+:global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden])):focus-visible),
+:global(.user-map-view [data-bb-point-edge]:focus-visible :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) {
+  outline: 3px solid var(--bb-edge-color, #0868c8); outline-offset: 2px;
 }
 :global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label) {
   --bb-edge-color: rgb(var(--v-theme-primary));

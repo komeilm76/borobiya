@@ -31,6 +31,14 @@ describe("user map offscreen pin cues", () => {
     expect(compileStyle({ source: userCss, filename: "UserMapView.vue", id: "user-edge-cues", scoped: true }).errors).toEqual([]);
   });
 
+  it("makes only edge chips pointer and keyboard actionable, including the named POI callout", () => {
+    expect(edgeCss).toContain('pointer-events: auto; cursor: pointer; touch-action: manipulation;');
+    expect(edgeCss).toContain('[data-bb-point-edge]:focus-visible');
+    expect(userMap).toContain('syncUserMapEdgeCue(instance, marker, label, edge);');
+    expect(userMap).toContain('if (label.hidden) { syncUserMapEdgeCue(instance, marker, label, null); return; }');
+    expect(edgeCss).not.toContain('pointer-events: none;');
+  });
+
   it("measures both on-map and offscreen forms before clamping, without moving the pin", () => {
     expect(userMap).toContain('element.removeAttribute("data-bb-point-edge"); // Re-measure its on-map form');
     expect(userMap).toContain('({ y } = pointLabelPlacement(canvas, anchor, label.getBoundingClientRect()));');
