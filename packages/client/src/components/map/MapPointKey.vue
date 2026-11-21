@@ -38,7 +38,8 @@ defineProps<{ kinds: MapPointKind[]; showGps?: boolean }>();
   transform: scale(1, 1.1) rotate(-45deg); }
 .bb-point-key__glyph { position: absolute; top: 6px; left: 5px; display: grid; place-items: center;
   width: 31px; height: 31px; font: 800 14px/1 var(--bb-font-family); }
-.bb-point-key__glyph .mdi { font-size: 14px; font-weight: 400; line-height: 1; }
+.bb-point-key__glyph .mdi { display: grid; place-items: center; width: 100%; height: 100%;
+  font-size: 14px; font-weight: 400; line-height: 1; }
 /* Private GPS is a circle/crosshair, never a destination teardrop. */
 .bb-point-key__gps { position: relative; display: inline-grid; place-items: center;
   flex: 0 0 46px; width: 46px; height: 48px; color: rgb(var(--v-theme-on-primary)); }

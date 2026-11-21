@@ -31,6 +31,9 @@ describe("map legend matches plotted points", () => {
     expect(css).toContain('top: 6px; left: 5px; display: grid; place-items: center;');
     expect(css).toContain('width: 31px; height: 31px; font: 800 14px/1');
     expect(css).toContain('background: var(--bb-pin, #1468c9)');
+    expect(css).toContain('.bb-point-key__glyph .mdi { display: grid; place-items: center; width: 100%; height: 100%;');
+    const markerCss = readFileSync(new URL("./map-point.css", import.meta.url), "utf8");
+    expect(markerCss).toContain('.bb-map-point__icon { display: grid; place-items: center; font-size: 18px;');
     expect(template!.content).toContain('class="bb-point-key__pin"');
     expect(template!.content).toContain('class="bb-point-key__glyph"');
     expect(template!.content).toContain('v-if="MAP_POINT_META[kind].icon"');

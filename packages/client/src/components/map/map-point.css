@@ -26,7 +26,9 @@ button.bb-map-point { cursor: pointer; }
   box-shadow: 0 4px 10px rgba(9, 25, 44, .5), 0 0 0 3px color-mix(in srgb, var(--bb-pin) 24%, transparent);
   transform: rotate(-45deg); }
 .bb-map-point__sign--icon { font-size: 0; }
-.bb-map-point__icon { font-size: 21px; font-weight: 400; line-height: 1; }
+/* One grid item per sign; its font box is centered in the colored head.
+   Keep the pictogram a little smaller than the face, like the map key. */
+.bb-map-point__icon { display: grid; place-items: center; font-size: 18px; font-weight: 400; line-height: 1; }
 .bb-map-point--sos .bb-map-point__sign::before { box-shadow: 0 4px 10px rgba(9, 25, 44, .5), 0 0 0 6px rgba(214, 38, 59, .22); }
 .bb-map-point--stop .bb-map-point__sign { font-size: 16px; font-weight: 900; }
 /* The teardrop rises above the true coordinate. Captions touch its crown

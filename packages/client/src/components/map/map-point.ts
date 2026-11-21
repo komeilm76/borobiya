@@ -36,15 +36,18 @@ export function createMapPointElement(kind: MapPointKind, detail: string, option
   if (!interactive) element.setAttribute("role", "img");
   const sign = document.createElement("span");
   sign.className = "bb-map-point__sign";
-  sign.textContent = kind === "stop" && options.number ? options.number.toLocaleString("fa-IR") : MAP_POINT_META[kind].glyph;
   sign.setAttribute("aria-hidden", "true");
   const icon = MAP_POINT_META[kind].icon;
   if (icon) {
+    // A hidden fallback text node becomes a second CSS-grid item and pushes
+    // the visible pictogram toward the tip of the pin. Use exactly one glyph.
     sign.classList.add("bb-map-point__sign--icon");
     const pictogram = document.createElement("span");
     pictogram.className = `mdi ${icon} bb-map-point__icon`;
     pictogram.setAttribute("aria-hidden", "true");
     sign.append(pictogram);
+  } else {
+    sign.textContent = kind === "stop" && options.number ? options.number.toLocaleString("fa-IR") : MAP_POINT_META[kind].glyph;
   }
   element.append(sign);
   if (options.caption) {

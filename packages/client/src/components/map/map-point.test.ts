@@ -42,6 +42,13 @@ describe("shared semantic map points", () => {
     expect(origin.tag).toBe("div");
     expect(origin.attrs.role).toBe("img");
     expect(origin.children[0]?.children[0]?.className).toContain("mdi-navigation-variant");
+    expect(origin.children[0]?.textContent).toBe(""); // No zero-size fallback grid row beneath the icon.
+    expect(origin.children[0]?.children).toHaveLength(1);
+    for (const kind of ["sos", "end", "helper", "requester", "director"] as const) {
+      const marker = createMapPointElement(kind, "مکان") as unknown as FakeElement;
+      expect(marker.children[0]?.textContent, kind).toBe("");
+      expect(marker.children[0]?.children, kind).toHaveLength(1);
+    }
     expect(origin.children[1]?.children[0]?.textContent).toBe("<مبدأ>");
     expect(origin.children[1]?.attrs["aria-hidden"]).toBe("true");
     const stale = createMapPointElement("requester", "موقعیت قدیمی", { caption: "درخواست‌کننده", stale: true }) as unknown as FakeElement;
