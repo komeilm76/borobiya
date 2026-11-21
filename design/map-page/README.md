@@ -8,7 +8,7 @@ The idle screen uses a 393 by 852 logical viewport with a 54-pixel status area a
 
 ## Sheets and navigation
 
-Bottom sheets have three detents: closed at 28 percent, half-open at 52 percent and open at 76 percent of the viewport. Normal navigation uses at most two states; the third is available only during an active trip. Sheets close by dragging down or pressing Escape. The primary button is never hidden, and bottom padding equals the safe area plus 12 pixels. A normal panel occupies no more than 45 percent of the viewport. The four top sections are map, mission, companions and history; profile and account settings form the fifth section.
+Bottom sheets have three detents: closed at 28 percent, half-open at 52 percent and open at 76 percent of the viewport. Normal navigation uses at most two states; the third is available only during an active trip. Sheets close by dragging down or pressing Escape. The primary button is never hidden, and bottom padding equals the safe area plus 12 pixels. A normal panel occupies no more than 45 percent of the viewport. The four top sections are map, mission, companions and history; profile and account settings form the fifth section. (The 2.0.0 product renames the companions surface to the Sharing Center; the artwork keeps the original name.)
 
 ## SOS and mission workflows
 
@@ -18,7 +18,7 @@ Mission acceptance is shown as a centered white modal over a dimmed map with a s
 
 ## Companions, talk and location
 
-Companion rows use freshness rings to show location age, presence and share state. Live sharing can be granted for a bounded duration and revoked explicitly; history playback requires an authorized share and a chronological range. One-to-one talk is a press-and-hold floor control: only the current speaker can send binary audio, sequences are ordered, idle or hold timeouts release the floor and no audio is recorded or stored. The talk panel uses a dark-teal surface, waveform, amber microphone and an explicit no-recording note.
+Companion rows use freshness rings to show location age, presence and share state. In the 2.0.0 product this surface is the Sharing Center: grants are directional (incoming/outgoing), live shares may run without expiry until revoked, history shares carry an explicit detail scope, and granting or revoking is audit-logged. Live sharing can be granted for a bounded duration and revoked explicitly; history playback requires an authorized share and a chronological range. One-to-one talk is a press-and-hold floor control: only the current speaker can send binary audio, sequences are ordered, idle or hold timeouts release the floor and no audio is recorded or stored. The talk panel uses a dark-teal surface, waveform, amber microphone and an explicit no-recording note.
 
 ## Data and implementation rules
 

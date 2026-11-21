@@ -1,0 +1,362 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import { useAuthStore } from '@/stores/auth.ts';
+import { useSettingsStore } from '@/stores/settings.ts';
+import { useOfflineStore } from '@/stores/offline.ts';
+import { useMapStore } from '@/stores/map.ts';
+import { useTrackStore } from '@/stores/track.ts';
+import { useFormatters } from '@/composables/useFormatters.ts';
+import { useToast } from '@/composables/useToast.ts';
+import { useRouter } from 'vue-router';
+import { useRealtimeStore } from '@/stores/realtime.ts';
+import { ROUTE_NAMES } from '@/router/index.ts';
+import { errorMessage } from '@/api/client.ts';
+import type { SavedPlaceView } from '@/api/types.ts';
+
+/** Profile screen: identity, active devices, saved places, theme choice and offline dataset version. */
+const auth = useAuthStore();
+const settings = useSettingsStore();
+const offline = useOfflineStore();
+const map = useMapStore();
+const track = useTrackStore();
+const format = useFormatters();
+const toast = useToast();
+const router = useRouter();
+const realtime = useRealtimeStore();
+const devices = computed(() => auth.devices);
+const places = computed(() => map.places);
+const logins = computed(() => auth.loginHistory);
+const logoutBusy = ref(false);
+/** Logout is irreversible and can strand an SOS responder: confirm against the canonical dialog (design: profile/06-logout-confirm). */
+const logoutConfirmOpen = ref(false);
+const currentDevice = computed(() => devices.value.find((device) => device.isCurrentDevice) ?? null);
+
+async function logout(): Promise<void> {
+  logoutConfirmOpen.value = true;
+}
+
+/** Confirmed logout: actually end the session and return to the sign-in screen. */
+async function confirmLogout(): Promise<void> {
+  if (logoutBusy.value) return;
+  logoutBusy.value = true;
+  // Close the dialog before the network and navigation settle: it must never linger as a dead
+  // overlay on the sign-in screen if the push itself hangs.
+  logoutConfirmOpen.value = false;
+  try {
+    await auth.logout();
+    realtime.disconnect();
+    await router.push({ name: ROUTE_NAMES.login });
+  } finally {
+    logoutBusy.value = false;
+  }
+}
+
+const showAllLogins = ref(false);
+/** Escape closes the logout confirmation (same contract as the admin drawer). */
+useEventListener(window, 'keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && logoutConfirmOpen.value) logoutConfirmOpen.value = false;
+});
+const visibleLogins = computed(() => (showAllLogins.value ? logins.value : logins.value.slice(0, 8)));
+const ROLE_LABELS: Record<string, string> = { user: 'کاربر', responder: 'امدادگر', admin: 'مدیر' };
+const isResponder = computed(() => auth.user?.role === 'responder');
+const ready = computed(() => Boolean(auth.user?.readyForMission));
+const readyBusy = ref(false);
+const recordTrack = computed(() => track.optIn);
+const trackBusy = computed(() => track.optInBusy);
+
+const editingName = ref(false);
+const nameDraft = ref('');
+const nameSaving = ref(false);
+const nameValid = computed(() => /^[a-z0-9._-]{3,32}$/.test(nameDraft.value));
+
+async function toggleReady(): Promise<void> {
+  if (readyBusy.value) return;
+  readyBusy.value = true;
+  try {
+    await auth.setReady(!ready.value);
+    toast.push(ready.value ? 'وضعیت آمادگی خاموش شد؛ پیشنهاد مأموریتی دریافت نمی‌کنید.' : 'آماده دریافت مأموریت هستید.', 'success', 2600);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    readyBusy.value = false;
+  }
+}
+
+async function toggleRecordTrack(): Promise<void> {
+  if (trackBusy.value) return;
+  try {
+    await track.setOptIn(!recordTrack.value);
+    toast.push(recordTrack.value ? 'ثبت مسیر فعال شد؛ در سفر یا مأموریت بعدی تأیید می‌پرسد.' : 'ثبت مسیر خاموش شد؛ هیچ نقطه‌ای ذخیره نمی‌شود.', 'success', 3000);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  }
+}
+
+function startEditName(): void {
+  nameDraft.value = auth.user?.username ?? '';
+  editingName.value = true;
+}
+
+async function saveName(): Promise<void> {
+  if (!nameValid.value || nameSaving.value) return;
+  nameSaving.value = true;
+  try {
+    await auth.updateUsername(nameDraft.value.trim().toLowerCase());
+    toast.push('نام کاربری تغییر کرد.', 'success', 2400);
+    editingName.value = false;
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    nameSaving.value = false;
+  }
+}
+
+onMounted(() => {
+  void auth.loadDevices();
+  void auth.loadLoginHistory();
+  if (!places.value.length && !map.loading) void map.load();
+});
+
+const PLACE_ICONS = ['map-marker-outline', 'home-outline', 'star', 'map-marker-path'] as const;
+
+const editingId = ref<string | null>(null);
+const editName = ref('');
+const editLabel = ref('');
+const editAddress = ref('');
+const editIcon = ref<string>('map-marker-outline');
+const saving = ref(false);
+const deletingId = ref<string | null>(null);
+
+function startEdit(place: SavedPlaceView): void {
+  editingId.value = place.id;
+  editName.value = place.name;
+  editLabel.value = place.label;
+  editAddress.value = place.address;
+  editIcon.value = place.icon || 'map-marker-outline';
+}
+function cancelEdit(): void {
+  editingId.value = null;
+}
+const canSaveEdit = computed(() => editName.value.trim().length >= 1 && editLabel.value.trim().length >= 1 && editAddress.value.trim().length >= 1 && !saving.value);
+
+async function saveEdit(place: SavedPlaceView): Promise<void> {
+  if (editingId.value !== place.id || !canSaveEdit.value) return;
+  saving.value = true;
+  try {
+    await map.updatePlace(place, {
+      name: editName.value.trim(),
+      label: editLabel.value.trim(),
+      address: editAddress.value.trim(),
+      icon: editIcon.value
+    });
+    toast.push('تغییرات مکان ذخیره شد.', 'success', 2400);
+    editingId.value = null;
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function remove(place: SavedPlaceView): Promise<void> {
+  if (deletingId.value) return;
+  deletingId.value = place.id;
+  try {
+    await map.deletePlace(place.id);
+    toast.push('مکان حذف شد.', 'success', 2400);
+    if (editingId.value === place.id) editingId.value = null;
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    deletingId.value = null;
+  }
+}
+</script>
+
+<template>
+  <div class="sheet__head">
+    <div>
+      <strong>{{ auth.user?.username ?? 'کاربر' }}</strong>
+      <span>{{ ROLE_LABELS[auth.user?.role ?? ''] ?? auth.user?.role }} · امتیاز {{ format.number(auth.user?.averageRating ?? 0) }}</span>
+    </div>
+    <button type="button" class="sheet__expand" aria-label="تغییر پوسته" @click="settings.cycle()">
+      <span class="mdi mdi-theme-light-dark" aria-hidden="true" />
+    </button>
+  </div>
+  <div class="sheet__body">
+    <div class="info-card">
+      <span class="mdi mdi-account-outline" aria-hidden="true" />
+      <div v-if="!editingName">
+        <strong>نام کاربری</strong>
+        <span>{{ auth.user?.username }}</span>
+      </div>
+      <form v-else class="place-edit" @submit.prevent="saveName">
+        <label><span>نام کاربری جدید (حروف کوچک انگلیسی، ۳ تا ۳۲ نویسه)</span>
+          <input v-model="nameDraft" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false" data-testid="username-input" />
+        </label>
+        <div class="action-row">
+          <button type="submit" class="primary-button" :disabled="!nameValid || nameSaving" data-testid="save-username">{{ nameSaving ? 'در حال ذخیره…' : 'ذخیره' }}</button>
+          <button type="button" class="ghost-button" @click="editingName = false">انصراف</button>
+        </div>
+      </form>
+      <button v-if="!editingName" type="button" class="text-link" data-testid="edit-username" @click="startEditName">ویرایش</button>
+    </div>
+
+    <div v-if="isResponder" class="info-card">
+      <span class="mdi mdi-account-check-outline" aria-hidden="true" />
+      <div>
+        <strong>آمادگی مأموریت</strong>
+        <span>{{ ready ? 'آماده دریافت پیشنهاد' : 'غیرفعال؛ پیشنهادی دریافت نمی‌کنید' }}</span>
+      </div>
+      <button type="button" class="ghost-button" :class="{ 'toggle-on': ready }" :disabled="readyBusy" role="switch" :aria-checked="ready" data-testid="ready-toggle" @click="toggleReady">
+        {{ readyBusy ? '…' : ready ? 'آماده‌ام' : 'آماده نیستم' }}
+      </button>
+    </div>
+
+    <div class="info-card" data-testid="record-track-card">
+      <span class="mdi mdi-map-marker-path" aria-hidden="true" />
+      <div>
+        <strong>ثبت مسیر</strong>
+        <span>{{ recordTrack ? 'فعال؛ مسیر شما فقط در سفر/مأموریت و با تأیید شما ثبت می‌شود.' : 'غیرفعال؛ هیچ نقطهٔ مسیری ذخیره نمی‌شود.' }}</span>
+      </div>
+      <button type="button" class="ghost-button" :class="{ 'toggle-on': recordTrack }" :disabled="trackBusy" role="switch" :aria-checked="recordTrack" data-testid="record-track-toggle" @click="toggleRecordTrack">
+        {{ trackBusy ? '…' : recordTrack ? 'روشن' : 'خاموش' }}
+      </button>
+    </div>
+
+    <h3 class="sheet__subtitle">دستگاه‌های فعال</h3>
+    <ul class="device-list">
+      <li v-for="device in devices" :key="device.sessionId">
+        <span class="mdi mdi-cellphone-link" aria-hidden="true" />
+        <div>
+          <strong>{{ device.deviceName }}</strong>
+          <small>{{ device.ip }} · {{ format.dateTime(device.lastActiveAt) }}</small>
+        </div>
+        <!-- The current session cannot revoke itself: the button is disabled, not merely failing. -->
+        <button type="button" class="text-link" :disabled="device.isCurrentDevice" @click="auth.revokeDevice(device.sessionId)">
+          {{ device.isCurrentDevice ? 'این دستگاه' : 'پایان' }}
+        </button>
+      </li>
+    </ul>
+    <p v-if="!devices.length" class="sheet__status">دستگاه دیگری فعال نیست.</p>
+
+    <h3 class="sheet__subtitle">ورودهای اخیر</h3>
+    <ul class="login-list">
+      <li v-for="entry in visibleLogins" :key="entry.id" class="login-row" :class="{ 'is-failed': !entry.success }">
+        <span class="mdi" :class="entry.success ? 'mdi-check-circle-outline' : 'mdi-close-circle-outline'" aria-hidden="true" />
+        <div>
+          <strong>{{ entry.deviceName || 'دستگاه ناشناس' }}</strong>
+          <small>{{ entry.ip }} · {{ format.dateTime(entry.loginAt) }}</small>
+        </div>
+        <span class="status-pill" :class="entry.success ? 'status-pill--success' : 'status-pill--danger'">{{ entry.success ? 'موفق' : 'ناموفق' }}</span>
+      </li>
+    </ul>
+    <p v-if="!logins.length" class="sheet__status">ورودی ثبت نشده است.</p>
+    <button v-if="logins.length > 8" type="button" class="text-link" @click="showAllLogins = !showAllLogins">
+      {{ showAllLogins ? 'نمایش کمتر' : `نمایش ${format.number(logins.length - 8)} مورد دیگر` }}
+    </button>
+
+    <h3 class="sheet__subtitle">مکان‌های ذخیره‌شده</h3>
+    <ul class="place-list">
+      <li v-for="place in places" :key="place.id" class="place-item">
+        <div class="place-row" :class="{ 'is-editing': editingId === place.id }">
+          <span :class="['mdi', `mdi-${place.icon || 'map-marker-outline'}`]" aria-hidden="true" />
+          <span class="place-row__text">
+            <strong>{{ place.label }}</strong>
+            <small>{{ place.address }}</small>
+          </span>
+          <span class="place-row__actions">
+            <button type="button" class="text-link" :data-testid="`edit-place-${place.id}`" @click="editingId === place.id ? cancelEdit() : startEdit(place)">
+              {{ editingId === place.id ? 'بستن' : 'ویرایش' }}
+            </button>
+            <button type="button" class="text-link text-link--danger" :disabled="deletingId === place.id" :data-testid="`delete-place-${place.id}`" @click="remove(place)">
+              {{ deletingId === place.id ? 'در حال حذف…' : 'حذف' }}
+            </button>
+          </span>
+        </div>
+        <form v-if="editingId === place.id" class="place-edit" @submit.prevent="saveEdit(place)">
+          <label><span>نام</span><input v-model="editName" required maxlength="80" /></label>
+          <label><span>برچسب</span><input v-model="editLabel" required maxlength="80" /></label>
+          <label><span>نشانی</span><input v-model="editAddress" required maxlength="200" /></label>
+          <fieldset class="save-place-form__icons">
+            <legend>نماد</legend>
+            <label v-for="icon in PLACE_ICONS" :key="icon" class="save-place-form__icon">
+              <input v-model="editIcon" type="radio" :value="icon" :name="`edit-icon-${place.id}`" />
+              <span :class="['mdi', `mdi-${icon}`]" aria-hidden="true" />
+            </label>
+          </fieldset>
+          <div class="action-row">
+            <button type="submit" class="primary-button" :disabled="!canSaveEdit">{{ saving ? 'در حال ذخیره…' : 'ذخیره تغییرات' }}</button>
+            <button type="button" class="ghost-button" @click="cancelEdit">انصراف</button>
+          </div>
+        </form>
+      </li>
+    </ul>
+    <p v-if="!places.length" class="sheet__status">هنوز مکانی ذخیره نشده است؛ روی نقشه ضربه بزنید و آن را ذخیره کنید.</p>
+    <div class="info-card">
+      <span class="mdi mdi-cloud-check-outline" aria-hidden="true" />
+      <div>
+        <strong>نسخه داده آفلاین</strong>
+        <span>{{ offline.cachedVersion ?? 'در حال خواندن…' }}</span>
+      </div>
+    </div>
+    <div class="info-card">
+      <span class="mdi mdi-shield-check-outline" aria-hidden="true" />
+      <div>
+        <strong>پرسش‌های امنیتی</strong>
+        <span>{{ auth.user?.securityReady ? 'تنظیم شده' : 'نیازمند تکمیل' }}</span>
+      </div>
+    </div>
+    <div v-if="logoutConfirmOpen" class="logout-confirm" role="presentation">
+      <div class="logout-confirm__scrim" aria-hidden="true" @click="logoutConfirmOpen = false" />
+      <section class="logout-confirm__panel" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title" aria-describedby="logout-confirm-body" data-testid="logout-confirm">
+        <span class="logout-confirm__icon mdi mdi-logout" aria-hidden="true" />
+        <strong id="logout-confirm-title" class="logout-confirm__title">از حساب خارج می‌شوید؟</strong>
+        <p id="logout-confirm-body" class="logout-confirm__body">نشست همین دستگاه پایان می‌یابد؛ دستگاه‌های دیگر خارج نمی‌شوند.</p>
+        <p v-if="currentDevice" class="logout-confirm__device">
+          <span class="mdi mdi-monitor" aria-hidden="true" />
+          <span>{{ currentDevice.deviceName }} · آخرین فعالیت {{ format.dateTime(currentDevice.lastActiveAt) }}</span>
+        </p>
+        <div class="logout-confirm__actions">
+          <button type="button" class="danger-button danger-button--solid" :disabled="logoutBusy" data-testid="logout-confirm-accept" @click="confirmLogout">
+            <span class="mdi mdi-logout" aria-hidden="true" />
+            <span>{{ logoutBusy ? 'در حال خروج…' : 'خروج' }}</span>
+          </button>
+          <button type="button" class="ghost-button" data-testid="logout-confirm-cancel" @click="logoutConfirmOpen = false">انصراف</button>
+        </div>
+        <p class="logout-confirm__warning">پس از خروج، برای ارسال SOS باید دوباره وارد شوید.</p>
+      </section>
+    </div>
+    <button type="button" class="danger-button danger-button--wide" data-testid="logout-button" :disabled="logoutBusy" @click="logout">
+      <span class="mdi mdi-logout" aria-hidden="true" />
+      <span>خروج از حساب</span>
+    </button>
+  </div>
+</template>
+
+<style scoped>
+.logout-confirm { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; }
+.logout-confirm__scrim { position: absolute; inset: 0; background: rgba(6, 14, 15, .55); }
+.logout-confirm__panel {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  inline-size: min(360px, 100%);
+  padding: 22px 20px 18px;
+  border-radius: var(--r20);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+.logout-confirm__icon { inline-size: 56px; block-size: 56px; display: grid; place-items: center; border-radius: 50%; background: rgba(175,52,56,.12); color: var(--danger); font-size: 26px; }
+.logout-confirm__title { font-size: 18px; font-weight: 800; color: var(--text); }
+.logout-confirm__body { margin: 0; font-size: 12.5px; color: var(--muted); }
+.logout-confirm__device { display: flex; gap: 8px; align-items: center; margin: 0; padding: 8px 14px; border-radius: var(--r12); background: var(--surface-2); font-size: 11.5px; color: var(--muted); }
+.logout-confirm__device .mdi { color: var(--info); }
+.logout-confirm__actions { display: flex; gap: 10px; justify-content: center; margin-block-start: 4px; }
+.logout-confirm__warning { margin: 2px 0 0; font-size: 11px; color: var(--warning); }
+@media (prefers-reduced-motion: reduce) { .logout-confirm { transition: none; } }
+</style>

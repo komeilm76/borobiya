@@ -1,0 +1,1 @@
+This is deliberately not an image. The sos-15 capture uploads it to trigger the inline photo error.

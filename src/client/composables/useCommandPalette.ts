@@ -1,0 +1,102 @@
+import { computed, ref, watch, type Ref } from 'vue';
+import { useMagicKeys, whenever, useEventListener } from '@vueuse/core';
+
+/**
+ * Shared open-state for the global palette. Toolbar triggers outside the palette component
+ * (e.g. the admin topbar search button) set this flag; the global CommandPalette renders it.
+ * A module-level ref is deliberate: the palette is a singleton owned by App.vue.
+ */
+export const commandPaletteOpen = ref(false);
+
+/** One entry in the command palette. */
+export interface CommandEntry {
+  id: string;
+  label: string;
+  icon: string;
+  group: string;
+  run: () => void;
+}
+
+/**
+ * Keyboard command palette state.
+ * `Ctrl/Cmd + K` is captured through VueUse `useMagicKeys`; arrow navigation is handled
+ * with a single keydown listener rather than ad-hoc DOM queries.
+ *
+ * @param entries Commands available to the current role.
+ * @param openRef Optional shared open ref (defaults to a private one). Pass `commandPaletteOpen`
+ *                to let external triggers open the same palette.
+ * @returns Reactive open state, filtered list and keyboard handlers.
+ */
+export function useCommandPalette(entries: () => CommandEntry[], openRef?: Ref<boolean>) {
+  const open = openRef ?? ref(false);
+  const query = ref('');
+  const activeIndex = ref(0);
+  const keys = useMagicKeys({ passive: false });
+
+  const results = computed(() => {
+    const term = query.value.trim().toLowerCase();
+    const all = entries();
+    if (!term) return all;
+    return all.filter((entry) => `${entry.label} ${entry.group}`.toLowerCase().includes(term));
+  });
+
+  // Narrowing the list must pull the highlight back inside it. Without this the index keeps
+  // pointing past the end of a shorter result set: nothing renders as selected, Enter runs nothing,
+  // and the first arrow press jumps to the top — the user sees a dialog that ignores them.
+  watch(
+    () => results.value.length,
+    (total) => {
+      if (total === 0) {
+        activeIndex.value = 0;
+        return;
+      }
+      if (activeIndex.value > total - 1) activeIndex.value = total - 1;
+    }
+  );
+
+  const show = (): void => {
+    open.value = true;
+    query.value = '';
+    activeIndex.value = 0;
+  };
+  const hide = (): void => {
+    open.value = false;
+  };
+  const toggle = (): void => {
+    if (open.value) hide();
+    else show();
+  };
+
+  whenever(computed(() => keys['Ctrl+K'].value || keys['Meta+K'].value), () => toggle());
+
+  useEventListener(window, 'keydown', (event: KeyboardEvent) => {
+    if (!open.value) return;
+    if (event.key === 'Escape') {
+      hide();
+      return;
+    }
+    if (!results.value.length) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      activeIndex.value = (activeIndex.value + 1) % results.value.length;
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      activeIndex.value = (activeIndex.value - 1 + results.value.length) % results.value.length;
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      activeIndex.value = 0;
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      activeIndex.value = results.value.length - 1;
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const entry = results.value[activeIndex.value];
+      if (entry) {
+        hide();
+        entry.run();
+      }
+    }
+  });
+
+  return { open, query, activeIndex, results, show, hide, toggle };
+}

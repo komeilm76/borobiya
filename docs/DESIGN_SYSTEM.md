@@ -1,6 +1,6 @@
 # Design system
 
-The design system is derived from the canonical images and generator theme files under `design/`. It is implemented in `public/app.css` with CSS custom properties, native browser modules and self-hosted fonts. No external stylesheet, icon CDN or component framework is used.
+The design system is derived from the canonical images and generator theme files under `design/`. It is implemented with CSS custom properties in `src/client/app.css`, Vuetify 3 theme tokens from `src/client/plugins/vuetify.ts`, compiled Tailwind CSS 4 utilities with preflight disabled, and self-hosted fonts. No external stylesheet or icon CDN is used, and the generated icon subset ships with the build.
 
 ## Color and status
 

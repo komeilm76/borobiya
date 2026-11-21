@@ -1,33 +1,34 @@
 # Automation
 
-`boro` is the repository's dependency-free command-line wrapper. It is an executable Node script and is the preferred entry point for setup, development, diagnostics and release checks. npm scripts remain available for individual operations and for CI.
+`boro` is the repository's command hub. It is a small shell shim that executes `scripts/boro.ts` with Bun, and it is the preferred entry point for setup, development, diagnostics and release checks. Bun scripts remain available for individual operations and for CI.
 
 ## Commands
 
-- `./boro setup` verifies the Node version, installs development tools if needed, copies `.env.example`, creates the data directory, generates assets and seeds the database.
-- `./boro dev` regenerates assets and starts the server in watch mode with explicit host defaults.
-- `./boro doctor` checks Node version, native TypeScript mode, canonical images, shared protocol, generated icon CSS, cache manifest, new tests, legacy-path removal and `node:sqlite` availability.
-- `./boro check` regenerates assets, runs server and browser typechecks, validates documentation and runs the full test suite.
+- `./boro setup` checks for Bun, runs `bun install` when `node_modules` is missing, copies `.env.example`, creates the data directory, builds the client and seeds the database.
+- `./boro dev` regenerates assets and starts `bun --watch src/server/index.ts` with development defaults (`NODE_ENV=development`, `HOST=0.0.0.0`).
+- `./boro doctor` checks the Bun version, canonical images, the shared protocol, the Vue entry, the TypeScript service-worker source, the Vitest configuration, `bun.lock`, the absence of `package-lock.json` and legacy paths, and the generated icon CSS and cache manifest.
+- `./boro check` builds the client, typechecks the Bun server and the Vue client, runs the documentation guard and executes the full Vitest suite with coverage.
 - `./boro verify` runs doctor followed by check.
-- `./boro bench` measures pure validation, deterministic tiles, concurrent HTTP reads and realtime live-location fan-out.
-- `./boro smoke` runs an in-process runtime smoke covering preview CSP/CORS, frame ancestors, generated assets, public APIs, login, WebSocket hello and SOS fan-out.
+- `./boro bench` measures pure validation, deterministic tiles, concurrent HTTP reads and realtime live-location fan-out against fixed budgets.
+- `./boro smoke` runs the in-process runtime smoke on `0.0.0.0` with simulated preview-proxy headers: CSP/CORS/framing, every precached asset, public APIs, login, WebSocket hello and SOS fan-out.
 - `./boro acceptance` verifies that the target checklist is closed and that release evidence, automation and CI are present.
-- `./boro deploy:check` validates production environment and generated assets.
-- `./boro db:seed` and `./boro db:reset` manage the local SQLite file.
-- `./boro clean` removes generated local data after an explicit operator command.
+- `./boro deploy:check` validates the production environment and generated assets.
+- `./boro db:seed` and `./boro db:reset` manage the local SQLite file; `./boro clean` removes local test and build output.
 
-## npm scripts
+## Bun scripts
 
-`npm ci` installs the two development tools from the committed lockfile. `npm run assets` regenerates fonts, icon CSS, logos, favicon and the content-versioned cache manifest. `npm run typecheck` validates server and test sources; `npm run typecheck:client` validates browser JavaScript with `checkJs`. `npm test` runs all tests; focused scripts exist for core, API, sockets, journeys, architecture and assets. `npm start` runs the server without watching.
+`bun install --frozen-lockfile` installs the pinned Vue/Vite/Vitest toolchain from `bun.lock`. `bun run assets` regenerates fonts, icon CSS, logos, favicon and the content-versioned cache manifest. `bun run build` clears previous Vite output, runs the Vite build, compiles the TypeScript service worker and then regenerates assets, so rebuilding the same sources reproduces the same chunk set and cache version. `bun run typecheck:server` runs `tsc` over `src/server` and `src/shared`; `bun run typecheck:client` runs `vue-tsc --noEmit` over every SFC and TypeScript module in `src/client`. `bun run test` and `bun run coverage` execute Vitest under Bun (`bunx --bun vitest`), which is required because the suites import Bun-only modules. `bun run start` runs the server without watching.
 
 ## CI
 
-The GitHub Actions workflow uses the pinned `ubuntu-24.04` runner, Node 22.22.3 and `npm ci`, then runs asset generation, `npm run verify`, `npm run bench`, `npm run smoke`, `npm run acceptance` and a production-configured deployment check. It is least-privilege, covers both push and pull-request events, and cancels superseded in-progress runs through a per-ref concurrency group. Checkout and Node setup are pinned to immutable action commits from Node 24-compatible v6 releases, and checkout credentials are not persisted. The deployment check supplies explicit secure-cookie, proxy-trust, demo-seed and frame-ancestor settings, so it also exercises the production safety guards. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The pipeline fails on runtime diagnostics, typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark failures or any automated test failure.
+The GitHub Actions workflow uses the pinned `ubuntu-24.04` runner and installs exactly the Bun version named in `.bun-version`. Because the Bun release objects on GitHub's CDN intermittently answer HTTP 504 and failed the whole gate before any project step ran, the runtime is installed from the npm registry tarball `@oven/bun-linux-x64` for that pinned version, with up to five attempts and `curl --retry 3`. The version is never floating — it is read from `.bun-version` — and the step is verified by running the same script locally. It then runs `bun install --frozen-lockfile`, asset generation, the server and client typechecks, the documentation guard, the Vue build, `bun run coverage`, `bun run bench`, `bun run smoke`, `bun run acceptance` and a production-configured deployment check. It is least-privilege (`contents: read`), covers both push and pull-request events, and cancels superseded in-progress runs through a per-ref concurrency group. Checkout credentials are not persisted. The deployment check supplies explicit secure-cookie, proxy-trust, demo-seed and frame-ancestor settings, so it also exercises the production safety guards.
+
+The pipeline fails on runtime diagnostics, `tsc` or `vue-tsc` errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark budget violations or any test failure.
 
 ## Asset generation
 
-`scripts/build-assets.mjs` reads canonical design fonts and icon mappings, writes self-hosted assets into `public/assets`, and computes a stable cache version from the generated static file set. The manifest is deterministic and timestamp-free, so regenerating unchanged assets does not dirty the checkout. It writes `/`-rooted precache paths, never `/public/...`. The service worker reads that manifest at install time, precaches all listed files, cleans old static caches and keeps a bounded runtime tile cache. Always rerun asset generation after adding a browser module or changing icon usage.
+`scripts/build-assets.ts` reads canonical design fonts and icon mappings, writes self-hosted assets into `public/assets`, copies the client-side web app manifest and computes a stable cache version from the generated static file set. The manifest is deterministic and timestamp-free, so regenerating unchanged assets does not dirty the checkout. Asset generation must be runnable on its own: CI calls `bun run assets` before the first Vite build, so `public/js` does not exist yet and the generator treats a missing directory as "no files" instead of failing. It writes `/`-rooted precache paths, never `/public/...`. The service worker reads that manifest at install time, precaches all listed files, cleans old static caches and keeps a bounded runtime tile cache. Always rerun the build after adding a view or changing icon usage; unknown icon names fail the build instead of shipping a blank glyph.
 
 ## Release sequence
 
-Run `npm ci`, `npm run check`, `./boro doctor`, `./boro deploy:check` and a production smoke test against `/_public/health`, `/_public/openapi.json`, a protected route, a tile and a WebSocket upgrade. Confirm backups for the SQLite data directory before restarting a long-running process. Use graceful shutdown so WebSocket peers and the database close cleanly.
+Run `bun install --frozen-lockfile`, `./boro check`, `./boro doctor`, `./boro deploy:check` and a production smoke test against `/_public/health`, `/_public/openapi.json`, a protected route, a tile and a WebSocket upgrade. Confirm backups for the SQLite data directory before restarting a long-running process. Use graceful shutdown so WebSocket peers and the database close cleanly.

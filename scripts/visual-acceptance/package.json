@@ -1,0 +1,18 @@
+{
+  "name": "borobiya-visual-acceptance",
+  "version": "1.0.0",
+  "description": "Interactive capture harness for docs/VISUAL_ACCEPTANCE.md (Stage F). Not part of the shipped client, server or tests.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node capture.mjs scenarios.json",
+    "diff": "node diff.mjs"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "^153.0.0",
+    "puppeteer-core": "^25.17.0"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
