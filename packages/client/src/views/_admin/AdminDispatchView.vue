@@ -2016,6 +2016,18 @@ onBeforeUnmount(() => {
   .dispatch-map-edge-cue:hover { box-shadow: none; }
   .dispatch-map-edge-cue__arrow { background: CanvasText; color: Canvas; }
 }
+/* Match the user map's dark-mode POI labels. A solid light chip and a dark
+   silhouette stand out over both dark land and the pale roads in dark tiles.
+   Limit this to map labels: the legend and map controls retain their theme. */
+@media (forced-colors: none) {
+  :global(:root.dark .dispatch-map-wrapper :is(.dispatch-sos-label, .dispatch-map-edge-cue)) {
+    background: #f4f7f6; color: #193536;
+    box-shadow: 0 0 0 2px #152b2d, 0 6px 18px rgba(0, 0, 0, .72);
+  }
+  :global(:root.dark .dispatch-map-wrapper .dispatch-map-edge-cue:hover) {
+    box-shadow: 0 0 0 2px #152b2d, 0 8px 20px rgba(0, 0, 0, .8);
+  }
+}
 .admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);
   font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }
 
