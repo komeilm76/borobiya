@@ -9,16 +9,24 @@ const { template, styles } = parse(source).descriptor;
 
 describe("SOS center on-map labels and offscreen directions", () => {
   it("names selected incidents only, qualified nearby responders and selected responder names", () => {
-    expect(source).toContain('mapTitle: selected && feature.id === selected.id ? incidentLabel(selected.incidentTypeId) : ""');
-    expect(source).toContain('filter: ["==", ["get", "isSelected"], true]');
+    expect(source).toContain('chip.textContent = incidentLabel(incident.incidentTypeId)');
+    expect(source).not.toContain('"text-field": ["get", "mapTitle"]');
+    expect(source).toContain('selectedSosLabelMarker = new selectedSosMarkerClass({ element, anchor: "center" })');
+    expect(source).toMatch(/element\.hidden = false;[\s\S]*?chip\.offsetWidth, chip\.offsetHeight\);[\s\S]*?element\.hidden = !placement\.visible;/);
+    expect(source).toContain('element.style.setProperty("--dispatch-selected-sos-color"');
     expect(source).toContain('"text-field": ["get", "username"]');
     expect(source).toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
     expect(source).toContain('"text-radial-offset": 3.8');
     expect(source).toContain('"text-variable-anchor": ["left", "right", "top", "bottom"]');
-    expect(source).toContain('"text-halo-color": palettes[themeStore.isDark ? "dark" : "light"].surface');
+    expect(source).toContain('"text-halo-color": palette.surface');
     expect(source).toContain('!adminSos.responderSearch');
-    // Selection alone (before/without a nearest fetch) updates the WebGL SOS title.
-    expect(source).toMatch(/watch\(\(\) => \[adminSos\.visibleRequests, adminSos\.selectedId\][\s\S]*?syncMapData\(\); updateMapEdgeCues\(\)/);
+    // Selection alone (before/without a nearest fetch) updates the opaque on-map title.
+    expect(source).toMatch(/watch\(\(\) => \[adminSos\.visibleRequests, adminSos\.selectedId\][\s\S]*?syncMapData\(\); syncSelectedSosLabel\(\); updateMapEdgeCues\(\)/);
+    expect(source).toContain('watch(incidentNameById, () => { syncSelectedSosLabel(); updateMapEdgeCues(); });');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -30px; left: 30px;');
+    expect(styles[0]!.content).toContain('border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--left .dispatch-sos-label)');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--below .dispatch-sos-label)');
     // Clustered responders otherwise lose both their pin and username at low zoom.
     expect(source).toContain('features: nearbyFeatures.value.features.filter((feature) => feature.properties.isSelected)');
     expect(source).toContain('id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID');

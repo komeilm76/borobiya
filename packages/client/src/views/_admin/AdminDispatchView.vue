@@ -649,7 +649,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
 import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
 import { getSosPhotoSrc } from "@/api/admin-sos";
@@ -672,6 +672,7 @@ import { needsOverlayRestore } from "@/map/overlay-restore";
 import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { palettes } from "@/styles/tokens";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
+import { dispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
 import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
@@ -690,7 +691,6 @@ const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
 const SOS_GLYPH_LAYER_ID = "admin-sos-glyph";
 const SOS_PIN_LAYER_ID = "admin-sos-pin";
-const SOS_TITLE_LAYER_ID = "admin-sos-selected-title";
 const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
@@ -833,16 +833,75 @@ function searchResponders(): void {
 }
 
 let mapInstance: MapLibreMap | null = null;
+let selectedSosMarkerClass: typeof import("maplibre-gl").Marker | null = null;
+let selectedSosLabelMarker: MapLibreMarker | null = null;
 let pulseAnimationFrame: number | null = null;
 let lastPulseUpdateAt = 0;
 let detachMapEvents: (() => void) | null = null;
 const mapEdgeCues = ref<DispatchEdgeCue[]>([]);
+
+function updateSelectedSosLabelPosition(): void {
+  const map = mapInstance, marker = selectedSosLabelMarker;
+  const incident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+  if (!map || !marker || !incident) return;
+  const element = marker.getElement();
+  const chip = element.firstElementChild as HTMLElement | null;
+  if (!chip) return;
+  // A previously offscreen marker is display:none; reveal it synchronously to
+  // measure the real text width before choosing a side on re-entry.
+  element.hidden = false;
+  const canvas = map.getCanvas();
+  chip.style.maxWidth = `${Math.max(64, Math.min(192, canvas.clientWidth - 72))}px`;
+  const pixel = map.project([incident.location.lon, incident.location.lat]);
+  const placement = dispatchSosLabelPlacement(pixel.x, pixel.y, canvas.clientWidth, canvas.clientHeight,
+    chip.offsetWidth, chip.offsetHeight);
+  element.hidden = !placement.visible;
+  element.classList.toggle("dispatch-sos-label-anchor--left", placement.side === "left");
+  const centered = placement.side === "below" || placement.side === "above";
+  element.classList.toggle("dispatch-sos-label-anchor--center", centered);
+  element.classList.toggle("dispatch-sos-label-anchor--above", placement.side === "above");
+  element.classList.toggle("dispatch-sos-label-anchor--below", placement.belowPin);
+  // In a narrow map, center under/above the tip but still keep the chip inside
+  // the map's own viewport rather than clipping it behind the card edge.
+  const left = pixel.x - chip.offsetWidth / 2;
+  const shift = Math.max(8 - left, Math.min(0, canvas.clientWidth - 8 - chip.offsetWidth - left));
+  element.style.setProperty("--dispatch-sos-label-shift", `${Math.round(centered ? shift : 0)}px`);
+}
+
+function syncSelectedSosLabel(): void {
+  const map = mapInstance;
+  const incident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+  if (!map || !selectedSosMarkerClass || !incident) {
+    selectedSosLabelMarker?.remove();
+    selectedSosLabelMarker = null;
+    return;
+  }
+  if (!selectedSosLabelMarker) {
+    const element = document.createElement("div");
+    element.className = "dispatch-sos-label-anchor";
+    element.setAttribute("aria-hidden", "true"); // The selected incident card and map choices supply the accessible name.
+    const chip = document.createElement("bdi");
+    chip.className = "dispatch-sos-label";
+    chip.dir = "auto";
+    element.append(chip);
+    selectedSosLabelMarker = new selectedSosMarkerClass({ element, anchor: "center" })
+      .setLngLat([incident.location.lon, incident.location.lat]).addTo(map);
+  } else selectedSosLabelMarker.setLngLat([incident.location.lon, incident.location.lat]);
+  const element = selectedSosLabelMarker.getElement();
+  const chip = element.firstElementChild as HTMLElement | null;
+  if (chip) chip.textContent = incidentLabel(incident.incidentTypeId); // Never interpret catalog names as HTML.
+  element.style.setProperty("--dispatch-selected-sos-color", SOS_MAP_MARKER_COLORS[
+    incident.status === "cancelled_by_rescuer" ? "high" : incident.severity]);
+  updateSelectedSosLabelPosition();
+}
+
 function edgeArrow(edge: DispatchEdgeCue["edge"]): string {
   return { top: "↑", bottom: "↓", left: "←", right: "→" }[edge];
 }
 function updateMapEdgeCues(): void {
   const map = mapInstance;
   if (!map) { mapEdgeCues.value = []; return; }
+  updateSelectedSosLabelPosition();
   const canvas = map.getCanvas();
   const incident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
   const points = [
@@ -1003,13 +1062,11 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
 }
 
 function ensureSosMapLayers(map: MapLibreMap): void {
-  const selected = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
   const alerts = buildSosAlertsGeoJson(adminSos.visibleRequests, adminSos.selectedId);
-  // No repeated "incident"/severity text before selection. Only the selected
-  // SOS carries its actual category title; all others remain colored marks.
+  // The selected incident title is a single DOM label with an opaque surface;
+  // GeoJSON carries only actual SOS points, not an unbacked WebGL text glyph.
   const data = { ...alerts, features: alerts.features.map((feature) => ({
     ...feature, properties: { ...feature.properties,
-      mapTitle: selected && feature.id === selected.id ? incidentLabel(selected.incidentTypeId) : "",
       pinImage: sosPinImage(feature.properties.status, feature.properties.severity, feature.properties.isSelected) }
   })) };
   registerPins(map);
@@ -1067,16 +1124,6 @@ function ensureSosMapLayers(map: MapLibreMap): void {
     layout: { "icon-image": ["get", "pinImage"], "icon-anchor": "bottom",
       "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
   });
-  if (!map.getLayer(SOS_TITLE_LAYER_ID)) map.addLayer({
-    id: SOS_TITLE_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
-    filter: ["==", ["get", "isSelected"], true],
-    layout: { "text-field": ["get", "mapTitle"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-anchor": "left", "text-radial-offset": 3.8,
-      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto",
-      "text-allow-overlap": true, "text-max-width": 10 },
-    paint: { "text-color": palettes[themeStore.isDark ? "dark" : "light"].text,
-      "text-halo-color": palettes[themeStore.isDark ? "dark" : "light"].surface, "text-halo-width": 3 }
-  });
 }
 
 function syncMapData(): void {
@@ -1100,7 +1147,7 @@ function restoreMapLayers(): void {
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
   }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID, RESPONDER_SELECTED_SOURCE_ID],
-  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,
+  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
     RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,
     RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
     RESPONDER_SELECTED_NAME_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID,
@@ -1243,12 +1290,13 @@ function activateMapChoice(choice: MapPointChoice): void {
   }).catch(() => { if (mapInstance === map) focusResponders(); });
 }
 
-function onMapReady(map: MapLibreMap): void {
+function onMapReady(map: MapLibreMap, MarkerClass: typeof import("maplibre-gl").Marker): void {
   detachMapEvents?.();
   mapPointChoices.value = [];
   mapInstance = map;
+  selectedSosMarkerClass = MarkerClass;
   syncMapData();
-  updateMapEdgeCues();
+  syncSelectedSosLabel();
   startPulseLoop();
 
   if (adminSos.selectedRequest) {
@@ -1261,6 +1309,9 @@ function onMapReady(map: MapLibreMap): void {
     });
     if (nearbyFeatures.value.features.length) frameSelectedIncident();
   }
+  // jumpTo above can change the side/visibility of both labels and edge cues
+  // before move listeners are registered.
+  updateMapEdgeCues();
 
   const onStyleData = () => {
     restoreMapLayers();
@@ -1311,6 +1362,8 @@ function onMapReady(map: MapLibreMap): void {
     map.off("move", updateMapEdgeCues);
     map.off("resize", updateMapEdgeCues);
     map.off("click", onMarkerClick);
+    selectedSosLabelMarker?.remove();
+    selectedSosLabelMarker = null;
     mapEdgeCues.value = [];
   };
 }
@@ -1329,17 +1382,17 @@ watch(() => themeStore.isDark, () => {
     for (const id of [RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID]) {
       if (map.getLayer(id)) map.setPaintProperty(id, "circle-color", responderPin);
     }
-    for (const id of [RESPONDER_NAME_LAYER_ID, RESPONDER_SELECTED_NAME_LAYER_ID, SOS_TITLE_LAYER_ID]) {
+    for (const id of [RESPONDER_NAME_LAYER_ID, RESPONDER_SELECTED_NAME_LAYER_ID]) {
       if (!map.getLayer(id)) continue;
       map.setPaintProperty(id, "text-color", palette.text);
       map.setPaintProperty(id, "text-halo-color", palette.surface);
     }
   } catch { /* MapCanvas is swapping styles; restoreMapLayers recreates removed layers. */ }
 });
-watch(incidentNameById, () => { syncMapData(); updateMapEdgeCues(); });
+watch(incidentNameById, () => { syncSelectedSosLabel(); updateMapEdgeCues(); });
 watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
 watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const,
-  () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
+  () => { mapPointChoices.value = []; syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); }, { flush: "sync" });
 // Keep the incident visible when its qualified suggestions arrive; selection
 // still focuses the incident immediately, before the nearest read completes.
 watch(() => [adminSos.nearestRequestId, adminSos.nearestLoaded] as const,
@@ -1605,6 +1658,28 @@ onBeforeUnmount(() => {
   position: relative;
   height: clamp(18rem, 37dvh, 23rem);
   min-height: 18rem;
+}
+/* MapLibre appends Marker elements outside this SFC's scoped subtree. The
+   zero-sized anchor stays at the exact SOS coordinates; only the chip moves. */
+:global(.dispatch-sos-label-anchor) { width: 0; height: 0; z-index: 4; pointer-events: none; }
+:global(.dispatch-sos-label-anchor[hidden]) { display: none; }
+:global(.dispatch-sos-label) { position: absolute; top: -30px; left: 30px;
+  transform: translateY(-50%); box-sizing: border-box; display: block;
+  width: max-content; max-width: min(12rem, calc(100vw - 4rem)); min-height: 30px;
+  padding: .32rem .65rem; border: 1px solid rgba(var(--v-theme-on-surface), .28);
+  border-inline-start: 3px solid var(--dispatch-selected-sos-color, #dc2626);
+  border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 3px 12px rgba(8, 21, 38, .36); font: 800 .8rem/1.4 var(--bb-font-family, sans-serif);
+  white-space: normal; overflow-wrap: anywhere; text-align: start; pointer-events: none; }
+:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) { left: -30px; transform: translate(-100%, -50%); }
+:global(.dispatch-sos-label-anchor--below .dispatch-sos-label) { top: 18px; transform: none; }
+:global(.dispatch-sos-label-anchor--left.dispatch-sos-label-anchor--below .dispatch-sos-label) { transform: translateX(-100%); }
+:global(.dispatch-sos-label-anchor--center .dispatch-sos-label) {
+  left: 0; top: 18px; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px))); }
+:global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label) {
+  top: auto; bottom: 60px; }
+@media (forced-colors: active) {
+  :global(.dispatch-sos-label) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
 }
 .dispatch-map-key { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin: 0;
   padding: .55rem .85rem; list-style: none; background: rgb(var(--v-theme-surface));
