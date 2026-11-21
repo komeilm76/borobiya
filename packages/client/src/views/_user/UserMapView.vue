@@ -1543,7 +1543,7 @@ function positionVisiblePointLabelsAfterMapMove(instance: MapLibreMap): void {
   // MapLibre updates marker transforms later in the same move/resize event.
   queueMicrotask(() => {
     if (map.value === instance) {
-      positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker]);
+      positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker, ...peerMarkers.values()]);
       positionSelectedPlaceLabels();
     }
   });
@@ -1556,7 +1556,7 @@ function schedulePointSpread(): void {
     if (!map.value) return;
     // GPS remains on the exact fix; only coincident route/companion marks move.
     spreadCoincidentPoints([destinationMarker, routeOriginMarker, ...peerMarkers.values()], [ownMarker]);
-    positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker, ownMarker]);
+    positionMapPointLabels(map.value, [destinationMarker, routeOriginMarker, ownMarker, ...peerMarkers.values()]);
     if (destinationMarker && isSelectedSearchDestination.value && !journey.navigating.value)
       positionSelectedPlaceLabel(destinationMarker, map.value);
   });
@@ -1678,7 +1678,17 @@ function syncPeerAvatars(): void {
       const avatar = document.createElement("span");
       avatar.className = "user-map-view__peer-avatar-face";
       avatar.setAttribute("aria-hidden", "true");
-      button.append(avatar);
+      const caption = document.createElement("span");
+      caption.className = "bb-map-point__caption";
+      caption.dir = "auto";
+      caption.setAttribute("aria-hidden", "true");
+      const name = document.createElement("span");
+      name.className = "bb-map-point__caption-name";
+      const age = document.createElement("span");
+      age.className = "bb-map-point__age";
+      age.textContent = "قدیمی";
+      caption.append(name, age);
+      button.append(avatar, caption);
       button.addEventListener("click", (event) => {
         event.stopPropagation(); // Don't reverse-geocode a companion tap as a map click.
         selectCompanion(peer.userId, false);
@@ -1690,6 +1700,10 @@ function syncPeerAvatars(): void {
     const button = marker.getElement();
     const face = button.firstElementChild;
     if (face) face.textContent = avatarInitial(peer.name);
+    const captionName = button.querySelector<HTMLElement>(".bb-map-point__caption-name");
+    if (captionName) captionName.textContent = peer.name; // Never render shared names as HTML.
+    const age = button.querySelector<HTMLElement>(".bb-map-point__age");
+    if (age) age.hidden = !peer.stale;
     button.setAttribute("aria-label", `اطلاعات همراه ${peer.name}؛ ${peer.stale ? "موقعیت قدیمی" : "موقعیت تازه"}`);
     button.setAttribute("title", peer.name);
     button.setAttribute("aria-pressed", String(selectedCompanionId.value === peer.userId));
