@@ -37,7 +37,8 @@
     <p v-else-if="!timeline.loading.value && !timeline.error.value" class="timeline__empty" role="status">
       هنوز مرحله‌ای برای این مأموریت ثبت نشده است.
     </p>
-    <MissionTracePanel v-if="mission.status === 'completed'" :mission-id="mission.id" />
+    <MissionTracePanel v-if="mission.status === 'completed'" :mission-id="mission.id"
+      :show-navigation="showNavigation" />
   </section>
 </template>
 
@@ -49,7 +50,9 @@ import { useMissionTimeline } from "@/composables/use-mission-timeline";
 const MissionTracePanel = defineAsyncComponent(() => import("./MissionTracePanel.vue"));
 import { actorLabel, isTerminal, statusLabel } from "@/mission/timeline-presentation";
 
-const props = defineProps<{ mission: Mission; audience: "user" | "admin" }>();
+const props = withDefaults(defineProps<{ mission: Mission; audience: "user" | "admin"; showNavigation?: boolean }>(), {
+  showNavigation: true
+});
 const auth = useAuthStore();
 const timeline = useMissionTimeline(computed(() => props.mission.id), props.audience,
   computed(() => auth.accessToken), computed(() => auth.user?.id ?? null), () => auth.ensureSession());

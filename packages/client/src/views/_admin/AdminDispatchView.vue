@@ -22,8 +22,9 @@
           <v-select id="dispatch-select-01"
             :model-value="adminSos.filterStatus"
             :items="dispatchFilters"
-            class="admin-dispatch__filter-select d-md-none"
-            label="وضعیت درخواست‌های اضطراری"
+            class="admin-dispatch__filter-select"
+            label="فیلتر SOS"
+            aria-label="وضعیت درخواست‌های اضطراری"
             item-title="title"
             item-value="value"
             density="compact"
@@ -33,27 +34,6 @@
             hide-details
             @update:model-value="onFilterChange"
           />
-          <v-btn-toggle id="dispatch-toggle-01"
-            class="admin-dispatch__filter-toggle d-none d-md-inline-flex"
-            :model-value="adminSos.filterStatus"
-            aria-label="وضعیت درخواست‌های اضطراری"
-            density="compact"
-            mandatory
-            rounded="lg"
-            color="primary"
-            variant="text"
-            @update:model-value="onFilterChange"
-          >
-            <v-btn id="dispatch-action-01" value="pending">
-              در انتظار رسیدگی
-            </v-btn>
-            <v-btn id="dispatch-action-02" value="dispatched">
-              اعزام‌شده
-            </v-btn>
-            <v-btn id="dispatch-action-03" value="all">
-              همه
-            </v-btn>
-          </v-btn-toggle>
         </div>
 
         <div class="admin-dispatch__toolbar-actions" role="group" aria-label="کنترل‌های هشدار و بازخوانی">
@@ -466,6 +446,7 @@
               aria-label="نقشهٔ درخواست‌های SOS و آخرین موقعیت ثبت‌شدهٔ امدادگران نزدیک"
               :style-url="mapStyleUrl"
               :constrain-bounds="false"
+              :show-navigation="false"
               :zoom="12"
               @ready="onMapReady"
             />
@@ -673,7 +654,7 @@
             </option>
           </select>
           <MissionTimelinePanel id="dispatch-timeline-01" v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
-            :mission="selectedTimelineMission" audience="admin" />
+            :mission="selectedTimelineMission" audience="admin" :show-navigation="false" />
         </details>
         <p v-else-if="adminSos.selectedRequest && missionLoaded" class="mb-3 text-body-2 text-medium-emphasis" role="status">
           برای این درخواست هنوز مأموریتی ثبت نشده است.
@@ -686,6 +667,7 @@
           </button>
           <template v-if="showLivePanel">
             <MissionLivePanel :id="`dispatch-live-01-${mission.id}`" v-for="mission in activeMissions" :key="mission.id" :mission="mission"
+              :show-navigation="false"
               :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
           </template>
         </section>
@@ -1950,18 +1932,6 @@ onBeforeUnmount(() => {
 .admin-dispatch :deep(.v-alert) {
   font-family: var(--bb-font-family); letter-spacing: normal;
 }
-/* Vuetify's compact toggle is shorter than its neighbouring sound actions.
-   The 46px outer group includes its border and holds 44px touch targets. */
-.admin-dispatch__filter-toggle { height: 46px; min-height: 46px;
-  border: 1px solid rgba(var(--v-theme-on-surface), .12);
-  border-radius: var(--bb-radius-nested, 16px) !important; background: rgba(var(--v-theme-surface), .95); overflow: hidden; }
-.admin-dispatch__toolbar .admin-dispatch__filter-toggle :deep(.v-btn) { display: flex; align-items: center; justify-content: center;
-  height: 44px; min-height: 44px; padding-inline: .75rem; border-radius: 0 !important; text-align: center; }
-.admin-dispatch__filter-toggle :deep(.v-btn__content) { display: flex; align-items: center; justify-content: center;
-  width: 100%; line-height: 1.3; text-align: center; white-space: nowrap; }
-.admin-dispatch__filter-toggle :deep(.v-btn:focus-visible) { outline-offset: -3px; }
-.admin-dispatch__filter-toggle :deep(.v-btn--active) { color: rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), .12); font-weight: 800; }
 .admin-dispatch__toolbar :deep(.v-btn) { height: 46px; min-height: 46px; padding-inline: .7rem; font-size: .82rem; }
 .admin-dispatch__toolbar :deep(.v-btn--icon) { width: 46px; padding: 0; }
 
@@ -2403,30 +2373,76 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__sidebar {
   position: absolute; z-index: 12; top: 0; right: 0; bottom: 0;
-  width: var(--dispatch-sidebar-width); padding: .85rem;
-  padding-top: max(.85rem, env(safe-area-inset-top, 0px));
+  width: var(--dispatch-sidebar-width); padding: .65rem .75rem;
+  padding-top: max(.65rem, env(safe-area-inset-top, 0px));
   overflow-y: auto; overscroll-behavior: contain;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  border-left: 1px solid var(--bb-color-outline); box-shadow: var(--bb-shadow-overlay);
+  border-left: 1px solid var(--bb-color-outline);
   scrollbar-gutter: stable;
 }
-.admin-dispatch__header { display: block; margin-bottom: .7rem !important; }
-.admin-dispatch__heading h1 { font-size: 1.1rem !important; }
-.admin-dispatch__eyebrow { margin-bottom: .2rem; }
-.admin-dispatch__toolbar { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: .5rem; }
+.admin-dispatch__header { display: block; margin-bottom: .4rem !important; }
+.admin-dispatch__heading { gap: .3rem !important; }
+.admin-dispatch__heading h1 { font-size: 1rem !important; line-height: 1.4; }
+.admin-dispatch__eyebrow { margin-bottom: .15rem; font-size: .8rem; }
+.admin-dispatch__toolbar { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: .35rem; }
 .admin-dispatch__filter-group, .admin-dispatch__toolbar-actions { min-width: 0; }
 .admin-dispatch__filter-select { width: 100%; max-width: none; }
-.admin-dispatch__filter-toggle { max-width: 100%; }
-.admin-dispatch__toolbar-actions { justify-content: flex-start; }
-.admin-dispatch__queue { display: flex; flex-direction: column; min-height: 0; }
-.admin-dispatch__nearby { margin-bottom: .8rem; }
-.admin-dispatch__nearby-empty { display: grid; gap: .2rem; padding: .85rem 1rem;
-  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
-  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-surface); }
-.admin-dispatch__nearby-empty span { color: var(--bb-color-muted); font-size: .85rem; }
+.admin-dispatch__toolbar-actions { justify-content: flex-start; gap: .25rem; }
+.admin-dispatch__queue { display: flex; flex-direction: column; min-height: 0;
+  padding-top: .3rem; border-top: 1px solid var(--bb-color-outline); }
+.admin-dispatch__nearby { margin-bottom: .35rem; }
+.admin-dispatch__nearby-empty { display: grid; gap: .15rem; padding: .6rem .5rem;
+  background: rgba(var(--v-theme-on-surface), .035); border-radius: .65rem; }
+.admin-dispatch__nearby-empty span { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-dispatch__responders .responder-list { max-height: min(22dvh, 11rem); }
 .admin-dispatch__queue .dispatch-request-list { max-height: max(8rem, 34dvh); }
 .admin-dispatch__queue .mb-4 { margin-bottom: 0 !important; }
+/* The pinned rail is one surface, not cards stacked inside another card.
+   Restrict these overrides to the rail; the incident card, map widgets and
+   confirmation dialogs keep their existing elevation and contrast. */
+#dispatch-sidebar .admin-dispatch__surface {
+  border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  background: transparent !important; backdrop-filter: none !important;
+}
+#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-title) {
+  padding: .55rem .5rem .35rem; font-size: .9rem !important;
+  line-height: 1.4; gap: .35rem !important;
+}
+#dispatch-sidebar .admin-dispatch__surface :deep(.v-divider) { opacity: .55; }
+#dispatch-sidebar .admin-dispatch__card-heading { gap: .35rem; }
+#dispatch-sidebar .dispatch-request-list, #dispatch-sidebar .responder-list {
+  padding: .2rem .3rem; background: transparent;
+}
+#dispatch-sidebar .dispatch-request-row, #dispatch-sidebar .dispatch-responder-row {
+  margin: 0; padding: .3rem .4rem; min-height: 44px;
+  border: 0; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .09);
+  border-radius: .5rem; background: transparent;
+}
+#dispatch-sidebar .dispatch-request-row:last-child, #dispatch-sidebar .dispatch-responder-row:last-child {
+  border-bottom: 0;
+}
+#dispatch-sidebar .dispatch-request-row.v-list-item--active,
+#dispatch-sidebar .dispatch-responder-row.v-list-item--active {
+  border-color: transparent; background: rgba(var(--v-theme-primary), .12);
+}
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title),
+#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-title) {
+  font-size: .85rem; line-height: 1.4;
+}
+#dispatch-sidebar .admin-dispatch__responder-search { padding: .45rem .5rem .1rem !important; gap: .35rem; }
+#dispatch-sidebar .admin-dispatch__manual-warning { margin: .3rem .5rem 0; font-size: .8rem; }
+#dispatch-sidebar .admin-dispatch__search-help { margin: .2rem .5rem .35rem; }
+#dispatch-sidebar .admin-dispatch__submit { padding: .45rem .5rem !important; gap: .25rem !important; }
+/* A compact desktop rail still retains 44px tap targets on touch widths. */
+#dispatch-sidebar :deep(.v-btn) { min-width: 38px; min-height: 38px; height: auto; font-size: .8rem; padding-inline: .5rem; }
+#dispatch-sidebar :deep(.v-btn--icon) { width: 38px; height: 38px; padding: 0; }
+#dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn) { height: 38px; min-height: 38px; }
+#dispatch-sidebar .replacement-flash :deep(.v-btn) { min-height: 44px; }
+@media (max-width: 900px) {
+  #dispatch-sidebar :deep(.v-btn), #dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn),
+  #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; }
+  #dispatch-sidebar :deep(.v-btn--icon) { width: 44px; height: 44px; }
+}
 .admin-dispatch__map-and-actions { position: absolute; inset: 0; min-width: 0; pointer-events: none; }
 .admin-dispatch__map-and-actions > #dispatch-map {
   position: absolute; inset: 0 var(--dispatch-sidebar-width) 0 0;
@@ -2533,7 +2549,6 @@ onBeforeUnmount(() => {
   .admin-dispatch__header { margin-bottom: .5rem !important; }
   .admin-dispatch__intro { display: none; }
   .admin-dispatch__filter-select { display: block !important; }
-  .admin-dispatch__filter-toggle { display: none !important; }
   .admin-dispatch__toolbar-actions { flex-wrap: wrap; }
   .admin-dispatch__search {
     top: calc(4.25rem + env(safe-area-inset-top, 0px)); right: .75rem;

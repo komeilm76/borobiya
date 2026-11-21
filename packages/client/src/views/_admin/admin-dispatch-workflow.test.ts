@@ -54,9 +54,10 @@ describe("admin SOS triage flow", () => {
   });
 
   it("scans verified workload honestly and keeps complete incident evidence available on demand", () => {
-    expect(template).not.toContain('admin-dispatch__overview'); // One filter control per breakpoint, not a second navigation row.
-    expect(template).toContain('class="admin-dispatch__filter-select d-md-none"');
-    expect(template).toContain('class="admin-dispatch__filter-toggle d-none d-md-inline-flex"');
+    expect(template).not.toContain('admin-dispatch__overview'); // One compact filter, not a second navigation row.
+    expect(template).toContain('class="admin-dispatch__filter-select"');
+    expect(template).toContain('label="فیلتر SOS"');
+    expect(template).not.toContain('admin-dispatch__filter-toggle');
     expect(template).toContain('v-if="adminSos.queueVerified" color="error"');
     expect(template).toContain("adminSos.visibleRequests.length.toLocaleString('fa-IR')");
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');

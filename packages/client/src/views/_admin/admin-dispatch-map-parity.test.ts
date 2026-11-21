@@ -32,18 +32,17 @@ describe('dispatch controls match the map Mission and Travel design language', (
     expect(css).toContain('.dispatch-map-choices { position: absolute;');
   });
 
-  it('uses the same field treatment, segmented selection, action sizes and Persian font', () => {
-    expect(template!.content).toContain('class="admin-dispatch__filter-select d-md-none"');
+  it('uses the same field treatment, compact filtering, action sizes and Persian font', () => {
+    expect(template!.content).toContain('class="admin-dispatch__filter-select"');
+    expect(template!.content).toContain('label="فیلتر SOS"');
+    expect(template!.content).not.toContain('admin-dispatch__filter-toggle');
     expect(template!.content).toContain('role="group" aria-label="فیلتر وضعیت درخواست‌ها"');
     expect(template!.content).not.toContain('admin-dispatch__toolbar-label');
     expect(template!.content).toContain('rounded="lg"\n            color="primary"\n            hide-details');
-    expect(template!.content).toContain('variant="text"\n            @update:model-value="onFilterChange"');
+    expect(template!.content).toContain('hide-details\n            @update:model-value="onFilterChange"');
     expect(template!.content).toContain('variant="outlined" rounded="lg" color="primary" density="compact"');
     expect(template!.content).toContain('type="submit" color="primary" variant="flat" rounded="lg"');
-    expect(css).toContain('.admin-dispatch__filter-toggle :deep(.v-btn--active)');
-    expect(css).toContain('.admin-dispatch__filter-toggle { height: 46px; min-height: 46px;');
-    expect(css).toContain('.admin-dispatch__toolbar .admin-dispatch__filter-toggle :deep(.v-btn) { display: flex; align-items: center; justify-content: center;');
-    expect(css).toContain('.admin-dispatch__filter-toggle :deep(.v-btn__content) { display: flex; align-items: center; justify-content: center;');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn) { height: 38px; min-height: 38px; }');
     expect(css).toContain('min-width: 44px; min-height: 44px; height: auto;');
     expect(css).toContain('font-family: var(--bb-font-family); letter-spacing: normal;');
     expect(css).toContain('.admin-dispatch__sender-id summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }');
@@ -54,6 +53,6 @@ describe('dispatch controls match the map Mission and Travel design language', (
     const compiled = compileStyle({ filename: 'AdminDispatchView.vue', id: 'dispatch-parity', scoped: true, source: css });
     expect(compiled.errors).toEqual([]);
     expect(compiled.code).toContain('.admin-dispatch__surface[data-v-dispatch-parity]');
-    expect(compiled.code).toContain('.admin-dispatch__toolbar .admin-dispatch__filter-toggle[data-v-dispatch-parity] .v-btn');
+    expect(compiled.code).toContain('#dispatch-sidebar .admin-dispatch__toolbar[data-v-dispatch-parity] .v-btn');
   });
 });

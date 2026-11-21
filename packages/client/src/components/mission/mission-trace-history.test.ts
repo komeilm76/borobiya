@@ -8,7 +8,8 @@ const mission = readFileSync(new URL("../../views/_user/UserMissionView.vue", im
 
 describe("member-only post-mission route comparison wiring", () => {
   it("shows the same completed-mission trace under requester, rescuer and admin timelines", () => {
-    expect(timeline).toContain('<MissionTracePanel v-if="mission.status === \'completed\'" :mission-id="mission.id" />');
+    expect(timeline).toContain('<MissionTracePanel v-if="mission.status === \'completed\'" :mission-id="mission.id"');
+    expect(timeline).toContain(':show-navigation="showNavigation" />');
     expect(trace).toContain('getMissionLocationTrace(token, id, abort.signal)');
     expect(trace).toContain('controller?.abort();');
     expect(trace).toContain('trace.incomplete');

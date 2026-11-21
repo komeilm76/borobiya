@@ -56,6 +56,8 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string;
   constrainBounds?: boolean;
   showZoom?: boolean;
+  /** Hide the entire zoom/compass control, while keeping pan, wheel and keyboard map interactions. */
+  showNavigation?: boolean;
   /** Use the companion map's 48px two-tone compass action, not the stock control styling. */
   compassAction?: boolean;
 }>(), {
@@ -63,7 +65,8 @@ const props = withDefaults(defineProps<{
   zoom: DEFAULT_MAP_ZOOM,
   ariaLabel: "نقشهٔ تعاملی",
   constrainBounds: true,
-  showZoom: true
+  showZoom: true,
+  showNavigation: true
 });
 
 const emit = defineEmits<{
@@ -245,7 +248,7 @@ function initializeMap(controller: AbortController, maplibre: typeof import("map
     throw error;
   }
   try {
-    instance.addControl(new NavigationControl({
+    if (props.showNavigation) instance.addControl(new NavigationControl({
       showCompass: true,
       showZoom: props.showZoom,
       visualizePitch: true

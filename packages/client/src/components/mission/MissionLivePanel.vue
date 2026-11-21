@@ -32,6 +32,7 @@
       <div class="live-panel__map-area">
         <div class="live-panel__map">
           <MapCanvas v-if="!externalCanvas" :center="center" :zoom="13" :constrain-bounds="false" :show-zoom="!fullscreen"
+            :show-navigation="showNavigation"
             :compass-action="fullscreen" :style-url="mapStyleUrl"
             :aria-label="routeActive ? 'نقشهٔ مأموریت، مسیرها و موقعیت‌های دریافت‌شدهٔ مجاز' : 'نقشهٔ موقعیت‌های دریافت‌شدهٔ اعضای مجاز مأموریت'"
             @ready="onMapReady" />
@@ -129,9 +130,11 @@ import { useRescuerMissionShareStore } from "@/stores/rescuer-mission-share";
 const props = withDefaults(defineProps<{
   mission: LiveMissionIdentity; center?: [number, number]; routeActive?: boolean;
   fullscreen?: boolean; roomOpen?: boolean; visible?: boolean;
+  showNavigation?: boolean;
   externalCanvas?: boolean; externalMap?: MapLibreMap | null; externalMarker?: typeof Marker | null;
 }>(), {
-  center: () => [51.4, 35.7], routeActive: false, fullscreen: false, roomOpen: false, visible: true
+  center: () => [51.4, 35.7], routeActive: false, fullscreen: false, roomOpen: false, visible: true,
+  showNavigation: true
 });
 const emit = defineEmits<{
   ready: [map: MapLibreMap, marker: typeof Marker];

@@ -16,6 +16,7 @@
         <p v-else>آخرین مسیر پیشنهادی ذخیره‌شده ({{ profileLabel }}، خط بنفشِ چین‌دار): {{ formatRouteDistance(trace.suggestedRoute!.distanceM) }}؛ مسیرهای رنگی، بخش‌های پیوستهٔ نمونه‌های GPS ثبت‌شده در کل مأموریت هستند.</p>
         <div v-if="routeLine || trace.points.length" class="mission-trace__map">
           <MapCanvas :center="mapCenter" :zoom="11" :constrain-bounds="false" :show-zoom="true"
+            :show-navigation="showNavigation"
             :style-url="mapStyleUrl" aria-label="نقشهٔ مقایسهٔ مسیر پیشنهادی و GPS ثبت‌شدهٔ اعضای مجاز"
             @ready="onMapReady" />
         </div>
@@ -49,7 +50,9 @@ import { useThemeStore } from "@/stores/theme";
 import { formatRouteDistance } from "@/sos/route-preview";
 import { buildMissionTraces, rescuerComparisonTrace, suggestedLine, TRACE_LABEL } from "@/mission/trace-geometry";
 
-const props = defineProps<{ missionId: string }>();
+const props = withDefaults(defineProps<{ missionId: string; showNavigation?: boolean }>(), {
+  showNavigation: true
+});
 const auth = useAuthStore();
 const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
