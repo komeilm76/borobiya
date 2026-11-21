@@ -68,6 +68,19 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).not.toContain('createMapPointElement('); // Dispatch pins remain WebGL; labels share the attached DOM chip.
   });
 
+  it("dims only unselected SOS symbols, including circle fallback and animated pulse", () => {
+    expect(source).toContain('"icon-opacity": ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1]');
+    expect(source).toContain('"circle-opacity": pinReady ? 0 : ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1]');
+    expect(source).toContain('"circle-stroke-opacity": pinReady ? 0 : ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1]');
+    expect(source).toContain('"text-opacity": pinReady ? 0 :\n      ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1]');
+    expect(source).toContain('0.35 * SOS_DIMMED_OPACITY, 0.35');
+    expect(source).toContain('opacity * SOS_DIMMED_OPACITY, opacity');
+    const selected = source.slice(source.indexOf('if (!map.getLayer(SOS_SELECTED_CORE_LAYER_ID))'), source.indexOf('function syncMapData()'));
+    expect(selected).not.toContain('isDimmed');
+    expect(source).toContain('filter: ["==", ["get", "isSelected"], false]');
+    expect(source).toContain('filter: ["==", ["get", "isSelected"], true]');
+  });
+
   it("uses contrasting blue responder glyphs, severity-coded SOS markers and a context-aware legend", () => {
     const contrastWithWhite = (hex: string) => {
       const channels = [1, 3, 5].map((offset) => {

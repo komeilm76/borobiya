@@ -3,6 +3,7 @@ import type { SosRequestRecord } from "@shared/index";
 import {
   buildSosAlertsGeoJson,
   SOS_MAP_MARKER_COLORS,
+  SOS_DIMMED_OPACITY,
   buildEligibleResponderGeoJson,
   formatResponderDistance,
   isDispatchableSosStatus,
@@ -10,6 +11,7 @@ import {
   parseAdminRescuerCancellationPayload,
   parseSosNewRequestPayload,
   playSosAlertSound,
+  toggleSosQueueSelection,
   SOS_STATUS_PRESENTATION,
   upsertSosAlert,
   type AlertAudioContextLike
@@ -121,10 +123,26 @@ describe("admin SOS alert helpers (T3.2.5)", () => {
       SOS_MAP_MARKER_COLORS.low
     ]);
     expect(geojson.features.map((f) => f.properties.isSelected)).toEqual([false, true, false]);
+    expect(geojson.features.map((f) => f.properties.isDimmed)).toEqual([true, false, true]);
+    expect(buildSosAlertsGeoJson([high, med, low], null).features.map((f) => f.properties.isDimmed))
+      .toEqual([false, false, false]);
+    expect(buildSosAlertsGeoJson([high, med, low], "not-yet-loaded").features.map((f) => f.properties.isDimmed))
+      .toEqual([false, false, false]);
+    expect(buildSosAlertsGeoJson([high, med, low], low.id).features.map((f) => f.properties.isDimmed))
+      .toEqual([true, true, false]);
+    expect(SOS_DIMMED_OPACITY).toBeGreaterThan(0);
+    expect(SOS_DIMMED_OPACITY).toBeLessThan(1);
     expect(buildSosAlertsGeoJson([low], low.id).features[0]?.properties.color).toBe(SOS_MAP_MARKER_COLORS.low);
     const cancelled = sampleSos({ severity: "low", status: "cancelled_by_rescuer" });
     expect(buildSosAlertsGeoJson([cancelled], cancelled.id).features[0]?.properties.color)
       .toBe(SOS_MAP_MARKER_COLORS.high);
+  });
+
+  it("toggles a queue row without changing another selected incident until clicked", () => {
+    expect(toggleSosQueueSelection(null, "a")).toBe("a");
+    expect(toggleSosQueueSelection("a", "b")).toBe("b");
+    expect(toggleSosQueueSelection("b", "b")).toBeNull();
+    expect(toggleSosQueueSelection(null, "b")).toBe("b");
   });
 
   it("synthesizes severity-graded Web Audio chimes, respects mute, and closes AudioContext", async () => {

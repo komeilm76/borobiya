@@ -54,6 +54,11 @@ export function isDispatchableSosStatus(status: SosRequestRecord["status"]): boo
   return status === "pending" || status === "dispatched" || status === "cancelled_by_rescuer";
 }
 
+/** Clicking the active queue row clears the selection without refocusing the map. */
+export function toggleSosQueueSelection(selectedId: string | null, clickedId: string): string | null {
+  return selectedId === clickedId ? null : clickedId;
+}
+
 export function formatResponderDistance(metres: number): string {
   if (!Number.isFinite(metres) || metres < 0) return "نامشخص";
   if (metres < 1000) return `${Math.round(metres)} متر`;
@@ -72,6 +77,7 @@ export interface SosAlertGeoFeature {
     severity: Severity;
     color: string;
     isSelected: boolean;
+    isDimmed: boolean;
     isManual: boolean;
     status: SosRequestRecord["status"];
   };
@@ -201,6 +207,9 @@ export function mergeSosAlertSnapshot(
 export const SOS_MAP_MARKER_COLORS: Record<Severity, string> = {
   high: "#dc2626", medium: "#a94d04", low: "#075c94"
 };
+// Other incidents stay recognizable and clickable while a selected SOS and
+// its nearby responders stand out. Never use opacity 0 (MapLibre hit-testing).
+export const SOS_DIMMED_OPACITY = 0.48;
 
 /** A rescuer cancellation needs immediate redispatch; otherwise both selected
  * and unselected map symbols must keep the incident's actual priority hue. */
@@ -213,6 +222,8 @@ export function buildSosAlertsGeoJson(
   requests: readonly SosRequestRecord[],
   selectedId: string | null
 ): SosAlertsFeatureCollection {
+  // An unresolved deep link is not yet a visible selection: keep all pins bright.
+  const hasSelected = selectedId !== null && requests.some((req) => req.id === selectedId);
   return {
     type: "FeatureCollection",
     features: requests.map((req) => ({
@@ -227,6 +238,7 @@ export function buildSosAlertsGeoJson(
         severity: req.severity,
         color: SOS_MAP_MARKER_COLORS[sosMapPriority(req.status, req.severity)],
         isSelected: req.id === selectedId,
+        isDimmed: hasSelected && req.id !== selectedId,
         isManual: req.location.isManual,
         status: req.status
       }

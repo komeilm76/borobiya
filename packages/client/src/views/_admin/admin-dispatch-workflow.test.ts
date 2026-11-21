@@ -61,6 +61,10 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('v-if="adminSos.queueVerified" color="error"');
     expect(template).toContain("adminSos.visibleRequests.length.toLocaleString('fa-IR')");
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
+    expect(template).toContain(':aria-pressed="item.id === adminSos.selectedId"');
+    expect(template).toContain('@click="toggleQueueRequest(item)"');
+    expect(template).toContain('variant="outlined">لغو انتخاب</v-chip>');
+    expect(source).toMatch(/function toggleQueueRequest\(item: SosRequestRecord\): void \{[\s\S]*?toggleSosQueueSelection\(adminSos.selectedId, item.id\) === null\)[\s\S]*?adminSos.selectRequest\(null\);[\s\S]*?focusRequest\(item\);/);
     const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-incident"'));
     expect(queue).toContain('item.location.isManual');
     expect(queue).toContain('item.photoUrl');

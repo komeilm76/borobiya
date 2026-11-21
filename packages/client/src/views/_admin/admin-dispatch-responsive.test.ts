@@ -34,7 +34,7 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).toContain("'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'");
     expect(source).toContain("'نمایش حادثه و امدادگران نزدیک روی نقشه'");
     expect(source).toContain('@click="frameSelectedIncident"');
-    expect(source).toContain('@click="focusRequest(item)"');
+    expect(source).toContain('@click="toggleQueueRequest(item)"');
   });
 
   it("groups compact alarm actions away from filters without shrinking touch targets", () => {

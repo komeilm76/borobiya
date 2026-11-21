@@ -185,8 +185,9 @@
             <v-list-item v-for="item in adminSos.visibleRequests" :key="item.id"
               :active="item.id === adminSos.selectedId"
               :aria-current="item.id === adminSos.selectedId ? 'true' : undefined"
+              :aria-pressed="item.id === adminSos.selectedId"
               class="dispatch-request-row"
-              @click="focusRequest(item)"
+              @click="toggleQueueRequest(item)"
             >
                 <template #prepend>
                   <span
@@ -199,6 +200,7 @@
                 <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
                   <span>{{ incidentLabel(item.incidentTypeId) }}</span>
                   <div class="d-flex flex-wrap align-center ga-1">
+                    <v-chip v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
                     <v-chip v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
                       نیازمند جایگزین
                     </v-chip>
@@ -662,7 +664,9 @@ import {
   buildEligibleResponderGeoJson,
   formatResponderDistance,
   SOS_MAP_MARKER_COLORS,
+  SOS_DIMMED_OPACITY,
   sosMapPriority,
+  toggleSosQueueSelection,
   SOS_SEVERITY_PRESENTATION,
   SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
@@ -1201,7 +1205,7 @@ function ensureSosMapLayers(map: MapLibreMap): void {
         // no-canvas circle fallback, the head is centered on the coordinate.
         "circle-translate": pinReady ? [0, -35] : [0, 0],
         "circle-translate-anchor": "viewport",
-        "circle-opacity": 0.35
+        "circle-opacity": ["case", ["boolean", ["get", "isDimmed"], false], 0.35 * SOS_DIMMED_OPACITY, 0.35]
       }
     });
   }
@@ -1214,8 +1218,8 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       filter: ["==", ["get", "isSelected"], false],
       paint: {
         "circle-color": ["get", "color"],
-        "circle-opacity": pinReady ? 0 : 1,
-        "circle-stroke-opacity": pinReady ? 0 : 1,
+        "circle-opacity": pinReady ? 0 : ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1],
+        "circle-stroke-opacity": pinReady ? 0 : ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1],
         "circle-radius": 12,
         "circle-stroke-width": 2,
         "circle-stroke-color": "#ffffff"
@@ -1227,13 +1231,15 @@ function ensureSosMapLayers(map: MapLibreMap): void {
     filter: ["==", ["get", "isSelected"], false],
     layout: { "text-field": MAP_POINT_META.sos.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 16, "text-allow-overlap": true },
-    paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 : 1 }
+    paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 :
+      ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1] }
   });
   if (pinReady && !map.getLayer(SOS_PIN_LAYER_ID)) map.addLayer({
     id: SOS_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
     filter: ["==", ["get", "isSelected"], false],
     layout: { "icon-image": ["get", "pinImage"], "icon-anchor": "bottom",
-      "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
+      "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true },
+    paint: { "icon-opacity": ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1] }
   });
   // A selected incident must not compete for draw order with another SOS
   // symbol in the same layer. Draw it last, above nearby pins and basemap POIs.
@@ -1317,7 +1323,8 @@ function startPulseLoop(): void {
       const radius = 11 + phase * 18;
       const opacity = Math.max(0.06, (1 - phase) * 0.45);
       map.setPaintProperty(SOS_PULSE_LAYER_ID, "circle-radius", radius);
-      map.setPaintProperty(SOS_PULSE_LAYER_ID, "circle-opacity", opacity);
+      map.setPaintProperty(SOS_PULSE_LAYER_ID, "circle-opacity",
+        ["case", ["boolean", ["get", "isDimmed"], false], opacity * SOS_DIMMED_OPACITY, opacity]);
     }
     pulseAnimationFrame = requestAnimationFrame(step);
   };
@@ -1344,6 +1351,15 @@ function focusReplacement(requestId: string): void {
     pendingDeepLinkId = requestId;
     adminSos.selectRequest(requestId);
   }
+}
+
+function toggleQueueRequest(item: SosRequestRecord): void {
+  pendingDeepLinkId = null; // A manual choice supersedes an unresolved route target.
+  if (toggleSosQueueSelection(adminSos.selectedId, item.id) === null) {
+    adminSos.selectRequest(null);
+    return;
+  }
+  focusRequest(item);
 }
 
 function focusRequest(item: SosRequestRecord): void {
