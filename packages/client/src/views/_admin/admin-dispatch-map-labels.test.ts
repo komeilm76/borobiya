@@ -13,7 +13,7 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('filter: ["==", ["get", "isSelected"], true]');
     expect(source).toContain('"text-field": ["get", "username"]');
     expect(source).toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
-    expect(source).toContain('"text-radial-offset": 1.5');
+    expect(source).toContain('"text-radial-offset": 3.8');
     expect(source).toContain('"text-variable-anchor": ["left", "right", "top", "bottom"]');
     expect(source).toContain('"text-halo-color": palettes[themeStore.isDark ? "dark" : "light"].surface');
     expect(source).toContain('!adminSos.responderSearch');
@@ -43,6 +43,10 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('"circle-stroke-color": "#f7b632"');
     expect(source).toContain('paint: { "text-color": "#ffffff" }');
     expect(template!.content).toContain('class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"');
+    expect(template!.content).toContain('v-for="item in sosSeverityKey"');
+    expect(template!.content).toContain('SOS_MAP_MARKER_COLORS[item.severity]');
+    expect(template!.content).toContain('nearbyFeatures.features.length > 1');
+    expect(styles[0]!.content).toContain('background: var(--dispatch-helper-color, #0868c8)');
     expect(template!.content).toContain('<li v-if="adminSos.selectedRequest">');
     expect(source).toContain('window.matchMedia?.("(prefers-reduced-motion: reduce)").matches');
     expect(source).toContain('watch(() => themeStore.isDark, () => {');

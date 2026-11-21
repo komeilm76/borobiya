@@ -381,10 +381,16 @@
               </div>
             </div>
           </div>
-          <ul class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه">
-            <li><span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert" aria-hidden="true" />حادثه · رنگ بر اساس شدت</li>
+          <ul class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
+            :style="{ '--dispatch-helper-color': themeStore.isDark ? '#205fd1' : '#0868c8' }">
+            <li v-for="item in sosSeverityKey" :key="item.severity">
+              <span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert"
+                :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[item.severity] }" aria-hidden="true" />
+              حادثه {{ item.label }}
+            </li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
+            <li v-if="adminSos.selectedRequest && nearbyFeatures.features.length > 1"><span class="dispatch-map-key__cluster" aria-hidden="true">+۲</span>چند امدادگر در یک ناحیه</li>
           </ul>
         </v-card>
         <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
@@ -652,6 +658,7 @@ import {
   buildSosAlertsGeoJson,
   buildEligibleResponderGeoJson,
   formatResponderDistance,
+  SOS_MAP_MARKER_COLORS,
   SOS_SEVERITY_PRESENTATION,
   SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
@@ -665,12 +672,18 @@ import { needsOverlayRestore } from "@/map/overlay-restore";
 import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { palettes } from "@/styles/tokens";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
-import { DISPATCH_PIN_IMAGES, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
+
+const sosSeverityKey = [
+  { severity: "high", label: "فوری" },
+  { severity: "medium", label: "متوسط" },
+  { severity: "low", label: "کم‌خطر" }
+] as const;
 
 const SOS_SOURCE_ID = "admin-sos-requests";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
@@ -884,7 +897,10 @@ let pinImagesSupported = true;
 function registerPins(map: MapLibreMap): void {
   if (!pinImagesSupported) return;
   try { ensureDispatchPinImages(map, themeStore.isDark); }
-  catch { pinImagesSupported = false; } // Keep circle fallback if 2D canvas is unavailable.
+  catch (error) {
+    if (error instanceof DispatchPinCanvasUnavailable) pinImagesSupported = false; // Circle fallback.
+    else throw error; // A style swap is temporary: retry once MapLibre finishes loading.
+  }
 }
 
 function ensureResponderMapLayers(map: MapLibreMap): void {
@@ -939,13 +955,13 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     id: RESPONDER_PIN_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["!", ["has", "point_count"]],
     layout: { "icon-image": DISPATCH_PIN_IMAGES.helper, "icon-anchor": "bottom",
-      "icon-size": .72, "icon-allow-overlap": true, "icon-ignore-placement": true }
+      "icon-size": .72, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
   }, before);
   if (!map.getLayer(RESPONDER_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "isSelected"], false]],
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 13, "text-anchor": "left", "text-radial-offset": 1.5,
+      "text-size": 13, "text-anchor": "left", "text-radial-offset": 3.8,
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto", "text-max-width": 9 },
     paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 2 }
   }, before);
@@ -974,13 +990,13 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   if (pinReady && !map.getLayer(RESPONDER_SELECTED_PIN_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_PIN_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
     layout: { "icon-image": DISPATCH_PIN_IMAGES.selectedHelper, "icon-anchor": "bottom",
-      "icon-size": .76, "icon-allow-overlap": true, "icon-ignore-placement": true }
+      "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
   }, before);
   if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-anchor": "top", "text-radial-offset": 1.5,
-      "text-variable-anchor": ["top", "bottom", "left", "right"], "text-justify": "auto",
+      "text-size": 14, "text-anchor": "left", "text-radial-offset": 3.8,
+      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto",
       "text-max-width": 9, "text-allow-overlap": true },
     paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 3 }
   }, before);
@@ -1016,6 +1032,10 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       paint: {
         "circle-color": ["get", "color"],
         "circle-radius": 18,
+        // The canvas pin's head is ~35px above its geographic tip. In the
+        // no-canvas circle fallback, the head is centered on the coordinate.
+        "circle-translate": pinReady ? [0, -35] : [0, 0],
+        "circle-translate-anchor": "viewport",
         "circle-opacity": 0.35
       }
     });
@@ -1045,13 +1065,13 @@ function ensureSosMapLayers(map: MapLibreMap): void {
   if (pinReady && !map.getLayer(SOS_PIN_LAYER_ID)) map.addLayer({
     id: SOS_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
     layout: { "icon-image": ["get", "pinImage"], "icon-anchor": "bottom",
-      "icon-size": .76, "icon-allow-overlap": true, "icon-ignore-placement": true }
+      "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
   });
   if (!map.getLayer(SOS_TITLE_LAYER_ID)) map.addLayer({
     id: SOS_TITLE_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
     filter: ["==", ["get", "isSelected"], true],
     layout: { "text-field": ["get", "mapTitle"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-anchor": "left", "text-radial-offset": 1.5,
+      "text-size": 14, "text-anchor": "left", "text-radial-offset": 3.8,
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto",
       "text-allow-overlap": true, "text-max-width": 10 },
     paint: { "text-color": palettes[themeStore.isDark ? "dark" : "light"].text,
@@ -1596,13 +1616,19 @@ onBeforeUnmount(() => {
 .dispatch-map-key__icon::after, .dispatch-map-key__selected::before {
   content: ""; position: absolute; z-index: -1; top: 2px; left: 3px;
   width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50% 50% 50% 4px;
-  background: #dc2626; box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: rotate(-45deg); }
-.dispatch-map-key__icon--helper::after { background: #0868c8; }
-.dispatch-map-key__selected::before { background: #205fd1; border-color: #f7b632; }
+  background: var(--dispatch-sos-color, #dc2626);
+  box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: rotate(-45deg); }
+.dispatch-map-key__icon--helper::after { background: var(--dispatch-helper-color, #0868c8); }
+.dispatch-map-key__selected::before { background: var(--dispatch-helper-color, #0868c8); border-color: #f7b632; }
+.dispatch-map-key__cluster { display: inline-grid; place-items: center; flex: 0 0 32px;
+  width: 32px; height: 32px; border: 3px solid #fff; border-radius: 50%;
+  color: #fff; background: var(--dispatch-helper-color, #0868c8);
+  box-shadow: 0 0 0 1px rgba(var(--v-theme-on-surface), .25); font: 800 .7rem/1 var(--bb-font-family); }
 @media (forced-colors: active) {
   .dispatch-map-key__icon, .dispatch-map-key__selected { color: CanvasText; }
-  .dispatch-map-key__icon::after, .dispatch-map-key__selected::before {
-    border-color: CanvasText; background: Canvas; box-shadow: none; }
+  .dispatch-map-key__icon::after, .dispatch-map-key__selected::before,
+  .dispatch-map-key__cluster { border-color: CanvasText; color: CanvasText;
+    background: Canvas; box-shadow: none; }
 }
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */

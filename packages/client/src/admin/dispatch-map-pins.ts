@@ -20,12 +20,14 @@ export function sosPinImage(status: string, severity: "high" | "medium" | "low",
     : DISPATCH_PIN_IMAGES[level];
 }
 
+export class DispatchPinCanvasUnavailable extends Error {}
+
 export function drawDispatchPin(color: string, kind: "sos" | "helper", selected = false,
   canvas: HTMLCanvasElement = document.createElement("canvas")): ImageData {
   canvas.width = 64;
   canvas.height = 72;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("2D canvas is required for dispatch map pins.");
+  if (!ctx) throw new DispatchPinCanvasUnavailable("2D canvas is required for dispatch map pins.");
   // A substantial, outlined teardrop: the thin rim and distinct interior pictogram
   // remain recognizable on both light and dark raster tiles at zoom 10–18.
   ctx.beginPath();

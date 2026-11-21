@@ -34,6 +34,10 @@ describe("shared semantic map points", () => {
     point.listener?.({ stopPropagation });
     expect(stopPropagation).toHaveBeenCalledOnce();
     expect(activated).toHaveBeenCalledOnce();
+    const captionedStop = createMapPointElement("stop", "باز کردن برنامهٔ مسیر",
+      { number: 3, caption: "ایستگاه ۳", onActivate: activated }) as unknown as FakeElement;
+    expect(captionedStop.children.map((child) => child.className)).toEqual(["bb-map-point__sign", "bb-map-point__caption"]);
+    expect(captionedStop.attrs["aria-label"]).toContain("باز کردن برنامهٔ مسیر");
     const origin = createMapPointElement("start", "نه موقعیت زنده", { caption: "<مبدأ>" }) as unknown as FakeElement;
     expect(origin.tag).toBe("div");
     expect(origin.attrs.role).toBe("img");

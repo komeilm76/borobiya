@@ -63,11 +63,15 @@ export function createMapPointElement(kind: MapPointKind, detail: string, option
     element.append(caption);
   }
   if (interactive) {
-    const tooltip = document.createElement("span");
-    tooltip.className = "bb-map-point__tooltip";
-    tooltip.textContent = detail || name;
-    tooltip.setAttribute("aria-hidden", "true");
-    element.append(tooltip);
+    // A caption already sits above/below the pin. Adding a hover/focus tooltip
+    // at the same position hides that caption (and selected-place callouts).
+    if (!options.caption) {
+      const tooltip = document.createElement("span");
+      tooltip.className = "bb-map-point__tooltip";
+      tooltip.textContent = detail || name;
+      tooltip.setAttribute("aria-hidden", "true");
+      element.append(tooltip);
+    }
     element.addEventListener("click", (event) => { event.stopPropagation(); options.onActivate?.(); });
   }
   return element;

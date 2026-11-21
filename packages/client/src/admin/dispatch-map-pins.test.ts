@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { DISPATCH_PIN_IMAGES, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, drawDispatchPin, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
 
 // Do not mount Vue components in unit tests (docs/TASKS.md).
 const dispatch = readFileSync(new URL("../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8");
@@ -39,9 +39,25 @@ describe("actual Dispatch map symbols", () => {
       ids.clear(); // setStyle discards runtime images
       ensureDispatchPinImages(map as never, true);
       expect(addImage).toHaveBeenCalledTimes(ids.size * 2);
+      ids.clear();
+      let failOnce = true;
+      const swappingStyle = { hasImage: (id: string) => ids.has(id), addImage: (id: string) => {
+        if (failOnce) { failOnce = false; throw new Error("Style is not loaded"); }
+        ids.add(id);
+      } };
+      expect(() => ensureDispatchPinImages(swappingStyle as never, false)).toThrow("Style is not loaded");
+      expect(() => ensureDispatchPinImages(swappingStyle as never, false)).not.toThrow();
+      expect(ids.size).toBe(Object.keys(DISPATCH_PIN_IMAGES).length);
     } finally {
       Object.defineProperty(globalThis, "document", { configurable: true, value: originalDocument });
     }
+  });
+
+  it("distinguishes unavailable 2D canvas from transient map-style errors", () => {
+    expect(() => drawDispatchPin("#dc2626", "sos", false,
+      { getContext: () => null } as unknown as HTMLCanvasElement)).toThrow(DispatchPinCanvasUnavailable);
+    expect(dispatch).toContain('if (error instanceof DispatchPinCanvasUnavailable) pinImagesSupported = false');
+    expect(dispatch).toContain('else throw error; // A style swap is temporary');
   });
 
   it("plots symbols from real SOS and qualified responder sources and keeps their click layers", () => {
@@ -50,6 +66,8 @@ describe("actual Dispatch map symbols", () => {
     expect(dispatch).toContain('id: RESPONDER_PIN_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID');
     expect(dispatch).toContain('id: RESPONDER_SELECTED_PIN_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID');
     expect(dispatch).toContain('"icon-anchor": "bottom"');
+    expect(dispatch).toContain('"icon-offset": [0, 4]');
+    expect(dispatch).toContain('"circle-translate": pinReady ? [0, -35] : [0, 0]');
     expect(dispatch).toContain('feature.layer.id === SOS_PIN_LAYER_ID');
     expect(dispatch).toContain('feature.layer.id === RESPONDER_PIN_LAYER_ID');
     expect(dispatch).toContain('"circle-stroke-opacity": pinReady ? 0 : 1');
