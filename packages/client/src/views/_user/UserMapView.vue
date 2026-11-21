@@ -3288,6 +3288,19 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view [data-bb-point-edge="left"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) { --bb-edge-arrow-rotation: -90deg; direction: ltr; }
 :global(.user-map-view [data-bb-point-edge="right"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) { --bb-edge-arrow-rotation: 90deg; }
 :global(.user-map-view [data-bb-point-edge="left"] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))::before) { border-radius: 0 .65rem .65rem 0; }
+/* Dark tiles and the dark UI surface nearly merge. Use a solid, light map-only
+   label with a dark silhouette so POIs remain locatable over land AND pale roads.
+   Keep the pin-colored border/connector and the compact edge-cue geometry. */
+@media (forced-colors: none) {
+  :global(:root.dark .user-map-view :is(.bb-map-point__caption, .bb-map-point__tooltip, .user-map-view__selected-place-label:not([hidden]), .user-map-view__result-marker__tooltip)) {
+    background: #f4f7f6; color: #193536;
+    box-shadow: 0 0 0 2px #152b2d, 0 6px 18px rgba(0, 0, 0, .72);
+  }
+  /* The dark theme's light primary cannot carry a white arrow glyph. */
+  :global(:root.dark .user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label) {
+    --bb-edge-color: #0e6666;
+  }
+}
 @media (forced-colors: active) {
   :global(.user-map-view [data-bb-point-edge] :is(.bb-map-point__caption, .user-map-view__selected-place-label:not([hidden]))) {
     background: Canvas; color: CanvasText; outline: 1px solid CanvasText;
