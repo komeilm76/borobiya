@@ -93,7 +93,6 @@
       </v-btn>
       <v-btn v-if="live.sharing.value" color="error" variant="tonal" rounded="lg"
         @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
-      <p>ارسال موقعیت مدیر ابتدا خاموش است. پس از ذخیرهٔ گیرندگان، ارسال آن را جداگانه آغاز کنید. پخش عمومی مستقل است.</p>
     </details>
     <template v-if="!fullscreen && !isAdmin">
       <p class="live-panel__note" role="status">برنامه در مأموریت فعال اشتراک خصوصی موقعیت شما را خودکار آغاز می‌کند؛ دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد. پخش عمومی مستقل است.</p>

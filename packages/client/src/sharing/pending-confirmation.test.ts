@@ -7,7 +7,7 @@ const devices = readFileSync(new URL("../components/settings/DevicePriorityPanel
 const dispatch = readFileSync(new URL("../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8");
 
 function dialog(source: string, model: string): string {
-  const start = source.indexOf(`<v-dialog v-model="${model}"`);
+  const start = source.indexOf(`v-model="${model}"`);
   expect(start, `dialog ${model}`).toBeGreaterThanOrEqual(0);
   const end = source.indexOf("</v-dialog>", start);
   expect(end, `closing tag for ${model}`).toBeGreaterThan(start);

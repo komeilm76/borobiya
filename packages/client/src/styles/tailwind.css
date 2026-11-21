@@ -522,8 +522,8 @@ a {
   .app-topbar .v-toolbar__content { padding-inline: 0.5rem !important; }
 }
 
-/* The companion map owns the entire viewport at every width. Its single menu
- * launcher and drawer replace (rather than overlay) the shared app bar. */
+/* Fullscreen map workspaces own the viewport. The menu launcher and drawer
+ * replace (rather than overlay) the shared app bar. */
 .app-shell--map { min-height: 100dvh; }
 .app-shell--map .app-main {
   min-height: 100dvh;
@@ -532,6 +532,11 @@ a {
   overflow: hidden;
 }
 .app-shell--map .app-footer { display: none; }
+/* Keep network status beside, not on top of, the dispatch sidebar heading. */
+.app-shell--map:has(.admin-dispatch) .network-status-icon--floating {
+  left: calc(4.25rem + env(safe-area-inset-left, 0px)); right: auto;
+}
+
 
 /* The network indicator and mission-offer bell are both map-shell controls.
    Give each its own 48px slot rather than painting one on top of the other. */

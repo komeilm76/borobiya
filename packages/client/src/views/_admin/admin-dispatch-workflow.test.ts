@@ -9,26 +9,26 @@ const css = parse(source).descriptor.styles[0]!.content;
 
 describe("admin SOS triage flow", () => {
   it("puts selection, incident context and responder action before optional history", () => {
-    const queue = template.indexOf('class="admin-dispatch__queue"');
-    const detail = template.indexOf('class="admin-dispatch__detail-heading"');
-    const map = template.indexOf('<MapCanvas');
     const responders = template.indexOf('id="dispatch-responders"');
+    const queue = template.indexOf('id="dispatch-queue"');
+    const map = template.indexOf('<MapCanvas');
+    const detail = template.indexOf('class="admin-dispatch__detail-heading"');
     const timeline = template.indexOf('class="mb-3 pa-3 dispatch-mission-timeline"');
-    const live = template.indexOf('<MissionLivePanel v-for="mission in activeMissions"');
-    expect(queue).toBeGreaterThan(0);
-    expect(queue).toBeLessThan(detail);
-    expect(detail).toBeLessThan(map);
-    expect(map).toBeLessThan(responders);
-    expect(responders).toBeLessThan(timeline);
+    const live = template.indexOf('v-for="mission in activeMissions"');
+    expect(responders).toBeGreaterThan(0);
+    expect(responders).toBeLessThan(queue);
+    expect(queue).toBeLessThan(map);
+    expect(map).toBeLessThan(detail);
+    expect(detail).toBeLessThan(timeline);
     expect(timeline).toBeLessThan(live);
     expect(template).toContain('v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"');
-    expect(template).toContain('v-if="adminSos.visibleRequests.length && !adminSos.selectedRequest"');
+    expect(template).toContain('v-if="!adminSos.selectedRequest"');
     expect(template).toContain('v-if="adminSos.nearestLoaded && !adminSos.nearestLoading"');
     expect(template).toContain(':disabled="!adminSos.canDispatchSelected"');
   });
 
   it("keeps incident evidence visible and uses the jump only for navigation, not dispatch", () => {
-    const detail = template.slice(template.indexOf('class="admin-dispatch__detail-heading"'), template.indexOf('<v-col cols="12" lg="7"'));
+    const detail = template.slice(template.indexOf('class="admin-dispatch__detail-heading"'), template.indexOf('id="dispatch-dialog-01"'));
     expect(detail).toContain('adminSos.selectedRequest.requesterId');
     expect(detail).toContain('adminSos.selectedRequest.description');
     expect(detail).toContain('class="admin-dispatch__facts"');
@@ -38,8 +38,7 @@ describe("admin SOS triage flow", () => {
     expect(detail).toContain('aria-controls="dispatch-responders" @click="focusResponders"');
     expect(detail).toContain('aria-controls="dispatch-map" @click="focusSelectedIncidentMap"');
     expect(detail).not.toContain('@click="requestDispatch"');
-    // On stacked layouts the map is below a long queue; an explicit jump must
-    // reveal it, keep the selected incident framed, and hand off keyboard focus.
+    // The map jump keeps the incident framed and hands off keyboard focus.
     const mapJump = source.slice(source.indexOf('function focusSelectedIncidentMap(): void {'),
       source.indexOf('function focusNearbyResponder(userId: string): void {'));
     expect(mapJump).toContain('frameSelectedIncident();');
@@ -65,13 +64,13 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('@click="toggleQueueRequest(item)"');
     expect(template).toContain('variant="outlined">لغو انتخاب</v-chip>');
     expect(source).toMatch(/function toggleQueueRequest\(item: SosRequestRecord\): void \{[\s\S]*?toggleSosQueueSelection\(adminSos.selectedId, item.id\) === null\)[\s\S]*?adminSos.selectRequest\(null\);[\s\S]*?focusRequest\(item\);/);
-    const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-incident"'));
+    const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-map-region"'));
     expect(queue).toContain('item.location.isManual');
     expect(queue).toContain('item.photoUrl');
     expect(queue).not.toContain('item.description'); // Full incident description belongs in the selected-request card.
     expect(queue).not.toContain('item.location.lat.toFixed'); // Coordinates live in incident facts and on the map.
     expect(template).toContain('adminSos.selectedRequest.location.lat.toFixed(6)');
-    expect(template).toContain('<details :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">');
+    expect(template).toContain(':key="adminSos.selectedRequest.id" class="admin-dispatch__location-details"');
     expect(template).toContain('class="admin-dispatch__sender-id"');
     expect(template).toContain('class="admin-dispatch__photo-open"');
     expect(template).toContain('v-model="photoDialogOpen"');
@@ -88,7 +87,7 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('class="admin-dispatch__search-help"');
     expect(template).toContain('v-else-if="adminSos.nearestError"');
     expect(template).toContain('class="admin-dispatch__submit');
-    expect(template).toContain('v-else-if="requestMissions.length" :key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline"');
+    expect(template).toContain(':key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline"');
     expect(template).toContain('class="admin-dispatch__followup mb-3"');
     expect(template).toContain(':aria-expanded="showLivePanel"');
     expect(template).toContain('@click="showLivePanel = !showLivePanel"');

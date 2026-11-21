@@ -1,12 +1,13 @@
 <template>
-  <v-container class="admin-dispatch py-6" fluid>
-    <header class="admin-dispatch__header mb-5">
+  <main id="dispatch-workspace" class="admin-dispatch" aria-label="مرکز پایش و اعزام اضطراری">
+    <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="امدادگران نزدیک و صف SOS">
+    <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
         <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
         <div class="admin-dispatch__heading d-flex flex-wrap align-center ga-2">
           <v-icon color="error" icon="mdi-radar" size="28" />
           <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
-          <v-chip
+          <v-chip id="dispatch-chip-01"
             :color="adminSos.connected ? 'success' : 'warning'"
             size="small"
             variant="tonal"
@@ -14,12 +15,11 @@
             {{ adminSos.connected ? "متصل به اتاق زندهٔ ادمین" : "در حال اتصال زنده…" }}
           </v-chip>
         </div>
-        <p class="admin-dispatch__intro-note">صف را بررسی کنید، شواهد و موقعیت را بسنجید، سپس به امدادگران واجد شرایط پیشنهاد بفرستید.</p>
       </div>
 
       <div class="admin-dispatch__toolbar">
         <div class="admin-dispatch__filter-group" role="group" aria-label="فیلتر وضعیت درخواست‌ها">
-          <v-select
+          <v-select id="dispatch-select-01"
             :model-value="adminSos.filterStatus"
             :items="dispatchFilters"
             class="admin-dispatch__filter-select d-md-none"
@@ -33,7 +33,7 @@
             hide-details
             @update:model-value="onFilterChange"
           />
-          <v-btn-toggle
+          <v-btn-toggle id="dispatch-toggle-01"
             class="admin-dispatch__filter-toggle d-none d-md-inline-flex"
             :model-value="adminSos.filterStatus"
             aria-label="وضعیت درخواست‌های اضطراری"
@@ -44,20 +44,20 @@
             variant="text"
             @update:model-value="onFilterChange"
           >
-            <v-btn value="pending">
+            <v-btn id="dispatch-action-01" value="pending">
               در انتظار رسیدگی
             </v-btn>
-            <v-btn value="dispatched">
+            <v-btn id="dispatch-action-02" value="dispatched">
               اعزام‌شده
             </v-btn>
-            <v-btn value="all">
+            <v-btn id="dispatch-action-03" value="all">
               همه
             </v-btn>
           </v-btn-toggle>
         </div>
 
         <div class="admin-dispatch__toolbar-actions" role="group" aria-label="کنترل‌های هشدار و بازخوانی">
-          <v-btn
+          <v-btn id="dispatch-action-04"
             density="compact"
             size="small"
             :aria-label="adminSos.soundMuted ? 'فعال‌سازی صدای هشدار' : 'بی‌صدا کردن هشدار'"
@@ -70,7 +70,7 @@
             {{ adminSos.soundMuted ? "بی‌صدا" : "صدای فعال" }}
           </v-btn>
 
-          <v-btn
+          <v-btn id="dispatch-action-05"
             density="compact"
             size="small"
             prepend-icon="mdi-bell-ring-outline"
@@ -81,7 +81,7 @@
             تست صدا
           </v-btn>
 
-          <v-btn
+          <v-btn id="dispatch-action-06"
             :loading="adminSos.loading"
             aria-label="بازخوانی فهرست درخواست‌های اضطراری"
             density="compact"
@@ -94,12 +94,12 @@
       </div>
     </header>
 
-    <v-alert v-if="soundTestError" type="warning" variant="tonal" role="alert" closable class="mb-4"
+    <v-alert id="dispatch-notice-01" v-if="soundTestError" type="warning" variant="tonal" role="alert" closable class="mb-4"
       @click:close="soundTestError = null">
       {{ soundTestError }}
     </v-alert>
 
-    <v-alert
+    <v-alert id="dispatch-notice-02"
       v-if="adminSos.errorMessage"
       class="mb-4"
       closable
@@ -110,11 +110,11 @@
       {{ adminSos.errorMessage }}
     </v-alert>
 
-    <v-alert v-if="adminSos.quickDispatchFeedback" :type="adminSos.quickDispatchFeedback.type"
+    <v-alert id="dispatch-notice-03" v-if="adminSos.quickDispatchFeedback" :type="adminSos.quickDispatchFeedback.type"
       variant="tonal" rounded="lg" role="status" class="mb-4">
       {{ adminSos.quickDispatchFeedback.message }}
     </v-alert>
-    <v-alert
+    <v-alert id="dispatch-notice-04"
       v-if="adminSos.urgentReplacement"
       class="replacement-flash mb-4"
       color="error"
@@ -135,30 +135,208 @@
           </p>
         </div>
         <div class="d-flex flex-wrap ga-2">
-          <v-btn color="error" variant="flat" :loading="adminSos.dispatchSubmitting"
+          <v-btn id="dispatch-action-07" color="error" variant="flat" :loading="adminSos.dispatchSubmitting"
             :disabled="adminSos.dispatchSubmitting"
             @click="quickRedispatch(adminSos.urgentReplacement.sosRequestId)">
             اعزام فوری به امدادگران جدید
           </v-btn>
-          <v-btn color="error" variant="tonal" @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">
+          <v-btn id="dispatch-action-08" color="error" variant="tonal" @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">
             مشاهدهٔ درخواست و اعزام
           </v-btn>
-          <v-btn color="error" variant="text" @click="adminSos.dismissUrgentReplacement()">بستن هشدار</v-btn>
+          <v-btn id="dispatch-action-09" color="error" variant="text" @click="adminSos.dismissUrgentReplacement()">بستن هشدار</v-btn>
         </div>
       </div>
     </v-alert>
 
-    <!-- Triage queue stays first in DOM and visual order when the columns stack. -->
-    <v-row class="admin-dispatch__workspace">
-      <v-col cols="12" lg="5" class="admin-dispatch__queue">
-        <p class="admin-dispatch__section-label">۰۱ / بررسی درخواست‌ها</p>
+    <section id="dispatch-queue-region" class="admin-dispatch__queue" aria-label="صف درخواست‌ها">
+        <section id="dispatch-nearby" class="admin-dispatch__nearby" aria-label="امدادگران نزدیک">
+          <div v-if="!adminSos.selectedRequest" class="admin-dispatch__nearby-empty" role="status">
+            <strong>امدادگران نزدیک</strong>
+            <span>برای مشاهدهٔ امدادگران واجد شرایط، یک درخواست SOS انتخاب کنید.</span>
+          </div>
+        <v-card v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"
+          class="admin-dispatch__surface admin-dispatch__responders bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
+          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
+            <div class="d-flex align-center ga-2">
+              <v-icon color="primary" icon="mdi-account-group-outline" />
+              <span>{{ adminSos.responderSearch ? 'جست‌وجوی دستی برای اعزام' : 'نزدیک‌ترین امدادگران واجد شرایط' }}</span>
+              <v-chip id="dispatch-chip-02" v-if="adminSos.nearestLoaded && !adminSos.nearestLoading" color="primary" size="x-small" variant="tonal">
+                {{ adminSos.nearestResponders.length }} نفر
+              </v-chip>
+              <v-chip id="dispatch-chip-03" v-else color="warning" size="x-small" variant="tonal">
+                {{ adminSos.nearestLoading ? 'در حال بررسی' : 'نامطمئن' }}
+              </v-chip>
+            </div>
+
+            <div class="d-flex align-center ga-1">
+              <v-btn id="dispatch-action-10"
+                :disabled="!adminSos.nearestLoaded || adminSos.nearestLoading || adminSos.nearestResponders.length === 0"
+                size="small"
+                variant="text"
+                @click="adminSos.selectAllNearestResponders()"
+              >
+                انتخاب همه
+              </v-btn>
+              <v-btn id="dispatch-action-11"
+                v-if="adminSos.selectedResponderIds.length > 0"
+                size="small"
+                variant="text"
+                @click="adminSos.clearResponderSelection()"
+              >
+                پاک‌سازی انتخاب
+              </v-btn>
+              <v-btn id="dispatch-action-12"
+                :loading="adminSos.nearestLoading"
+                aria-label="بازخوانی امدادگران نزدیک"
+                icon="mdi-refresh"
+                size="small"
+                variant="text"
+                @click="adminSos.loadNearestResponders()"
+              />
+            </div>
+          </v-card-title>
+          <v-divider />
+          <form id="dispatch-form-01" class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
+            <v-text-field id="dispatch-field-01" v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
+              placeholder="حداقل ۲ حرف؛ جست‌وجوی دستی حتی بدون موقعیت یا تخصص مرتبط"
+              variant="outlined" rounded="lg" color="primary" density="compact" hide-details autocomplete="off" maxlength="64"
+              aria-label="جست‌وجوی امدادگر با نام کاربری" />
+            <v-btn id="dispatch-action-13" type="submit" color="primary" variant="flat" rounded="lg" :disabled="responderSearchInput.trim().length === 1"
+              :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
+          </form>
+          <p v-if="adminSos.responderSearch" class="admin-dispatch__manual-warning" role="note">
+            <v-icon icon="mdi-alert-outline" size="18" aria-hidden="true" />
+            جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند؛ پیش از اعزام صلاحیت و دسترسی را بررسی کنید.
+          </p>
+          <details id="dispatch-details-01" class="admin-dispatch__search-help">
+            <summary>معیارهای فهرست امدادگران</summary>
+            <p>{{ adminSos.responderSearch
+              ? 'تا ۱۰ حساب فعال و آزاد با نام کاربری منطبق؛ موقعیت/فاصله در جست‌وجوی دستی نمایش داده نمی‌شود و تخصص مرتبط ممکن است ثبت نشده باشد.'
+              : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند. فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده در فهرست نزدیک‌ترین‌ها هستند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}</p>
+          </details>
+          <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
+            <v-chip :id="`dispatch-chip-04-${id}`" v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
+              variant="tonal" @click:close="adminSos.toggleResponderSelection(id)">
+              @{{ adminSos.selectedResponderNames[id] ?? id }}
+            </v-chip>
+          </div>
+
+          <v-alert id="dispatch-notice-05"
+            v-if="adminSos.dispatchFeedback"
+            :type="adminSos.dispatchFeedback.type"
+            class="ma-4 mb-0"
+            closable
+            density="comfortable"
+            variant="tonal"
+            @click:close="adminSos.dispatchFeedback = null"
+          >
+            {{ adminSos.dispatchFeedback.message }}
+          </v-alert>
+
+          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis" role="status">
+            <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
+            در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
+          </v-card-text>
+
+          <v-alert id="dispatch-notice-06" v-else-if="adminSos.nearestError" class="ma-4" type="error" variant="tonal" role="alert">
+            {{ adminSos.nearestError }}
+            <template #append>
+              <v-btn id="dispatch-action-14" variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
+            </template>
+          </v-alert>
+
+          <v-card-text
+            v-else-if="adminSos.nearestLoaded && adminSos.nearestResponders.length === 0"
+            class="py-6 text-center text-medium-emphasis" role="status"
+          >
+            {{ adminSos.responderSearch
+              ? 'برای این نام کاربری حساب فعال و آزاد دیگری یافت نشد. نام کاربری را بررسی کنید.'
+              : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
+          </v-card-text>
+
+          <v-list id="dispatch-list-01" v-else-if="adminSos.nearestLoaded" class="responder-list" lines="two" aria-label="امدادگران واجد شرایط یا جست‌وجوشده">
+            <v-list-item v-for="responder in adminSos.nearestResponders" :key="responder.userId"
+              :id="`dispatch-responder-${responder.userId}`"
+              :active="adminSos.selectedResponderIds.includes(responder.userId)"
+              class="dispatch-responder-row"
+              @click="adminSos.toggleResponderSelection(responder.userId)"
+            >
+                <template #prepend>
+                  <v-checkbox-btn  :id="`dispatch-check-${responder.userId}`"
+                    :model-value="adminSos.selectedResponderIds.includes(responder.userId)"
+                    :aria-label="`انتخاب امدادگر ${responder.username}`"
+                    color="primary"
+                    @click.stop="adminSos.toggleResponderSelection(responder.userId)"
+                  />
+                </template>
+
+                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
+                  <div class="d-flex align-center ga-2">
+                    <span dir="ltr">@{{ responder.username }}</span>
+                    <v-chip :id="`dispatch-chip-05-${responder.userId}`"
+                      v-if="proposedRescuerIdSet.has(responder.userId)"
+                      color="info"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      پیشنهاد ارسال‌شده
+                    </v-chip>
+                  </div>
+
+                  <div class="d-flex align-center ga-2">
+                    <v-chip :id="`dispatch-chip-06-${responder.userId}`" :color="responder.distance === null ? 'warning' : 'primary'" size="x-small" variant="flat">
+                      {{ responder.distance === null ? 'فاصله نامشخص' : formatDistance(responder.distance) }}
+                    </v-chip>
+                    <v-chip :id="`dispatch-chip-07-${responder.userId}`" color="amber-darken-2" size="x-small" variant="tonal">
+                      {{ responder.avgRating !== null ? `★ ${responder.avgRating.toFixed(1)}` : "بدون امتیاز" }}
+                    </v-chip>
+                  </div>
+                </v-list-item-title>
+
+                <v-list-item-subtitle class="d-flex flex-wrap align-center ga-2 mt-1">
+                  <span v-if="responder.categoryName">تخصص: {{ responder.categoryName }}</span>
+                  <span v-else class="text-warning">تخصص مرتبط ثبت نشده</span>
+                  <span>•</span>
+                  <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
+                </v-list-item-subtitle>
+                <template v-if="!adminSos.responderSearch && nearbyFeatures.features.some((feature) => feature.id === responder.userId)" #append>
+                  <v-btn :id="`dispatch-action-15-${responder.userId}`" icon="mdi-map-marker-radius-outline" variant="text" color="primary"
+                    :aria-label="`نمایش آخرین موقعیت ثبت‌شدهٔ ${responder.username} روی نقشه`"
+                    :title="`نمایش ${responder.username} روی نقشه`" @click.stop="focusNearbyResponder(responder.userId)" />
+                </template>
+              </v-list-item>
+          </v-list>
+          <v-card-text v-else class="py-6 text-center text-medium-emphasis" role="status">
+            فهرست امدادگران هنوز تأیید نشده است؛ نتیجهٔ خالی نمی‌توان گرفت.
+            <v-btn id="dispatch-action-16" variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
+          </v-card-text>
+
+          <v-divider />
+          <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
+            <span class="text-caption text-medium-emphasis">
+              {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
+            </span>
+            <v-btn id="dispatch-action-17"
+              :disabled="!adminSos.canDispatchSelected"
+              :loading="adminSos.dispatchSubmitting"
+              color="error"
+              prepend-icon="mdi-send-check-outline"
+              rounded="lg"
+              variant="flat"
+              @click="requestDispatch"
+            >
+              اعزام امدادگران انتخاب‌شده ({{ adminSos.selectedResponderIds.length }})
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+        </section>
         <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
-            <v-chip v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
+            <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
               {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
             </v-chip>
-            <v-chip v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
+            <v-chip id="dispatch-chip-09" v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
           </v-card-title>
           <v-divider />
 
@@ -170,19 +348,20 @@
             class="py-8 text-center" role="status">
             صف هنوز تأیید نشده است؛ نبودن درخواست اضطراری را نمی‌توان نتیجه گرفت.
             <span v-if="adminSos.listTruncated">فقط بخشی از درخواست‌ها دریافت شده‌اند.</span>
-            <v-btn variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
+            <v-btn id="dispatch-action-18" variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
           </v-card-text>
           <v-card-text v-else-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis">
             در حال حاضر درخواست اضطراری فعالی در این نما ثبت نشده است. به محض ارسال SOS جدید، نشانگر تپنده و هشدار صوتی فعال می‌شود.
           </v-card-text>
-          <v-alert v-if="adminSos.visibleRequests.length && !adminSos.queueVerified" type="warning" variant="tonal"
+          <v-alert id="dispatch-notice-07" v-if="adminSos.visibleRequests.length && !adminSos.queueVerified" type="warning" variant="tonal"
             density="compact" role="status" class="ma-3">
             این فهرست هنوز تأیید نشده است؛ وضعیت موارد نمایشی ممکن است قدیمی باشد یا درخواست‌های بیشتری در صف باشند.
             <span v-if="adminSos.listTruncated">فقط نخستین ۱۰۰ مورد خوانده شدند.</span>
           </v-alert>
 
-          <v-list v-if="adminSos.visibleRequests.length" class="dispatch-request-list" lines="two" aria-label="فهرست درخواست‌های SOS">
+          <v-list id="dispatch-list-02" v-if="adminSos.visibleRequests.length" class="dispatch-request-list" lines="two" aria-label="فهرست درخواست‌های SOS">
             <v-list-item v-for="item in adminSos.visibleRequests" :key="item.id"
+              :id="`dispatch-sos-${item.id}`"
               :active="item.id === adminSos.selectedId"
               :aria-current="item.id === adminSos.selectedId ? 'true' : undefined"
               :aria-pressed="item.id === adminSos.selectedId"
@@ -200,18 +379,18 @@
                 <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
                   <span>{{ incidentLabel(item.incidentTypeId) }}</span>
                   <div class="d-flex flex-wrap align-center ga-1">
-                    <v-chip v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
-                    <v-chip v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
+                    <v-chip :id="`dispatch-chip-10-${item.id}`" v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
+                    <v-chip :id="`dispatch-chip-11-${item.id}`" v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
                       نیازمند جایگزین
                     </v-chip>
-                    <v-chip v-else
+                    <v-chip :id="`dispatch-chip-12-${item.id}`" v-else
                       :color="statusMeta(item.status).badgeColor"
                       size="x-small"
                       variant="tonal"
                     >
                       {{ statusMeta(item.status).label }}
                     </v-chip>
-                    <v-chip
+                    <v-chip :id="`dispatch-chip-13-${item.id}`"
                       :color="severityMeta(item.severity).badgeColor"
                       size="x-small"
                       variant="flat"
@@ -232,6 +411,133 @@
           </v-list>
         </v-card>
 
+    </section>
+    </aside>
+    <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
+        <div id="dispatch-search" class="admin-dispatch__search" role="search" aria-label="جست‌وجو روی نقشه">
+          <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجوی کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
+            prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" variant="solo" rounded="lg"
+            autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
+          <div v-if="searchQuery.length >= 2" id="dispatch-search-results" class="admin-dispatch__search-results"
+            role="listbox" aria-label="نتایج جست‌وجوی نقشه">
+            <button v-for="item in matchedRequests" :key="item.id" type="button" class="admin-dispatch__search-result"
+              :id="`dispatch-search-sos-${item.id}`" role="option" :aria-selected="item.id === adminSos.selectedId"
+              @click="selectSearchRequest(item)">
+              <v-icon icon="mdi-alert-circle-outline" size="20" aria-hidden="true" />
+              <span> SOS · {{ incidentLabel(item.incidentTypeId) }} <small>{{ item.id.slice(0, 8) }}</small></span>
+            </button>
+            <button v-for="user in searchedUsers" :key="user.id" type="button" class="admin-dispatch__search-result"
+              :id="`dispatch-search-account-${user.id}`" role="option" aria-selected="false"
+              @click="focusSearchUser(user)">
+              <v-icon icon="mdi-account-outline" size="20" aria-hidden="true" />
+              <span>کاربر · @{{ user.username }} <small>{{ adminSos.requests.some((item) => item.requesterId === user.id)
+                ? 'موقعیت درخواست SOS' : nearbyFeatures.features.some((feature) => feature.id === user.id)
+                  ? 'موقعیت تأییدشدهٔ امدادگر' : 'پروفایل؛ موقعیت تأییدشده‌ای در دسترس نیست' }}</small></span>
+            </button>
+            <button v-for="responder in matchedResponders" :key="responder.userId" type="button"
+              class="admin-dispatch__search-result" :id="`dispatch-search-user-${responder.userId}`" role="option"
+              :aria-selected="adminSos.selectedResponderIds.includes(responder.userId)" @click="focusSearchResponder(responder.userId)">
+              <v-icon icon="mdi-account-outline" size="20" aria-hidden="true" />
+              <span>امدادگر · @{{ responder.username }}</span>
+            </button>
+            <button v-for="(place, index) in searchedPlaces" :key="place.placeId" type="button" class="admin-dispatch__search-result"
+              :id="`dispatch-search-place-${index}`" role="option" aria-selected="false"
+              @click="focusSearchPlace(place)">
+              <v-icon icon="mdi-map-marker-outline" size="20" aria-hidden="true" />
+              <span>{{ place.name }} <small>{{ place.address }}</small></span>
+            </button>
+            <p v-if="usersLoading" role="status">در حال جست‌وجوی کاربران…</p>
+            <p v-if="usersError" role="alert">جست‌وجوی کاربران در دسترس نیست. <button id="dispatch-users-retry" type="button" @click="retryUserSearch">تلاش دوباره</button></p>
+            <p v-if="searchQuery.length > 30" role="status">برای جست‌وجوی کاربر حداکثر ۳۰ نویسه وارد کنید.</p>
+            <p v-if="placesLoading" role="status">در حال جست‌وجوی مکان‌ها…</p>
+            <p v-if="placesError" role="alert">جست‌وجوی مکان‌ها در دسترس نیست. <button id="dispatch-search-retry" type="button" @click="retryPlaceSearch">تلاش دوباره</button></p>
+            <button v-if="adminSos.selectedRequest && searchQuery.length >= 2" id="dispatch-search-username" type="button"
+              class="admin-dispatch__search-result" role="option" aria-selected="false" @click="searchUsernameOnMap">
+              <v-icon icon="mdi-account-search-outline" size="20" aria-hidden="true" />
+              جست‌وجوی نام کاربری در امدادگران (موقعیت تأیید نمی‌شود)
+            </button>
+            <p v-if="!matchedRequests.length && !matchedResponders.length && !searchedUsers.length && !searchedPlaces.length && !placesLoading && !usersLoading && !placesError && !usersError"
+              role="status">نتیجه‌ای در موارد بارگذاری‌شده پیدا نشد.</p>
+          </div>
+        </div>
+        <v-card id="dispatch-map" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
+          <div class="dispatch-map-wrapper">
+            <MapCanvas id="dispatch-canvas-01"
+              aria-label="نقشهٔ درخواست‌های SOS و آخرین موقعیت ثبت‌شدهٔ امدادگران نزدیک"
+              :style-url="mapStyleUrl"
+              :constrain-bounds="false"
+              :zoom="12"
+              @ready="onMapReady"
+            />
+
+            <div v-if="mapEdgeCues.length" class="dispatch-map-edge-cues" aria-label="نقاط بیرون از قاب نقشه">
+              <button v-for="cue in mapEdgeCues" :key="`${cue.kind}-${cue.id}`" type="button"
+                :id="`dispatch-edge-${cue.kind}-${cue.id}`" class="dispatch-map-edge-cue" :class="[`dispatch-map-edge-cue--${cue.kind}`, `dispatch-map-edge-cue--${cue.edge}`]"
+                :style="{ left: `${cue.x}px`, top: `${cue.y}px`, '--dispatch-edge-color': edgeCueColor(cue) }"
+                :aria-label="`${cue.kind === 'sos' ? 'حادثهٔ انتخاب‌شده' : 'امدادگر نزدیک'} ${cue.label}، بیرون از قاب نقشه در سمت ${edgeCueDirectionLabel[cue.edge]}، نمایش روی نقشه`"
+                :title="cue.label"
+                @click="focusEdgeCue(cue)">
+                <span class="dispatch-map-edge-cue__arrow" aria-hidden="true">
+                  <svg :class="`dispatch-map-edge-cue__arrow--${cue.edge}`" viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 20V4 M5 11l7-7 7 7" fill="none" stroke="currentColor" stroke-width="3.5"
+                      stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span><bdi dir="auto">{{ cue.label }}</bdi>
+              </button>
+            </div>
+
+            <v-btn v-if="adminSos.selectedRequest" id="dispatch-recenter" class="map-selected-alert-card"
+              color="surface" variant="flat" rounded="xl" prepend-icon="mdi-crosshairs-gps"
+              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'"
+              @click="frameSelectedIncident">{{ nearbyFeatures.features.length ? 'حادثه و امدادگران' : 'نمایش محل حادثه' }}</v-btn>
+
+            <div v-if="mapPointChoices.length" id="dispatch-map-choices" class="dispatch-map-choices" role="group"
+              aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه" dir="rtl">
+              <div id="dispatch-map-choices-heading" class="dispatch-map-choices__heading">
+                <strong>نقاط این مکان</strong>
+                <button id="dispatch-button-01" type="button" aria-label="بستن فهرست نقاط" @click="mapPointChoices = []">×</button>
+              </div>
+              <div class="dispatch-map-choices__items">
+                <button :id="`dispatch-button-02-${choice.kind}-${choice.id}`" v-for="choice in mapPointChoices" :key="`${choice.kind}-${choice.id}`" type="button"
+                  @click="activateMapChoice(choice)">{{ choice.label }}</button>
+              </div>
+            </div>
+          </div>
+          <ul id="dispatch-map-legend" class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
+            :style="{ '--dispatch-helper-color': themeStore.isDark ? '#205fd1' : '#0868c8' }">
+            <li v-for="item in sosSeverityKey" :key="item.severity">
+              <span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert"
+                :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[item.severity] }" aria-hidden="true" />
+              حادثه {{ item.label }}
+            </li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--selected-sos mdi mdi-alert"
+              :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[sosMapPriority(adminSos.selectedRequest.status, adminSos.selectedRequest.severity)] }"
+              aria-hidden="true" />حادثه انتخاب‌شده</li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
+            <li v-if="adminSos.selectedRequest && nearbyFeatures.features.length > 1"><span class="dispatch-map-key__cluster" aria-hidden="true">+۲</span>چند امدادگر در یک ناحیه</li>
+          </ul>
+        </v-card>
+        <div v-if="adminSos.selectedRequest" id="dispatch-incident-panel" class="admin-dispatch__incident-panel"
+          :class="{ 'admin-dispatch__incident-panel--expanded': incidentExpanded }">
+          <button id="dispatch-incident-toggle" type="button" class="admin-dispatch__incident-toggle"
+            :aria-expanded="incidentExpanded" aria-controls="dispatch-incident-content"
+            @click="toggleIncidentPanel">
+            <v-icon icon="mdi-alert-circle-outline" color="error" size="22" aria-hidden="true" />
+            <span><strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
+              <small>{{ statusMeta(adminSos.selectedRequest.status).label }} · {{ severityMeta(adminSos.selectedRequest.severity).label }}</small></span>
+            <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
+          </button>
+          <div v-show="incidentExpanded" id="dispatch-incident-content">
+        <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
+          (adminSos.nearestLoading || adminSos.nearestError || adminSos.nearestLoaded)"
+          class="admin-dispatch__map-note" role="status">
+          {{ adminSos.nearestLoading ? 'در حال بررسی امدادگران نزدیک…'
+            : adminSos.nearestError ? 'موقعیت امدادگران تأیید نشد؛ فهرست را بازخوانی کنید.'
+              : nearbyFeatures.features.length ? `نقاط ${nearbyFeatures.features.length.toLocaleString('fa-IR')} امدادگر واجد شرایط، آخرین موقعیت ثبت‌شده‌اند؛ موقعیت زنده نیستند.`
+                : adminSos.nearestLoaded ? 'موقعیت ثبت‌شده‌ای از امدادگران واجد شرایط در دسترس نیست.' : '' }}
+        </p>
+
         <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="admin-dispatch__detail-heading">
             <div class="admin-dispatch__detail-title">
@@ -239,10 +545,10 @@
               <h2>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</h2>
             </div>
             <div class="admin-dispatch__detail-badges">
-              <v-chip :color="statusMeta(adminSos.selectedRequest.status).badgeColor" size="small" variant="tonal">
+              <v-chip id="dispatch-chip-14" :color="statusMeta(adminSos.selectedRequest.status).badgeColor" size="small" variant="tonal">
                 {{ statusMeta(adminSos.selectedRequest.status).label }}
               </v-chip>
-              <v-chip :color="severityMeta(adminSos.selectedRequest.severity).badgeColor" size="small" variant="flat">
+              <v-chip id="dispatch-chip-15" :color="severityMeta(adminSos.selectedRequest.severity).badgeColor" size="small" variant="flat">
                 {{ severityMeta(adminSos.selectedRequest.severity).label }}
               </v-chip>
             </div>
@@ -252,14 +558,14 @@
             <span class="admin-dispatch__sender-icon" aria-hidden="true"><v-icon icon="mdi-account-circle-outline" size="23" /></span>
             <div class="admin-dispatch__sender-copy">
               <strong>ارسال‌کنندهٔ درخواست</strong>
-              <details class="admin-dispatch__sender-id"><summary>شناسهٔ ثبت‌شده</summary>
+              <details id="dispatch-details-02" class="admin-dispatch__sender-id"><summary>شناسهٔ ثبت‌شده</summary>
                 <bdi dir="ltr">{{ adminSos.selectedRequest.requesterId }}</bdi>
               </details>
             </div>
-            <v-btn color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-account-details-outline"
-              class="admin-dispatch__sender-action" @click="senderProfileOpen = true">مشاهدهٔ پروفایل</v-btn>
+            <v-btn id="dispatch-action-19" color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-account-details-outline"
+              class="admin-dispatch__sender-action" @click="profileUserId = null; senderProfileOpen = true">مشاهدهٔ پروفایل</v-btn>
           </div>
-          <v-alert
+          <v-alert id="dispatch-notice-08"
             v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer' &&
               adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
             class="ma-4 mb-0 replacement-flash"
@@ -292,7 +598,7 @@
                 <dd>{{ adminSos.selectedRequest.location.isManual ? "انتخاب دستی روی نقشه" : "GPS دستگاه" }}</dd>
               </div>
             </dl>
-            <details :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">
+            <details id="dispatch-details-03" :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">
               <summary>جزئیات موقعیت و مختصات <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
               <dl class="admin-dispatch__facts">
                 <div>
@@ -307,13 +613,13 @@
             </details>
             <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
               <h3>تصویر پیوست حادثه</h3>
-              <button v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
+              <button id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
                 :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
                 <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
                   class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
               </button>
               <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
-              <v-btn v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
+              <v-btn id="dispatch-action-20" v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
                 color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
               <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
             </div>
@@ -321,292 +627,44 @@
               {{ adminSos.selectedRequestProposals.length.toLocaleString('fa-IR') }} پیشنهاد در این نشست ارسال شد؛ وضعیت پذیرش آن‌ها در این بخش تأیید نمی‌شود.
             </p>
             <div class="admin-dispatch__next">
-              <span>گام بعدی: بررسی امدادگران واجد شرایط</span>
-              <v-btn color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-map-marker-outline"
+              <v-btn id="dispatch-action-21" color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-map-marker-outline"
                 aria-controls="dispatch-map" @click="focusSelectedIncidentMap">نمایش حادثه روی نقشه</v-btn>
-              <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-search-outline"
+              <v-btn id="dispatch-action-22" color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-search-outline"
                 aria-controls="dispatch-responders" @click="focusResponders">انتخاب امدادگر و اعزام</v-btn>
             </div>
           </v-card-text>
-          <v-dialog v-model="photoDialogOpen" max-width="min(94vw, 60rem)" aria-label="تصویر کامل پیوست حادثه">
-            <v-card rounded="xl" class="admin-dispatch__photo-dialog">
+          <v-dialog id="dispatch-dialog-01" v-model="photoDialogOpen" max-width="min(94vw, 60rem)" aria-label="تصویر کامل پیوست حادثه">
+            <v-card id="dispatch-card-01" rounded="xl" class="admin-dispatch__photo-dialog">
               <v-card-title class="d-flex align-center justify-space-between">
                 تصویر پیوست حادثه
-                <v-btn icon="mdi-close" variant="text" aria-label="بستن تصویر" @click="photoDialogOpen = false" />
+                <v-btn id="dispatch-action-23" icon="mdi-close" variant="text" aria-label="بستن تصویر" @click="photoDialogOpen = false" />
               </v-card-title>
               <v-card-text><img v-if="photoSrc" :src="photoSrc" alt="تصویر کامل پیوست درخواست امداد"
                 referrerpolicy="no-referrer" @error="photoSrc = null"></v-card-text>
             </v-card>
           </v-dialog>
         </v-card>
-      </v-col>
-      <v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">
-        <p class="admin-dispatch__section-label">۰۲ / موقعیت حادثه و اعزام</p>
-        <p v-if="adminSos.visibleRequests.length && !adminSos.selectedRequest" class="admin-dispatch__selection-hint" role="status">
-          <v-icon icon="mdi-cursor-default-click-outline" size="20" aria-hidden="true" />
-          برای بررسی حادثه و انتخاب امدادگر، یکی از درخواست‌های صف را انتخاب کنید.
-        </p>
-        <v-card id="dispatch-map" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
-          <div class="dispatch-map-wrapper">
-            <MapCanvas
-              aria-label="نقشهٔ درخواست‌های SOS و آخرین موقعیت ثبت‌شدهٔ امدادگران نزدیک"
-              :style-url="mapStyleUrl"
-              :constrain-bounds="false"
-              :zoom="12"
-              @ready="onMapReady"
-            />
 
-            <div v-if="mapEdgeCues.length" class="dispatch-map-edge-cues" aria-label="نقاط بیرون از قاب نقشه">
-              <button v-for="cue in mapEdgeCues" :key="`${cue.kind}-${cue.id}`" type="button"
-                class="dispatch-map-edge-cue" :class="[`dispatch-map-edge-cue--${cue.kind}`, `dispatch-map-edge-cue--${cue.edge}`]"
-                :style="{ left: `${cue.x}px`, top: `${cue.y}px`, '--dispatch-edge-color': edgeCueColor(cue) }"
-                :aria-label="`${cue.kind === 'sos' ? 'حادثهٔ انتخاب‌شده' : 'امدادگر نزدیک'} ${cue.label}، بیرون از قاب نقشه در سمت ${edgeCueDirectionLabel[cue.edge]}، نمایش روی نقشه`"
-                :title="cue.label"
-                @click="focusEdgeCue(cue)">
-                <span class="dispatch-map-edge-cue__arrow" aria-hidden="true">
-                  <svg :class="`dispatch-map-edge-cue__arrow--${cue.edge}`" viewBox="0 0 24 24" focusable="false">
-                    <path d="M12 20V4 M5 11l7-7 7 7" fill="none" stroke="currentColor" stroke-width="3.5"
-                      stroke-linecap="round" stroke-linejoin="round" />
-                  </svg>
-                </span><bdi dir="auto">{{ cue.label }}</bdi>
-              </button>
-            </div>
 
-            <v-btn v-if="adminSos.selectedRequest" class="map-selected-alert-card"
-              color="surface" variant="flat" rounded="xl" prepend-icon="mdi-crosshairs-gps"
-              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'"
-              @click="frameSelectedIncident">{{ nearbyFeatures.features.length ? 'حادثه و امدادگران' : 'نمایش محل حادثه' }}</v-btn>
-
-            <div v-if="mapPointChoices.length" class="dispatch-map-choices" role="group"
-              aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه" dir="rtl">
-              <div class="dispatch-map-choices__heading">
-                <strong>نقاط این مکان</strong>
-                <button type="button" aria-label="بستن فهرست نقاط" @click="mapPointChoices = []">×</button>
-              </div>
-              <div class="dispatch-map-choices__items">
-                <button v-for="choice in mapPointChoices" :key="`${choice.kind}-${choice.id}`" type="button"
-                  @click="activateMapChoice(choice)">{{ choice.label }}</button>
-              </div>
-            </div>
-          </div>
-          <ul class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
-            :style="{ '--dispatch-helper-color': themeStore.isDark ? '#205fd1' : '#0868c8' }">
-            <li v-for="item in sosSeverityKey" :key="item.severity">
-              <span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert"
-                :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[item.severity] }" aria-hidden="true" />
-              حادثه {{ item.label }}
-            </li>
-            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--selected-sos mdi mdi-alert"
-              :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[sosMapPriority(adminSos.selectedRequest.status, adminSos.selectedRequest.severity)] }"
-              aria-hidden="true" />حادثه انتخاب‌شده</li>
-            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
-            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
-            <li v-if="adminSos.selectedRequest && nearbyFeatures.features.length > 1"><span class="dispatch-map-key__cluster" aria-hidden="true">+۲</span>چند امدادگر در یک ناحیه</li>
-          </ul>
-        </v-card>
-        <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
-          (adminSos.nearestLoading || adminSos.nearestError || adminSos.nearestLoaded)"
-          class="admin-dispatch__map-note" role="status">
-          {{ adminSos.nearestLoading ? 'در حال بررسی امدادگران نزدیک…'
-            : adminSos.nearestError ? 'موقعیت امدادگران تأیید نشد؛ فهرست را بازخوانی کنید.'
-              : nearbyFeatures.features.length ? `نقاط ${nearbyFeatures.features.length.toLocaleString('fa-IR')} امدادگر واجد شرایط، آخرین موقعیت ثبت‌شده‌اند؛ موقعیت زنده نیستند.`
-                : adminSos.nearestLoaded ? 'موقعیت ثبت‌شده‌ای از امدادگران واجد شرایط در دسترس نیست.' : '' }}
-        </p>
-
-        <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer' &&
+        <v-btn id="dispatch-action-24" v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer' &&
           adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
           color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
           :disabled="adminSos.dispatchSubmitting"
           @click="quickRedispatch(adminSos.selectedRequest.id)">
           اعزام فوری به امدادگران جدید
         </v-btn>
-        <v-card v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"
-          class="admin-dispatch__surface admin-dispatch__responders bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
-          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
-            <div class="d-flex align-center ga-2">
-              <v-icon color="primary" icon="mdi-account-group-outline" />
-              <span>{{ adminSos.responderSearch ? 'جست‌وجوی دستی برای اعزام' : 'نزدیک‌ترین امدادگران واجد شرایط' }}</span>
-              <v-chip v-if="adminSos.nearestLoaded && !adminSos.nearestLoading" color="primary" size="x-small" variant="tonal">
-                {{ adminSos.nearestResponders.length }} نفر
-              </v-chip>
-              <v-chip v-else color="warning" size="x-small" variant="tonal">
-                {{ adminSos.nearestLoading ? 'در حال بررسی' : 'نامطمئن' }}
-              </v-chip>
-            </div>
-
-            <div class="d-flex align-center ga-1">
-              <v-btn
-                :disabled="!adminSos.nearestLoaded || adminSos.nearestLoading || adminSos.nearestResponders.length === 0"
-                size="small"
-                variant="text"
-                @click="adminSos.selectAllNearestResponders()"
-              >
-                انتخاب همه
-              </v-btn>
-              <v-btn
-                v-if="adminSos.selectedResponderIds.length > 0"
-                size="small"
-                variant="text"
-                @click="adminSos.clearResponderSelection()"
-              >
-                پاک‌سازی انتخاب
-              </v-btn>
-              <v-btn
-                :loading="adminSos.nearestLoading"
-                aria-label="بازخوانی امدادگران نزدیک"
-                icon="mdi-refresh"
-                size="small"
-                variant="text"
-                @click="adminSos.loadNearestResponders()"
-              />
-            </div>
-          </v-card-title>
-          <v-divider />
-          <form class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
-            <v-text-field v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
-              placeholder="حداقل ۲ حرف؛ جست‌وجوی دستی حتی بدون موقعیت یا تخصص مرتبط"
-              variant="outlined" rounded="lg" color="primary" density="compact" hide-details autocomplete="off" maxlength="64"
-              aria-label="جست‌وجوی امدادگر با نام کاربری" />
-            <v-btn type="submit" color="primary" variant="flat" rounded="lg" :disabled="responderSearchInput.trim().length === 1"
-              :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
-          </form>
-          <p v-if="adminSos.responderSearch" class="admin-dispatch__manual-warning" role="note">
-            <v-icon icon="mdi-alert-outline" size="18" aria-hidden="true" />
-            جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند؛ پیش از اعزام صلاحیت و دسترسی را بررسی کنید.
-          </p>
-          <details class="admin-dispatch__search-help">
-            <summary>معیارهای فهرست امدادگران</summary>
-            <p>{{ adminSos.responderSearch
-              ? 'تا ۱۰ حساب فعال و آزاد با نام کاربری منطبق؛ موقعیت/فاصله در جست‌وجوی دستی نمایش داده نمی‌شود و تخصص مرتبط ممکن است ثبت نشده باشد.'
-              : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند. فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده در فهرست نزدیک‌ترین‌ها هستند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}</p>
-          </details>
-          <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
-            <v-chip v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
-              variant="tonal" @click:close="adminSos.toggleResponderSelection(id)">
-              @{{ adminSos.selectedResponderNames[id] ?? id }}
-            </v-chip>
-          </div>
-
-          <v-alert
-            v-if="adminSos.dispatchFeedback"
-            :type="adminSos.dispatchFeedback.type"
-            class="ma-4 mb-0"
-            closable
-            density="comfortable"
-            variant="tonal"
-            @click:close="adminSos.dispatchFeedback = null"
-          >
-            {{ adminSos.dispatchFeedback.message }}
-          </v-alert>
-
-          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis" role="status">
-            <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
-            در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
-          </v-card-text>
-
-          <v-alert v-else-if="adminSos.nearestError" class="ma-4" type="error" variant="tonal" role="alert">
-            {{ adminSos.nearestError }}
-            <template #append>
-              <v-btn variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
-            </template>
-          </v-alert>
-
-          <v-card-text
-            v-else-if="adminSos.nearestLoaded && adminSos.nearestResponders.length === 0"
-            class="py-6 text-center text-medium-emphasis" role="status"
-          >
-            {{ adminSos.responderSearch
-              ? 'برای این نام کاربری حساب فعال و آزاد دیگری یافت نشد. نام کاربری را بررسی کنید.'
-              : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
-          </v-card-text>
-
-          <v-list v-else-if="adminSos.nearestLoaded" class="responder-list" lines="two" aria-label="امدادگران واجد شرایط یا جست‌وجوشده">
-            <v-list-item v-for="responder in adminSos.nearestResponders" :key="responder.userId"
-              :active="adminSos.selectedResponderIds.includes(responder.userId)"
-              class="dispatch-responder-row"
-              @click="adminSos.toggleResponderSelection(responder.userId)"
-            >
-                <template #prepend>
-                  <v-checkbox-btn
-                    :model-value="adminSos.selectedResponderIds.includes(responder.userId)"
-                    :aria-label="`انتخاب امدادگر ${responder.username}`"
-                    color="primary"
-                    @click.stop="adminSos.toggleResponderSelection(responder.userId)"
-                  />
-                </template>
-
-                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
-                  <div class="d-flex align-center ga-2">
-                    <span dir="ltr">@{{ responder.username }}</span>
-                    <v-chip
-                      v-if="proposedRescuerIdSet.has(responder.userId)"
-                      color="info"
-                      size="x-small"
-                      variant="tonal"
-                    >
-                      پیشنهاد ارسال‌شده
-                    </v-chip>
-                  </div>
-
-                  <div class="d-flex align-center ga-2">
-                    <v-chip :color="responder.distance === null ? 'warning' : 'primary'" size="x-small" variant="flat">
-                      {{ responder.distance === null ? 'فاصله نامشخص' : formatDistance(responder.distance) }}
-                    </v-chip>
-                    <v-chip color="amber-darken-2" size="x-small" variant="tonal">
-                      {{ responder.avgRating !== null ? `★ ${responder.avgRating.toFixed(1)}` : "بدون امتیاز" }}
-                    </v-chip>
-                  </div>
-                </v-list-item-title>
-
-                <v-list-item-subtitle class="d-flex flex-wrap align-center ga-2 mt-1">
-                  <span v-if="responder.categoryName">تخصص: {{ responder.categoryName }}</span>
-                  <span v-else class="text-warning">تخصص مرتبط ثبت نشده</span>
-                  <span>•</span>
-                  <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
-                </v-list-item-subtitle>
-                <template v-if="!adminSos.responderSearch && nearbyFeatures.features.some((feature) => feature.id === responder.userId)" #append>
-                  <v-btn icon="mdi-map-marker-radius-outline" variant="text" color="primary"
-                    :aria-label="`نمایش آخرین موقعیت ثبت‌شدهٔ ${responder.username} روی نقشه`"
-                    :title="`نمایش ${responder.username} روی نقشه`" @click.stop="focusNearbyResponder(responder.userId)" />
-                </template>
-              </v-list-item>
-          </v-list>
-          <v-card-text v-else class="py-6 text-center text-medium-emphasis" role="status">
-            فهرست امدادگران هنوز تأیید نشده است؛ نتیجهٔ خالی نمی‌توان گرفت.
-            <v-btn variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
-          </v-card-text>
-
-          <v-divider />
-          <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
-            <span class="text-caption text-medium-emphasis">
-              {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
-            </span>
-            <v-btn
-              :disabled="!adminSos.canDispatchSelected"
-              :loading="adminSos.dispatchSubmitting"
-              color="error"
-              prepend-icon="mdi-send-check-outline"
-              rounded="lg"
-              variant="flat"
-              @click="requestDispatch"
-            >
-              اعزام امدادگران انتخاب‌شده ({{ adminSos.selectedResponderIds.length }})
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-
         <div v-if="adminSos.selectedRequest" class="admin-dispatch__mission-header">
           <h2>پیگیری مأموریت</h2>
-          <v-btn size="small" variant="text" color="primary" prepend-icon="mdi-refresh"
+          <v-btn id="dispatch-action-25" size="small" variant="text" color="primary" prepend-icon="mdi-refresh"
             :loading="missionLoading" :disabled="missionLoading"
             @click="loadActiveMissions()">بازخوانی مأموریت‌ها</v-btn>
         </div>
-        <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
+        <v-alert id="dispatch-notice-09" v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
           {{ missionError }}
         </v-alert>
-        <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading && !requestMissions.length" type="article" class="mb-3"
+        <v-skeleton-loader id="dispatch-loading-01" v-if="adminSos.selectedRequest && missionLoading && !requestMissions.length" type="article" class="mb-3"
           role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
-        <details v-else-if="requestMissions.length" :key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline">
+        <details id="dispatch-details-04" v-else-if="requestMissions.length" :key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline">
           <summary>خط زمانی <span>{{ requestMissions.length.toLocaleString('fa-IR') }} مأموریت</span></summary>
           <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">انتخاب مأموریت</label>
           <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
@@ -614,25 +672,27 @@
               {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
             </option>
           </select>
-          <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
+          <MissionTimelinePanel id="dispatch-timeline-01" v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
             :mission="selectedTimelineMission" audience="admin" />
         </details>
         <p v-else-if="adminSos.selectedRequest && missionLoaded" class="mb-3 text-body-2 text-medium-emphasis" role="status">
           برای این درخواست هنوز مأموریتی ثبت نشده است.
         </p>
-        <section v-if="activeMissions.length" class="admin-dispatch__followup mb-3">
-          <button type="button" class="admin-dispatch__followup-toggle" :aria-expanded="showLivePanel"
+        <section id="dispatch-section-01" v-if="activeMissions.length" class="admin-dispatch__followup mb-3">
+          <button id="dispatch-button-04" type="button" class="admin-dispatch__followup-toggle" :aria-expanded="showLivePanel"
             @click="showLivePanel = !showLivePanel">
             موقعیت زنده و اعضای مأموریت <span>{{ activeMissions.length.toLocaleString('fa-IR') }} مأموریت فعال</span>
             <v-icon :icon="showLivePanel ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
           </button>
           <template v-if="showLivePanel">
-            <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
+            <MissionLivePanel :id="`dispatch-live-01-${mission.id}`" v-for="mission in activeMissions" :key="mission.id" :mission="mission"
               :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
           </template>
         </section>
-        <v-dialog v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
-          <v-card title="تأیید اعزام دستی" class="admin-dispatch__confirmation" rounded="xl">
+          </div>
+        </div>
+        <v-dialog id="dispatch-dialog-02" v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
+          <v-card id="dispatch-card-02" title="تأیید اعزام دستی" class="admin-dispatch__confirmation" rounded="xl">
             <v-card-text>
               موقعیت یا تخصص مرتبط برای افراد زیر تأیید نشده است. پیش از ارسال پیشنهاد مأموریت، صلاحیت و دسترسی آن‌ها را بررسی کنید:
               <ul class="mt-2 ps-6">
@@ -643,26 +703,27 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer />
-              <v-btn variant="text" rounded="lg" :disabled="adminSos.dispatchSubmitting" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
-              <v-btn color="error" variant="flat" rounded="lg" :loading="adminSos.dispatchSubmitting" :disabled="!adminSos.canDispatchSelected"
+              <v-btn id="dispatch-action-26" variant="text" rounded="lg" :disabled="adminSos.dispatchSubmitting" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
+              <v-btn id="dispatch-action-27" color="error" variant="flat" rounded="lg" :loading="adminSos.dispatchSubmitting" :disabled="!adminSos.canDispatchSelected"
                 @click="confirmManualDispatch">ارسال با آگاهی از محدودیت‌ها</v-btn>
             </v-card-actions>
           </v-card>
         </v-dialog>
-      </v-col>
-
-    </v-row>
-    <AdminUserProfileDialog v-model="senderProfileOpen" :user-id="adminSos.selectedRequest?.requesterId ?? null"
+    </section>
+    <AdminUserProfileDialog v-model="senderProfileOpen" :user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"
       title="پروفایل ارسال‌کننده" />
-  </v-container>
+  </main>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
-import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
+import type { GeocodeResult, IncidentType, Severity, SosRequestRecord, UserProfile } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
+import { searchPlaces } from "@/api/geocoding";
+import { listAdminUsers } from "@/api/admin-users";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
 import {
@@ -744,12 +805,14 @@ const dispatchFilters = [
 ];
 const auth = useAuthStore(pinia);
 const senderProfileOpen = ref(false);
+const profileUserId = ref<string | null>(null);
 const photoDialogOpen = ref(false);
 const photoOpenLoading = ref(false);
 const photoOpenError = ref<string | null>(null);
 let photoOpenGeneration = 0;
 watch(() => adminSos.selectedRequest?.id, () => {
   senderProfileOpen.value = false;
+  profileUserId.value = null;
   photoDialogOpen.value = false;
   photoOpenError.value = null;
   photoOpenLoading.value = false;
@@ -825,6 +888,135 @@ const nearbyFeatures = computed(() => buildEligibleResponderGeoJson(
     adminSos.nearestLoaded && !adminSos.responderSearch
     ? adminSos.nearestResponders : [], adminSos.selectedResponderIds
 ));
+// SOS and qualified responders are searched locally. Admin accounts use the
+// authenticated admin endpoint; place and POI queries use the same-origin gateway.
+const mapSearch = ref("");
+const searchedPlaces = ref<GeocodeResult[]>([]);
+const searchedUsers = ref<UserProfile[]>([]);
+const usersLoading = ref(false);
+const usersError = ref(false);
+let userSearchController: AbortController | null = null;
+const placesLoading = ref(false);
+const placesError = ref(false);
+const searchQuery = computed(() => (mapSearch.value ?? "").trim());
+let placeSearchController: AbortController | null = null;
+let placeSearchTimer: ReturnType<typeof setTimeout> | null = null;
+const matchedRequests = computed(() => {
+  const q = searchQuery.value.toLocaleLowerCase();
+  if (q.length < 2) return [];
+  return adminSos.requests.filter((item) =>
+    [item.id, item.requesterId, incidentLabel(item.incidentTypeId), item.description]
+      .some((value) => value.toLocaleLowerCase().includes(q))).slice(0, 8);
+});
+const matchedResponders = computed(() => {
+  const q = searchQuery.value.replace(/^@/, "").toLocaleLowerCase();
+  if (q.length < 2 || !adminSos.nearestLoaded) return [];
+  return adminSos.nearestResponders.filter((item) => item.username.toLocaleLowerCase().includes(q)).slice(0, 8);
+});
+async function findPlaces(query: string, controller: AbortController): Promise<void> {
+  placesLoading.value = true;
+  placesError.value = false;
+  try {
+    const results = await searchPlaces({ q: query, limit: 8 }, controller.signal);
+    if (!controller.signal.aborted) searchedPlaces.value = results;
+  } catch {
+    if (!controller.signal.aborted) placesError.value = true;
+  } finally {
+    if (!controller.signal.aborted) placesLoading.value = false;
+  }
+}
+function retryPlaceSearch(): void {
+  const query = searchQuery.value;
+  // An explicit @username lookup never sends the account name to the place gateway.
+  if (query.length < 2 || query.startsWith("@")) return;
+  placeSearchController?.abort();
+  placeSearchController = new AbortController();
+  void findPlaces(query, placeSearchController);
+}
+async function findUsers(query: string, controller: AbortController): Promise<void> {
+  const token = auth.accessToken;
+  if (!token || query.length > 30) return;
+  usersLoading.value = true;
+  usersError.value = false;
+  try {
+    const response = await listAdminUsers({ q: query, page: 1, limit: 8 }, token, controller.signal);
+    if (!controller.signal.aborted && token === auth.accessToken) searchedUsers.value = response.items;
+  } catch {
+    if (!controller.signal.aborted) usersError.value = true;
+  } finally {
+    if (!controller.signal.aborted) usersLoading.value = false;
+  }
+}
+function retryUserSearch(): void {
+  const query = searchQuery.value.replace(/^@/, "");
+  if (query.length < 2 || query.length > 30) return;
+  userSearchController?.abort();
+  userSearchController = new AbortController();
+  void findUsers(query, userSearchController);
+}
+watch([mapSearch, () => auth.accessToken], () => {
+  if (placeSearchTimer) clearTimeout(placeSearchTimer);
+  placeSearchController?.abort();
+  userSearchController?.abort();
+  searchedPlaces.value = [];
+  searchedUsers.value = [];
+  placesLoading.value = false;
+  placesError.value = false;
+  usersLoading.value = false;
+  usersError.value = false;
+  if (searchQuery.value.length < 2) return;
+  placeSearchTimer = setTimeout(() => { retryPlaceSearch(); retryUserSearch(); }, 350);
+});
+function selectSearchRequest(item: SosRequestRecord): void {
+  if (!adminSos.visibleRequests.some((request) => request.id === item.id)) adminSos.setFilterStatus("all");
+  focusRequest(item);
+  mapSearch.value = "";
+}
+function focusSearchResponder(id: string): void {
+  // Only verified, incident-matched coordinates are navigable on the map.
+  const feature = nearbyFeatures.value.features.find((item) => item.id === id);
+  if (feature) mapInstance?.flyTo({ center: feature.geometry.coordinates as [number, number], zoom: Math.max(mapInstance.getZoom(), 14) });
+  else focusResponders();
+  mapSearch.value = "";
+}
+function focusSearchUser(user: UserProfile): void {
+  const incident = adminSos.requests.find((item) => item.requesterId === user.id);
+  if (incident) selectSearchRequest(incident);
+  else if (nearbyFeatures.value.features.some((feature) => feature.id === user.id)) focusSearchResponder(user.id);
+  else {
+    // A user account is not a map coordinate. Only incident and verified
+    // responder positions can be mapped; otherwise open the exact profile.
+    profileUserId.value = user.id;
+    senderProfileOpen.value = true;
+    mapSearch.value = "";
+  }
+}
+function searchUsernameOnMap(): void {
+  responderSearchInput.value = searchQuery.value.replace(/^@/, "");
+  searchResponders();
+  focusResponders();
+  mapSearch.value = "";
+}
+let placeMarker: MapLibreMarker | null = null;
+function focusSearchPlace(place: GeocodeResult): void {
+  const map = mapInstance;
+  if (!map) return;
+  placeMarker?.remove();
+  if (mapLabelMarkerClass) {
+    const marker = document.createElement("div");
+    marker.id = "dispatch-place-marker";
+    marker.className = "dispatch-place-marker";
+    marker.setAttribute("role", "img");
+    marker.setAttribute("aria-label", `مکان جست‌وجوشده: ${place.name}`);
+    const title = document.createElement("span");
+    title.textContent = place.name;
+    marker.append(title);
+    placeMarker = new mapLabelMarkerClass({ element: marker, anchor: "bottom" })
+      .setLngLat([place.lon, place.lat]).addTo(map);
+  }
+  map.flyTo({ center: [place.lon, place.lat], zoom: Math.max(map.getZoom(), 15) });
+  mapSearch.value = "";
+}
 const responderSearchInput = ref("");
 const soundTestError = ref<string | null>(null);
 async function testSound(): Promise<void> {
@@ -832,6 +1024,17 @@ async function testSound(): Promise<void> {
   if (!await adminSos.testAlertSound()) {
     soundTestError.value = "پخش صدای آزمایشی ممکن نشد؛ صدای دستگاه و مجوز پخش مرورگر را بررسی کنید. هشدار دیداری همچنان فعال است.";
   }
+}
+const compactDispatch = useMediaQuery("(max-width: 900px)");
+const incidentExpanded = ref(!compactDispatch.value);
+watch(compactDispatch, (compact) => { incidentExpanded.value = !compact; });
+function toggleIncidentPanel(): void {
+  incidentExpanded.value = !incidentExpanded.value;
+  if (!incidentExpanded.value) {
+    photoDialogOpen.value = false;
+    showLivePanel.value = false;
+  }
+  frameSelectedIncident();
 }
 const showLivePanel = ref(false);
 const manualDispatchConfirmation = ref(false);
@@ -843,6 +1046,7 @@ watch(() => adminSos.selectedId, () => {
   responderSearchInput.value = "";
   manualDispatchConfirmation.value = false;
   showLivePanel.value = false;
+  incidentExpanded.value = !compactDispatch.value;
 }, { flush: "sync" });
 function requestDispatch(): void {
   if (!adminSos.canDispatchSelected) return;
@@ -1413,17 +1617,24 @@ function focusRequest(item: SosRequestRecord): void {
   adminSos.selectRequest(item.id);
   mapInstance?.flyTo({
     center: [item.location.lon, item.location.lat],
+    offset: dispatchFocusOffset(),
     zoom: Math.max(mapInstance.getZoom(), 14)
   });
 }
 
+// Keep the geographic point in the unobstructed map area, not under the
+// pinned incident card. Edge cues use the actual resized MapLibre viewport.
+function dispatchFocusOffset(): [number, number] {
+  if (!incidentExpanded.value) return compactDispatch.value ? [0, 30] : [0, 0];
+  return compactDispatch.value ? [100, 0] : [Math.min(140, window.innerWidth * .12), 0];
+}
 function frameSelectedIncident(): void {
   const incident = adminSos.selectedRequest;
   const map = mapInstance;
   if (!incident || !map) return;
   const points = nearbyFeatures.value.features.map((feature) => feature.geometry.coordinates);
   if (!points.length) {
-    map.flyTo({ center: [incident.location.lon, incident.location.lat], zoom: Math.max(map.getZoom(), 14) });
+    map.flyTo({ center: [incident.location.lon, incident.location.lat], offset: dispatchFocusOffset(), zoom: Math.max(map.getZoom(), 14) });
     return;
   }
   const [west, east] = shortestLongitudeBounds([incident.location.lon, ...points.map(([lon]) => lon)]);
@@ -1432,7 +1643,8 @@ function frameSelectedIncident(): void {
     south = Math.min(south, lat); north = Math.max(north, lat);
   }
   map.fitBounds([[west, south], [east, north]], {
-    padding: { top: 56, bottom: 56, left: 48, right: 48 }, maxZoom: 14,
+    padding: { top: 56, bottom: compactDispatch.value ? 76 : 56,
+      left: !incidentExpanded.value ? 48 : compactDispatch.value ? 160 : 290, right: 48 }, maxZoom: 14,
     duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650
   });
 }
@@ -1496,6 +1708,8 @@ function activateMapChoice(choice: MapPointChoice): void {
 }
 
 function onMapReady(map: MapLibreMap, MarkerClass: typeof import("maplibre-gl").Marker): void {
+  placeMarker?.remove();
+  placeMarker = null;
   detachMapEvents?.();
   mapPointChoices.value = [];
   mapInstance = map;
@@ -1505,16 +1719,18 @@ function onMapReady(map: MapLibreMap, MarkerClass: typeof import("maplibre-gl").
   startPulseLoop();
 
   if (adminSos.selectedRequest) {
-    map.jumpTo({
+    map.easeTo({
       center: [
         adminSos.selectedRequest.location.lon,
         adminSos.selectedRequest.location.lat
       ],
-      zoom: 13
+      offset: dispatchFocusOffset(),
+      zoom: 13,
+      duration: 0
     });
     if (nearbyFeatures.value.features.length) frameSelectedIncident();
   }
-  // jumpTo above can change the side/visibility of both labels and edge cues
+  // The initial camera change can alter the side/visibility of labels and edge cues
   // before move listeners are registered.
   updateMapEdgeCues();
 
@@ -1687,6 +1903,10 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   stopPulseLoop();
+  if (placeSearchTimer) clearTimeout(placeSearchTimer);
+  placeSearchController?.abort();
+  userSearchController?.abort();
+  placeMarker?.remove();
   detachMapEvents?.();
   detachMapEvents = null;
   mapInstance = null;
@@ -1744,12 +1964,6 @@ onBeforeUnmount(() => {
   background: rgba(var(--v-theme-primary), .12); font-weight: 800; }
 .admin-dispatch__toolbar :deep(.v-btn) { height: 46px; min-height: 46px; padding-inline: .7rem; font-size: .82rem; }
 .admin-dispatch__toolbar :deep(.v-btn--icon) { width: 46px; padding: 0; }
-.admin-dispatch__workspace { margin-inline: -clamp(.75rem, 1.25vw, 1.25rem); }
-.admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(.75rem, 1.25vw, 1.25rem); }
-.admin-dispatch__section-label {
-  margin: 0 0 .65rem; color: rgb(var(--v-theme-primary)); font-size: .8rem;
-  font-weight: 800; line-height: 1.5;
-}
 
 /* Vuetify's text utilities force Roboto even when the page inherits Persian-first type. */
 .admin-dispatch :deep(.text-h5),
@@ -2094,20 +2308,6 @@ onBeforeUnmount(() => {
 .dispatch-map-choices__items button { display: block; width: 100%; text-align: start;
   padding: .35rem .5rem; font-size: .82rem; }
 .dispatch-map-choices__items button:hover { background: var(--bb-color-inset); }
-/* Vuetify's lg columns start at 1280px. Below that width the queue and map
- * stack; the compact recenter action stays inside the map. */
-@media (max-width: 1279px) {
-  .dispatch-map-wrapper { display: flex; flex-direction: column; height: auto; min-height: 0; gap: 0.75rem; }
-  .dispatch-map-wrapper > :deep(.map-canvas) {
-    flex: 0 0 auto;
-    height: clamp(17rem, 40dvh, 22rem);
-    min-height: 17rem;
-  }
-  .dispatch-map-choices { position: static; max-height: 12rem; width: calc(100% - 1.5rem);
-    align-self: center; }
-
-}
-
 @media (max-width: 959px) {
   .admin-dispatch__filter-select { width: 15rem; }
 }
@@ -2193,4 +2393,172 @@ onBeforeUnmount(() => {
   background: rgba(var(--v-theme-primary), .12); border-color: rgb(var(--v-theme-primary));
 }
 :global(:root.dark .mission-timeline-select) { background: var(--bb-color-inset); }
+
+/* Full-viewport dispatch surface: the map is the ground plane. All controls
+   have independent scroll areas instead of shrinking MapLibre's canvas. */
+.admin-dispatch {
+  position: relative; width: 100%; height: 100dvh; max-width: none;
+  margin: 0; padding: 0; overflow: hidden;
+  --dispatch-sidebar-width: clamp(20rem, 28vw, 25rem);
+}
+.admin-dispatch__sidebar {
+  position: absolute; z-index: 12; top: 0; right: 0; bottom: 0;
+  width: var(--dispatch-sidebar-width); padding: .85rem;
+  padding-top: max(.85rem, env(safe-area-inset-top, 0px));
+  overflow-y: auto; overscroll-behavior: contain;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  border-left: 1px solid var(--bb-color-outline); box-shadow: var(--bb-shadow-overlay);
+  scrollbar-gutter: stable;
+}
+.admin-dispatch__header { display: block; margin-bottom: .7rem !important; }
+.admin-dispatch__heading h1 { font-size: 1.1rem !important; }
+.admin-dispatch__eyebrow { margin-bottom: .2rem; }
+.admin-dispatch__toolbar { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: .5rem; }
+.admin-dispatch__filter-group, .admin-dispatch__toolbar-actions { min-width: 0; }
+.admin-dispatch__filter-select { width: 100%; max-width: none; }
+.admin-dispatch__filter-toggle { max-width: 100%; }
+.admin-dispatch__toolbar-actions { justify-content: flex-start; }
+.admin-dispatch__queue { display: flex; flex-direction: column; min-height: 0; }
+.admin-dispatch__nearby { margin-bottom: .8rem; }
+.admin-dispatch__nearby-empty { display: grid; gap: .2rem; padding: .85rem 1rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-surface); }
+.admin-dispatch__nearby-empty span { color: var(--bb-color-muted); font-size: .85rem; }
+.admin-dispatch__responders .responder-list { max-height: min(22dvh, 11rem); }
+.admin-dispatch__queue .dispatch-request-list { max-height: max(8rem, 34dvh); }
+.admin-dispatch__queue .mb-4 { margin-bottom: 0 !important; }
+.admin-dispatch__map-and-actions { position: absolute; inset: 0; min-width: 0; pointer-events: none; }
+.admin-dispatch__map-and-actions > #dispatch-map {
+  position: absolute; inset: 0 var(--dispatch-sidebar-width) 0 0;
+  width: calc(100% - var(--dispatch-sidebar-width)); height: 100%; margin: 0 !important;
+  border: 0; border-radius: 0 !important; pointer-events: auto;
+}
+.admin-dispatch__map-and-actions .dispatch-map-wrapper {
+  display: block; height: 100%; min-height: 0; gap: 0;
+}
+.admin-dispatch__map-and-actions .dispatch-map-wrapper > :deep(.map-canvas) {
+  display: block; width: 100%; height: 100%; min-height: 0;
+}
+.admin-dispatch__incident-panel {
+  position: absolute; z-index: 9; top: calc(4.75rem + env(safe-area-inset-top, 0px));
+  left: calc(.75rem + env(safe-area-inset-left, 0px));
+  width: min(23rem, calc(100% - var(--dispatch-sidebar-width) - 2rem));
+  max-height: min(62dvh, 36rem);
+  overflow: auto; overscroll-behavior: contain; pointer-events: auto;
+  scrollbar-gutter: stable; border-radius: var(--bb-radius-card, 24px);
+  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+  padding: .35rem;
+}
+.admin-dispatch__incident-toggle {
+  display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 48px;
+  padding: .45rem .65rem; border: 0; border-radius: 1rem; cursor: pointer;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  text-align: start; font: inherit;
+}
+.admin-dispatch__incident-toggle > span { display: grid; flex: 1; min-width: 0; }
+.admin-dispatch__incident-toggle strong, .admin-dispatch__incident-toggle small { overflow-wrap: anywhere; }
+.admin-dispatch__incident-toggle small { font-size: .8rem; color: var(--bb-color-muted); }
+.admin-dispatch__incident-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
+.admin-dispatch__incident-panel #dispatch-incident { margin-bottom: .7rem; }
+.admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .4rem .6rem .65rem; }
+.admin-dispatch__search {
+  position: absolute; z-index: 11; top: calc(.75rem + env(safe-area-inset-top, 0px));
+  right: calc(var(--dispatch-sidebar-width) + .75rem);
+  /* The shared menu and Network button occupy the first 7.25rem of the map. */
+  width: min(28rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));
+  pointer-events: auto;
+}
+.admin-dispatch__search-results {
+  max-height: min(48dvh, 24rem); overflow-y: auto; overscroll-behavior: contain;
+  margin-top: .3rem; padding: .35rem; border-radius: 1rem;
+  border: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-overlay);
+}
+.admin-dispatch__search-result { display: flex; width: 100%; align-items: center;
+  gap: .55rem; padding: .55rem; min-height: 44px; border: 0; border-radius: .65rem;
+  background: transparent; color: inherit; text-align: start; font: inherit; cursor: pointer; }
+.admin-dispatch__search-result:hover, .admin-dispatch__search-result:focus-visible {
+  background: rgba(var(--v-theme-primary), .1); outline-color: rgb(var(--v-theme-primary)); }
+.admin-dispatch__search-result small { display: block; color: var(--bb-color-muted); }
+.admin-dispatch__search-results p { padding: .55rem; margin: 0; }
+.admin-dispatch__search-results p button { color: rgb(var(--v-theme-primary)); min-height: 44px; }
+.admin-dispatch__map-and-actions .dispatch-map-key {
+  position: absolute; z-index: 4; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+  right: .75rem; left: 24rem;
+  width: max-content; max-width: calc(100% - 25rem);
+  max-height: 7.5rem; overflow-y: auto; border-radius: 1rem;
+  box-shadow: var(--bb-shadow-overlay);
+}
+.admin-dispatch__map-and-actions .map-selected-alert-card {
+  top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  right: .75rem; left: auto;
+}
+.admin-dispatch__map-and-actions .dispatch-map-choices {
+  /* A temporary hit chooser must sit above the pinned incident panel. */
+  position: absolute; z-index: 15; right: .75rem;
+  left: auto; bottom: 5rem; max-height: min(30dvh, 15rem);
+}
+:global(.dispatch-place-marker) {
+  display: grid; justify-items: center; gap: 3px; max-width: min(12rem, 55vw);
+  pointer-events: none; font: 800 .8rem/1.35 var(--bb-font-family);
+}
+:global(.dispatch-place-marker span) {
+  padding: .35rem .65rem; border: 1px solid var(--bb-color-outline);
+  border-radius: 1rem; background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-overlay);
+  white-space: normal; overflow-wrap: anywhere; text-align: center;
+}
+:global(.dispatch-place-marker::after) {
+  content: ""; display: block; width: 18px; height: 18px;
+  border: 3px solid #fff; border-radius: 50%; background: #166bb1;
+  box-shadow: 0 0 0 2px #166bb1, 0 3px 8px #142638;
+}
+@media (max-width: 1100px) {
+  .admin-dispatch { --dispatch-sidebar-width: 19rem; }
+  .admin-dispatch__incident-panel { width: min(19rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem)); }
+  .admin-dispatch__map-and-actions .dispatch-map-key {
+    left: .75rem; max-width: calc(100% - 1.5rem);
+    bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (max-width: 900px) {
+  .admin-dispatch__sidebar {
+    top: auto; left: 0; right: 0; bottom: 0; width: 100%;
+    height: min(38dvh, 21rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+    border-left: 0; border-top: 1px solid var(--bb-color-outline);
+  }
+  .admin-dispatch__map-and-actions > #dispatch-map {
+    inset: 0 0 min(38dvh, 21rem) 0; width: 100%; height: calc(100% - min(38dvh, 21rem));
+  }
+  .admin-dispatch__header { margin-bottom: .5rem !important; }
+  .admin-dispatch__intro { display: none; }
+  .admin-dispatch__filter-select { display: block !important; }
+  .admin-dispatch__filter-toggle { display: none !important; }
+  .admin-dispatch__toolbar-actions { flex-wrap: wrap; }
+  .admin-dispatch__search {
+    top: calc(4.25rem + env(safe-area-inset-top, 0px)); right: .75rem;
+    left: .75rem; width: auto;
+  }
+  .admin-dispatch__search-results { max-height: 22dvh; }
+  .admin-dispatch__incident-panel {
+    top: calc(8rem + env(safe-area-inset-top, 0px)); left: .75rem;
+    width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
+  }
+  .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
+  .admin-dispatch__map-and-actions .map-selected-alert-card {
+    top: auto; bottom: 4.5rem; right: .75rem;
+  }
+  .admin-dispatch__map-and-actions .dispatch-map-key {
+    bottom: .5rem; left: .75rem; right: .75rem; width: calc(100% - 1.5rem);
+    max-width: calc(100% - 1.5rem); max-height: none;
+    flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+  }
+  .admin-dispatch__map-and-actions .dispatch-map-key li { flex: none; }
+  .admin-dispatch__map-and-actions .dispatch-map-choices {
+    right: .75rem; bottom: 4.5rem;
+  }
+  .admin-dispatch__queue .dispatch-request-list, .admin-dispatch__responders .responder-list {
+    max-height: 10rem;
+  }
+}
 </style>

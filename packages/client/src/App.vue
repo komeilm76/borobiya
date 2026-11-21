@@ -185,8 +185,8 @@
       </header>
       <RouterView v-slot="{ Component, route }">
         <Transition mode="out-in" name="page-fade">
-          <!-- Map query changes (offers and future tabs) must not tear down a live trip or MapLibre. -->
-          <component :is="Component" :key="route.name === 'user-map' ? route.path : route.fullPath" />
+          <!-- Map query changes must not tear down a live trip, dispatch selection or MapLibre. -->
+          <component :is="Component" :key="route.name === 'user-map' || route.name === 'admin-dispatch' ? route.path : route.fullPath" />
         </Transition>
       </RouterView>
     </v-main>
@@ -370,9 +370,9 @@ const mapNavItems = computed(() => {
 });
 const router = useRouter();
 const route = useRoute();
-// Both map-first workspaces use the same full-viewport shell and navigation drawer.
+// Map-first workspaces use the same full-viewport shell and navigation drawer.
 // Proposal and route-choice overlays remain specific to the companion map.
-const isMapRoute = computed(() => route.name === "user-map" || route.name === "user-mission");
+const isMapRoute = computed(() => route.name === "user-map" || route.name === "user-mission" || route.name === "admin-dispatch");
 // The companion map owns its share icon. Other pages keep an independent manual
 // general Broadcast action above SOS, even during an active mission.
 const showGeneralShareButton = computed(() => showSosButton.value && route.name !== "user-map");

@@ -9,7 +9,7 @@ const app = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
 // Never mount Vue SFCs in unit tests (docs/TASKS.md).
 describe("trip to mission acceptance guard", () => {
   it("keeps the map instance through offer and future tab query changes", () => {
-    expect(app).toContain(":key=\"route.name === 'user-map' ? route.path : route.fullPath\"");
+    expect(app).toContain(":key=\"route.name === 'user-map' || route.name === 'admin-dispatch' ? route.path : route.fullPath\"");
     expect(compileTemplate({ filename: "App.vue", id: "map-route-key", source: parse(app).descriptor.template!.content }).errors).toEqual([]);
   });
   it("registers a synchronous trip stop, including a weak-GPS pending Start", () => {

@@ -11,9 +11,9 @@ describe("admin sender identity and profile access", () => {
   it("links the selected SOS requester by exact ID without interrupting dispatch", () => {
     expect(dispatch).toContain('class="admin-dispatch__sender" role="group"');
     expect(dispatch).toContain('adminSos.selectedRequest.requesterId');
-    expect(dispatch).toContain('@click="senderProfileOpen = true"');
-    expect(dispatch).toContain(':user-id="adminSos.selectedRequest?.requesterId ?? null"');
-    expect(dispatch).toMatch(/watch\(\(\) => adminSos\.selectedRequest\?\.id, \(\) => \{\s*senderProfileOpen\.value = false;\s*photoDialogOpen\.value = false;[\s\S]*?\}, \{ flush: "sync" \}\);/);
+    expect(dispatch).toContain('@click="profileUserId = null; senderProfileOpen = true"');
+    expect(dispatch).toContain(':user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"');
+    expect(dispatch).toMatch(/watch\(\(\) => adminSos\.selectedRequest\?\.id, \(\) => \{\s*senderProfileOpen\.value = false;\s*profileUserId\.value = null;\s*photoDialogOpen\.value = false;[\s\S]*?\}, \{ flush: "sync" \}\);/);
     expect(dispatch).toContain('title="پروفایل ارسال‌کننده"');
     expect(dispatch).toContain('@click="requestDispatch"');
     expect(dispatch).toContain('class="admin-dispatch__map-and-actions"');

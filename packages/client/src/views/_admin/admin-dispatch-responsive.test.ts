@@ -1,81 +1,105 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { compileTemplate, parse } from "vue/compiler-sfc";
 
 const source = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
+const shell = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
+const template = parse(source).descriptor.template!.content;
+const css = parse(source).descriptor.styles[0]!.content;
 
-describe("dispatch console responsive triage (source-pinned; no Vue mount)", () => {
-  it("keeps one filter state with a labeled compact select below md and a toggle above", () => {
-    expect(source).toMatch(/<v-select\s+:model-value="adminSos\.filterStatus"[\s\S]*?class="admin-dispatch__filter-select d-md-none"[\s\S]*?label="وضعیت درخواست‌های اضطراری"[\s\S]*?@update:model-value="onFilterChange"/);
-    expect(source).toMatch(/<v-btn-toggle\s+class="admin-dispatch__filter-toggle d-none d-md-inline-flex"\s+:model-value="adminSos\.filterStatus"/);
-    expect(source).toContain("adminSos.setFilterStatus(value)");
-    // The filter remains usable even while the server snapshot/counts are unverified.
-    expect(source).toContain('title: "در انتظار رسیدگی", value: "pending"');
-    expect(source).toContain('title: "اعزام‌شده", value: "dispatched"');
+describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
+  it("uses the map shell and preserves map state across incident query changes", () => {
+    expect(shell).toContain('route.name === "admin-dispatch"');
+    expect(shell).toContain("route.name === 'admin-dispatch' ? route.path : route.fullPath");
+    expect(css).toContain('height: 100dvh; max-width: none;');
+    expect(css).toContain('.admin-dispatch__map-and-actions { position: absolute; inset: 0;');
+    expect(css).toContain('.admin-dispatch__map-and-actions .dispatch-map-wrapper > :deep(.map-canvas)');
+    expect(css).toContain('width: 100%; height: 100%; min-height: 0;');
+    expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-layout", source: template }).errors).toEqual([]);
   });
 
-  it("presents the SOS queue first and keeps map controls clear at stacked widths", () => {
-    const mapColumn = '<v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">';
-    const queueColumn = '<v-col cols="12" lg="5" class="admin-dispatch__queue">';
-    expect(source).toContain(mapColumn);
-    expect(source).toContain(queueColumn);
-    expect(source.indexOf(queueColumn)).toBeLessThan(source.indexOf(mapColumn));
-    expect(source).not.toMatch(/\.admin-dispatch__queue \{ order:/); // no visual/keyboard order mismatch
-    const desktop = source.split("<style scoped>")[1]!.split("@media (max-width: 1279px)")[0]!;
-    expect(desktop).toMatch(/\.map-selected-alert-card \{\s*position: absolute;/);
-    expect(desktop).toContain('top: .75rem; left: .75rem; right: auto;');
-    expect(desktop).not.toContain('.severity-legend');
-    expect(desktop).toContain('.dispatch-map-choices { position: absolute;');
-    const stacked = source.split("@media (max-width: 1279px) {")[1]!.split("@media (max-width: 599px)")[0]!;
-    expect(stacked).toMatch(/\.dispatch-map-wrapper \{[^}]*display: flex;[^}]*height: auto;/);
-    expect(stacked).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(17rem, 40dvh, 22rem\);[^}]*min-height: 17rem;/);
-    expect(stacked).toContain('.dispatch-map-choices { position: static;');
-    expect(stacked).not.toMatch(/\.map-selected-alert-card \{[^}]*position: static;/);
-    expect(source.indexOf('class="map-selected-alert-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
-    expect(source).toContain("'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'");
-    expect(source).toContain("'نمایش حادثه و امدادگران نزدیک روی نقشه'");
-    expect(source).toContain('@click="frameSelectedIncident"');
-    expect(source).toContain('@click="toggleQueueRequest(item)"');
+  it("pins nearby responders ahead of the SOS queue, with the selected incident over the map", () => {
+    const nearby = template.indexOf('id="dispatch-nearby"');
+    const queue = template.indexOf('id="dispatch-queue"');
+    const map = template.indexOf('id="dispatch-map"');
+    const incident = template.indexOf('id="dispatch-incident"');
+    expect(nearby).toBeGreaterThan(0);
+    expect(nearby).toBeLessThan(queue);
+    expect(queue).toBeLessThan(map);
+    expect(map).toBeLessThan(incident);
+    expect(template).toContain('id="dispatch-sidebar"');
+    expect(template).toContain('id="dispatch-incident-panel"');
+    expect(template).toContain('id="dispatch-incident-toggle"');
+    expect(template).toContain('v-show="incidentExpanded" id="dispatch-incident-content"');
+    expect(source).toContain('const compactDispatch = useMediaQuery("(max-width: 900px)")');
+    expect(source).toContain('incidentExpanded.value = !compactDispatch.value;');
+    expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;');
+    expect(css).toContain('.admin-dispatch__incident-panel {');
+    expect(css).toContain('overflow: auto; overscroll-behavior: contain; pointer-events: auto;');
+    expect(template).toContain('@click="toggleQueueRequest(item)"');
+    expect(template).toContain('@click="frameSelectedIncident"');
+    expect(template).toContain('id="dispatch-map-legend"');
+    expect(template).toContain('id="dispatch-map-choices"');
   });
 
-  it("groups compact alarm actions away from filters without shrinking touch targets", () => {
-    const filter = source.indexOf('class="admin-dispatch__filter-group" role="group"');
-    const actions = source.indexOf('class="admin-dispatch__toolbar-actions" role="group"');
-    expect(filter).toBeGreaterThan(0);
-    expect(actions).toBeGreaterThan(filter);
-    const toolbar = source.slice(filter, source.indexOf('</header>'));
-    for (const action of ['adminSos.toggleSoundMuted()', 'testSound', 'adminSos.refreshRequests()']) {
-      expect(toolbar).toContain(action);
+  it("provides local SOS search, admin user lookup and same-origin place/POI search", () => {
+    expect(template).toContain('id="dispatch-search-input"');
+    expect(template).toContain('v-for="item in matchedRequests"');
+    expect(template).toContain('v-for="user in searchedUsers"');
+    expect(template).toContain('v-for="(place, index) in searchedPlaces"');
+    expect(source).toContain('listAdminUsers({ q: query, page: 1, limit: 8 }, token, controller.signal)');
+    expect(source).toContain('searchPlaces({ q: query, limit: 8 }, controller.signal)');
+    expect(source).toContain('placeSearchController?.abort();');
+    expect(source).toContain('userSearchController?.abort();');
+    expect(source).toContain('focusRequest(item);');
+    expect(source).toContain('new mapLabelMarkerClass({ element: marker, anchor: "bottom" })');
+    expect(source).toContain('marker.id = "dispatch-place-marker";');
+    expect(source).toContain('title.textContent = place.name;');
+    expect(source).toContain('query.startsWith("@")');
+    expect(source).toContain('searchQuery.value.replace(/^@/, "")');
+    expect(source).toContain('profileUserId.value = user.id;');
+    expect(template).toContain('موقعیت تأییدشده‌ای در دسترس نیست');
+    expect(template).toContain('id="dispatch-search-retry"');
+    expect(template).toContain('id="dispatch-users-retry"');
+  });
+
+  it("assigns CSS IDs to every dispatch button, card and input widget", () => {
+    type Node = { type: number; tag?: string; props?: { type: number; name?: string;
+      arg?: { content?: string }; value?: { content?: string } }[]; children?: Node[] };
+    const controls = new Set(["v-btn", "button", "v-card", "v-list-item", "v-select",
+      "v-text-field", "v-btn-toggle", "v-dialog", "v-checkbox-btn", "MapCanvas"]);
+    const staticIds: string[] = [];
+    function walk(node: Node): void {
+      if (node.tag && controls.has(node.tag)) {
+        const id = node.props?.find((prop) => prop.name === "id" ||
+          (prop.name === "bind" && prop.arg?.content === "id"));
+        expect(id, `${node.tag} at ${node.props?.[0]?.value?.content ?? "unnamed"}`).toBeDefined();
+        if (id?.name === "id") staticIds.push(id.value!.content!);
+      }
+      for (const child of node.children ?? []) walk(child);
     }
-    expect(toolbar.match(/size="small"/g)).toHaveLength(3);
-    expect(toolbar).toContain('aria-label="بازخوانی فهرست درخواست‌های اضطراری"');
-    expect(source).toContain('min-width: 44px; min-height: 44px; height: auto;');
-    expect(source).toContain('.admin-dispatch__toolbar :deep(.v-btn) { height: 46px; min-height: 46px;');
-    expect(source).toContain('.admin-dispatch__filter-toggle { height: 46px; min-height: 46px;');
-    expect(source).toContain('.admin-dispatch__toolbar .admin-dispatch__filter-toggle :deep(.v-btn) { display: flex; align-items: center; justify-content: center;');
-    expect(source).toContain('.admin-dispatch__filter-toggle :deep(.v-btn__content) { display: flex; align-items: center; justify-content: center;');
-    expect(source).not.toContain('admin-dispatch__toolbar-label');
-    expect(source).toContain('.dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }');
-    expect(source).toContain('d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold');
-    expect(source).not.toContain('admin-dispatch__overview');
-    expect(source).toContain('.map-selected-alert-card:focus-visible');
-    expect(source).toContain('@media (max-width: 699px) {');
+    walk(parse(source).descriptor.template!.ast as Node);
+    expect(new Set(staticIds).size).toBe(staticIds.length);
   });
 
-  it("uses aligned surfaces and inset selected rows instead of unrelated side/top accents", () => {
-    expect(source).toContain('<v-row class="admin-dispatch__workspace">');
-    expect(source.indexOf('۰۱ / بررسی درخواست‌ها')).toBeLessThan(source.indexOf('۰۲ / موقعیت حادثه و اعزام'));
-    expect(source).toContain('.admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(');
-    expect(source).toContain('.dispatch-request-row.v-list-item--active, .dispatch-responder-row.v-list-item--active {');
-    const selectedRows = source.match(/\.dispatch-request-row\.v-list-item--active, \.dispatch-responder-row\.v-list-item--active \{[^}]*\}/)?.[0];
-    expect(selectedRows).toBeDefined();
-    expect(selectedRows).not.toContain('border-inline-start-color:');
-    expect(selectedRows).not.toContain('border-top: 3px solid'); // Map labels may have a pin-facing edge.
-  });
-
-  it("still reserves the compact filter and responder search wrap for phones", () => {
-    const phone = source.split("@media (max-width: 599px) {")[1]!.split("\n}\n\n.pulse-indicator")[0]!;
-    expect(phone).toContain('.admin-dispatch__filter-select { flex: 1 1 12rem;');
-    expect(phone).toContain('.admin-dispatch__responder-search { flex-wrap: wrap; }');
-    expect(phone).not.toContain('.dispatch-map-wrapper {');
+  it("keeps the narrow layout usable and its actions identifiable", () => {
+    expect(css).toContain('@media (max-width: 900px) {');
+    expect(css).toContain('height: min(38dvh, 21rem);');
+    expect(css).toContain('max-height: min(25dvh, 15rem);');
+    expect(css).toContain('.admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }');
+    // Child map controls use offsets within the map card, not the outer sidebar width twice.
+    expect(css).toContain('right: .75rem; left: 24rem;');
+    expect(css).toContain('max-width: calc(100% - 25rem);');
+    expect(css).not.toContain('max-width: calc(100% - var(--dispatch-sidebar-width) - 26rem);');
+    expect(css).toContain('.admin-dispatch__map-and-actions .dispatch-map-choices {');
+    expect(css).toContain('position: absolute; z-index: 15; right: .75rem;');
+    expect(css).toContain('flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;');
+    expect(source).toContain('offset: dispatchFocusOffset()');
+    expect(template).toContain(':id="`dispatch-sos-${item.id}`"');
+    expect(template).toContain(':id="`dispatch-responder-${responder.userId}`"');
+    expect(template).toContain('id="dispatch-recenter"');
+    expect(template).toContain('id="dispatch-responders"');
+    expect(template).toContain('id="dispatch-incident"');
+    expect(template).not.toContain('صف را بررسی کنید، شواهد و موقعیت را بسنجید');
   });
 });
