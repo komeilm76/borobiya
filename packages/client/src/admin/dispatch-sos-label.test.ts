@@ -17,6 +17,13 @@ describe("selected Dispatch SOS label placement", () => {
     });
   });
 
+  it("attaches the same chip to a coordinate-centered circle if canvas pins are unavailable", () => {
+    expect(dispatchSosLabelPlacement(100, 20, 400, 240, 95, 30, 0)).toMatchObject({
+      side: "below", belowPin: true, visible: true
+    });
+    expect(dispatchSosLabelPlacement(370, 110, 400, 240, 95, 30, 0).side).toBe("left");
+  });
+
   it("uses a bounded center fallback on narrow maps and hides offscreen labels", () => {
     expect(dispatchSosLabelPlacement(90, 100, 160, 240, 110, 36)).toMatchObject({ side: "below", visible: true });
     expect(dispatchSosLabelPlacement(90, 210, 160, 240, 110, 36)).toMatchObject({ side: "above", visible: true });

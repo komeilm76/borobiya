@@ -1,5 +1,5 @@
-// Semantic map vocabulary for the user workspaces. Dispatch has a separate
-// selected-incident-only WebGL label policy. Color and the key are secondary.
+// Semantic map vocabulary for the user workspaces. Dispatch has separate
+// cluster-aware labels beside its WebGL pins. Color and the key are secondary.
 export type MapPointKind = "sos" | "start" | "end" | "helper" | "nearby" | "stop" | "requester" | "director";
 
 // Glyphs remain a font-independent fallback and the MapLibre WebGL symbol vocabulary

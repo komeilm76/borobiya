@@ -11,19 +11,17 @@ describe("SOS center on-map labels and offscreen directions", () => {
   it("names selected incidents only, qualified nearby responders and selected responder names", () => {
     expect(source).toContain('chip.textContent = incidentLabel(incident.incidentTypeId)');
     expect(source).not.toContain('"text-field": ["get", "mapTitle"]');
-    expect(source).toContain('selectedSosLabelMarker = new selectedSosMarkerClass({ element, anchor: "center" })');
-    expect(source).toMatch(/element\.hidden = false;[\s\S]*?chip\.offsetWidth, chip\.offsetHeight\);[\s\S]*?element\.hidden = !placement\.visible;/);
-    expect(source).toContain('element.style.setProperty("--dispatch-selected-sos-color"');
-    expect(source).toContain('"text-field": ["get", "username"]');
-    expect(source).toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
-    // The padded plate meets the ~17px pin head rather than obscuring its glyph.
-    expect(source).toContain('"text-radial-offset": 2.4');
-    expect(source).toContain('"text-radial-offset": 2.3');
-    expect(source).toContain('"text-variable-anchor": ["left", "right", "top", "bottom"]');
-    expect(source).toContain('"text-halo-color": palette.surface');
-    expect(source).toContain('"icon-text-fit": "both" as const');
-    expect(source).toContain('"icon-image": DISPATCH_PIN_IMAGES.name');
-    expect(source).toContain('"text-translate": pinReady ? [0, -35] : [0, 0]');
+    expect(source).toContain('selectedSosLabelMarker = new mapLabelMarkerClass({ element, anchor: "center" })');
+    expect(source).toMatch(/element\.hidden = false;[\s\S]*?chip\.offsetWidth, chip\.offsetHeight, hasPin \? -35 : 0\);[\s\S]*?element\.hidden = !placement\.visible;/);
+    expect(source).toContain('element.style.setProperty("--dispatch-label-color"');
+    expect(source).toContain('element.className = "dispatch-sos-label-anchor dispatch-responder-label-anchor"');
+    expect(source).toContain('chip.className = "dispatch-sos-label dispatch-responder-label"');
+    expect(source).toContain('chip.textContent = feature.properties.username');
+    expect(source).toContain('element.style.setProperty("--dispatch-label-color", themeStore.isDark ? "#205fd1" : "#0868c8")');
+    expect(source).toContain('positionResponderLabels(map)');
+    expect(source).toContain('nonOverlappingResponderLabelIds(candidates');
+    expect(source).not.toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
+    expect(source).not.toContain('DISPATCH_PIN_IMAGES.name');
     expect(source).toContain('!adminSos.responderSearch');
     // Selection alone (before/without a nearest fetch) updates the opaque on-map title.
     expect(source).toMatch(/watch\(\(\) => \[adminSos\.visibleRequests, adminSos\.selectedId\][\s\S]*?syncMapData\(\); syncSelectedSosLabel\(\); updateMapEdgeCues\(\)/);
@@ -31,24 +29,28 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -35px; left: 16px;');
     expect(styles[0]!.content).toContain('border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
     const labelCss = styles[0]!.content;
-    expect(labelCss).toContain('border-left: 3px solid var(--dispatch-selected-sos-color, #dc2626)');
-    expect(labelCss).not.toContain('border-inline-start: 3px solid var(--dispatch-selected-sos-color');
+    expect(labelCss).toContain('border-left: 3px solid var(--dispatch-label-color, #dc2626)');
+    expect(labelCss).not.toContain('border-inline-start: 3px solid var(--dispatch-label-color');
     expect(labelCss).toContain(':global(.dispatch-sos-label::after)');
     expect(labelCss).toContain('left: -8px; top: calc(50% - 4px);');
     expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--left .dispatch-sos-label)');
-    expect(labelCss).toContain('border-right: 3px solid var(--dispatch-selected-sos-color');
+    expect(labelCss).toContain('border-right: 3px solid var(--dispatch-label-color');
     expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--center .dispatch-sos-label::after)');
     expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label::after)');
     expect(source).toContain('filter: ["==", ["get", "isSelected"], false]');
     expect(source).toContain('"circle-color": SELECTED_SOS_COLOR, "circle-radius": 23');
     // Clustered responders otherwise lose both their pin and username at low zoom.
     expect(source).toContain('features: nearbyFeatures.value.features.filter((feature) => feature.properties.isSelected)');
-    expect(source).toContain('id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID');
+    expect(source).toContain('visibleResponderLabelIds(map.queryRenderedFeatures({ layers })');
+    expect(source).toContain('syncResponderLabels(); // The new cluster/pin frame is now queryable.');
+    expect(source).toContain('clearResponderLabels();');
+    expect(source).toContain('map.off("render", onRender);');
+    expect(styles[0]!.content).toContain(':global(.dispatch-responder-label-anchor) { z-index: 3; }');
     expect(source).toContain('id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID');
     expect(source).toContain('feature.layer.id === RESPONDER_SELECTED_DOT_LAYER_ID');
     expect(source).toContain('RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,');
     expect(source).toContain('adminSos.nearestRequestId === adminSos.selectedRequest.id');
-    expect(source).not.toContain('createMapPointElement('); // Dispatch keeps its own WebGL grammar.
+    expect(source).not.toContain('createMapPointElement('); // Dispatch pins remain WebGL; labels share the attached DOM chip.
   });
 
   it("uses contrasting blue responder glyphs, severity-coded SOS markers and a context-aware legend", () => {
