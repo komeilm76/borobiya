@@ -168,8 +168,8 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(styles[0]!.content).toContain('width: 34px; height: 100%;');
     expect(styles[0]!.content).toContain('width: 17px; height: 17px;');
     expect(styles[0]!.content).toContain('font: 800 .78rem/1.1 var(--bb-font-family)');
-    expect(styles[0]!.content).toContain('border-radius: .55rem;');
-    expect(styles[0]!.content).toContain('border-radius: .5rem 0 0 .5rem; color: #fff; background: var(--dispatch-edge-color, #0868c8)');
+    expect(styles[0]!.content).toContain('border-radius: .7rem;');
+    expect(styles[0]!.content).toContain('border-radius: .65rem 0 0 .65rem; color: #fff; background: var(--dispatch-edge-color, #0868c8)');
     for (const side of ["bottom", "left", "right"])
       expect(styles[0]!.content).toContain(`.dispatch-map-edge-cue__arrow--${side}`);
     expect(styles[0]!.content).toContain('-webkit-line-clamp: 2');

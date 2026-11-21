@@ -1984,7 +1984,7 @@ onBeforeUnmount(() => {
   align-items: center; gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
   width: min(138px, calc(100% - 24px)); height: 34px; padding: 0;
   padding-inline-end: .4rem;
-  border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .55rem;
+  border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .7rem;
   overflow: hidden; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.1 var(--bb-font-family);
   text-align: start; cursor: pointer; pointer-events: auto; }
@@ -1992,7 +1992,7 @@ onBeforeUnmount(() => {
 /* The arrow's 34px width matches the cue's outer height. Its left corners are
    gently rounded; the other edge stays flush to the button border. */
 .dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 34px; height: 100%;
-  border-radius: .5rem 0 0 .5rem; color: #fff; background: var(--dispatch-edge-color, #0868c8); }
+  border-radius: .65rem 0 0 .65rem; color: #fff; background: var(--dispatch-edge-color, #0868c8); }
 .dispatch-map-edge-cue__arrow svg { display: block; width: 17px; height: 17px; }
 .dispatch-map-edge-cue__arrow--bottom { transform: rotate(180deg); }
 .dispatch-map-edge-cue__arrow--left { transform: rotate(-90deg); }
