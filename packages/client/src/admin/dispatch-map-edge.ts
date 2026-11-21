@@ -11,11 +11,11 @@ export function dispatchMapEdgeCues(width: number, height: number,
   candidates: readonly DispatchEdgeCandidate[]): DispatchEdgeCue[] {
   if (width < 160 || height < 180) return [];
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-  // Match the 176px by 56px CSS cue, with a 12px gap to the viewport.
+  // Match the compact 148px by 46px CSS cue, with a 12px gap to the viewport.
   // Narrow maps shrink the cue to width - 24px rather than cropping it.
-  const cueWidth = Math.min(176, width - 24);
+  const cueWidth = Math.min(148, width - 24);
   const insetX = cueWidth / 2 + 12;
-  const bottomY = height - 40;
+  const bottomY = height - 35;
   const outside = candidates.filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y) &&
     (point.x < 0 || point.x > width || point.y < 0 || point.y > height));
   // The selected incident always wins; selected responders precede nearby ones.
@@ -38,10 +38,10 @@ export function dispatchMapEdgeCues(width: number, height: number,
       clamp(point.x, insetX, width - insetX);
     // Left/top clears the recenter button. Right/top also clears MapLibre's
     // zoom/compass controls (which occupy the map's upper-right corner).
-    const topY = edge === "right" || (edge === "top" && x > width - 132) ? 132 : 90;
+    const topY = edge === "right" || (edge === "top" && x > width - 132) ? 126 : 86;
     const yMin = Math.min(topY, bottomY);
     const y = edge === "top" ? yMin : edge === "bottom" ? bottomY : clamp(point.y, yMin, bottomY);
-    if (cues.some((cue) => Math.abs(cue.x - x) < cueWidth + 8 && Math.abs(cue.y - y) < 60)) continue;
+    if (cues.some((cue) => Math.abs(cue.x - x) < cueWidth + 8 && Math.abs(cue.y - y) < 50)) continue;
     cues.push({ ...point, edge, x, y });
     if (cues.length === 3) break; // Avoid covering the map; the responder list remains complete.
   }

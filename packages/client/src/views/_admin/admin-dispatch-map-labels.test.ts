@@ -128,6 +128,11 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('id: SOS_SELECTED_CORE_LAYER_ID, type: "circle", source: SOS_SOURCE_ID');
     expect(source).toMatch(/id: SOS_SELECTED_CORE_LAYER_ID,[\s\S]*?paint: \{ "circle-color": \["get", "color"\]/);
     expect(template!.content).toContain('SOS_MAP_MARKER_COLORS[sosMapPriority(adminSos.selectedRequest.status, adminSos.selectedRequest.severity)]');
+    // The 64×72 canvas map icons draw a 46×64 teardrop at .72–.76 scale
+    // (~33–35×46–49px). The legend's teardrop is ~36×48px, not a tiny dot.
+    expect(styles[0]!.content).toContain('flex: 0 0 42px; width: 42px; height: 48px;');
+    expect(styles[0]!.content).toContain('width: 27px; height: 27px; border: 2px solid #fff;');
+    expect(styles[0]!.content).toContain('transform: scale(.83, 1.1) rotate(-45deg)');
     expect(styles[0]!.content).toContain('box-shadow: 0 0 0 5px color-mix(in srgb, var(--dispatch-sos-color, #dc2626) 19%, transparent)');
     expect(styles[0]!.content).not.toContain('.dispatch-map-key__icon--selected-sos::after { background: #dc2626');
     expect(source).not.toContain("isFireIncidentLabel");
@@ -152,8 +157,10 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(template!.content).toContain('class="dispatch-map-edge-cue__arrow" aria-hidden="true"');
     expect(template!.content).toContain('stroke-width="3.5"');
     expect(source).toContain('return themeStore.isDark ? "#205fd1" : "#0868c8"');
-    expect(styles[0]!.content).toContain('width: min(176px, calc(100% - 24px)); height: 56px;');
-    expect(styles[0]!.content).toContain('grid-template-columns: 32px minmax(0, 1fr)');
+    expect(styles[0]!.content).toContain('width: min(148px, calc(100% - 24px)); height: 46px; padding: .2rem .45rem;');
+    expect(styles[0]!.content).toContain('grid-template-columns: 26px minmax(0, 1fr)');
+    expect(styles[0]!.content).toContain('width: 26px; height: 26px;');
+    expect(styles[0]!.content).toContain('width: 19px; height: 19px;');
     expect(styles[0]!.content).toContain('color: #fff; background: var(--dispatch-edge-color, #0868c8)');
     for (const side of ["bottom", "left", "right"])
       expect(styles[0]!.content).toContain(`.dispatch-map-edge-cue__arrow--${side}`);
