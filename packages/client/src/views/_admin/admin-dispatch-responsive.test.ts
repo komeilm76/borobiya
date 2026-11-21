@@ -89,8 +89,8 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('max-height: min(25dvh, 15rem);');
     expect(css).toContain('.admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }');
     // Child map controls use offsets within the map card, not the outer sidebar width twice.
-    expect(css).toContain('right: .75rem; left: 24rem;');
-    expect(css).toContain('max-width: calc(100% - 25rem);');
+    expect(css).toContain('right: 4.25rem; left: 24rem;');
+    expect(css).toContain('max-width: calc(100% - 28.5rem);');
     expect(css).not.toContain('max-width: calc(100% - var(--dispatch-sidebar-width) - 26rem);');
     expect(css).toContain('.admin-dispatch__map-and-actions .dispatch-map-choices {');
     expect(css).toContain('position: absolute; z-index: 15; right: .75rem;');

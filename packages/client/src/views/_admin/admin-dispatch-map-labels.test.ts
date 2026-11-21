@@ -148,6 +148,26 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('map.setPaintProperty(id, "circle-color", responderPin)');
   });
 
+  it("starts with the legend hidden and offers one accessible map icon to reveal it", () => {
+    const markup = template!.content;
+    const legend = markup.slice(markup.indexOf('id="dispatch-legend-toggle"'), markup.indexOf('</ul>', markup.indexOf('id="dispatch-map-legend"')));
+    expect(source).toContain('const legendOpen = ref(false);');
+    expect(legend).toContain('icon="mdi-map-outline"');
+    expect(legend).toContain(":aria-label=\"legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'\"");
+    expect(legend).toContain(':aria-expanded="legendOpen" aria-controls="dispatch-map-legend"');
+    expect(legend).toContain('@click="legendOpen = !legendOpen"');
+    expect(legend).toContain('id="dispatch-map-legend" class="dispatch-map-key"');
+    expect(legend).toContain('v-show="legendOpen"');
+    expect(legend).toContain('v-for="item in sosSeverityKey"');
+    const css = styles[0]!.content;
+    expect(css).toContain('.admin-dispatch__legend-toggle {\n  position: absolute; z-index: 5; right: .75rem;');
+    expect(css).toContain('width: 44px; height: 44px; min-width: 44px; min-height: 44px;');
+    expect(css).toContain('right: 4.25rem; left: 24rem;');
+    expect(css).toContain('left: .75rem; right: 4.25rem; width: calc(100% - 5rem);');
+    expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-legend", source: markup }).errors).toEqual([]);
+    expect(compileStyle({ filename: "AdminDispatchView.vue", id: "dispatch-legend", scoped: true, source: css }).errors).toEqual([]);
+  });
+
   it("places bounded screen-edge buttons for the selected SOS and authorised responders", () => {
     expect(source).toContain('<div v-if="mapEdgeCues.length" class="dispatch-map-edge-cues"');
     expect(source).toContain('@click="focusEdgeCue(cue)"');

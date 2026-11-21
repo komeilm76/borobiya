@@ -484,7 +484,14 @@
               </div>
             </div>
           </div>
+          <v-btn id="dispatch-legend-toggle" class="admin-dispatch__legend-toggle"
+            icon="mdi-map-outline" :color="legendOpen ? 'primary' : 'surface'" variant="flat"
+            :aria-label="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
+            :title="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
+            :aria-expanded="legendOpen" aria-controls="dispatch-map-legend"
+            @click="legendOpen = !legendOpen" />
           <ul id="dispatch-map-legend" class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
+            v-show="legendOpen"
             :style="{ '--dispatch-helper-color': themeStore.isDark ? '#205fd1' : '#0868c8' }">
             <li v-for="item in sosSeverityKey" :key="item.severity">
               <span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert"
@@ -1057,6 +1064,7 @@ let pulseAnimationFrame: number | null = null;
 let lastPulseUpdateAt = 0;
 let detachMapEvents: (() => void) | null = null;
 const mapEdgeCues = ref<DispatchEdgeCue[]>([]);
+const legendOpen = ref(false);
 const edgeCueDirectionLabel = { top: "بالا", bottom: "پایین", left: "چپ", right: "راست" } as const;
 
 type DispatchLabelSide = DispatchSosLabelPlacement["side"];
@@ -2148,6 +2156,15 @@ onBeforeUnmount(() => {
 .dispatch-map-key { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin: 0;
   padding: .55rem .85rem; list-style: none; background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface)); font: 700 .76rem/1.5 var(--bb-font-family); }
+.admin-dispatch__legend-toggle {
+  position: absolute; z-index: 5; right: .75rem;
+  bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+  width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+  box-shadow: var(--bb-shadow-overlay);
+}
+.admin-dispatch__legend-toggle:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
+}
 .dispatch-map-key li { display: inline-flex; align-items: center; gap: .35rem; }
 .dispatch-map-key__icon, .dispatch-map-key__selected { position: relative; isolation: isolate;
   display: inline-grid; place-items: center; flex: 0 0 46px; width: 46px; height: 48px;
@@ -2621,8 +2638,8 @@ onBeforeUnmount(() => {
 .admin-dispatch__search-results p button { color: rgb(var(--v-theme-primary)); min-height: 44px; }
 .admin-dispatch__map-and-actions .dispatch-map-key {
   position: absolute; z-index: 4; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
-  right: .75rem; left: 24rem;
-  width: max-content; max-width: calc(100% - 25rem);
+  right: 4.25rem; left: 24rem;
+  width: max-content; max-width: calc(100% - 28.5rem);
   max-height: 7.5rem; overflow-y: auto; border-radius: 1rem;
   box-shadow: var(--bb-shadow-overlay);
 }
@@ -2650,7 +2667,7 @@ onBeforeUnmount(() => {
   .admin-dispatch { --dispatch-sidebar-width: 19rem; }
   .admin-dispatch__incident-panel { width: min(19rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem)); }
   .admin-dispatch__map-and-actions .dispatch-map-key {
-    left: .75rem; max-width: calc(100% - 1.5rem);
+    left: .75rem; max-width: calc(100% - 5rem);
     bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
 }
@@ -2683,9 +2700,11 @@ onBeforeUnmount(() => {
     width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
   }
   .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
+  .admin-dispatch__legend-toggle { bottom: calc(.5rem + env(safe-area-inset-bottom, 0px)); }
   .admin-dispatch__map-and-actions .dispatch-map-key {
-    bottom: .5rem; left: .75rem; right: .75rem; width: calc(100% - 1.5rem);
-    max-width: calc(100% - 1.5rem); max-height: none;
+    bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
+    left: .75rem; right: 4.25rem; width: calc(100% - 5rem);
+    max-width: calc(100% - 5rem); max-height: none;
     flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
   }
   .admin-dispatch__map-and-actions .dispatch-map-key li { flex: none; }
