@@ -330,8 +330,11 @@ export class TeamService {
    */
   teamDispatch(identity: AuthIdentity, sosId: string, input: { groupId: string; leaderId: string; requirements: RequirementLine[]; memberIds?: string[] }): Record<string, unknown> {
     this.requireAdmin(identity);
-    const sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
+    let sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
     if (!sos) throw notFound('SOS request not found.');
+    // An elapsed request leaves the dispatch queue instead of being team-dispatched late.
+    this.ctx.services.sos.expireDueRequests(this.ctx.clock());
+    sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId) ?? sos;
     const group = this.ctx.repo.one<Record<string, any>>('SELECT * FROM service_groups WHERE id=? AND status=?', input.groupId, 'active');
     if (!group) throw badRequest('Unknown active service group.', { field: 'groupId' });
     const lines = this.validateRequirementLines(input.requirements);

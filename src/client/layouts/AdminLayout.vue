@@ -37,6 +37,8 @@ onMounted(async () => {
   unsubscribers.push(
     realtime.on(HTTP_EVENTS.SOS_CREATED, () => void admin.loadDispatch()),
     realtime.on(HTTP_EVENTS.SOS_DISPATCHED, () => void admin.loadDispatch()),
+    realtime.on(HTTP_EVENTS.SOS_CANCELLED, () => void admin.loadDispatch()),
+    realtime.on(HTTP_EVENTS.SOS_EXPIRED, () => void admin.loadDispatch()),
     realtime.on(HTTP_EVENTS.ADMIN_ALERT, () => void admin.loadAlerts()),
     realtime.on(HTTP_EVENTS.SETTINGS_UPDATED, () => void admin.loadSettings()),
     realtime.on(HTTP_EVENTS.SUPPORT_REQUEST_CREATED, () => void admin.loadPendingSupportRequests()),

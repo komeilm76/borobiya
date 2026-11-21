@@ -64,6 +64,7 @@ export class SosService {
   }
 
   listSos(identity: AuthIdentity, status: string | undefined, limit: number): Record<string, unknown> {
+    this.expireDueRequests(this.ctx.clock());
     const clauses: string[] = [];
     const params: SqlValue[] = [];
     if (identity.role === ROLES.USER) {
@@ -90,6 +91,7 @@ export class SosService {
   }
 
   getSos(identity: AuthIdentity, sosId: string): Record<string, unknown> {
+    this.expireDueRequests(this.ctx.clock());
     const row = this.ctx.repo.one<Record<string, any>>(`${SOS_SELECT} WHERE s.id = ?`, sosId);
     if (!row) throw notFound('SOS request not found.');
     if (!this.canView(identity, row)) throw notFound('SOS request not found.');
@@ -107,8 +109,11 @@ export class SosService {
   }
 
   cancelSos(identity: AuthIdentity, sosId: string, reasonId: string, detail: string | undefined): Record<string, unknown> {
-    const row = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
+    let row = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
     if (!row) throw notFound('SOS request not found.');
+    // An elapsed request is expired, not cancellable; judge the transition on fresh state.
+    this.expireDueRequests(this.ctx.clock());
+    row = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId) ?? row;
     if (String(row.requester_id) !== identity.userId && identity.role !== ROLES.ADMIN) throw forbidden('Only the requester or an administrator can cancel this request.');
     const reason = this.ctx.repo.one<Record<string, any>>('SELECT * FROM cancellation_reasons WHERE id=?', reasonId);
     if (!reason) throw badRequest('Unknown cancellation reason.', { field: 'reasonId' });
@@ -142,8 +147,11 @@ export class SosService {
    */
   dispatch(identity: AuthIdentity, sosId: string, input: DispatchInput): Record<string, unknown> {
     if (identity.role !== ROLES.ADMIN) throw forbidden('Administrator permission is required.');
-    const sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
+    let sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
     if (!sos) throw notFound('SOS request not found.');
+    // An elapsed request leaves the dispatch queue instead of being dispatched late.
+    this.expireDueRequests(this.ctx.clock());
+    sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId) ?? sos;
     const mode = input.mode ?? 'offer';
     const responderIds = [...new Set(input.responderIds)];
     if (mode === 'immediate' && responderIds.length !== 1) {
@@ -271,11 +279,14 @@ export class SosService {
 
   acceptSos(identity: AuthIdentity, sosId: string): Record<string, unknown> {
     if (identity.role !== ROLES.RESPONDER) throw forbidden('Responder permission is required.');
-    const sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
+    let sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId);
     if (!sos) throw notFound('SOS request not found.');
     // Expiry is enforced at retrieval and again here at acceptance: a due offer is expired
-    // on the spot (idempotently) and can never reach a mission.
+    // on the spot (idempotently) and can never reach a mission. The request itself is
+    // judged on fresh state too — an elapsed request is no longer acceptable.
     this.expireDueOffers(this.ctx.clock());
+    this.expireDueRequests(this.ctx.clock());
+    sos = this.ctx.repo.one<Record<string, any>>('SELECT * FROM sos_requests WHERE id=?', sosId) ?? sos;
     const offers = this.ctx.repo.all<Record<string, any>>('SELECT * FROM mission_offers WHERE sos_id=?', sosId);
     if (offers.length) {
       // The offer set is authoritative: only an addressed worker with a pending offer may accept.
@@ -358,6 +369,7 @@ export class SosService {
     const sos = this.ctx.repo.one('SELECT id FROM sos_requests WHERE id=?', sosId);
     if (!sos) throw notFound('SOS request not found.');
     this.expireDueOffers(this.ctx.clock());
+    this.expireDueRequests(this.ctx.clock());
     const changed = this.ctx.uow.commit((tx) => {
       const now = this.ctx.clock();
       const result = tx.repo.run(
@@ -374,6 +386,7 @@ export class SosService {
   listOffers(identity: AuthIdentity, limit: number): Record<string, unknown> {
     if (identity.role !== ROLES.RESPONDER) return { items: [], total: 0 };
     this.expireDueOffers(this.ctx.clock());
+    this.expireDueRequests(this.ctx.clock());
     const rows = this.ctx.repo.all<Record<string, any>>(
       `${SOS_SELECT} JOIN mission_offers o ON o.sos_id = s.id
        WHERE o.responder_id = ? AND o.status = 'pending' AND s.status = ?
@@ -423,6 +436,64 @@ export class SosService {
   }
 
   /**
+   * Expires every request whose `expires_at` (creation + 2h) has elapsed while it is still
+   * `pending` or `dispatched` — the `expire` transition the state table and the plan's
+   * lifecycle (… → COMPLETED/CANCELLED/EXPIRED) define, which no actor performed: stale
+   * requests used to sit in the dispatch queue forever. Pending offers addressed on a
+   * dispatched request die with it. A request that already has a mission (immediate
+   * dispatch — the worker may still press start) and any request past acceptance are never
+   * expired: the two hours are a response window, not a mission duration. Runs from the
+   * maintenance interval and lazily on reads and acceptance, like offer expiry.
+   *
+   * @param now Millisecond timestamp to judge expiry against.
+   * @returns How many requests transitioned to `expired`.
+   */
+  expireDueRequests(now: number = this.ctx.clock()): number {
+    const due = this.ctx.repo.all<Record<string, any>>(
+      `SELECT id, requester_id AS requesterId, assigned_responder_id AS assignedResponderId, status
+       FROM sos_requests WHERE status IN (?, ?) AND expires_at <= ?`,
+      SOS_STATUS.PENDING, SOS_STATUS.DISPATCHED, now);
+    if (!due.length) return 0;
+    return this.ctx.uow.commit((tx) => {
+      let expired = 0;
+      for (const row of due) {
+        const sosId = String(row.id);
+        if (tx.repo.one('SELECT id FROM missions WHERE sos_id=?', sosId)) continue;
+        const transition = transitionSos(String(row.status), 'expire', ROLES.ADMIN);
+        if (!transition.ok) continue;
+        const result = tx.repo.run(
+          'UPDATE sos_requests SET status=?, updated_at=? WHERE id=? AND status=?',
+          transition.next, now, sosId, String(row.status));
+        if (!result.changes) continue; // a concurrent dispatch/accept won; leave it alone
+        expired += 1;
+        // Pending offers addressed on the request die with it, with the same event and
+        // audit trail offer expiry produces on its own path.
+        const offered = tx.repo.all<Record<string, any>>(
+          'SELECT id, responder_id AS responderId FROM mission_offers WHERE sos_id=? AND status=?', sosId, 'pending');
+        for (const offer of offered) {
+          tx.repo.run('UPDATE mission_offers SET status=?, expired_at=? WHERE id=? AND status=?',
+            'expired', now, String(offer.id), 'pending');
+          tx.event(HTTP_EVENTS.MISSION_OFFER_EXPIRED, {
+            offerId: String(offer.id), sosId, responderId: String(offer.responderId), expiredAt: now
+          }, [`user:${String(offer.responderId)}`, 'role:admin', `sos:${sosId}`]);
+          tx.repo.run('INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
+            null, 'mission_offer.expired', `mission_offers:${String(offer.id)}`, 'system',
+            JSON.stringify({ sosId, responderId: String(offer.responderId), expiredAt: now, reason: 'sos_expired' }), now);
+        }
+        tx.event(HTTP_EVENTS.SOS_EXPIRED, {
+          sosId, status: transition.next, expiredAt: now
+        }, [`user:${String(row.requesterId)}`, 'role:admin', `sos:${sosId}`,
+          ...(row.assignedResponderId ? [`user:${String(row.assignedResponderId)}`] : []),
+          ...offered.map((offer) => `user:${String(offer.responderId)}`)]);
+        tx.repo.run('INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
+          null, 'sos.expired', `sos_requests:${sosId}`, 'system',
+          JSON.stringify({ expiredAt: now }), now);
+      }
+      return expired;
+    });
+  }
+
+  /**
    * If `sosId` is still 'dispatched' with zero pending offers and no mission, moves it back to
    * 'pending' (admin redispatch queue) and raises an open alert. Never touches a request with
    * an accepted offer or an existing mission; never deletes history.
@@ -455,6 +526,7 @@ export class SosService {
   /** Administrator view of offers (all statuses) for dispatch-board monitoring. */
   listAllOffers(status: string | undefined, limit: number): Record<string, unknown> {
     this.expireDueOffers(this.ctx.clock());
+    this.expireDueRequests(this.ctx.clock());
     const filter = status && ['pending', 'accepted', 'declined', 'expired', 'cancelled'].includes(status) ? status : null;
     const rows = this.ctx.repo.all<Record<string, any>>(
       `SELECT o.id, o.sos_id AS sosId, o.responder_id AS responderId, u.username AS responderUsername,

@@ -216,6 +216,7 @@ export async function createApp(overrides: ConfigOverrides = {}): Promise<Borobi
         if (trackPurge.blocked > 0) console.error(`[jobs] track purge blocked for ${trackPurge.blocked} context(s); raw points kept until summaries persist`);
         context.repo.purgeEventsOlderThan(new Date(context.clock() - 7 * 86_400_000).toISOString());
         context.services.sos.expireDueOffers();
+        context.services.sos.expireDueRequests();
       } catch (error) {
         console.error('[jobs] maintenance failed', error);
       }

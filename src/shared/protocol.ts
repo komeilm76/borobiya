@@ -118,6 +118,7 @@ export const HTTP_EVENTS = Object.freeze({
   SOS_DISPATCHED: 'sos.dispatched',
   SOS_ACCEPTED: 'sos.accepted',
   SOS_CANCELLED: 'sos.cancelled',
+  SOS_EXPIRED: 'sos.expired',
   MISSION_UPDATED: 'mission.updated',
   MISSION_OFFER_EXPIRED: 'mission.offer.expired',
   MISSION_TEAM_UPDATED: 'mission.team.updated',

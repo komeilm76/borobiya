@@ -283,7 +283,7 @@ describe('mobile shell', () => {
   it('tears down every subscription, the geolocation watch and the socket on unmount', async () => {
     const shell = await mountShell();
     const subscribed = [...shell.handlers.values()].reduce((total, set) => total + set.size, 0);
-    expect(subscribed).toBe(8);
+    expect(subscribed).toBe(10);
     shell.wrapper.unmount();
     expect(shell.spies.stopLocation).toHaveBeenCalledTimes(1);
     expect(shell.spies.disconnect).toHaveBeenCalledTimes(1);
