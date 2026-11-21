@@ -20,6 +20,14 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('element.style.setProperty("--dispatch-label-color", themeStore.isDark ? "#205fd1" : "#0868c8")');
     expect(source).toContain('positionResponderLabels(map)');
     expect(source).toContain('nonOverlappingResponderLabelIds(candidates');
+    expect(source).toContain('reserved.push(bounds)');
+    expect(source).toContain('selectedSosPinBounds(rect.left + pin.x, rect.top + pin.y, pinReady)');
+    expect(source).toMatch(/const DISPATCH_LAYER_ORDER = \[[\s\S]*?SOS_SELECTED_PIN_LAYER_ID\s*\] as const/);
+    expect(source).toContain('raiseDispatchLayers(map, DISPATCH_LAYER_ORDER)');
+    expect(source).toContain('id: SOS_SELECTED_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID');
+    expect(source).toContain('id: SOS_SELECTED_CORE_LAYER_ID, type: "circle", source: SOS_SOURCE_ID');
+    expect(source).toContain('id: SOS_SELECTED_GLYPH_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID');
+    expect(source).toContain('feature.layer.id === SOS_SELECTED_PIN_LAYER_ID');
     expect(source).not.toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
     expect(source).not.toContain('DISPATCH_PIN_IMAGES.name');
     expect(source).toContain('!adminSos.responderSearch');
@@ -49,6 +57,7 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('syncResponderLabels(); // The new cluster/pin frame is now queryable.');
     expect(source).toContain('clearResponderLabels();');
     expect(source).toContain('map.off("render", onRender);');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor) { width: 0; height: 0; z-index: 4;');
     expect(styles[0]!.content).toContain(':global(.dispatch-responder-label-anchor) { z-index: 3; }');
     expect(source).toContain('id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID');
     expect(source).toContain('feature.layer.id === RESPONDER_SELECTED_DOT_LAYER_ID');

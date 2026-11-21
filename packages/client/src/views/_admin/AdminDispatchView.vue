@@ -674,7 +674,8 @@ import { needsOverlayRestore } from "@/map/overlay-restore";
 import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
 import { dispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
-import { nonOverlappingResponderLabelIds, visibleResponderLabelIds } from "@/admin/dispatch-responder-labels";
+import { raiseDispatchLayers } from "@/admin/dispatch-map-layer-order";
+import { nonOverlappingResponderLabelIds, selectedSosPinBounds, visibleResponderLabelIds } from "@/admin/dispatch-responder-labels";
 import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
@@ -694,6 +695,9 @@ const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
 const SOS_GLYPH_LAYER_ID = "admin-sos-glyph";
 const SOS_PIN_LAYER_ID = "admin-sos-pin";
+const SOS_SELECTED_CORE_LAYER_ID = "admin-sos-selected-core";
+const SOS_SELECTED_GLYPH_LAYER_ID = "admin-sos-selected-glyph";
+const SOS_SELECTED_PIN_LAYER_ID = "admin-sos-selected-pin";
 const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
@@ -704,6 +708,17 @@ const RESPONDER_SELECTED_GLYPH_LAYER_ID = "admin-sos-selected-rescuers-glyph";
 const RESPONDER_SELECTED_PIN_LAYER_ID = "admin-sos-selected-rescuers-pin";
 const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
 const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
+// MapLibre layer order is the canvas z-index. The selected SOS draws last;
+// labels are separate DOM markers above the canvas.
+const DISPATCH_LAYER_ORDER = [
+  RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_LABEL_LAYER_ID,
+  RESPONDER_PIN_LAYER_ID, RESPONDER_COUNT_LAYER_ID,
+  RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
+  RESPONDER_SELECTED_PIN_LAYER_ID,
+  SOS_AURA_LAYER_ID, SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
+  SOS_PIN_LAYER_ID, SOS_SELECTED_CORE_LAYER_ID, SOS_SELECTED_GLYPH_LAYER_ID,
+  SOS_SELECTED_PIN_LAYER_ID
+] as const;
 type MapPointChoice = { kind: "sos" | "responder" | "cluster"; id: string; label: string;
   clusterId?: number; coordinates?: [number, number] };
 const mapPointChoices = ref<MapPointChoice[]>([]);
@@ -895,8 +910,18 @@ function positionResponderLabels(map: MapLibreMap): void {
   }
   const sos = selectedSosLabelMarker?.getElement();
   const sosChip = sos && !sos.hidden ? sos.firstElementChild as HTMLElement | null : null;
-  const visible = nonOverlappingResponderLabelIds(candidates,
-    sosChip ? [sosChip.getBoundingClientRect()] : []);
+  const reserved: { left: number; right: number; top: number; bottom: number }[] =
+    sosChip ? [sosChip.getBoundingClientRect()] : [];
+  const incident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+  if (incident) {
+    const pin = map.project([incident.location.lon, incident.location.lat]);
+    const canvas = map.getCanvas();
+    const rect = canvas.getBoundingClientRect();
+    const pinReady = Boolean(map.getLayer(SOS_SELECTED_PIN_LAYER_ID));
+    const bounds = selectedSosPinBounds(rect.left + pin.x, rect.top + pin.y, pinReady);
+    reserved.push(bounds);
+  }
+  const visible = nonOverlappingResponderLabelIds(candidates, reserved);
   for (const candidate of candidates) responderLabelMarkers.get(candidate.id)!.marker.getElement().hidden =
     !visible.has(candidate.id);
 }
@@ -1183,24 +1208,49 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       id: SOS_CORE_LAYER_ID,
       type: "circle",
       source: SOS_SOURCE_ID,
+      filter: ["==", ["get", "isSelected"], false],
       paint: {
-        "circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR, ["get", "color"]],
+        "circle-color": ["get", "color"],
         "circle-opacity": pinReady ? 0 : 1,
         "circle-stroke-opacity": pinReady ? 0 : 1,
-        "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 14, 12],
-        "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3.5, 2],
+        "circle-radius": 12,
+        "circle-stroke-width": 2,
         "circle-stroke-color": "#ffffff"
       }
     });
   }
   if (!map.getLayer(SOS_GLYPH_LAYER_ID)) map.addLayer({
     id: SOS_GLYPH_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], false],
     layout: { "text-field": MAP_POINT_META.sos.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 16, "text-allow-overlap": true },
     paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 : 1 }
   });
   if (pinReady && !map.getLayer(SOS_PIN_LAYER_ID)) map.addLayer({
     id: SOS_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], false],
+    layout: { "icon-image": ["get", "pinImage"], "icon-anchor": "bottom",
+      "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
+  });
+  // A selected incident must not compete for draw order with another SOS
+  // symbol in the same layer. Draw it last, above nearby pins and basemap POIs.
+  if (!map.getLayer(SOS_SELECTED_CORE_LAYER_ID)) map.addLayer({
+    id: SOS_SELECTED_CORE_LAYER_ID, type: "circle", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], true],
+    paint: { "circle-color": SELECTED_SOS_COLOR,
+      "circle-opacity": pinReady ? 0 : 1, "circle-stroke-opacity": pinReady ? 0 : 1,
+      "circle-radius": 14, "circle-stroke-width": 3.5, "circle-stroke-color": "#ffffff" }
+  });
+  if (!map.getLayer(SOS_SELECTED_GLYPH_LAYER_ID)) map.addLayer({
+    id: SOS_SELECTED_GLYPH_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], true],
+    layout: { "text-field": MAP_POINT_META.sos.glyph, "text-font": ["Borobiya Vazirmatn"],
+      "text-size": 16, "text-allow-overlap": true },
+    paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 : 1 }
+  });
+  if (pinReady && !map.getLayer(SOS_SELECTED_PIN_LAYER_ID)) map.addLayer({
+    id: SOS_SELECTED_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], true],
     layout: { "icon-image": ["get", "pinImage"], "icon-anchor": "bottom",
       "icon-size": .76, "icon-offset": [0, 4], "icon-allow-overlap": true, "icon-ignore-placement": true }
   });
@@ -1211,7 +1261,8 @@ function syncMapData(): void {
   if (!map || !map.getStyle()) return;
   try {
     ensureResponderMapLayers(map);
-    ensureSosMapLayers(map); // SOS remains above rescuers at coincident points.
+    ensureSosMapLayers(map); // Selected SOS draws above all other dispatch POIs.
+    raiseDispatchLayers(map, DISPATCH_LAYER_ORDER);
   } catch {
     // If a new style JSON is still mid-fetch, the `styledata` / `idle` listener below applies the data immediately once ready.
   }
@@ -1219,7 +1270,7 @@ function syncMapData(): void {
 
 function restoreMapLayers(): void {
   const map = mapInstance;
-  if (!map) return;
+  if (!map || !map.isStyleLoaded()) return;
   const imageMissing = pinImagesSupported && map.isStyleLoaded() &&
     Object.values(DISPATCH_PIN_IMAGES).some((id) => !map.hasImage(id));
   if (!imageMissing && !needsOverlayRestore({
@@ -1228,11 +1279,15 @@ function restoreMapLayers(): void {
     hasLayer: (id) => Boolean(map.getLayer(id))
   }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID, RESPONDER_SELECTED_SOURCE_ID],
   [SOS_AURA_LAYER_ID, SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
+    SOS_SELECTED_CORE_LAYER_ID, SOS_SELECTED_GLYPH_LAYER_ID,
     RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID,
     RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
     RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID,
     ...(pinImagesSupported && Object.values(DISPATCH_PIN_IMAGES).every((id) => map.hasImage(id))
-      ? [SOS_PIN_LAYER_ID, RESPONDER_PIN_LAYER_ID, RESPONDER_SELECTED_PIN_LAYER_ID] : [])])) return;
+      ? [SOS_PIN_LAYER_ID, SOS_SELECTED_PIN_LAYER_ID, RESPONDER_PIN_LAYER_ID, RESPONDER_SELECTED_PIN_LAYER_ID] : [])])) {
+    raiseDispatchLayers(map, DISPATCH_LAYER_ORDER);
+    return;
+  }
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
   syncMapData();
@@ -1414,14 +1469,16 @@ function onMapReady(map: MapLibreMap, MarkerClass: typeof import("maplibre-gl").
     syncResponderLabels(); // Final pass after tile/style transitions.
   };
   const onMarkerClick = (event: MapMouseEvent) => {
-    const layers = [SOS_PIN_LAYER_ID, RESPONDER_PIN_LAYER_ID, RESPONDER_SELECTED_PIN_LAYER_ID,
-      SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
+    const layers = [SOS_SELECTED_PIN_LAYER_ID, SOS_PIN_LAYER_ID, RESPONDER_PIN_LAYER_ID, RESPONDER_SELECTED_PIN_LAYER_ID,
+      SOS_SELECTED_CORE_LAYER_ID, SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID,
+      RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
       .filter((id) => Boolean(map.getLayer(id)));
     const choices = new Map<string, MapPointChoice>();
     if (layers.length) for (const feature of map.queryRenderedFeatures(event.point, { layers })) {
       const props = feature.properties;
       const id = props?.id;
-      if ((feature.layer.id === SOS_PIN_LAYER_ID || feature.layer.id === SOS_CORE_LAYER_ID) && typeof id === "string") {
+      if ((feature.layer.id === SOS_SELECTED_PIN_LAYER_ID || feature.layer.id === SOS_PIN_LAYER_ID ||
+        feature.layer.id === SOS_SELECTED_CORE_LAYER_ID || feature.layer.id === SOS_CORE_LAYER_ID) && typeof id === "string") {
         const request = adminSos.visibleRequests.find((item) => item.id === id);
         if (request) choices.set(`sos-${id}`, { kind: "sos", id,
           label: `حادثه SOS · ${incidentLabel(request.incidentTypeId)}` });

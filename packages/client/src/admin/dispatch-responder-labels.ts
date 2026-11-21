@@ -17,6 +17,14 @@ export function visibleResponderLabelIds(
 
 type LabelBounds = { left: number; right: number; top: number; bottom: number };
 
+/** DOM chips paint above WebGL regardless of the pin layer's order. Reserve
+ * the selected incident's painted head so a responder chip cannot cover it. */
+export function selectedSosPinBounds(x: number, y: number, pinReady: boolean): LabelBounds {
+  return pinReady
+    ? { left: x - 26, right: x + 26, top: y - 59, bottom: y + 6 }
+    : { left: x - 18, right: x + 18, top: y - 18, bottom: y + 18 };
+}
+
 /** Keep selected names readable first. Hiding a colliding chip never hides its
  * actual WebGL pin, changes its coordinate, or removes its accessible list row. */
 export function nonOverlappingResponderLabelIds(

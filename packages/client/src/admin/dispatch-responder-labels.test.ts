@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nonOverlappingResponderLabelIds, visibleResponderLabelIds } from "./dispatch-responder-labels";
+import { nonOverlappingResponderLabelIds, selectedSosPinBounds, visibleResponderLabelIds } from "./dispatch-responder-labels";
 
 describe("visible responder name chips", () => {
   const individual = new Set(["nearby-pin", "nearby-dot", "selected-pin", "selected-dot"]);
@@ -20,6 +20,19 @@ describe("visible responder name chips", () => {
       feature("nearby-dot", "other")
     ], new Set(["selected", "other"]), individual)]).toEqual(["selected", "other"]);
     expect(visibleResponderLabelIds([feature("nearby-pin", "removed")], new Set(), individual).size).toBe(0);
+  });
+
+  it("reserves the selected SOS head from DOM labels in pin and circle modes", () => {
+    const pin = selectedSosPinBounds(100, 100, true);
+    expect(pin).toEqual({ left: 74, right: 126, top: 41, bottom: 106 });
+    const circle = selectedSosPinBounds(100, 100, false);
+    expect(circle).toEqual({ left: 82, right: 118, top: 82, bottom: 118 });
+    const candidates = [
+      { id: "covers-pin", selected: true, bounds: { left: 90, right: 140, top: 50, bottom: 75 } },
+      { id: "outside", selected: false, bounds: { left: 150, right: 200, top: 50, bottom: 75 } }
+    ];
+    expect([...nonOverlappingResponderLabelIds(candidates, [pin])]).toEqual(["outside"]);
+    expect([...nonOverlappingResponderLabelIds(candidates, [circle])]).toEqual(["covers-pin", "outside"]);
   });
 
   it("prioritises selected responders and never covers the selected incident title", () => {
