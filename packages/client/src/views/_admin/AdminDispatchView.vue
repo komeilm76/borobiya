@@ -1958,6 +1958,8 @@ onBeforeUnmount(() => {
   width: 27px; height: 27px; border: 2px solid #fff; border-radius: 50% 50% 50% 4px;
   background: var(--dispatch-sos-color, #dc2626);
   box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: scale(1, 1.1) rotate(-45deg); }
+/* Center each glyph in the rounded head, above the teardrop's pointed tail. */
+.dispatch-map-key__icon::before, .dispatch-map-key__selected > .mdi { transform: translateY(-5px); }
 .dispatch-map-key__icon--selected-sos::after {
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--dispatch-sos-color, #dc2626) 19%, transparent); }
 .dispatch-map-key__icon--helper::after { background: var(--dispatch-helper-color, #0868c8); }
@@ -1977,11 +1979,11 @@ onBeforeUnmount(() => {
 .dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 24px minmax(0, 1fr);
   align-items: center; gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
-  width: min(138px, calc(100% - 24px)); height: 38px; padding: 0;
+  width: min(138px, calc(100% - 24px)); height: 36px; padding: 0;
   padding-inline-end: .4rem;
   border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .9rem;
   overflow: hidden; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.2 var(--bb-font-family);
+  box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.15 var(--bb-font-family);
   text-align: start; cursor: pointer; pointer-events: auto; }
 .dispatch-map-edge-cue--sos { border-width: 3px; }
 /* The colored strip meets the button border, while the grid gap keeps text clear. */
