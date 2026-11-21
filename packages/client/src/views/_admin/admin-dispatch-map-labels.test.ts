@@ -148,7 +148,16 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('map.off("move", updateMapEdgeCues);');
     expect(source).toContain('nearbyFeatures.value.features.some((feature) => feature.id === cue.id)');
     expect(styles[0]!.content).toContain('pointer-events: none;');
-    expect(styles[0]!.content).toContain('min-height: 44px;');
+    expect(template!.content).toContain(':style="{ left: `${cue.x}px`, top: `${cue.y}px`, \'--dispatch-edge-color\': edgeCueColor(cue) }"');
+    expect(template!.content).toContain('class="dispatch-map-edge-cue__arrow" aria-hidden="true"');
+    expect(template!.content).toContain('stroke-width="3.5"');
+    expect(source).toContain('return themeStore.isDark ? "#205fd1" : "#0868c8"');
+    expect(styles[0]!.content).toContain('width: min(176px, calc(100% - 24px)); height: 56px;');
+    expect(styles[0]!.content).toContain('grid-template-columns: 32px minmax(0, 1fr)');
+    expect(styles[0]!.content).toContain('color: #fff; background: var(--dispatch-edge-color, #0868c8)');
+    for (const side of ["bottom", "left", "right"])
+      expect(styles[0]!.content).toContain(`.dispatch-map-edge-cue__arrow--${side}`);
+    expect(styles[0]!.content).toContain('-webkit-line-clamp: 2');
     expect(compileTemplate({ source: template!.content, filename: "AdminDispatchView.vue", id: "dispatch-labels" }).errors).toEqual([]);
     expect(compileStyle({ source: styles[0]!.content, filename: "AdminDispatchView.vue", id: "dispatch-labels", scoped: true }).errors).toEqual([]);
   });

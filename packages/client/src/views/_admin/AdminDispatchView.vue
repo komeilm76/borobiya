@@ -359,10 +359,16 @@
             <div v-if="mapEdgeCues.length" class="dispatch-map-edge-cues" aria-label="نقاط بیرون از قاب نقشه">
               <button v-for="cue in mapEdgeCues" :key="`${cue.kind}-${cue.id}`" type="button"
                 class="dispatch-map-edge-cue" :class="`dispatch-map-edge-cue--${cue.kind}`"
-                :style="{ left: `${cue.x}px`, top: `${cue.y}px` }"
+                :style="{ left: `${cue.x}px`, top: `${cue.y}px`, '--dispatch-edge-color': edgeCueColor(cue) }"
                 :aria-label="`${cue.kind === 'sos' ? 'حادثهٔ انتخاب‌شده' : 'امدادگر نزدیک'} ${cue.label}، بیرون از قاب نقشه، نمایش روی نقشه`"
+                :title="cue.label"
                 @click="focusEdgeCue(cue)">
-                <span aria-hidden="true">{{ edgeArrow(cue.edge) }}</span><bdi dir="auto">{{ cue.label }}</bdi>
+                <span class="dispatch-map-edge-cue__arrow" aria-hidden="true">
+                  <svg :class="`dispatch-map-edge-cue__arrow--${cue.edge}`" viewBox="0 0 24 24" focusable="false">
+                    <path d="M12 20V4 M5 11l7-7 7 7" fill="none" stroke="currentColor" stroke-width="3.5"
+                      stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span><bdi dir="auto">{{ cue.label }}</bdi>
               </button>
             </div>
 
@@ -1044,8 +1050,10 @@ function syncSelectedSosLabel(): void {
   updateSelectedSosLabelPosition();
 }
 
-function edgeArrow(edge: DispatchEdgeCue["edge"]): string {
-  return { top: "↑", bottom: "↓", left: "←", right: "→" }[edge];
+function edgeCueColor(cue: DispatchEdgeCue): string {
+  if (cue.kind === "responder") return themeStore.isDark ? "#205fd1" : "#0868c8";
+  const incident = adminSos.visibleRequests.find((item) => item.id === cue.id);
+  return incident ? SOS_MAP_MARKER_COLORS[sosMapPriority(incident.status, incident.severity)] : SOS_MAP_MARKER_COLORS.high;
 }
 function updateMapEdgeCues(): void {
   const map = mapInstance;
@@ -1967,21 +1975,26 @@ onBeforeUnmount(() => {
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */
 .dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.dispatch-map-edge-cue { position: absolute; display: inline-flex; align-items: center; justify-content: center;
-  gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
-  max-width: 8rem; min-height: 44px; padding: .25rem .55rem;
-  border: 2px solid rgb(var(--v-theme-primary)); border-radius: .75rem;
+.dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center; gap: .5rem; transform: translate(-50%, -50%); box-sizing: border-box;
+  width: min(176px, calc(100% - 24px)); height: 56px; padding: .35rem .6rem;
+  border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .9rem;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.35 var(--bb-font-family);
-  cursor: pointer; pointer-events: auto; }
-.dispatch-map-edge-cue--sos { border-color: rgb(var(--v-theme-error)); }
-.dispatch-map-edge-cue > span { flex: none; color: rgb(var(--v-theme-primary)); font-size: 1.15rem; }
-.dispatch-map-edge-cue--sos > span { color: rgb(var(--v-theme-error)); }
-.dispatch-map-edge-cue bdi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dispatch-map-edge-cue:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+  box-shadow: var(--bb-shadow-overlay); font: 800 .85rem/1.25 var(--bb-font-family);
+  text-align: start; cursor: pointer; pointer-events: auto; }
+.dispatch-map-edge-cue--sos { border-width: 3px; }
+.dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: .55rem; color: #fff; background: var(--dispatch-edge-color, #0868c8); }
+.dispatch-map-edge-cue__arrow svg { display: block; width: 22px; height: 22px; }
+.dispatch-map-edge-cue__arrow--bottom { transform: rotate(180deg); }
+.dispatch-map-edge-cue__arrow--left { transform: rotate(-90deg); }
+.dispatch-map-edge-cue__arrow--right { transform: rotate(90deg); }
+.dispatch-map-edge-cue bdi { display: -webkit-box; min-width: 0; max-height: 2.5em; overflow: hidden;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+.dispatch-map-edge-cue:focus-visible { outline: 3px solid var(--dispatch-edge-color, #0868c8); outline-offset: 2px; }
 @media (forced-colors: active) {
   .dispatch-map-edge-cue { background: Canvas; color: CanvasText; border-color: CanvasText !important; box-shadow: none; }
-  .dispatch-map-edge-cue > span { color: CanvasText !important; }
+  .dispatch-map-edge-cue__arrow { background: CanvasText; color: Canvas; }
 }
 .admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);
   font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }

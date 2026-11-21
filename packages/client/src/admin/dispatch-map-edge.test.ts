@@ -9,14 +9,28 @@ describe("dispatch map edge cues", () => {
     expect(dispatchMapEdgeCues(320, 280, [
       { ...sos, x: 160, y: -25 }, { ...rescuer, x: 220, y: 290 }
     ])).toEqual([
-      { ...sos, edge: "top", x: 160, y: 80 },
-      { ...rescuer, edge: "bottom", x: 220, y: 250 }
+      { ...sos, edge: "top", x: 160, y: 90 },
+      { ...rescuer, edge: "bottom", x: 220, y: 240 }
     ]);
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0])
-      .toMatchObject({ edge: "left", x: 72, y: 140 });
+      .toMatchObject({ edge: "left", x: 100, y: 140 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 340, y: 140 }])[0])
-      .toMatchObject({ edge: "right", x: 248, y: 140 });
+      .toMatchObject({ edge: "right", x: 220, y: 140 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 160, y: 140 }])).toEqual([]);
+  });
+
+  it("keeps larger cues inside narrow maps and their arrows clear of top-right controls", () => {
+    const narrow = dispatchMapEdgeCues(160, 272, [
+      { ...rescuer, x: -10, y: 160 }
+    ]);
+    expect(narrow[0]).toMatchObject({ edge: "left", x: 80, y: 160 });
+    // The 136px-wide button at x=80 spans x=12..148, not outside the map.
+    expect(narrow[0]!.x - (160 - 24) / 2).toBe(12);
+    const topRight = dispatchMapEdgeCues(320, 280, [{ ...rescuer, x: 300, y: -10 }]);
+    expect(topRight[0]).toMatchObject({ edge: "top", x: 220, y: 132 });
+    expect(dispatchMapEdgeCues(320, 280, [{ ...rescuer, x: 330, y: 15 }])[0])
+      .toMatchObject({ edge: "right", y: 132 });
+    expect(dispatchMapEdgeCues(320, 170, [{ ...sos, x: 160, y: -20 }])).toEqual([]);
   });
 
   it("prioritises the selected incident, selected responders, and avoids stacked cards", () => {
