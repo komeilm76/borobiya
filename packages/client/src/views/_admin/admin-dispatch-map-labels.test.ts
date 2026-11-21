@@ -19,9 +19,10 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('chip.textContent = feature.properties.username');
     expect(source).toContain('element.style.setProperty("--dispatch-label-color", themeStore.isDark ? "#205fd1" : "#0868c8")');
     expect(source).toContain('positionResponderLabels(map)');
-    expect(source).toContain('nonOverlappingResponderLabelIds(candidates');
-    expect(source).toContain('reserved.push(bounds)');
-    expect(source).toContain('selectedSosPinBounds(rect.left + pin.x, rect.top + pin.y, pinReady)');
+    expect(source).toContain('placeResponderLabels(candidates, (id, side) => {');
+    expect(source).toContain('setDispatchLabelSide(element, chip, pixel.x, canvas.clientWidth, side)');
+    expect(source).toContain('reserved.push(selectedSosPinBounds(viewport.left + pin.x, viewport.top + pin.y, pinReady))');
+    expect(source).toContain('box.right > viewport.right - 8 || box.top < viewport.top + 8');
     expect(source).toMatch(/const DISPATCH_LAYER_ORDER = \[[\s\S]*?SOS_SELECTED_PIN_LAYER_ID\s*\] as const/);
     expect(source).toContain('raiseDispatchLayers(map, DISPATCH_LAYER_ORDER)');
     expect(source).toContain('id: SOS_SELECTED_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID');
@@ -48,7 +49,8 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(labelCss).toMatch(/--center\.dispatch-sos-label-anchor--above \.dispatch-sos-label\) \{[^}]*top: auto; bottom: 51px;[^}]*border-bottom: 3px/);
     expect(labelCss).toMatch(/--center\.dispatch-sos-label-anchor--above \.dispatch-sos-label::after\) \{[^}]*top: auto; bottom: -8px/);
     expect(labelCss).toContain('top: auto; bottom: 18px;'); // Circle fallback stays attached above too.
-    expect(source).toContain('element.classList.toggle("dispatch-sos-label-anchor--above", placement.side === "above")');
+    expect(source).toContain('element.classList.toggle("dispatch-sos-label-anchor--above", side === "above")');
+    expect(source).toContain('element.classList.toggle("dispatch-sos-label-anchor--below", side === "below")');
     expect(source).toContain('filter: ["==", ["get", "isSelected"], false]');
     expect(source).toContain('"circle-color": ["get", "color"], "circle-radius": 23');
     expect(source).toContain('"circle-stroke-color": ["get", "color"]');

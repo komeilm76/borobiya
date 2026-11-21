@@ -679,9 +679,9 @@ import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
-import { dispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
+import { dispatchSosLabelPlacement, type DispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
 import { raiseDispatchLayers } from "@/admin/dispatch-map-layer-order";
-import { nonOverlappingResponderLabelIds, selectedSosPinBounds, visibleResponderLabelIds } from "@/admin/dispatch-responder-labels";
+import { placeResponderLabels, selectedSosPinBounds, visibleResponderLabelIds } from "@/admin/dispatch-responder-labels";
 import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
@@ -863,10 +863,24 @@ let lastPulseUpdateAt = 0;
 let detachMapEvents: (() => void) | null = null;
 const mapEdgeCues = ref<DispatchEdgeCue[]>([]);
 
-function positionDispatchLabel(map: MapLibreMap, marker: MapLibreMarker, coordinates: [number, number]): void {
+type DispatchLabelSide = DispatchSosLabelPlacement["side"];
+
+function setDispatchLabelSide(element: HTMLElement, chip: HTMLElement, x: number, width: number, side: DispatchLabelSide): void {
+  element.classList.toggle("dispatch-sos-label-anchor--left", side === "left");
+  const centered = side === "below" || side === "above";
+  element.classList.toggle("dispatch-sos-label-anchor--center", centered);
+  element.classList.toggle("dispatch-sos-label-anchor--above", side === "above");
+  element.classList.toggle("dispatch-sos-label-anchor--below", side === "below");
+  // Shift centered chips into the viewport without detaching their necks.
+  const left = x - chip.offsetWidth / 2;
+  const shift = Math.max(8 - left, Math.min(0, width - 8 - chip.offsetWidth - left));
+  element.style.setProperty("--dispatch-sos-label-shift", `${Math.round(centered ? shift : 0)}px`);
+}
+
+function positionDispatchLabel(map: MapLibreMap, marker: MapLibreMarker, coordinates: [number, number]): DispatchLabelSide | null {
   const element = marker.getElement();
   const chip = element.firstElementChild as HTMLElement | null;
-  if (!chip) return;
+  if (!chip) return null;
   // A previously offscreen marker is display:none; reveal it synchronously to
   // measure the real text width before choosing a side on re-entry.
   element.hidden = false;
@@ -880,16 +894,8 @@ function positionDispatchLabel(map: MapLibreMap, marker: MapLibreMarker, coordin
   const placement = dispatchSosLabelPlacement(pixel.x, pixel.y, canvas.clientWidth, canvas.clientHeight,
     chip.offsetWidth, chip.offsetHeight, hasPin ? -35 : 0);
   element.hidden = !placement.visible;
-  element.classList.toggle("dispatch-sos-label-anchor--left", placement.side === "left");
-  const centered = placement.side === "below" || placement.side === "above";
-  element.classList.toggle("dispatch-sos-label-anchor--center", centered);
-  element.classList.toggle("dispatch-sos-label-anchor--above", placement.side === "above");
-  element.classList.toggle("dispatch-sos-label-anchor--below", placement.belowPin);
-  // In a narrow map, center under/above the tip but still keep the chip inside
-  // the map's own viewport rather than clipping it behind the card edge.
-  const left = pixel.x - chip.offsetWidth / 2;
-  const shift = Math.max(8 - left, Math.min(0, canvas.clientWidth - 8 - chip.offsetWidth - left));
-  element.style.setProperty("--dispatch-sos-label-shift", `${Math.round(centered ? shift : 0)}px`);
+  setDispatchLabelSide(element, chip, pixel.x, canvas.clientWidth, placement.side);
+  return placement.visible ? placement.side : null;
 }
 
 function updateSelectedSosLabelPosition(): void {
@@ -906,13 +912,12 @@ function clearResponderLabels(): void {
 }
 
 function positionResponderLabels(map: MapLibreMap): void {
-  const candidates: { id: string; selected: boolean; bounds: DOMRect }[] = [];
+  const canvas = map.getCanvas();
+  const viewport = canvas.getBoundingClientRect();
+  const candidates: { id: string; selected: boolean; preferred: DispatchLabelSide }[] = [];
   for (const [id, { marker, coordinates, selected }] of responderLabelMarkers) {
-    positionDispatchLabel(map, marker, coordinates);
-    const element = marker.getElement();
-    if (element.hidden) continue;
-    const chip = element.firstElementChild as HTMLElement | null;
-    if (chip) candidates.push({ id, selected, bounds: chip.getBoundingClientRect() });
+    const preferred = positionDispatchLabel(map, marker, coordinates);
+    if (preferred) candidates.push({ id, selected, preferred });
   }
   const sos = selectedSosLabelMarker?.getElement();
   const sosChip = sos && !sos.hidden ? sos.firstElementChild as HTMLElement | null : null;
@@ -921,13 +926,22 @@ function positionResponderLabels(map: MapLibreMap): void {
   const incident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
   if (incident) {
     const pin = map.project([incident.location.lon, incident.location.lat]);
-    const canvas = map.getCanvas();
-    const rect = canvas.getBoundingClientRect();
     const pinReady = Boolean(map.getLayer(SOS_SELECTED_PIN_LAYER_ID));
-    const bounds = selectedSosPinBounds(rect.left + pin.x, rect.top + pin.y, pinReady);
-    reserved.push(bounds);
+    reserved.push(selectedSosPinBounds(viewport.left + pin.x, viewport.top + pin.y, pinReady));
   }
-  const visible = nonOverlappingResponderLabelIds(candidates, reserved);
+  const visible = placeResponderLabels(candidates, (id, side) => {
+    const entry = responderLabelMarkers.get(id)!;
+    const element = entry.marker.getElement();
+    const chip = element.firstElementChild as HTMLElement;
+    const pixel = map.project(entry.coordinates);
+    setDispatchLabelSide(element, chip, pixel.x, canvas.clientWidth, side);
+    const box = chip.getBoundingClientRect();
+    // A side whose measured chip would clip at a map edge is not an option.
+    if (box.width <= 0 || box.height <= 0 || box.left < viewport.left + 8 ||
+      box.right > viewport.right - 8 || box.top < viewport.top + 8 ||
+      box.bottom > viewport.bottom - 8) return null;
+    return box;
+  }, reserved);
   for (const candidate of candidates) responderLabelMarkers.get(candidate.id)!.marker.getElement().hidden =
     !visible.has(candidate.id);
 }
