@@ -44,7 +44,7 @@ describe("admin SOS triage flow", () => {
     expect(mapJump).toContain('frameSelectedIncident();');
     expect(mapJump).toContain('document.getElementById("dispatch-map")');
     expect(mapJump).toContain('scrollIntoView({');
-    expect(mapJump).toContain('querySelector<HTMLButtonElement>(".map-selected-alert-card")?.focus({ preventScroll: true });');
+    expect(mapJump).toContain('document.getElementById("dispatch-recenter")?.focus({ preventScroll: true });');
     expect(css).toContain('#dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(source).toMatch(/function focusResponders\(\): void \{\s*if \(!adminSos\.selectedRequest\) return;/);
     expect(source).toContain('target.focus({ preventScroll: true });');
@@ -111,7 +111,7 @@ describe("admin SOS triage flow", () => {
     expect(css).toContain('.admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(css).toContain('.admin-dispatch__responders:focus-visible');
     expect(css).toContain('.admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }');
-    expect(css).toContain('min-height: 44px; max-width: calc(100% - 1.5rem);');
+    expect(css).toContain('flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px;');
     expect(css).toContain('.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }');
     expect(css).toContain('width: auto; height: auto; object-fit: contain;');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: template }).errors).toEqual([]);

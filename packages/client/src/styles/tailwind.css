@@ -642,10 +642,10 @@ a {
     inset-block-end: auto;
   }
   .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
-    inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));
+    inset-block-start: calc(12rem + env(safe-area-inset-top, 0px));
   }
   .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-block-start: calc(11.25rem + env(safe-area-inset-top, 0px));
+    inset-block-start: calc(15.5rem + env(safe-area-inset-top, 0px));
   }
 }
 

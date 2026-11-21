@@ -28,7 +28,8 @@ describe('dispatch controls match the map Mission and Travel design language', (
     expect(rule('.dispatch-request-row, .dispatch-responder-row')).toContain('border-radius: var(--bb-radius-nested, 16px);');
     expect(rule('.admin-dispatch__facts > div')).toContain('border-radius: var(--bb-radius-nested, 16px);');
     expect(css).toContain('box-shadow: var(--bb-shadow-overlay);');
-    expect(css).toContain('.map-selected-alert-card { box-shadow: var(--bb-shadow-surface); }');
+    expect(rule('.map-selected-alert-card')).toContain('width: 44px; height: 44px;');
+    expect(rule('.admin-dispatch__search')).toContain('box-shadow: var(--bb-shadow-overlay);');
     expect(css).toContain('.dispatch-map-choices { position: absolute;');
   });
 

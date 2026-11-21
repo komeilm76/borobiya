@@ -3,17 +3,16 @@
     <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="صف SOS و امدادگران نزدیک">
     <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
-        <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
-        <div class="admin-dispatch__heading d-flex flex-wrap align-center ga-2">
-          <v-icon color="error" icon="mdi-radar" size="28" />
-          <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
-          <v-chip id="dispatch-chip-01"
-            :color="adminSos.connected ? 'success' : 'warning'"
-            size="small"
-            variant="tonal"
-          >
+        <div class="admin-dispatch__intro-top">
+          <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
+          <v-chip id="dispatch-chip-01" :color="adminSos.connected ? 'success' : 'warning'"
+            size="x-small" variant="tonal" role="status">
             {{ adminSos.connected ? "متصل به اتاق زندهٔ ادمین" : "در حال اتصال زنده…" }}
           </v-chip>
+        </div>
+        <div class="admin-dispatch__heading d-flex align-center ga-2">
+          <v-icon color="error" icon="mdi-radar" size="24" />
+          <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
         </div>
       </div>
 
@@ -147,7 +146,7 @@
             <span v-if="adminSos.listTruncated">فقط بخشی از درخواست‌ها دریافت شده‌اند.</span>
             <v-btn id="dispatch-action-18" variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
           </v-card-text>
-          <v-card-text v-else-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis">
+          <v-card-text v-else-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis" role="status">
             در حال حاضر درخواست اضطراری فعالی در این نما ثبت نشده است. به محض ارسال SOS جدید، نشانگر تپنده و هشدار صوتی فعال می‌شود.
           </v-card-text>
           <v-alert id="dispatch-notice-07" v-if="adminSos.visibleRequests.length && !adminSos.queueVerified" type="warning" variant="tonal"
@@ -175,7 +174,7 @@
 
                 <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
                   <span>{{ incidentLabel(item.incidentTypeId) }}</span>
-                  <div class="d-flex flex-wrap align-center ga-1">
+                  <div class="admin-dispatch__request-chips d-flex flex-wrap align-center ga-1">
                     <v-chip :id="`dispatch-chip-10-${item.id}`" v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
                     <v-chip :id="`dispatch-chip-11-${item.id}`" v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
                       نیازمند جایگزین
@@ -385,10 +384,25 @@
         </section>
     </aside>
     <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
-        <div id="dispatch-search" class="admin-dispatch__search" role="search" aria-label="جست‌وجو روی نقشه">
-          <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجوی کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
-            prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" variant="solo" rounded="lg"
-            autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
+        <section id="dispatch-search" class="admin-dispatch__search" aria-label="جست‌وجو روی نقشه">
+          <div class="admin-dispatch__search-header">
+            <span class="admin-dispatch__search-indicator" :class="{ 'admin-dispatch__search-indicator--active': searchQuery.length >= 2 }" aria-hidden="true" />
+            <div class="admin-dispatch__search-copy">
+              <h2>جست‌وجو روی نقشه</h2>
+              <p>درخواست SOS، کاربر و مکان</p>
+            </div>
+            <v-btn v-if="adminSos.selectedRequest" id="dispatch-recenter" class="map-selected-alert-card"
+              icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
+              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
+              :title="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران' : 'نمایش محل حادثه'"
+              @click="frameSelectedIncident" />
+          </div>
+          <div class="admin-dispatch__search-form" role="search">
+            <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجو در نقشه"
+              placeholder="کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
+              prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" variant="outlined" rounded="lg"
+              autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
+          </div>
           <div v-if="searchQuery.length >= 2" id="dispatch-search-results" class="admin-dispatch__search-results"
             role="listbox" aria-label="نتایج جست‌وجوی نقشه">
             <button v-for="item in matchedRequests" :key="item.id" type="button" class="admin-dispatch__search-result"
@@ -430,7 +444,7 @@
             <p v-if="!matchedRequests.length && !matchedResponders.length && !searchedUsers.length && !searchedPlaces.length && !placesLoading && !usersLoading && !placesError && !usersError"
               role="status">نتیجه‌ای در موارد بارگذاری‌شده پیدا نشد.</p>
           </div>
-        </div>
+        </section>
         <v-card id="dispatch-map" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
             <MapCanvas id="dispatch-canvas-01"
@@ -457,11 +471,6 @@
                 </span><bdi dir="auto">{{ cue.label }}</bdi>
               </button>
             </div>
-
-            <v-btn v-if="adminSos.selectedRequest" id="dispatch-recenter" class="map-selected-alert-card"
-              color="surface" variant="flat" rounded="xl" prepend-icon="mdi-crosshairs-gps"
-              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'بازگشت به محل حادثهٔ انتخاب‌شده روی نقشه'"
-              @click="frameSelectedIncident">{{ nearbyFeatures.features.length ? 'حادثه و امدادگران' : 'نمایش محل حادثه' }}</v-btn>
 
             <div v-if="mapPointChoices.length" id="dispatch-map-choices" class="dispatch-map-choices" role="group"
               aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه" dir="rtl">
@@ -1633,8 +1642,8 @@ function focusSelectedIncidentMap(): void {
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     block: "start"
   });
-  // The map card is not focusable; hand keyboard users to its recenter action.
-  target?.querySelector<HTMLButtonElement>(".map-selected-alert-card")?.focus({ preventScroll: true });
+  // The canvas is not focusable; hand keyboard users to the widget's recenter action.
+  document.getElementById("dispatch-recenter")?.focus({ preventScroll: true });
 }
 
 function focusNearbyResponder(userId: string): void {
@@ -2221,18 +2230,10 @@ onBeforeUnmount(() => {
   font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }
 
 .map-selected-alert-card {
-  position: absolute; z-index: 2;
-  top: .75rem; left: .75rem; right: auto; /* Clear MapLibre's top-right controls. */
-  min-height: 44px; max-width: calc(100% - 1.5rem);
-  border: 1px solid var(--bb-color-outline);
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px;
   font-family: var(--bb-font-family); letter-spacing: normal;
-  box-shadow: var(--bb-shadow-overlay);
 }
 .map-selected-alert-card:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-@media (max-width: 1023px) {
-  .map-selected-alert-card { box-shadow: var(--bb-shadow-surface); }
-}
 
 .dispatch-request-list {
   max-height: min(42dvh, 24rem);
@@ -2380,11 +2381,15 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 12; top: 0; right: 0; bottom: 0;
   width: var(--dispatch-sidebar-width); padding: .4rem .5rem;
   padding-top: max(.4rem, env(safe-area-inset-top, 0px));
+  display: flex; flex-direction: column; min-height: 0;
   overflow-y: auto; overscroll-behavior: contain;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   border-left: 1px solid var(--bb-color-outline);
 }
-.admin-dispatch__header { display: block; margin-bottom: .2rem !important; }
+.admin-dispatch__header { display: block; flex: none; margin-bottom: .35rem !important; }
+.admin-dispatch__intro-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .15rem .35rem; }
+.admin-dispatch__intro-top .admin-dispatch__eyebrow { margin: 0; }
+.admin-dispatch__intro-top :deep(.v-chip) { flex: none; max-width: 100%; }
 .admin-dispatch__heading { gap: .2rem !important; }
 .admin-dispatch__heading h1 { font-size: 1rem !important; line-height: 1.4; }
 .admin-dispatch__eyebrow { margin-bottom: .15rem; font-size: .8rem; }
@@ -2392,13 +2397,30 @@ onBeforeUnmount(() => {
 .admin-dispatch__filter-group { flex: 1; min-width: 0; }
 .admin-dispatch__toolbar-actions { flex: none; min-width: 0; justify-content: flex-start; gap: .1rem; }
 .admin-dispatch__filter-select { width: 100%; max-width: none; }
-.admin-dispatch__queue { display: flex; flex-direction: column; min-height: 0; }
-.admin-dispatch__nearby { margin-top: .4rem; }
-.admin-dispatch__nearby-empty { display: grid; gap: .15rem; padding: .6rem .5rem;
+/* Below the fixed header and alerts, give each worklist half of the rail.
+   Scroll the rows inside their own cards; short viewports may scroll the rail
+   rather than clipping responder search, warnings or the dispatch action. */
+.admin-dispatch__queue, .admin-dispatch__nearby {
+  display: flex; flex: 1 1 0; flex-direction: column; min-height: 18rem;
+}
+.admin-dispatch__queue { padding-bottom: .2rem; }
+.admin-dispatch__nearby { padding-top: .2rem; }
+.admin-dispatch__queue > #dispatch-queue,
+.admin-dispatch__nearby > #dispatch-responders {
+  display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0;
+}
+.admin-dispatch__nearby-empty { display: flex; flex: 1 1 auto; flex-direction: column; justify-content: center;
+  gap: .15rem; padding: .6rem .5rem;
   background: rgba(var(--v-theme-on-surface), .035); border-radius: .65rem; }
 .admin-dispatch__nearby-empty span { color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__responders .responder-list { max-height: min(22dvh, 11rem); }
-.admin-dispatch__queue .dispatch-request-list { max-height: max(8rem, 34dvh); }
+.admin-dispatch__responders .responder-list,
+.admin-dispatch__queue .dispatch-request-list {
+  flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;
+}
+#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-text[role="status"]) {
+  flex: 1 1 auto; display: grid; place-content: center;
+}
+#dispatch-sidebar > :deep(.v-alert) { flex: none; }
 .admin-dispatch__queue .mb-4 { margin-bottom: 0 !important; }
 /* The pinned rail is one surface, not cards stacked inside another card.
    Restrict these overrides to the rail; the map, dialogs and floating incident
@@ -2430,6 +2452,10 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-title) {
   font-size: .8rem; line-height: 1.35; gap: .25rem !important;
   justify-content: flex-start !important;
+}
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title) { justify-content: space-between !important; }
+#dispatch-sidebar .admin-dispatch__request-chips {
+  margin-inline-start: auto; justify-content: flex-end; max-width: 100%;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-subtitle),
 #dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-subtitle) {
@@ -2564,14 +2590,26 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 11; top: calc(.75rem + env(safe-area-inset-top, 0px));
   right: calc(var(--dispatch-sidebar-width) + .75rem);
   /* The shared menu and Network button occupy the first 7.25rem of the map. */
-  width: min(28rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));
+  width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));
+  max-height: min(65dvh, 30rem); padding: .6rem .8rem;
+  display: flex; flex-direction: column; gap: .5rem; overflow: hidden;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(10px);
   pointer-events: auto;
 }
+.admin-dispatch__search-header { display: flex; flex: none; align-items: center; gap: .6rem; min-width: 0; }
+.admin-dispatch__search-indicator { flex: none; width: .65rem; height: .65rem;
+  border-radius: 50%; background: #7d9291; }
+.admin-dispatch__search-indicator--active { background: #1f8a5b; box-shadow: 0 0 0 4px rgba(31, 138, 91, .18); }
+.admin-dispatch__search-copy { flex: 1; min-width: 0; }
+.admin-dispatch__search-copy h2 { margin: 0; font-size: .86rem; font-weight: 800; line-height: 1.4; }
+.admin-dispatch__search-copy p { margin: .1rem 0 0; color: var(--bb-color-muted); font-size: .8rem; }
+.admin-dispatch__search-form { flex: none; min-width: 0; }
 .admin-dispatch__search-results {
-  max-height: min(48dvh, 24rem); overflow-y: auto; overscroll-behavior: contain;
-  margin-top: .3rem; padding: .35rem; border-radius: 1rem;
-  border: 1px solid var(--bb-color-outline); background: rgb(var(--v-theme-surface));
-  color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-overlay);
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: .15rem; border-radius: .75rem;
 }
 .admin-dispatch__search-result { display: flex; width: 100%; align-items: center;
   gap: .55rem; padding: .55rem; min-height: 44px; border: 0; border-radius: .65rem;
@@ -2587,10 +2625,6 @@ onBeforeUnmount(() => {
   width: max-content; max-width: calc(100% - 25rem);
   max-height: 7.5rem; overflow-y: auto; border-radius: 1rem;
   box-shadow: var(--bb-shadow-overlay);
-}
-.admin-dispatch__map-and-actions .map-selected-alert-card {
-  top: calc(4.5rem + env(safe-area-inset-top, 0px));
-  right: .75rem; left: auto;
 }
 .admin-dispatch__map-and-actions .dispatch-map-choices {
   /* A temporary hit chooser must sit above the pinned incident panel. */
@@ -2624,7 +2658,11 @@ onBeforeUnmount(() => {
   .admin-dispatch__sidebar {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%;
     height: min(38dvh, 21rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
-    border-left: 0; border-top: 1px solid var(--bb-color-outline);
+    display: block; border-left: 0; border-top: 1px solid var(--bb-color-outline);
+  }
+  .admin-dispatch__queue, .admin-dispatch__nearby { display: block; min-height: 0; }
+  .admin-dispatch__queue > #dispatch-queue, .admin-dispatch__nearby > #dispatch-responders {
+    display: flex; height: auto;
   }
   .admin-dispatch__map-and-actions > #dispatch-map {
     inset: 0 0 min(38dvh, 21rem) 0; width: 100%; height: calc(100% - min(38dvh, 21rem));
@@ -2635,17 +2673,16 @@ onBeforeUnmount(() => {
   .admin-dispatch__toolbar-actions { flex-wrap: wrap; }
   .admin-dispatch__search {
     top: calc(4.25rem + env(safe-area-inset-top, 0px)); right: .75rem;
-    left: .75rem; width: auto;
+    left: .75rem; width: auto; max-height: min(38dvh, 15rem);
+    padding: .4rem .6rem; gap: .3rem;
   }
-  .admin-dispatch__search-results { max-height: 22dvh; }
+  .admin-dispatch__search-copy p { display: none; }
+  .admin-dispatch__search-results { max-height: none; }
   .admin-dispatch__incident-panel {
-    top: calc(8rem + env(safe-area-inset-top, 0px)); left: .75rem;
+    top: calc(11rem + env(safe-area-inset-top, 0px)); left: .75rem;
     width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
   }
   .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
-  .admin-dispatch__map-and-actions .map-selected-alert-card {
-    top: auto; bottom: 4.5rem; right: .75rem;
-  }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: .5rem; left: .75rem; right: .75rem; width: calc(100% - 1.5rem);
     max-width: calc(100% - 1.5rem); max-height: none;
