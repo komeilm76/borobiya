@@ -157,7 +157,7 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(template!.content).toContain('class="dispatch-map-edge-cue__arrow" aria-hidden="true"');
     expect(template!.content).toContain('stroke-width="3.5"');
     expect(source).toContain('return themeStore.isDark ? "#205fd1" : "#0868c8"');
-    expect(styles[0]!.content).toContain('width: min(138px, calc(100% - 24px)); height: 44px; padding: 0;');
+    expect(styles[0]!.content).toContain('width: min(138px, calc(100% - 24px)); height: 38px; padding: 0;');
     expect(styles[0]!.content).toContain('padding-inline-end: .4rem;');
     expect(styles[0]!.content).toContain('grid-template-columns: 24px minmax(0, 1fr)');
     expect(styles[0]!.content).toContain('align-items: center; gap: .35rem;');

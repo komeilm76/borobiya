@@ -10,7 +10,7 @@ describe("dispatch map edge cues", () => {
       { ...sos, x: 160, y: -25 }, { ...rescuer, x: 220, y: 290 }
     ])).toEqual([
       { ...sos, edge: "top", x: 160, y: 86 },
-      { ...rescuer, edge: "bottom", x: 220, y: 246 }
+      { ...rescuer, edge: "bottom", x: 220, y: 249 }
     ]);
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0])
       .toMatchObject({ edge: "left", x: 81, y: 140 });

@@ -1977,7 +1977,7 @@ onBeforeUnmount(() => {
 .dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 24px minmax(0, 1fr);
   align-items: center; gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
-  width: min(138px, calc(100% - 24px)); height: 44px; padding: 0;
+  width: min(138px, calc(100% - 24px)); height: 38px; padding: 0;
   padding-inline-end: .4rem;
   border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .9rem;
   overflow: hidden; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
