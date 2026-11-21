@@ -1951,13 +1951,13 @@ onBeforeUnmount(() => {
   color: rgb(var(--v-theme-on-surface)); font: 700 .76rem/1.5 var(--bb-font-family); }
 .dispatch-map-key li { display: inline-flex; align-items: center; gap: .35rem; }
 .dispatch-map-key__icon, .dispatch-map-key__selected { position: relative; isolation: isolate;
-  display: inline-grid; place-items: center; flex: 0 0 42px; width: 42px; height: 48px;
+  display: inline-grid; place-items: center; flex: 0 0 46px; width: 46px; height: 48px;
   color: #fff; font-size: 20px; }
 .dispatch-map-key__icon::after, .dispatch-map-key__selected::before {
-  content: ""; position: absolute; z-index: -1; top: 8px; left: 5px;
+  content: ""; position: absolute; z-index: -1; top: 8px; left: 7px;
   width: 27px; height: 27px; border: 2px solid #fff; border-radius: 50% 50% 50% 4px;
   background: var(--dispatch-sos-color, #dc2626);
-  box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: scale(.83, 1.1) rotate(-45deg); }
+  box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: scale(1, 1.1) rotate(-45deg); }
 .dispatch-map-key__icon--selected-sos::after {
   box-shadow: 0 0 0 5px color-mix(in srgb, var(--dispatch-sos-color, #dc2626) 19%, transparent); }
 .dispatch-map-key__icon--helper::after { background: var(--dispatch-helper-color, #0868c8); }
@@ -1975,17 +1975,19 @@ onBeforeUnmount(() => {
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */
 .dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 26px minmax(0, 1fr);
+.dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 24px minmax(0, 1fr);
   align-items: center; gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
-  width: min(148px, calc(100% - 24px)); height: 46px; padding: .2rem .45rem;
+  width: min(138px, calc(100% - 24px)); height: 44px; padding: 0;
+  padding-inline-end: .4rem;
   border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .9rem;
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  overflow: hidden; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.2 var(--bb-font-family);
   text-align: start; cursor: pointer; pointer-events: auto; }
 .dispatch-map-edge-cue--sos { border-width: 3px; }
-.dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 26px; height: 26px;
-  border-radius: .45rem; color: #fff; background: var(--dispatch-edge-color, #0868c8); }
-.dispatch-map-edge-cue__arrow svg { display: block; width: 19px; height: 19px; }
+/* The colored strip meets the button border, while the grid gap keeps text clear. */
+.dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 24px; height: 100%;
+  color: #fff; background: var(--dispatch-edge-color, #0868c8); }
+.dispatch-map-edge-cue__arrow svg { display: block; width: 17px; height: 17px; }
 .dispatch-map-edge-cue__arrow--bottom { transform: rotate(180deg); }
 .dispatch-map-edge-cue__arrow--left { transform: rotate(-90deg); }
 .dispatch-map-edge-cue__arrow--right { transform: rotate(90deg); }

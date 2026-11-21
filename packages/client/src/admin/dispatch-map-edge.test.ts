@@ -10,12 +10,12 @@ describe("dispatch map edge cues", () => {
       { ...sos, x: 160, y: -25 }, { ...rescuer, x: 220, y: 290 }
     ])).toEqual([
       { ...sos, edge: "top", x: 160, y: 86 },
-      { ...rescuer, edge: "bottom", x: 220, y: 245 }
+      { ...rescuer, edge: "bottom", x: 220, y: 246 }
     ]);
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0])
-      .toMatchObject({ edge: "left", x: 86, y: 140 });
+      .toMatchObject({ edge: "left", x: 81, y: 140 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 340, y: 140 }])[0])
-      .toMatchObject({ edge: "right", x: 234, y: 140 });
+      .toMatchObject({ edge: "right", x: 239, y: 140 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: 160, y: 140 }])).toEqual([]);
   });
 
@@ -27,11 +27,11 @@ describe("dispatch map edge cues", () => {
     // The 136px-wide button at x=80 spans x=12..148, not outside the map.
     expect(narrow[0]!.x - (160 - 24) / 2).toBe(12);
     const topRight = dispatchMapEdgeCues(320, 280, [{ ...rescuer, x: 300, y: -10 }]);
-    expect(topRight[0]).toMatchObject({ edge: "top", x: 234, y: 126 });
+    expect(topRight[0]).toMatchObject({ edge: "top", x: 239, y: 126 });
     expect(dispatchMapEdgeCues(320, 280, [{ ...rescuer, x: 330, y: 15 }])[0])
       .toMatchObject({ edge: "right", y: 126 });
-    // At 320px wide the 148px cue stays 12px from either horizontal edge.
-    expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0]!.x - 148 / 2).toBe(12);
+    // At 320px wide the 138px cue stays 12px from either horizontal edge.
+    expect(dispatchMapEdgeCues(320, 280, [{ ...sos, x: -10, y: 140 }])[0]!.x - 138 / 2).toBe(12);
     expect(dispatchMapEdgeCues(320, 170, [{ ...sos, x: 160, y: -20 }])).toEqual([]);
   });
 
