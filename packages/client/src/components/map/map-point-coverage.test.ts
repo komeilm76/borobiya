@@ -17,7 +17,7 @@ describe("on-map labels for each user-workspace point state", () => {
     expect(room).not.toContain('element.style.opacity');
     expect(missionMemberCaption("rescuer", "requester", {
       requesterId: "requester", rescuerId: "rescuer" }, { rescuer: "saved_rescuer" })).toBe("saved_rescuer");
-    expect(css).toContain('.bb-map-point--stale .bb-map-point__sign { border-style: dashed; }');
+    expect(css).toContain('.bb-map-point--stale .bb-map-point__sign::before { border-style: dashed; }');
     expect(css).toContain('background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
     expect(css).toContain('@media (forced-colors: active)');
   });
@@ -34,13 +34,17 @@ describe("on-map labels for each user-workspace point state", () => {
     expect(css).toContain('.bb-map-point.user-map-view__selected-place--named .bb-map-point__caption { display: none; }');
   });
 
-  it("keeps the actual MapLibre marker absolute and places captions beside the 30px sign", () => {
+  it("keeps the actual MapLibre marker centered and captions clear of the painted pin", () => {
     // MapLibre applies a translate(...) to this exact element; relative positioning
     // would place the geographic anchor at a flow-dependent, wrong coordinate.
     expect(css).toMatch(/\.bb-map-point \{ position: absolute; top: 0; left: 0;/);
     expect(css).not.toMatch(/\.bb-map-point \{ position: relative/);
-    expect(css).toContain('.bb-map-point__caption { position: absolute; top: calc(50% + 19px); left: 50%;');
-    expect(css).toContain('bottom: calc(50% + 19px);');
+    expect(css).toContain('.bb-map-point__sign::before { content: "";');
+    expect(css).toContain('transform: rotate(-45deg);');
+    expect(css).toContain('.bb-map-point__caption { position: absolute; top: calc(50% + 15px); left: 50%;');
+    expect(css).toContain('bottom: calc(50% + 56px);');
+    expect(userMap).toContain('element: createMapPointElement("end", "مکان انتخاب‌شده؛ نمایش مسیر"), anchor: "center"');
+    expect(userMap).not.toContain('new markerConstructor({ color: "#dc483e" })');
     expect(css).toContain('var(--bb-point-label-y, 0px)');
     expect(css).toContain('[data-bb-point-edge="top"]');
     expect(css).toContain('[data-bb-point-edge="bottom"]');

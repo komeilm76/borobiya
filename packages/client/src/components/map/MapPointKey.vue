@@ -21,8 +21,10 @@ defineProps<{ kinds: MapPointKind[] }>();
 .bb-point-key { display: flex; flex-wrap: wrap; gap: .35rem .85rem; margin: 0; padding: 0;
   list-style: none; font: 700 .8rem/1.5 var(--bb-font-family); }
 .bb-point-key li { display: inline-flex; align-items: center; gap: .3rem; }
-.bb-point-key__sign { display: inline-grid; place-items: center; width: 28px; height: 28px; }
-.bb-point-key__sign .bb-map-point__sign { width: 24px; height: 24px; font-size: .8rem; box-shadow: none; }
+.bb-point-key__sign { display: inline-grid; place-items: center; width: 36px; height: 36px; }
+.bb-point-key__sign .bb-map-point__sign { position: relative; top: auto; left: auto;
+  width: 26px; height: 26px; font-size: .8rem; }
+.bb-point-key__sign .bb-map-point__sign::before { box-shadow: none; }
 .bb-point-key__sign .bb-map-point__sign--icon { font-size: 0; }
 .bb-point-key__sign .bb-map-point__icon { font-size: 14px; }
 </style>

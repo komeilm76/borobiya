@@ -384,7 +384,7 @@
           <ul class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه">
             <li><span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert" aria-hidden="true" />حادثه · رنگ بر اساس شدت</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
-            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true" />امدادگر انتخاب‌شده</li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
           </ul>
         </v-card>
         <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
@@ -665,6 +665,7 @@ import { needsOverlayRestore } from "@/map/overlay-restore";
 import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { palettes } from "@/styles/tokens";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
+import { DISPATCH_PIN_IMAGES, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -675,14 +676,17 @@ const SOS_SOURCE_ID = "admin-sos-requests";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
 const SOS_GLYPH_LAYER_ID = "admin-sos-glyph";
+const SOS_PIN_LAYER_ID = "admin-sos-pin";
 const SOS_TITLE_LAYER_ID = "admin-sos-selected-title";
 const RESPONDER_SOURCE_ID = "admin-sos-nearby-rescuers";
 const RESPONDER_DOT_LAYER_ID = "admin-sos-nearby-rescuers-dot";
 const RESPONDER_LABEL_LAYER_ID = "admin-sos-nearby-rescuers-label";
+const RESPONDER_PIN_LAYER_ID = "admin-sos-nearby-rescuers-pin";
 const RESPONDER_NAME_LAYER_ID = "admin-sos-nearby-rescuers-name";
 const RESPONDER_SELECTED_SOURCE_ID = "admin-sos-selected-rescuers";
 const RESPONDER_SELECTED_DOT_LAYER_ID = "admin-sos-selected-rescuers-dot";
 const RESPONDER_SELECTED_GLYPH_LAYER_ID = "admin-sos-selected-rescuers-glyph";
+const RESPONDER_SELECTED_PIN_LAYER_ID = "admin-sos-selected-rescuers-pin";
 const RESPONDER_SELECTED_NAME_LAYER_ID = "admin-sos-selected-rescuers-name";
 const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
 const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
@@ -876,6 +880,12 @@ function onFilterChange(value: unknown): void {
 }
 
 type GeoJsonSourceData = Parameters<GeoJSONSource["setData"]>[0];
+let pinImagesSupported = true;
+function registerPins(map: MapLibreMap): void {
+  if (!pinImagesSupported) return;
+  try { ensureDispatchPinImages(map, themeStore.isDark); }
+  catch { pinImagesSupported = false; } // Keep circle fallback if 2D canvas is unavailable.
+}
 
 function ensureResponderMapLayers(map: MapLibreMap): void {
   const data = nearbyFeatures.value as unknown as GeoJsonSourceData;
@@ -893,6 +903,8 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   else map.addSource(RESPONDER_SELECTED_SOURCE_ID, {
     type: "geojson", data: selectedData as unknown as GeoJsonSourceData
   });
+  registerPins(map);
+  const pinReady = pinImagesSupported && Object.values(DISPATCH_PIN_IMAGES).every((id) => map.hasImage(id));
   const palette = palettes[themeStore.isDark ? "dark" : "light"];
   // White glyphs must remain legible on both basemaps; the theme's pale dark-mode
   // primary is designed for dark text and cannot safely carry a white map symbol.
@@ -903,6 +915,8 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     filter: ["!", ["has", "point_count"]],
     paint: {
       "circle-color": responderPin,
+      "circle-opacity": pinReady ? 0 : 1,
+      "circle-stroke-opacity": pinReady ? 0 : 1,
       "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 15, 13],
       "circle-stroke-color": ["case", ["boolean", ["get", "isSelected"], false], "#f7b632", "#ffffff"],
       "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3.5, 2.5]
@@ -919,7 +933,13 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     filter: ["!", ["has", "point_count"]],
     layout: { "text-field": MAP_POINT_META.nearby.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 18, "text-allow-overlap": true },
-    paint: { "text-color": "#ffffff" }
+    paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 : 1 }
+  }, before);
+  if (pinReady && !map.getLayer(RESPONDER_PIN_LAYER_ID)) map.addLayer({
+    id: RESPONDER_PIN_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
+    filter: ["!", ["has", "point_count"]],
+    layout: { "icon-image": DISPATCH_PIN_IMAGES.helper, "icon-anchor": "bottom",
+      "icon-size": .72, "icon-allow-overlap": true, "icon-ignore-placement": true }
   }, before);
   if (!map.getLayer(RESPONDER_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
@@ -941,13 +961,20 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   if (!map.getLayer(RESPONDER_SELECTED_DOT_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID,
     paint: { "circle-color": responderPin, "circle-radius": 15,
+      "circle-opacity": pinReady ? 0 : 1,
+      "circle-stroke-opacity": pinReady ? 0 : 1,
       "circle-stroke-color": "#f7b632", "circle-stroke-width": 3.5 }
   }, before);
   if (!map.getLayer(RESPONDER_SELECTED_GLYPH_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_GLYPH_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
     layout: { "text-field": MAP_POINT_META.nearby.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 18, "text-allow-overlap": true },
-    paint: { "text-color": "#ffffff" }
+    paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 : 1 }
+  }, before);
+  if (pinReady && !map.getLayer(RESPONDER_SELECTED_PIN_LAYER_ID)) map.addLayer({
+    id: RESPONDER_SELECTED_PIN_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
+    layout: { "icon-image": DISPATCH_PIN_IMAGES.selectedHelper, "icon-anchor": "bottom",
+      "icon-size": .76, "icon-allow-overlap": true, "icon-ignore-placement": true }
   }, before);
   if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
@@ -966,8 +993,11 @@ function ensureSosMapLayers(map: MapLibreMap): void {
   // SOS carries its actual category title; all others remain colored marks.
   const data = { ...alerts, features: alerts.features.map((feature) => ({
     ...feature, properties: { ...feature.properties,
-      mapTitle: selected && feature.id === selected.id ? incidentLabel(selected.incidentTypeId) : "" }
+      mapTitle: selected && feature.id === selected.id ? incidentLabel(selected.incidentTypeId) : "",
+      pinImage: sosPinImage(feature.properties.status, feature.properties.severity, feature.properties.isSelected) }
   })) };
+  registerPins(map);
+  const pinReady = pinImagesSupported && Object.values(DISPATCH_PIN_IMAGES).every((id) => map.hasImage(id));
   const existingSource = map.getSource(SOS_SOURCE_ID) as GeoJSONSource | undefined;
   if (!existingSource) {
     map.addSource(SOS_SOURCE_ID, {
@@ -998,6 +1028,8 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       source: SOS_SOURCE_ID,
       paint: {
         "circle-color": ["get", "color"],
+        "circle-opacity": pinReady ? 0 : 1,
+        "circle-stroke-opacity": pinReady ? 0 : 1,
         "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 14, 12],
         "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3.5, 2],
         "circle-stroke-color": "#ffffff"
@@ -1008,7 +1040,12 @@ function ensureSosMapLayers(map: MapLibreMap): void {
     id: SOS_GLYPH_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
     layout: { "text-field": MAP_POINT_META.sos.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 16, "text-allow-overlap": true },
-    paint: { "text-color": "#ffffff" }
+    paint: { "text-color": "#ffffff", "text-opacity": pinReady ? 0 : 1 }
+  });
+  if (pinReady && !map.getLayer(SOS_PIN_LAYER_ID)) map.addLayer({
+    id: SOS_PIN_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
+    layout: { "icon-image": ["get", "pinImage"], "icon-anchor": "bottom",
+      "icon-size": .76, "icon-allow-overlap": true, "icon-ignore-placement": true }
   });
   if (!map.getLayer(SOS_TITLE_LAYER_ID)) map.addLayer({
     id: SOS_TITLE_LAYER_ID, type: "symbol", source: SOS_SOURCE_ID,
@@ -1035,7 +1072,10 @@ function syncMapData(): void {
 
 function restoreMapLayers(): void {
   const map = mapInstance;
-  if (!map || !needsOverlayRestore({
+  if (!map) return;
+  const imageMissing = pinImagesSupported && map.isStyleLoaded() &&
+    Object.values(DISPATCH_PIN_IMAGES).some((id) => !map.hasImage(id));
+  if (!imageMissing && !needsOverlayRestore({
     styleLoaded: Boolean(map.isStyleLoaded()),
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
@@ -1043,7 +1083,9 @@ function restoreMapLayers(): void {
   [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID, SOS_TITLE_LAYER_ID,
     RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,
     RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
-    RESPONDER_SELECTED_NAME_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID])) return;
+    RESPONDER_SELECTED_NAME_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID,
+    ...(pinImagesSupported && Object.values(DISPATCH_PIN_IMAGES).every((id) => map.hasImage(id))
+      ? [SOS_PIN_LAYER_ID, RESPONDER_PIN_LAYER_ID, RESPONDER_SELECTED_PIN_LAYER_ID] : [])])) return;
   // Requests and selection changes call syncMapData directly. An idle/styledata callback only
   // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
   syncMapData();
@@ -1207,17 +1249,20 @@ function onMapReady(map: MapLibreMap): void {
     restoreMapLayers();
   };
   const onMarkerClick = (event: MapMouseEvent) => {
-    const layers = [SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
+    const layers = [SOS_PIN_LAYER_ID, RESPONDER_PIN_LAYER_ID, RESPONDER_SELECTED_PIN_LAYER_ID,
+      SOS_CORE_LAYER_ID, RESPONDER_DOT_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID]
       .filter((id) => Boolean(map.getLayer(id)));
     const choices = new Map<string, MapPointChoice>();
     if (layers.length) for (const feature of map.queryRenderedFeatures(event.point, { layers })) {
       const props = feature.properties;
       const id = props?.id;
-      if (feature.layer.id === SOS_CORE_LAYER_ID && typeof id === "string") {
+      if ((feature.layer.id === SOS_PIN_LAYER_ID || feature.layer.id === SOS_CORE_LAYER_ID) && typeof id === "string") {
         const request = adminSos.visibleRequests.find((item) => item.id === id);
         if (request) choices.set(`sos-${id}`, { kind: "sos", id,
           label: `حادثه SOS · ${incidentLabel(request.incidentTypeId)}` });
-      } else if ((feature.layer.id === RESPONDER_DOT_LAYER_ID ||
+      } else if ((feature.layer.id === RESPONDER_PIN_LAYER_ID ||
+        feature.layer.id === RESPONDER_SELECTED_PIN_LAYER_ID ||
+        feature.layer.id === RESPONDER_DOT_LAYER_ID ||
         feature.layer.id === RESPONDER_SELECTED_DOT_LAYER_ID) && typeof id === "string" &&
         nearbyFeatures.value.features.some((item) => item.id === id)) {
         choices.set(`responder-${id}`, { kind: "responder", id,
@@ -1260,6 +1305,7 @@ watch(() => themeStore.isDark, () => {
   const palette = palettes[themeStore.isDark ? "dark" : "light"];
   const responderPin = themeStore.isDark ? "#205fd1" : "#0868c8";
   try {
+    if (pinImagesSupported) refreshResponderPinImages(map, themeStore.isDark);
     for (const id of [RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID]) {
       if (map.getLayer(id)) map.setPaintProperty(id, "circle-color", responderPin);
     }
@@ -1544,16 +1590,19 @@ onBeforeUnmount(() => {
   padding: .55rem .85rem; list-style: none; background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface)); font: 700 .76rem/1.5 var(--bb-font-family); }
 .dispatch-map-key li { display: inline-flex; align-items: center; gap: .35rem; }
-.dispatch-map-key__icon { display: inline-grid; place-items: center; width: 21px; height: 21px;
-  border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 14px;
-  box-shadow: 0 0 0 1px rgba(var(--v-theme-on-surface), .25); }
-.dispatch-map-key__icon--sos { background: #dc2626; border-radius: 7px; }
-.dispatch-map-key__icon--helper { background: #0868c8; }
-.dispatch-map-key__selected { width: 19px; height: 19px; border: 4px solid #205fd1;
-  border-radius: 50%; box-shadow: 0 0 0 2px #f7b632; }
+.dispatch-map-key__icon, .dispatch-map-key__selected { position: relative; isolation: isolate;
+  display: inline-grid; place-items: center; flex: 0 0 27px; width: 27px; height: 30px;
+  color: #fff; font-size: 16px; }
+.dispatch-map-key__icon::after, .dispatch-map-key__selected::before {
+  content: ""; position: absolute; z-index: -1; top: 2px; left: 3px;
+  width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50% 50% 50% 4px;
+  background: #dc2626; box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: rotate(-45deg); }
+.dispatch-map-key__icon--helper::after { background: #0868c8; }
+.dispatch-map-key__selected::before { background: #205fd1; border-color: #f7b632; }
 @media (forced-colors: active) {
-  .dispatch-map-key__icon, .dispatch-map-key__selected { border-color: CanvasText;
-    color: CanvasText; background: Canvas; box-shadow: none; }
+  .dispatch-map-key__icon, .dispatch-map-key__selected { color: CanvasText; }
+  .dispatch-map-key__icon::after, .dispatch-map-key__selected::before {
+    border-color: CanvasText; background: Canvas; box-shadow: none; }
 }
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */

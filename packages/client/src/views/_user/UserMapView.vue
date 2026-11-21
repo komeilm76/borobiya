@@ -1391,8 +1391,9 @@ function syncSelectedPlaceMarker(): void {
   // Selected POI stays distinct from the optional set of category result pins.
   // Marker is supplied by MapCanvas after its lazy MapLibre import; no eager map chunk here.
   if (!selectedPlaceMarker) {
-    selectedPlaceMarker = new markerConstructor({ color: "#dc483e" })
-      .setLngLat([place.lon, place.lat]).addTo(instance);
+    selectedPlaceMarker = new markerConstructor({
+      element: createMapPointElement("end", "مکان انتخاب‌شده؛ نمایش مسیر"), anchor: "center"
+    }).setLngLat([place.lon, place.lat]).addTo(instance);
     const element = selectedPlaceMarker.getElement();
     element.setAttribute("role", "button");
     element.setAttribute("tabindex", "0");
@@ -2396,14 +2397,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
   top: calc(100% + .45rem); bottom: auto;
 }
-/* The compact Trip pin uses a centered 30px sign; its place callout should
-   sit beside the sign, not beyond the full 44px touch target. The default
-   MapLibre search pin above retains its bottom-tip anchoring. */
+/* Both the route destination and the selected search POI use the centered
+   painted teardrop; the callout clears its crown without moving its tip. */
 :global(.user-map-view .bb-map-point.user-map-view__selected-place .user-map-view__selected-place-label:not([hidden])) {
-  bottom: calc(50% + 19px);
+  bottom: calc(50% + 56px);
 }
 :global(.user-map-view .bb-map-point.user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
-  top: calc(50% + 19px); bottom: auto;
+  top: calc(50% + 15px); bottom: auto;
 }
 :global(.user-map-view .user-map-view__selected-place[data-bb-point-edge] .user-map-view__selected-place-label:not([hidden])) {
   border-color: rgb(var(--v-theme-primary));
@@ -2484,24 +2484,31 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   appearance: none; cursor: pointer;
 }
 :global(.user-map-view .user-map-view__peer-avatar-face) {
-  position: relative; display: grid; place-items: center; width: 32px; height: 32px;
-  border: 2px solid #fff; border-radius: 50%;
-  color: #fff; background: linear-gradient(145deg, #936ef0, #5e3eac);
-  box-shadow: 0 3px 9px rgba(9, 25, 44, .45), 0 0 0 3px rgba(94, 62, 172, .25);
-  font-size: .8rem; font-weight: 800; line-height: 1; text-transform: none;
+  position: absolute; top: -22px; left: 4px; z-index: 0;
+  display: grid; place-items: center; width: 36px; height: 36px;
+  color: #fff; font-size: .9rem; font-weight: 800; line-height: 1; text-transform: none;
+}
+:global(.user-map-view .user-map-view__peer-avatar-face::before) {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  border: 2px solid #fff; border-radius: 50% 50% 50% 7px;
+  background: linear-gradient(135deg, #794bd0, #503291);
+  box-shadow: 0 4px 10px rgba(9, 25, 44, .5), 0 0 0 3px rgba(94, 62, 172, .25);
+  transform: rotate(-45deg);
 }
 /* A fresh fix, not an online-status claim; stale fixes retain the visible age label. */
 :global(.user-map-view .user-map-view__peer-avatar-face::after) {
-  content: ""; position: absolute; bottom: -2px; right: -3px; width: 8px; height: 8px;
+  content: ""; position: absolute; bottom: 0; right: 0; width: 9px; height: 9px;
   border: 2px solid #fff; border-radius: 50%; background: #087d45;
 }
 :global(.user-map-view .user-map-view__peer-avatar--stale) { --bb-pin: #526b6b; }
-:global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face) { background: #526b6b; color: #fff; border-style: dashed; }
+:global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face::before) {
+  background: #526b6b; border-style: dashed;
+}
 :global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face::after) { background: #64748b; }
-:global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face) { outline: 3px solid #f7b632; outline-offset: 2px; }
-:global(.user-map-view .user-map-view__peer-avatar .bb-map-point__caption) { top: auto; bottom: calc(50% + 19px); }
+:global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face::before) { outline: 3px solid #f7b632; outline-offset: 2px; }
+:global(.user-map-view .user-map-view__peer-avatar .bb-map-point__caption) { top: auto; bottom: calc(50% + 56px); }
 :global(.user-map-view .user-map-view__peer-avatar.bb-map-point--label-flipped .bb-map-point__caption) {
-  top: calc(50% + 19px); bottom: auto;
+  top: calc(50% + 15px); bottom: auto;
 }
 :global(.user-map-view .user-map-view__peer-avatar[data-bb-point-edge] .bb-map-point__caption) {
   border-color: rgb(var(--v-theme-primary));
@@ -2584,7 +2591,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
  * screen-upright; the SVG arrow is rotated by MapLibre against the route bearing. */
 :global(.user-map-view .user-map-view__own-marker) {
   display: grid; place-items: center; width: 48px; height: 48px;
-  border-radius: 50%; background: rgba(var(--v-theme-primary), .22);
+  border: 1px solid rgba(var(--v-theme-primary), .5); border-radius: 50%;
+  background: radial-gradient(circle, rgba(var(--v-theme-primary), .26) 0 60%, rgba(var(--v-theme-primary), .08) 61%);
+  box-shadow: 0 0 0 4px rgba(var(--v-theme-primary), .14), 0 4px 16px rgba(9, 25, 44, .25);
   cursor: default;
 }
 :global(.user-map-view .user-map-view__own-marker--mission) {
@@ -2620,10 +2629,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   display: none;
 }
 :global(.user-map-view .user-map-view__own-marker-icon) {
-  display: grid; place-items: center; width: 32px; height: 32px;
+  display: grid; place-items: center; width: 36px; height: 36px;
   border: 3px solid rgb(var(--v-theme-on-primary)); border-radius: 50%;
   color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary));
-  box-shadow: 0 2px 8px rgba(13, 48, 46, .4); font-size: 18px;
+  box-shadow: 0 2px 9px rgba(13, 48, 46, .4); font-size: 20px;
 }
 :global(.user-map-view .user-map-view__direction-arrow) { display: none; }
 :global(.user-map-view .user-map-view__own-marker--navigating) {
@@ -2647,7 +2656,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   :global(.user-map-view .user-map-view__own-marker-icon) { border-color: CanvasText; background: Highlight; color: HighlightText; }
   :global(.user-map-view .user-map-view__direction-arrow__body) { fill: Highlight; stroke: HighlightText; }
   :global(.user-map-view .user-map-view__direction-arrow__accent) { fill: HighlightText; }
-  :global(.user-map-view .user-map-view__peer-avatar-face) { border-color: CanvasText; background: Highlight; color: HighlightText; }
+  :global(.user-map-view .user-map-view__peer-avatar-face) { color: HighlightText; }
+  :global(.user-map-view .user-map-view__peer-avatar-face::before) {
+    border-color: CanvasText; background: Highlight; box-shadow: none;
+  }
+  :global(.user-map-view .user-map-view__peer-avatar-face::after) { border-color: CanvasText; }
 }
 
 

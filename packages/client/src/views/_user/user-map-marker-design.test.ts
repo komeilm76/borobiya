@@ -36,7 +36,8 @@ describe("own and companion marker design", () => {
       expect(view).toContain(`user-map-view__peer-avatar[data-bb-point-edge="${edge}"]`);
     expect(marker).not.toContain('button.textContent = avatarInitial(peer.name)');
     expect(rule(":global(.user-map-view .user-map-view__peer-avatar)")).toMatch(/width: 44px; height: 44px;/);
-    expect(rule(":global(.user-map-view .user-map-view__peer-avatar-face)")).toMatch(/width: 32px; height: 32px;/);
+    expect(rule(":global(.user-map-view .user-map-view__peer-avatar-face)")).toMatch(/width: 36px; height: 36px;/);
+    expect(rule(":global(.user-map-view .user-map-view__peer-avatar-face::before)")).toContain('transform: rotate(-45deg);');
     expect(compiled.errors).toEqual([]);
     expect(compiled.code).toContain(".user-map-view__peer-avatar-face");
   });
@@ -62,7 +63,7 @@ describe("own and companion marker design", () => {
     expect(own).not.toContain('mdi-navigation-variant');
     expect(own).toContain('ownMarkerMotion.move({ lon: fix.lon, lat: fix.lat,');
     expect(own).not.toContain('new markerConstructor({ color:');
-    expect(body("syncSelectedPlaceMarker")).toContain('new markerConstructor({ color: "#dc483e" })');
+    expect(body("syncSelectedPlaceMarker")).toContain('element: createMapPointElement("end", "مکان انتخاب‌شده؛ نمایش مسیر"), anchor: "center"');
     expect(body("onMapReady")).toContain('ownMarker?.remove(); ownMarker = null;');
     expect(rule(":global(.user-map-view .user-map-view__own-marker)")).toContain("width: 48px; height: 48px;");
     expect(rule(":global(.user-map-view .user-map-view__own-marker-icon)")).toContain("background: rgb(var(--v-theme-primary));");
