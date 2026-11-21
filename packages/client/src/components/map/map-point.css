@@ -35,10 +35,16 @@ button.bb-map-point { cursor: pointer; }
   transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
   box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
   max-width: min(9rem, 42vw); min-height: 28px; padding: .22rem .6rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), .25); border-inline-start: 3px solid var(--bb-pin, #1468c9);
+  border: 1px solid rgba(var(--v-theme-on-surface), .25); border-top: 3px solid var(--bb-pin, #1468c9);
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 4px 14px rgba(3, 29, 31, .32); font: 800 .78rem/1.45 var(--bb-font-family, sans-serif);
   white-space: nowrap; pointer-events: none; }
+/* The neck overlaps the painted tip/crown rather than leaving two adjacent
+   floating shapes. Edge-clamped captions hide it when the pin is offscreen. */
+.bb-map-point__caption::after { content: ""; position: absolute; z-index: -1;
+  top: -7px; left: calc(50% - 5px - var(--bb-point-label-shift, 0px));
+  width: 10px; height: 9px; border-radius: 4px; background: var(--bb-pin, #1468c9); }
+.bb-map-point[data-bb-point-edge] .bb-map-point__caption::after { display: none; }
 .bb-map-point__caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Off-screen points get a small directional edge cue; the sign itself is never
    displaced from its geographic location. Hidden/selected-place captions stay hidden. */
@@ -52,14 +58,32 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point--helper .bb-map-point__caption,
 .bb-map-point--start .bb-map-point__caption,
 .bb-map-point--stop .bb-map-point__caption,
-.bb-map-point--director .bb-map-point__caption { top: auto; bottom: calc(50% + 51px); }
-.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption { top: auto; bottom: calc(50% + 51px); }
+.bb-map-point--director .bb-map-point__caption {
+  top: auto; bottom: calc(50% + 51px); border-top-width: 1px;
+  border-bottom: 3px solid var(--bb-pin, #1468c9); }
+.bb-map-point--sos .bb-map-point__caption::after,
+.bb-map-point--helper .bb-map-point__caption::after,
+.bb-map-point--start .bb-map-point__caption::after,
+.bb-map-point--stop .bb-map-point__caption::after,
+.bb-map-point--director .bb-map-point__caption::after { top: auto; bottom: -7px; }
+.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption {
+  top: auto; bottom: calc(50% + 51px); border-top-width: 1px;
+  border-bottom: 3px solid var(--bb-pin, #1468c9); }
+.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption::after { top: auto; bottom: -7px; }
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--sos .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--helper .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--start .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--stop .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--director .bb-map-point__caption {
-  top: 50%; bottom: auto;
+  top: 50%; bottom: auto; border-top: 3px solid var(--bb-pin, #1468c9);
+  border-bottom-width: 1px;
+}
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--sos .bb-map-point__caption::after,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--helper .bb-map-point__caption::after,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--start .bb-map-point__caption::after,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--stop .bb-map-point__caption::after,
+.bb-map-point.bb-map-point--label-flipped.bb-map-point--director .bb-map-point__caption::after {
+  top: -7px; bottom: auto;
 }
 .bb-map-point--stale .bb-map-point__sign::before { border-style: dashed; }
 .bb-map-point__age { flex: none; padding-inline-start: .3rem; border-inline-start: 1px solid currentColor;
@@ -67,9 +91,13 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point__tooltip { position: absolute; bottom: calc(50% + 51px); left: 50%; z-index: 2;
   transform: translateX(-50%); display: block; max-width: min(13rem, calc(100vw - 1.5rem));
   width: max-content; padding: .35rem .55rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
-  border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  border-bottom: 3px solid var(--bb-pin, #1468c9);
+  border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); font: 700 .78rem/1.4 var(--bb-font-family, sans-serif);
   white-space: normal; overflow-wrap: anywhere; visibility: hidden; pointer-events: none; }
+.bb-map-point__tooltip::after { content: ""; position: absolute; z-index: -1;
+  bottom: -7px; left: calc(50% - 5px); width: 10px; height: 9px;
+  border-radius: 4px; background: var(--bb-pin, #1468c9); }
 @media (hover: hover) { .bb-map-point:hover { z-index: 6; }
   .bb-map-point:hover .bb-map-point__tooltip { visibility: visible; } }
 .bb-map-point:focus-visible { z-index: 6; outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 1px; border-radius: 12px; }
@@ -82,4 +110,5 @@ button.bb-map-point { cursor: pointer; }
     background: Canvas !important; box-shadow: none !important; }
   .bb-map-point__caption, .bb-map-point__tooltip { background: Canvas; color: CanvasText;
     border-color: CanvasText !important; box-shadow: none; }
+  .bb-map-point__caption::after, .bb-map-point__tooltip::after { background: CanvasText; }
   .bb-map-point[data-bb-point-edge] .bb-map-point__caption::before { color: CanvasText; } }

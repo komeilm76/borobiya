@@ -2368,15 +2368,25 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   display: block; width: max-content;
   max-width: min(16rem, calc(100vw - 2rem), var(--result-tooltip-map-width, 16rem));
   padding: .35rem .7rem; border: 1px solid rgba(var(--v-theme-on-surface), .25);
-  border-inline-start: 3px solid var(--result-color, #475569);
+  border-bottom: 3px solid var(--result-color, #475569);
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 4px 14px rgba(3, 29, 31, .24);
   font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
   letter-spacing: normal; text-align: center; white-space: normal; overflow-wrap: anywhere;
   visibility: hidden; opacity: 0; pointer-events: none;
 }
+:global(.user-map-view .user-map-view__result-marker__tooltip::after) {
+  content: ""; position: absolute; z-index: -1; bottom: -7px;
+  left: calc(50% - var(--result-tooltip-shift, 0px));
+  width: 10px; height: 9px; transform: translateX(-50%);
+  border-radius: 4px; background: var(--result-color, #475569);
+}
 :global(.user-map-view .user-map-view__result-marker--tooltip-below .user-map-view__result-marker__tooltip) {
-  top: 50%; bottom: auto;
+  top: 50%; bottom: auto; border-bottom-width: 1px;
+  border-top: 3px solid var(--result-color, #475569);
+}
+:global(.user-map-view .user-map-view__result-marker--tooltip-below .user-map-view__result-marker__tooltip::after) {
+  top: -7px; bottom: auto;
 }
 @media (hover: hover) {
   :global(.user-map-view .user-map-view__result-marker:hover) { z-index: 4; }
@@ -2399,13 +2409,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   display: block; width: max-content;
   max-width: min(15rem, calc(100vw - 2rem), var(--selected-label-map-width, 15rem));
   padding: .45rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  border: 1px solid rgba(var(--v-theme-on-surface), .2); border-inline-start: 3px solid #c8203d;
+  border: 1px solid rgba(var(--v-theme-on-surface), .2); border-bottom: 3px solid #c8203d;
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 5px 18px rgba(3, 29, 31, .28); pointer-events: none;
   font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
 }
 :global(.user-map-view .user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
-  top: 50%; bottom: auto;
+  top: 50%; bottom: auto; border-bottom-width: 1px; border-top: 3px solid #c8203d;
 }
 /* Both the route destination and the selected search POI use the centered
    painted teardrop; the callout clears its crown without moving its tip. */
@@ -2430,6 +2440,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   :global(.user-map-view .user-map-view__result-marker),
   :global(.user-map-view .user-map-view__selected-place-label),
   :global(.user-map-view .user-map-view__result-marker__tooltip) { border-color: CanvasText !important; background: Canvas; color: CanvasText; box-shadow: none; }
+  :global(.user-map-view .user-map-view__result-marker__tooltip::after) { background: CanvasText; }
   :global(.user-map-view .user-map-view__selected-place[data-bb-point-edge] .user-map-view__selected-place-label::before) { color: CanvasText; }
 }
 
@@ -2615,13 +2626,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
   display: block; width: max-content; max-width: min(7rem, 34vw); overflow: hidden; text-overflow: ellipsis;
   padding: .2rem .5rem; border: 1px solid rgba(var(--v-theme-on-surface), .25);
-  border-inline-start: 3px solid rgb(var(--v-theme-primary));
+  border-top: 3px solid rgb(var(--v-theme-primary));
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 10px rgba(3, 29, 31, .45); font: 800 .75rem/1.4 var(--bb-font-family, sans-serif);
   white-space: nowrap; pointer-events: none;
 }
 :global(.user-map-view .user-map-view__own-marker--mission.bb-map-point--label-flipped .user-map-view__own-marker-label) {
-  top: auto; bottom: calc(50% + 18px);
+  top: auto; bottom: calc(50% + 18px); border-top-width: 1px;
+  border-bottom: 3px solid rgb(var(--v-theme-primary));
 }
 :global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label) {
   border-color: rgb(var(--v-theme-primary));

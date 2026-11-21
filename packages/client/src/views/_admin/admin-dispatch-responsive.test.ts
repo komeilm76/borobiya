@@ -66,8 +66,10 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source.indexOf('۰۱ / بررسی درخواست‌ها')).toBeLessThan(source.indexOf('۰۲ / موقعیت حادثه و اعزام'));
     expect(source).toContain('.admin-dispatch__workspace > :deep(.v-col) { padding-inline: clamp(');
     expect(source).toContain('.dispatch-request-row.v-list-item--active, .dispatch-responder-row.v-list-item--active {');
-    expect(source).not.toContain('border-inline-start-color:');
-    expect(source).not.toContain('border-top: 3px solid');
+    const selectedRows = source.match(/\.dispatch-request-row\.v-list-item--active, \.dispatch-responder-row\.v-list-item--active \{[^}]*\}/)?.[0];
+    expect(selectedRows).toBeDefined();
+    expect(selectedRows).not.toContain('border-inline-start-color:');
+    expect(selectedRows).not.toContain('border-top: 3px solid'); // Map labels may have a pin-facing edge.
   });
 
   it("still reserves the compact filter and responder search wrap for phones", () => {

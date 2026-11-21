@@ -91,6 +91,11 @@ describe("show all current POIs on the map", () => {
     const style = descriptor.styles[0]!.content;
     expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*width:\s*44px; height:\s*44px/s);
     expect(style).toContain('bottom: calc(50% + 51px); left: 50%;');
+    expect(style).toContain('border-bottom: 3px solid var(--result-color, #475569);');
+    expect(style).toContain('border-top: 3px solid var(--result-color, #475569);');
+    expect(style).toContain('.user-map-view__result-marker__tooltip::after');
+    expect(style).toContain('left: calc(50% - var(--result-tooltip-shift, 0px));');
+    expect(style).toContain('border-bottom: 3px solid #c8203d;');
     expect(style).toContain('.user-map-view__result-marker:hover .user-map-view__result-marker__tooltip');
     expect(style).toContain('.user-map-view__result-marker:focus-visible .user-map-view__result-marker__tooltip');
     expect(style).toContain('pointer-events: none;');

@@ -16,7 +16,9 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('element.style.setProperty("--dispatch-selected-sos-color"');
     expect(source).toContain('"text-field": ["get", "username"]');
     expect(source).toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
-    expect(source).toContain('"text-radial-offset": 1.4');
+    // The padded plate meets the ~17px pin head rather than obscuring its glyph.
+    expect(source).toContain('"text-radial-offset": 2.4');
+    expect(source).toContain('"text-radial-offset": 2.3');
     expect(source).toContain('"text-variable-anchor": ["left", "right", "top", "bottom"]');
     expect(source).toContain('"text-halo-color": palette.surface');
     expect(source).toContain('"icon-text-fit": "both" as const');
@@ -28,8 +30,17 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('watch(incidentNameById, () => { syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); });');
     expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -35px; left: 16px;');
     expect(styles[0]!.content).toContain('border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
-    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--left .dispatch-sos-label)');
-    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--below .dispatch-sos-label)');
+    const labelCss = styles[0]!.content;
+    expect(labelCss).toContain('border-left: 3px solid var(--dispatch-selected-sos-color, #dc2626)');
+    expect(labelCss).not.toContain('border-inline-start: 3px solid var(--dispatch-selected-sos-color');
+    expect(labelCss).toContain(':global(.dispatch-sos-label::after)');
+    expect(labelCss).toContain('left: -8px; top: calc(50% - 4px);');
+    expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--left .dispatch-sos-label)');
+    expect(labelCss).toContain('border-right: 3px solid var(--dispatch-selected-sos-color');
+    expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--center .dispatch-sos-label::after)');
+    expect(labelCss).toContain(':global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label::after)');
+    expect(source).toContain('filter: ["==", ["get", "isSelected"], false]');
+    expect(source).toContain('"circle-color": SELECTED_SOS_COLOR, "circle-radius": 23');
     // Clustered responders otherwise lose both their pin and username at low zoom.
     expect(source).toContain('features: nearbyFeatures.value.features.filter((feature) => feature.properties.isSelected)');
     expect(source).toContain('id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID');

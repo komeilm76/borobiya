@@ -1023,7 +1023,7 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "isSelected"], false]],
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 13, "text-radial-offset": 1.4,
+      "text-size": 13, "text-radial-offset": 2.4,
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto", "text-max-width": 9,
       ...(pinReady ? { "icon-image": DISPATCH_PIN_IMAGES.name, "icon-text-fit": "both" as const,
         "icon-text-fit-padding": [3, 7, 3, 7] } : {}) },
@@ -1060,7 +1060,7 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-radial-offset": 1.4,
+      "text-size": 14, "text-radial-offset": 2.3,
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto",
       "text-max-width": 9, "text-allow-overlap": true,
       "icon-allow-overlap": true,
@@ -1096,9 +1096,9 @@ function ensureSosMapLayers(map: MapLibreMap): void {
   if (!map.getLayer(SOS_AURA_LAYER_ID)) map.addLayer({
     id: SOS_AURA_LAYER_ID, type: "circle", source: SOS_SOURCE_ID,
     filter: ["==", ["get", "isSelected"], true],
-    paint: { "circle-color": SELECTED_SOS_COLOR, "circle-radius": 30,
-      "circle-opacity": .13, "circle-stroke-color": SELECTED_SOS_COLOR,
-      "circle-stroke-width": 8, "circle-stroke-opacity": .08,
+    paint: { "circle-color": SELECTED_SOS_COLOR, "circle-radius": 23,
+      "circle-opacity": .08, "circle-stroke-color": SELECTED_SOS_COLOR,
+      "circle-stroke-width": 3, "circle-stroke-opacity": .06,
       "circle-translate": pinReady ? [0, -35] : [0, 0],
       "circle-translate-anchor": "viewport" }
   });
@@ -1108,6 +1108,9 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       id: SOS_PULSE_LAYER_ID,
       type: "circle",
       source: SOS_SOURCE_ID,
+      // The selected pin and its attached title already carry the emphasis;
+      // avoid a large animated ring behind the compact joined marker.
+      filter: ["==", ["get", "isSelected"], false],
       paint: {
         "circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR, ["get", "color"]],
         "circle-radius": 18,
@@ -1686,22 +1689,38 @@ onBeforeUnmount(() => {
 :global(.dispatch-sos-label-anchor) { width: 0; height: 0; z-index: 4; pointer-events: none; }
 :global(.dispatch-sos-label-anchor[hidden]) { display: none; }
 :global(.dispatch-sos-label) { position: absolute; top: -35px; left: 16px;
-  transform: translateY(-50%); box-sizing: border-box; display: block;
+  transform: translateY(-50%); box-sizing: border-box; display: block; isolation: isolate;
   width: max-content; max-width: min(12rem, calc(100vw - 4rem)); min-height: 32px;
-  padding: .34rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .2);
-  border-inline-start: 3px solid var(--dispatch-selected-sos-color, #dc2626);
+  padding: .34rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .24);
+  /* Physical pin-facing edges: a logical inline-start border lands on the far
+     side of an RTL incident title, as in the reported screenshot. */
+  border-left: 3px solid var(--dispatch-selected-sos-color, #dc2626);
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: 0 3px 12px rgba(8, 21, 38, .28); font: 800 .83rem/1.4 var(--bb-font-family, sans-serif);
+  box-shadow: 0 3px 10px rgba(8, 21, 38, .22); font: 800 .83rem/1.4 var(--bb-font-family, sans-serif);
   white-space: normal; overflow-wrap: anywhere; text-align: start; pointer-events: none; }
-:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) { left: -16px; transform: translate(-100%, -50%); }
-:global(.dispatch-sos-label-anchor--below .dispatch-sos-label) { top: 0; transform: none; }
-:global(.dispatch-sos-label-anchor--left.dispatch-sos-label-anchor--below .dispatch-sos-label) { transform: translateX(-100%); }
+/* A short colored neck overlaps the pin head. The label is still a separate,
+   zero-hit-area overlay and neither the pin nor its geographic anchor moves. */
+:global(.dispatch-sos-label::after) { content: ""; position: absolute; z-index: -1;
+  left: -8px; top: calc(50% - 4px); width: 10px; height: 8px;
+  border-radius: 4px; background: var(--dispatch-selected-sos-color, #dc2626); }
+:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) {
+  left: -16px; transform: translate(-100%, -50%); border-left-width: 1px;
+  border-right: 3px solid var(--dispatch-selected-sos-color, #dc2626); }
+:global(.dispatch-sos-label-anchor--left .dispatch-sos-label::after) { left: auto; right: -8px; }
 :global(.dispatch-sos-label-anchor--center .dispatch-sos-label) {
-  left: 0; top: 0; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px))); }
+  left: 0; top: 0; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px)));
+  border-left-width: 1px; border-top: 3px solid var(--dispatch-selected-sos-color, #dc2626); }
+:global(.dispatch-sos-label-anchor--center .dispatch-sos-label::after) {
+  left: calc(50% - 5px - var(--dispatch-sos-label-shift, 0px)); top: -8px;
+  width: 10px; height: 10px; }
 :global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label) {
-  top: auto; bottom: 51px; }
+  top: auto; bottom: 51px; border-top-width: 1px;
+  border-bottom: 3px solid var(--dispatch-selected-sos-color, #dc2626); }
+:global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label::after) {
+  top: auto; bottom: -8px; }
 @media (forced-colors: active) {
   :global(.dispatch-sos-label) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
+  :global(.dispatch-sos-label::after) { background: CanvasText; }
 }
 .dispatch-map-key { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin: 0;
   padding: .55rem .85rem; list-style: none; background: rgb(var(--v-theme-surface));
