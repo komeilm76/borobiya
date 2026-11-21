@@ -32,6 +32,8 @@ describe("own and companion marker design", () => {
     expect(marker).toContain('captionName.textContent = peer.name');
     expect(marker).toContain('age.hidden = !peer.stale');
     expect(view).toContain('positionMapPointLabels(instance, [destinationMarker, routeOriginMarker, ownMarker, ...peerMarkers.values()]);');
+    for (const edge of ["top", "bottom", "left", "right"])
+      expect(view).toContain(`user-map-view__peer-avatar[data-bb-point-edge="${edge}"]`);
     expect(marker).not.toContain('button.textContent = avatarInitial(peer.name)');
     expect(rule(":global(.user-map-view .user-map-view__peer-avatar)")).toMatch(/width: 44px; height: 44px;/);
     expect(rule(":global(.user-map-view .user-map-view__peer-avatar-face)")).toMatch(/width: 32px; height: 32px;/);

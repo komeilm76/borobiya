@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SosRequestRecord } from "@shared/index";
 import {
   buildSosAlertsGeoJson,
+  SOS_MAP_MARKER_COLORS,
   buildEligibleResponderGeoJson,
   formatResponderDistance,
   isDispatchableSosStatus,
@@ -9,7 +10,6 @@ import {
   parseAdminRescuerCancellationPayload,
   parseSosNewRequestPayload,
   playSosAlertSound,
-  SOS_SEVERITY_PRESENTATION,
   SOS_STATUS_PRESENTATION,
   upsertSosAlert,
   type AlertAudioContextLike
@@ -116,13 +116,13 @@ describe("admin SOS alert helpers (T3.2.5)", () => {
     expect(geojson.features).toHaveLength(3);
     expect(geojson.features[0]?.geometry.coordinates).toEqual([51.3498, 35.7012]);
     expect(geojson.features.map((f) => f.properties.color)).toEqual([
-      SOS_SEVERITY_PRESENTATION.high.color,
-      SOS_SEVERITY_PRESENTATION.medium.color,
-      SOS_SEVERITY_PRESENTATION.low.color
+      SOS_MAP_MARKER_COLORS.high,
+      SOS_MAP_MARKER_COLORS.medium,
+      SOS_MAP_MARKER_COLORS.low
     ]);
     expect(geojson.features.map((f) => f.properties.isSelected)).toEqual([false, true, false]);
     expect(buildSosAlertsGeoJson([sampleSos({ severity: "low", status: "cancelled_by_rescuer" })], null)
-      .features[0]?.properties.color).toBe(SOS_SEVERITY_PRESENTATION.high.color);
+      .features[0]?.properties.color).toBe(SOS_MAP_MARKER_COLORS.high);
   });
 
   it("synthesizes severity-graded Web Audio chimes, respects mute, and closes AudioContext", async () => {

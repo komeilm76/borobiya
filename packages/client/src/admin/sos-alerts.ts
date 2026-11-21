@@ -196,6 +196,12 @@ export function mergeSosAlertSnapshot(
   return sortSosRequests([...byId.values()]);
 }
 
+// The map's white exclamation must remain legible on each severity hue;
+// chips/cards use their separate presentation colors above.
+export const SOS_MAP_MARKER_COLORS: Record<Severity, string> = {
+  high: "#dc2626", medium: "#a94d04", low: "#075c94"
+};
+
 /** Builds the MapLibre GeoJSON feature collection for pulsing severity-colored SOS markers. */
 export function buildSosAlertsGeoJson(
   requests: readonly SosRequestRecord[],
@@ -214,8 +220,8 @@ export function buildSosAlertsGeoJson(
         id: req.id,
         severity: req.severity,
         color: req.status === "cancelled_by_rescuer"
-          ? SOS_SEVERITY_PRESENTATION.high.color
-          : SOS_SEVERITY_PRESENTATION[req.severity].color,
+          ? SOS_MAP_MARKER_COLORS.high
+          : SOS_MAP_MARKER_COLORS[req.severity],
         isSelected: req.id === selectedId,
         isManual: req.location.isManual,
         status: req.status

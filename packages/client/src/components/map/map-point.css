@@ -5,27 +5,36 @@
   padding: 0; border: 0; background: transparent; color: #fff; font: 800 13px/1 var(--bb-font-family, sans-serif);
   cursor: default; appearance: none; touch-action: manipulation; }
 button.bb-map-point { cursor: pointer; }
-.bb-map-point__sign { display: grid; place-items: center; box-sizing: border-box; width: 30px; height: 30px;
-  border: 2px solid white; background: #34566b; border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(12, 31, 38, .48); }
-.bb-map-point--sos .bb-map-point__sign { background: #b91c1c; border-radius: 8px 8px 8px 2px; font-size: 20px; }
-.bb-map-point--start .bb-map-point__sign { background: #2563a6; border-radius: 50%; }
-.bb-map-point--end .bb-map-point__sign { background: #8a4112; border-radius: 50%; }
-.bb-map-point--stop .bb-map-point__sign { background: #9a5d05; border-radius: 9px; }
-.bb-map-point--helper .bb-map-point__sign { background: #0a6956; border-radius: 50%; font-size: 17px; }
-.bb-map-point--nearby .bb-map-point__sign { background: #0e6666; border-radius: 50%; font-size: 19px; }
-.bb-map-point--requester .bb-map-point__sign { background: #a9422a; border-radius: 12px 12px 3px 12px; }
-.bb-map-point--director .bb-map-point__sign { background: #5151a1; border-radius: 4px; }
+/* One geographic anchor at the center of each 44px target. The inner badge is
+   decorative: no offset/rotation of the MapLibre element or GPS coordinate. */
+.bb-map-point { --bb-pin: #1468c9; }
+.bb-map-point--sos { --bb-pin: #d6263b; }
+.bb-map-point--start { --bb-pin: #087d45; }
+.bb-map-point--end { --bb-pin: #c8203d; }
+.bb-map-point--stop { --bb-pin: #7642b5; }
+.bb-map-point--helper { --bb-pin: #0866c4; }
+.bb-map-point--nearby { --bb-pin: #5e3eac; }
+.bb-map-point--requester { --bb-pin: #087eaa; }
+.bb-map-point--director { --bb-pin: #96510c; }
+.bb-map-point__sign { display: grid; place-items: center; box-sizing: border-box; width: 32px; height: 32px;
+  border: 2px solid white; background: linear-gradient(145deg, var(--bb-pin), color-mix(in srgb, var(--bb-pin) 85%, #081225));
+  border-radius: 50%; color: #fff;
+  box-shadow: 0 3px 9px rgba(9, 25, 44, .48), 0 0 0 3px color-mix(in srgb, var(--bb-pin) 24%, transparent);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35); }
+.bb-map-point__sign--icon { font-size: 0; }
+.bb-map-point__icon { font-size: 18px; font-weight: 400; line-height: 1; }
+.bb-map-point--sos .bb-map-point__sign { border-radius: 12px; box-shadow: 0 3px 9px rgba(9, 25, 44, .48), 0 0 0 5px rgba(214, 38, 59, .22); }
+.bb-map-point--stop .bb-map-point__sign { border-radius: 11px; font-size: 15px; font-weight: 900; }
 /* Opaque text surfaces with a 4px sign-to-caption gap. Position from the
-   centered 30px sign, not the outer 44px touch target; labels stay attached
+   centered 32px sign, not the outer 44px touch target; labels stay attached
    visually while the geographical anchor remains the sign's center. */
 .bb-map-point__caption { position: absolute; top: calc(50% + 19px); left: 50%;
   transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
   box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
-  max-width: min(8rem, 36vw); min-height: 25px; padding: .17rem .46rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), .3); border-radius: .55rem;
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: 0 3px 10px rgba(3, 29, 31, .45); font: 800 .78rem/1.45 var(--bb-font-family, sans-serif);
+  max-width: min(9rem, 42vw); min-height: 28px; padding: .22rem .6rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .25); border-inline-start: 3px solid var(--bb-pin, #1468c9);
+  border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 4px 14px rgba(3, 29, 31, .32); font: 800 .78rem/1.45 var(--bb-font-family, sans-serif);
   white-space: nowrap; pointer-events: none; }
 .bb-map-point__caption-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Off-screen points get a small directional edge cue; the sign itself is never

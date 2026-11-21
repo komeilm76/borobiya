@@ -381,6 +381,11 @@
               </div>
             </div>
           </div>
+          <ul class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه">
+            <li><span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert" aria-hidden="true" />حادثه · رنگ بر اساس شدت</li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true" />امدادگر انتخاب‌شده</li>
+          </ul>
         </v-card>
         <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
           (adminSos.nearestLoading || adminSos.nearestError || adminSos.nearestLoaded)"
@@ -889,29 +894,32 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     type: "geojson", data: selectedData as unknown as GeoJsonSourceData
   });
   const palette = palettes[themeStore.isDark ? "dark" : "light"];
+  // White glyphs must remain legible on both basemaps; the theme's pale dark-mode
+  // primary is designed for dark text and cannot safely carry a white map symbol.
+  const responderPin = themeStore.isDark ? "#205fd1" : "#0868c8";
   const before = map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined;
   if (!map.getLayer(RESPONDER_DOT_LAYER_ID)) map.addLayer({
     id: RESPONDER_DOT_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
     filter: ["!", ["has", "point_count"]],
     paint: {
-      "circle-color": palette.primary,
-      "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 14, 12],
-      "circle-stroke-color": palette.surface,
-      "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3, 2]
+      "circle-color": responderPin,
+      "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 15, 13],
+      "circle-stroke-color": ["case", ["boolean", ["get", "isSelected"], false], "#f7b632", "#ffffff"],
+      "circle-stroke-width": ["case", ["boolean", ["get", "isSelected"], false], 3.5, 2.5]
     }
   }, before);
   if (!map.getLayer(RESPONDER_CLUSTER_LAYER_ID)) map.addLayer({
     id: RESPONDER_CLUSTER_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
     filter: ["has", "point_count"],
-    paint: { "circle-color": palette.primary, "circle-radius": 18,
-      "circle-stroke-color": palette.surface, "circle-stroke-width": 3 }
+    paint: { "circle-color": responderPin, "circle-radius": 18,
+      "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 }
   }, before);
   if (!map.getLayer(RESPONDER_LABEL_LAYER_ID)) map.addLayer({
     id: RESPONDER_LABEL_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["!", ["has", "point_count"]],
     layout: { "text-field": MAP_POINT_META.nearby.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 18, "text-allow-overlap": true },
-    paint: { "text-color": palette.onPrimary }
+    paint: { "text-color": "#ffffff" }
   }, before);
   if (!map.getLayer(RESPONDER_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
@@ -926,20 +934,20 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     filter: ["has", "point_count"],
     layout: { "text-field": ["to-string", ["get", "point_count"]],
       "text-font": ["Borobiya Vazirmatn"], "text-size": 13, "text-allow-overlap": true },
-    paint: { "text-color": palette.onPrimary }
+    paint: { "text-color": "#ffffff" }
   }, before);
   // Keep the selected fix above the cluster count while SOS icons retain
   // priority at coincident incident coordinates.
   if (!map.getLayer(RESPONDER_SELECTED_DOT_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID,
-    paint: { "circle-color": palette.primary, "circle-radius": 14,
-      "circle-stroke-color": palette.surface, "circle-stroke-width": 3 }
+    paint: { "circle-color": responderPin, "circle-radius": 15,
+      "circle-stroke-color": "#f7b632", "circle-stroke-width": 3.5 }
   }, before);
   if (!map.getLayer(RESPONDER_SELECTED_GLYPH_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_GLYPH_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
     layout: { "text-field": MAP_POINT_META.nearby.glyph, "text-font": ["Borobiya Vazirmatn"],
       "text-size": 18, "text-allow-overlap": true },
-    paint: { "text-color": palette.onPrimary }
+    paint: { "text-color": "#ffffff" }
   }, before);
   if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
@@ -1045,6 +1053,7 @@ function startPulseLoop(): void {
   if (
     pulseAnimationFrame !== null ||
     typeof requestAnimationFrame !== "function" ||
+    (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) ||
     adminSos.visibleRequests.length === 0
   ) {
     return;
@@ -1243,6 +1252,24 @@ function onMapReady(map: MapLibreMap): void {
 
 let pendingDeepLinkId: string | null = null;
 
+// A style diff can retain custom layers. Refresh their paint when the basemap
+// theme changes rather than leaving light-mode labels on the dark map.
+watch(() => themeStore.isDark, () => {
+  const map = mapInstance;
+  if (!map) return;
+  const palette = palettes[themeStore.isDark ? "dark" : "light"];
+  const responderPin = themeStore.isDark ? "#205fd1" : "#0868c8";
+  try {
+    for (const id of [RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_SELECTED_DOT_LAYER_ID]) {
+      if (map.getLayer(id)) map.setPaintProperty(id, "circle-color", responderPin);
+    }
+    for (const id of [RESPONDER_NAME_LAYER_ID, RESPONDER_SELECTED_NAME_LAYER_ID, SOS_TITLE_LAYER_ID]) {
+      if (!map.getLayer(id)) continue;
+      map.setPaintProperty(id, "text-color", palette.text);
+      map.setPaintProperty(id, "text-halo-color", palette.surface);
+    }
+  } catch { /* MapCanvas is swapping styles; restoreMapLayers recreates removed layers. */ }
+});
 watch(incidentNameById, () => { syncMapData(); updateMapEdgeCues(); });
 watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
 watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const,
@@ -1512,6 +1539,21 @@ onBeforeUnmount(() => {
   position: relative;
   height: clamp(18rem, 37dvh, 23rem);
   min-height: 18rem;
+}
+.dispatch-map-key { display: flex; flex-wrap: wrap; gap: .35rem .9rem; margin: 0;
+  padding: .55rem .85rem; list-style: none; background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface)); font: 700 .76rem/1.5 var(--bb-font-family); }
+.dispatch-map-key li { display: inline-flex; align-items: center; gap: .35rem; }
+.dispatch-map-key__icon { display: inline-grid; place-items: center; width: 21px; height: 21px;
+  border: 2px solid #fff; border-radius: 50%; color: #fff; font-size: 14px;
+  box-shadow: 0 0 0 1px rgba(var(--v-theme-on-surface), .25); }
+.dispatch-map-key__icon--sos { background: #dc2626; border-radius: 7px; }
+.dispatch-map-key__icon--helper { background: #0868c8; }
+.dispatch-map-key__selected { width: 19px; height: 19px; border: 4px solid #205fd1;
+  border-radius: 50%; box-shadow: 0 0 0 2px #f7b632; }
+@media (forced-colors: active) {
+  .dispatch-map-key__icon, .dispatch-map-key__selected { border-color: CanvasText;
+    color: CanvasText; background: Canvas; box-shadow: none; }
 }
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */

@@ -2,15 +2,17 @@
 // selected-incident-only WebGL label policy. Color and the key are secondary.
 export type MapPointKind = "sos" | "start" | "end" | "helper" | "nearby" | "stop" | "requester" | "director";
 
-export const MAP_POINT_META: Record<MapPointKind, { label: string; glyph: string }> = {
-  sos: { label: "حادثه SOS", glyph: "!" },
-  start: { label: "مبدأ مسیر", glyph: "A" },
-  end: { label: "مقصد مسیر", glyph: "B" },
-  helper: { label: "عضو امدادرسان", glyph: "✚" },
-  nearby: { label: "امدادگر نزدیک", glyph: "+" },
+// Glyphs remain a font-independent fallback and the MapLibre WebGL symbol vocabulary
+// on Dispatch. DOM markers use the matching pictograms for fast recognition.
+export const MAP_POINT_META: Record<MapPointKind, { label: string; glyph: string; icon?: string }> = {
+  sos: { label: "حادثه SOS", glyph: "!", icon: "mdi-alert" },
+  start: { label: "مبدأ مسیر", glyph: "A", icon: "mdi-navigation-variant" },
+  end: { label: "مقصد مسیر", glyph: "B", icon: "mdi-flag-checkered" },
+  helper: { label: "عضو امدادرسان", glyph: "✚", icon: "mdi-lifebuoy" },
+  nearby: { label: "امدادگر نزدیک", glyph: "+", icon: "mdi-account-search" },
   stop: { label: "ایستگاه میانی", glyph: "1" },
-  requester: { label: "درخواست‌کننده", glyph: "د" },
-  director: { label: "مدیر مرکز", glyph: "م" }
+  requester: { label: "درخواست‌کننده", glyph: "د", icon: "mdi-account" },
+  director: { label: "مدیر مرکز", glyph: "م", icon: "mdi-office-building" }
 };
 
 /** MapLibre owns the marker DOM. Never mount a second Vue app/canvas per pin. */
@@ -34,6 +36,14 @@ export function createMapPointElement(kind: MapPointKind, detail: string, option
   sign.className = "bb-map-point__sign";
   sign.textContent = kind === "stop" && options.number ? options.number.toLocaleString("fa-IR") : MAP_POINT_META[kind].glyph;
   sign.setAttribute("aria-hidden", "true");
+  const icon = MAP_POINT_META[kind].icon;
+  if (icon) {
+    sign.classList.add("bb-map-point__sign--icon");
+    const pictogram = document.createElement("span");
+    pictogram.className = `mdi ${icon} bb-map-point__icon`;
+    pictogram.setAttribute("aria-hidden", "true");
+    sign.append(pictogram);
+  }
   element.append(sign);
   if (options.caption) {
     const caption = document.createElement("span");

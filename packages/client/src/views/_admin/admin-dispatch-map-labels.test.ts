@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+import { SOS_MAP_MARKER_COLORS } from "@/admin/sos-alerts";
 
 // Source/compiler checks only; docs/TASKS.md forbids mounting Vue SFCs in unit tests.
 const source = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
@@ -26,6 +27,26 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,');
     expect(source).toContain('adminSos.nearestRequestId === adminSos.selectedRequest.id');
     expect(source).not.toContain('createMapPointElement('); // Dispatch keeps its own WebGL grammar.
+  });
+
+  it("uses contrasting blue responder glyphs, severity-coded SOS markers and a context-aware legend", () => {
+    const contrastWithWhite = (hex: string) => {
+      const channels = [1, 3, 5].map((offset) => {
+        const value = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return 1.05 / (0.05 + channels[0]! * .2126 + channels[1]! * .7152 + channels[2]! * .0722);
+    };
+    for (const color of [...Object.values(SOS_MAP_MARKER_COLORS), "#205fd1", "#0868c8"])
+      expect(contrastWithWhite(color), color).toBeGreaterThanOrEqual(4.5);
+    expect(source).toContain('const responderPin = themeStore.isDark ? "#205fd1" : "#0868c8"');
+    expect(source).toContain('"circle-stroke-color": "#f7b632"');
+    expect(source).toContain('paint: { "text-color": "#ffffff" }');
+    expect(template!.content).toContain('class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"');
+    expect(template!.content).toContain('<li v-if="adminSos.selectedRequest">');
+    expect(source).toContain('window.matchMedia?.("(prefers-reduced-motion: reduce)").matches');
+    expect(source).toContain('watch(() => themeStore.isDark, () => {');
+    expect(source).toContain('map.setPaintProperty(id, "circle-color", responderPin)');
   });
 
   it("places bounded screen-edge buttons for the selected SOS and authorised responders", () => {

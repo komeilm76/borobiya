@@ -6,18 +6,20 @@ afterEach(() => vi.unstubAllGlobals());
 describe("shared semantic map points", () => {
   it("gives each role a visible mark rather than relying on a color key", () => {
     expect(new Set(Object.values(MAP_POINT_META).map((item) => item.glyph)).size).toBeGreaterThan(5);
-    expect(MAP_POINT_META).toMatchObject({ sos: { glyph: "!" }, start: { glyph: "A" },
-      end: { glyph: "B" }, helper: { glyph: "✚" }, stop: { glyph: "1" } });
+    expect(MAP_POINT_META).toMatchObject({ sos: { glyph: "!", icon: "mdi-alert" },
+      start: { glyph: "A", icon: "mdi-navigation-variant" },
+      end: { glyph: "B", icon: "mdi-flag-checkered" }, helper: { glyph: "✚", icon: "mdi-lifebuoy" },
+      stop: { glyph: "1" } });
   });
 
   it("creates a keyboard-native point button without unsafe HTML and stops map-click propagation", () => {
     type FakeElement = { tag: string; type?: string; className: string; textContent: string;
-      attrs: Record<string, string>; children: FakeElement[];
+      attrs: Record<string, string>; children: FakeElement[]; classList: { add(name: string): void };
       listener?: (event: { stopPropagation: () => void }) => void;
       setAttribute(name: string, value: string): void; append(node: FakeElement): void;
       addEventListener(name: string, listener: FakeElement["listener"]): void };
     const createElement = (tag: string): FakeElement => ({ tag, className: "", textContent: "", attrs: {}, children: [],
-      setAttribute(name, value) { this.attrs[name] = value; }, append(node) { this.children.push(node); },
+      classList: { add() {} }, setAttribute(name, value) { this.attrs[name] = value; }, append(node) { this.children.push(node); },
       addEventListener(name, listener) { if (name === "click") this.listener = listener; } });
     vi.stubGlobal("document", { createElement });
     const activated = vi.fn();
@@ -35,6 +37,7 @@ describe("shared semantic map points", () => {
     const origin = createMapPointElement("start", "نه موقعیت زنده", { caption: "<مبدأ>" }) as unknown as FakeElement;
     expect(origin.tag).toBe("div");
     expect(origin.attrs.role).toBe("img");
+    expect(origin.children[0]?.children[0]?.className).toContain("mdi-navigation-variant");
     expect(origin.children[1]?.children[0]?.textContent).toBe("<مبدأ>");
     expect(origin.children[1]?.attrs["aria-hidden"]).toBe("true");
     const stale = createMapPointElement("requester", "موقعیت قدیمی", { caption: "درخواست‌کننده", stale: true }) as unknown as FakeElement;
