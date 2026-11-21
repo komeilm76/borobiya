@@ -131,11 +131,11 @@ describe("SOS center on-map labels and offscreen directions", () => {
     // The 64×72 canvas map icons draw a 46×64 teardrop at .72–.76 scale.
     // Keep the legend's height but widen its previously too-narrow silhouette.
     expect(styles[0]!.content).toContain('flex: 0 0 46px; width: 46px; height: 48px;');
-    expect(styles[0]!.content).toContain('color: #fff; font-size: 18px;');
+    expect(styles[0]!.content).toContain('color: #fff; font-size: 16px;');
     expect(styles[0]!.content).toContain('width: 27px; height: 27px; border: 2px solid #fff;');
     expect(styles[0]!.content).toContain('transform: scale(1, 1.1) rotate(-45deg)');
     expect(styles[0]!.content).toContain('.dispatch-map-key__icon.mdi::before, .dispatch-map-key__selected > .mdi {');
-    expect(styles[0]!.content).toContain('position: absolute; top: 3px; left: 7px; display: grid; place-items: center;');
+    expect(styles[0]!.content).toContain('position: absolute; top: 6px; left: 5px; display: grid; place-items: center;');
     expect(styles[0]!.content).toContain('width: 31px; height: 31px; line-height: 1;');
     expect(styles[0]!.content).toContain('box-shadow: 0 0 0 5px color-mix(in srgb, var(--dispatch-sos-color, #dc2626) 19%, transparent)');
     expect(styles[0]!.content).not.toContain('.dispatch-map-key__icon--selected-sos::after { background: #dc2626');
@@ -163,12 +163,13 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('return themeStore.isDark ? "#205fd1" : "#0868c8"');
     expect(styles[0]!.content).toContain('width: min(138px, calc(100% - 24px)); height: 34px; padding: 0;');
     expect(styles[0]!.content).toContain('padding-inline-end: .4rem;');
-    expect(styles[0]!.content).toContain('grid-template-columns: 24px minmax(0, 1fr)');
+    expect(styles[0]!.content).toContain('grid-template-columns: 34px minmax(0, 1fr)');
     expect(styles[0]!.content).toContain('align-items: center; gap: .35rem;');
-    expect(styles[0]!.content).toContain('width: 24px; height: 100%;');
+    expect(styles[0]!.content).toContain('width: 34px; height: 100%;');
     expect(styles[0]!.content).toContain('width: 17px; height: 17px;');
     expect(styles[0]!.content).toContain('font: 800 .78rem/1.1 var(--bb-font-family)');
-    expect(styles[0]!.content).toContain('border-radius: .9rem 0 0 .9rem; color: #fff; background: var(--dispatch-edge-color, #0868c8)');
+    expect(styles[0]!.content).toContain('border-radius: .55rem;');
+    expect(styles[0]!.content).toContain('border-radius: .5rem 0 0 .5rem; color: #fff; background: var(--dispatch-edge-color, #0868c8)');
     for (const side of ["bottom", "left", "right"])
       expect(styles[0]!.content).toContain(`.dispatch-map-edge-cue__arrow--${side}`);
     expect(styles[0]!.content).toContain('-webkit-line-clamp: 2');
