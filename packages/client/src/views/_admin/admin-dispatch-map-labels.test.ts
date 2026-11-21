@@ -70,6 +70,29 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).not.toContain('createMapPointElement('); // Dispatch pins remain WebGL; labels share the attached DOM chip.
   });
 
+  it("makes responder and SOS labels keyboard-clickable without selecting underlying map points", () => {
+    const responder = source.slice(source.indexOf('if (!entry) {\n      const element = document.createElement("div")'),
+      source.indexOf('positionResponderLabels(map);\n}'));
+    const sos = source.slice(source.indexOf('if (!selectedSosLabelMarker) {'), source.indexOf('updateSelectedSosLabelPosition();\n}'));
+    for (const label of [responder, sos]) {
+      expect(label).toContain('document.createElement("button")');
+      expect(label).toContain('chip.type = "button"');
+      expect(label).toContain('stopLabelMapEvents(chip)');
+      expect(label).toContain('chip.addEventListener("click", (event) => {');
+      expect(label).toContain('event.stopPropagation()');
+      expect(label).not.toContain('element.setAttribute("aria-hidden", "true")');
+    }
+    expect(responder).toContain('activateMapChoice({ kind: "responder", id, label: "" })');
+    expect(responder).toContain('chip.setAttribute("aria-pressed", String(feature.properties.isSelected))');
+    expect(sos).toContain('activateMapChoice({ kind: "sos", id: selected.id, label: "" })');
+    expect(sos).toContain('chip.setAttribute("aria-pressed", "true")');
+    expect(source).toContain('adminSos.selectRequest(toggleSosQueueSelection(adminSos.selectedId, choice.id))');
+    expect(source).toContain('for (const type of ["pointerdown", "mousedown", "touchstart", "dblclick", "keydown"])');
+    expect(styles[0]!.content).toContain('text-align: start; pointer-events: auto;');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label:focus-visible)');
+    expect(styles[0]!.content).toContain('cursor: pointer;');
+  });
+
   it("dims only unselected SOS symbols, including circle fallback and animated pulse", () => {
     expect(source).toContain('"icon-opacity": ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1]');
     expect(source).toContain('"circle-opacity": pinReady ? 0 : ["case", ["boolean", ["get", "isDimmed"], false], SOS_DIMMED_OPACITY, 1]');

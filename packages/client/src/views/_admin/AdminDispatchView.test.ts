@@ -48,7 +48,9 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("buildEligibleResponderGeoJson(");
     expect(viewSource).toContain("adminSos.nearestRequestId === adminSos.selectedRequest.id");
     expect(viewSource).toContain("!adminSos.responderSearch");
-    expect(viewSource).toContain('watch(nearbyFeatures, () => { mapPointChoices.value = []; clearResponderLabels(); syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });');
+    expect(viewSource).toContain('watch(nearbyFeatures, (next) => {');
+    expect(viewSource).toContain('if (!feature) { entry.marker.remove(); responderLabelMarkers.delete(id); continue; }');
+    expect(viewSource).toContain('chip.setAttribute("aria-pressed", String(entry.selected))');
     expect(viewSource).toContain("[adminSos.nearestRequestId, adminSos.nearestLoaded]");
     expect(viewSource).toContain("if (nearbyFeatures.value.features.length) frameSelectedIncident()");
     expect(viewSource).toContain("[SOS_SOURCE_ID, RESPONDER_SOURCE_ID, RESPONDER_SELECTED_SOURCE_ID]");

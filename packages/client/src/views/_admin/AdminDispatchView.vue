@@ -911,6 +911,13 @@ function clearResponderLabels(): void {
   responderLabelMarkers.clear();
 }
 
+/** Only the chip is a hit target: don't let a label click (or a drag starting
+ * on it) also activate the WebGL pin or pan the map underneath. */
+function stopLabelMapEvents(chip: HTMLButtonElement): void {
+  for (const type of ["pointerdown", "mousedown", "touchstart", "dblclick", "keydown"])
+    chip.addEventListener(type, (event) => event.stopPropagation());
+}
+
 function positionResponderLabels(map: MapLibreMap): void {
   const canvas = map.getCanvas();
   const viewport = canvas.getBoundingClientRect();
@@ -971,10 +978,15 @@ function syncResponderLabels(): void {
     if (!entry) {
       const element = document.createElement("div");
       element.className = "dispatch-sos-label-anchor dispatch-responder-label-anchor";
-      element.setAttribute("aria-hidden", "true"); // The map's choice tray and responder list are accessible.
-      const chip = document.createElement("bdi");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "dispatch-sos-label dispatch-responder-label";
       chip.dir = "auto";
+      stopLabelMapEvents(chip);
+      chip.addEventListener("click", (event) => {
+        event.stopPropagation();
+        activateMapChoice({ kind: "responder", id, label: "" });
+      });
       element.append(chip);
       const marker = new mapLabelMarkerClass({ element, anchor: "center" })
         .setLngLat(coordinates).addTo(map);
@@ -989,6 +1001,8 @@ function syncResponderLabels(): void {
     const element = entry.marker.getElement();
     const chip = element.firstElementChild as HTMLElement;
     chip.textContent = feature.properties.username; // No HTML from server-provided usernames.
+    chip.setAttribute("aria-pressed", String(feature.properties.isSelected));
+    chip.setAttribute("aria-label", `${feature.properties.isSelected ? "لغو انتخاب" : "انتخاب"} امدادگر نزدیک ${feature.properties.username}`);
     element.style.setProperty("--dispatch-label-color", themeStore.isDark ? "#205fd1" : "#0868c8");
   }
   positionResponderLabels(map);
@@ -1005,17 +1019,27 @@ function syncSelectedSosLabel(): void {
   if (!selectedSosLabelMarker) {
     const element = document.createElement("div");
     element.className = "dispatch-sos-label-anchor";
-    element.setAttribute("aria-hidden", "true"); // The selected incident card and map choices supply the accessible name.
-    const chip = document.createElement("bdi");
+    const chip = document.createElement("button");
+    chip.type = "button";
     chip.className = "dispatch-sos-label";
     chip.dir = "auto";
+    stopLabelMapEvents(chip);
+    chip.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const selected = adminSos.selectedRequest;
+      if (selected) activateMapChoice({ kind: "sos", id: selected.id, label: "" });
+    });
     element.append(chip);
     selectedSosLabelMarker = new mapLabelMarkerClass({ element, anchor: "center" })
       .setLngLat([incident.location.lon, incident.location.lat]).addTo(map);
   } else selectedSosLabelMarker.setLngLat([incident.location.lon, incident.location.lat]);
   const element = selectedSosLabelMarker.getElement();
   const chip = element.firstElementChild as HTMLElement | null;
-  if (chip) chip.textContent = incidentLabel(incident.incidentTypeId); // Never interpret catalog names as HTML.
+  if (chip) {
+    chip.textContent = incidentLabel(incident.incidentTypeId); // Never interpret catalog names as HTML.
+    chip.setAttribute("aria-pressed", "true");
+    chip.setAttribute("aria-label", `لغو انتخاب حادثه ${incidentLabel(incident.incidentTypeId)}`);
+  }
   element.style.setProperty("--dispatch-label-color", SOS_MAP_MARKER_COLORS[sosMapPriority(incident.status, incident.severity)]);
   updateSelectedSosLabelPosition();
 }
@@ -1439,7 +1463,11 @@ function focusResponders(): void {
 
 function activateMapChoice(choice: MapPointChoice): void {
   mapPointChoices.value = [];
-  if (choice.kind === "sos") { adminSos.selectRequest(choice.id); return; }
+  if (choice.kind === "sos") {
+    if (adminSos.visibleRequests.some((item) => item.id === choice.id))
+      adminSos.selectRequest(toggleSosQueueSelection(adminSos.selectedId, choice.id));
+    return;
+  }
   if (choice.kind === "responder") {
     // This is only a qualified, currently visible suggestion; manual lookup
     // and stale results never become a map-based dispatch selection.
@@ -1577,7 +1605,22 @@ watch(() => themeStore.isDark, () => {
   } catch { /* MapCanvas is swapping styles; restoreMapLayers recreates removed layers. */ }
 });
 watch(incidentNameById, () => { syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); });
-watch(nearbyFeatures, () => { mapPointChoices.value = []; clearResponderLabels(); syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
+watch(nearbyFeatures, (next) => {
+  mapPointChoices.value = [];
+  const current = new Map(next.features.map((feature) => [String(feature.id), feature]));
+  // Keep a focused label button when only responder selection changes. Remove
+  // labels for people no longer eligible immediately, before the new map frame.
+  for (const [id, entry] of responderLabelMarkers) {
+    const feature = current.get(id);
+    if (!feature) { entry.marker.remove(); responderLabelMarkers.delete(id); continue; }
+    entry.selected = feature.properties.isSelected;
+    const chip = entry.marker.getElement().firstElementChild as HTMLElement;
+    chip.textContent = feature.properties.username;
+    chip.setAttribute("aria-pressed", String(entry.selected));
+    chip.setAttribute("aria-label", `${entry.selected ? "لغو انتخاب" : "انتخاب"} امدادگر نزدیک ${feature.properties.username}`);
+  }
+  syncMapData(); updateMapEdgeCues();
+}, { flush: "sync" });
 watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const,
   () => { mapPointChoices.value = []; syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); }, { flush: "sync" });
 // Keep the incident visible when its qualified suggestions arrive; selection
@@ -1847,11 +1890,13 @@ onBeforeUnmount(() => {
   min-height: 18rem;
 }
 /* MapLibre appends these labels outside the SFC scope. Their zero-sized
-   anchors stay at the exact incident/responder coordinates; only chips move. */
+   anchors stay at the exact incident/responder coordinates; only chips move.
+   The anchor ignores hits, but its actual chip is an interactive button. */
 :global(.dispatch-sos-label-anchor) { width: 0; height: 0; z-index: 4; pointer-events: none; }
 :global(.dispatch-sos-label-anchor[hidden]) { display: none; }
 :global(.dispatch-responder-label-anchor) { z-index: 3; }
 :global(.dispatch-sos-label) { position: absolute; top: -35px; left: 16px;
+  appearance: none; cursor: pointer;
   transform: translateY(-50%); box-sizing: border-box; display: block; isolation: isolate;
   width: max-content; max-width: min(12rem, calc(100vw - 4rem)); min-height: 32px;
   padding: .34rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .24);
@@ -1860,9 +1905,11 @@ onBeforeUnmount(() => {
   border-left: 3px solid var(--dispatch-label-color, #dc2626);
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 10px rgba(8, 21, 38, .22); font: 800 .83rem/1.4 var(--bb-font-family, sans-serif);
-  white-space: normal; overflow-wrap: anywhere; text-align: start; pointer-events: none; }
-/* A short colored neck overlaps the pin head. The label is still a separate,
-   zero-hit-area overlay and neither the pin nor its geographic anchor moves. */
+  white-space: normal; overflow-wrap: anywhere; text-align: start; pointer-events: auto; }
+:global(.dispatch-sos-label:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+/* A short colored neck overlaps the pin head. Only the chip is a hit target;
+   neither the pin nor its geographic anchor moves. */
 :global(.dispatch-sos-label::after) { content: ""; position: absolute; z-index: -1;
   left: -8px; top: calc(50% - 4px); width: 10px; height: 8px;
   border-radius: 4px; background: var(--dispatch-label-color, #dc2626); }
