@@ -1980,18 +1980,18 @@ onBeforeUnmount(() => {
 /* Screen-space edge cues are never geographic pins: their buttons bring the
  * operator back to the real point. Keep them above map tiles, below choice tray. */
 .dispatch-map-edge-cues { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
-.dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 34px minmax(0, 1fr);
+.dispatch-map-edge-cue { position: absolute; display: grid; grid-template-columns: 30px minmax(0, 1fr);
   align-items: center; gap: .35rem; transform: translate(-50%, -50%); box-sizing: border-box;
-  width: min(138px, calc(100% - 24px)); height: 34px; padding: 0;
+  width: min(138px, calc(100% - 24px)); height: 30px; padding: 0;
   padding-inline-end: .4rem;
-  border: 2px solid var(--dispatch-edge-color, #0868c8); border-radius: .7rem;
+  border: 0; border-radius: .7rem;
   overflow: hidden; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: var(--bb-shadow-overlay); font: 800 .78rem/1.1 var(--bb-font-family);
+  box-shadow: 0 3px 12px rgba(8, 21, 38, .28), 0 1px 3px rgba(8, 21, 38, .14);
+  font: 800 .78rem/1.1 var(--bb-font-family);
   text-align: start; cursor: pointer; pointer-events: auto; }
-.dispatch-map-edge-cue--sos { border-width: 3px; }
-/* The arrow's 34px width matches the cue's outer height. Its left corners are
-   gently rounded; the other edge stays flush to the button border. */
-.dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 34px; height: 100%;
+/* The arrow's width matches the cue's height. Its left corners are gently
+   rounded; the other edge stays flush against the card, without a border gap. */
+.dispatch-map-edge-cue__arrow { display: grid; place-items: center; width: 30px; height: 100%;
   border-radius: .65rem 0 0 .65rem; color: #fff; background: var(--dispatch-edge-color, #0868c8); }
 .dispatch-map-edge-cue__arrow svg { display: block; width: 17px; height: 17px; }
 .dispatch-map-edge-cue__arrow--bottom { transform: rotate(180deg); }
@@ -2001,7 +2001,8 @@ onBeforeUnmount(() => {
   -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .dispatch-map-edge-cue:focus-visible { outline: 3px solid var(--dispatch-edge-color, #0868c8); outline-offset: 2px; }
 @media (forced-colors: active) {
-  .dispatch-map-edge-cue { background: Canvas; color: CanvasText; border-color: CanvasText !important; box-shadow: none; }
+  .dispatch-map-edge-cue { background: Canvas; color: CanvasText; outline: 1px solid CanvasText;
+    outline-offset: -1px; box-shadow: none; }
   .dispatch-map-edge-cue__arrow { background: CanvasText; color: Canvas; }
 }
 .admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);

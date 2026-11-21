@@ -161,14 +161,17 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(template!.content).toContain('class="dispatch-map-edge-cue__arrow" aria-hidden="true"');
     expect(template!.content).toContain('stroke-width="3.5"');
     expect(source).toContain('return themeStore.isDark ? "#205fd1" : "#0868c8"');
-    expect(styles[0]!.content).toContain('width: min(138px, calc(100% - 24px)); height: 34px; padding: 0;');
+    expect(styles[0]!.content).toContain('width: min(138px, calc(100% - 24px)); height: 30px; padding: 0;');
     expect(styles[0]!.content).toContain('padding-inline-end: .4rem;');
-    expect(styles[0]!.content).toContain('grid-template-columns: 34px minmax(0, 1fr)');
+    expect(styles[0]!.content).toContain('grid-template-columns: 30px minmax(0, 1fr)');
     expect(styles[0]!.content).toContain('align-items: center; gap: .35rem;');
-    expect(styles[0]!.content).toContain('width: 34px; height: 100%;');
+    expect(styles[0]!.content).toContain('width: 30px; height: 100%;');
     expect(styles[0]!.content).toContain('width: 17px; height: 17px;');
     expect(styles[0]!.content).toContain('font: 800 .78rem/1.1 var(--bb-font-family)');
-    expect(styles[0]!.content).toContain('border-radius: .7rem;');
+    expect(styles[0]!.content).toContain('border: 0; border-radius: .7rem;');
+    expect(styles[0]!.content).toContain('box-shadow: 0 3px 12px rgba(8, 21, 38, .28), 0 1px 3px rgba(8, 21, 38, .14);');
+    expect(styles[0]!.content).not.toContain('.dispatch-map-edge-cue--sos { border-width: 3px; }');
+    expect(styles[0]!.content).toContain('outline: 1px solid CanvasText;');
     expect(styles[0]!.content).toContain('border-radius: .65rem 0 0 .65rem; color: #fff; background: var(--dispatch-edge-color, #0868c8)');
     for (const side of ["bottom", "left", "right"])
       expect(styles[0]!.content).toContain(`.dispatch-map-edge-cue__arrow--${side}`);
