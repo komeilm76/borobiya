@@ -67,7 +67,7 @@ describe("compact mission itinerary and visible map legend", () => {
     expect(css).toContain('.mission-desk__map-legend { flex: none; min-width: 0;');
     expect(css).toContain('border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-card, 24px);');
     expect(css).toContain('background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));');
-    expect(css).toContain('.mission-desk__map-legend :deep(.bb-point-key) { display: grid;\n  grid-template-columns: repeat(3,');
+    expect(css).toContain('.mission-desk__map-legend :deep(.bb-point-key) { display: flex; flex-wrap: wrap;\n  gap: .25rem .85rem; }');
     const stack = page.slice(page.indexOf('class="mission-desk__bottom-stack"'), page.indexOf('class="mission-desk__bottom-panel"'));
     expect(stack.indexOf('class="mission-desk__map-legend bb-floating-card"')).toBeGreaterThan(0);
     expect(stack.indexOf('<MissionStatusPanel v-if="activeTool === \'status\'"')).toBeGreaterThan(stack.indexOf('class="mission-desk__map-legend bb-floating-card"'));

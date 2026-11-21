@@ -50,7 +50,7 @@ describe("Mission tab uses Travel's map-card hierarchy", () => {
     expect(styles.progress).toContain('color: var(--bb-color-muted); font-size: .82rem;');
     expect(styles.mission).toContain('.mission-desk__map-cards :deep(.mission-map-cards) {\n  border: 0; border-radius: 0; background: transparent; box-shadow: none;');
     expect(styles.mission).toContain('.mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: 1rem;');
-    expect(styles.mission).toContain('.mission-desk__map-legend :deep(.bb-point-key) { display: grid;');
+    expect(styles.mission).toContain('.mission-desk__map-legend :deep(.bb-point-key) { display: flex; flex-wrap: wrap;');
     expect(sources.mission).toContain('<MapPointKey :kinds=');
     expect(sources.mission).toContain('id="mission-tool-legend"');
     expect(sources.progress).toContain(':disabled="!desk.canAdvance.value" @click="desk.advanceStatus()"');

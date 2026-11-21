@@ -1581,9 +1581,9 @@ onBeforeUnmount(() => {
   background: rgba(var(--v-theme-surface), .95); color: rgb(var(--v-theme-on-surface));
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
 .mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: 1rem; font-weight: 800; }
-.mission-desk__map-legend :deep(.bb-point-key) { display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem .45rem; }
-.mission-desk__map-legend :deep(.bb-point-key li) { min-width: 0; overflow-wrap: anywhere; }
+.mission-desk__map-legend :deep(.bb-point-key) { display: flex; flex-wrap: wrap;
+  gap: .25rem .85rem; }
+.mission-desk__map-legend :deep(.bb-point-key li) { min-width: 0; }
 .mission-desk__map-legend small { display: block; margin-top: .3rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.35; }
 /* One scroll surface for the steps and guarded action within the docked card.
    No individual stage has a nested scroller. */
