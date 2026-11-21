@@ -10,11 +10,10 @@ describe("selected Dispatch SOS label placement", () => {
 
   it("flips to the other side at the right edge and below the pin at the top", () => {
     expect(dispatchSosLabelPlacement(370, 110, 400, 240, 95, 30).side).toBe("left");
-    // At x=170 there is 110px to the right; the new 24px gap makes this fit
-    // whereas the old 30px gap would place the same label on the wrong side.
+    // The chip touches the side of the pin, without a spacer.
     expect(dispatchSosLabelPlacement(170, 110, 280, 240, 76, 30).side).toBe("right");
     expect(dispatchSosLabelPlacement(100, 20, 400, 240, 95, 30)).toMatchObject({
-      side: "right", belowPin: true
+      side: "below", belowPin: true
     });
   });
 

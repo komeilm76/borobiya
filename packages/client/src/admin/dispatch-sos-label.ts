@@ -10,14 +10,16 @@ export type DispatchSosLabelPlacement = {
 export function dispatchSosLabelPlacement(
   x: number, y: number, width: number, height: number, labelWidth: number, labelHeight: number
 ): DispatchSosLabelPlacement {
-  const gap = 24; // Pin head reaches ~18px from its center; the pill tucks just beside it.
+  const gap = 16; // The label border touches the painted head (~17px from center).
+  const belowCrown = y - 35 - labelHeight / 2 < 8;
   const fitsRight = x + gap + labelWidth <= width - 8;
   const fitsLeft = x - gap - labelWidth >= 8;
-  const side = fitsRight ? "right" : fitsLeft ? "left" :
-    y + 16 + labelHeight <= height - 8 ? "below" : "above";
+  const side = belowCrown && y + labelHeight <= height - 8 ? "below" :
+    fitsRight ? "right" : fitsLeft ? "left" :
+      y + labelHeight <= height - 8 ? "below" : "above";
   return {
     side,
-    belowPin: side === "below" || (side !== "above" && y - 35 - labelHeight / 2 < 8),
+    belowPin: side === "below",
     visible: width > 0 && height > 0 && x >= 0 && x <= width && y >= 0 && y <= height
   };
 }

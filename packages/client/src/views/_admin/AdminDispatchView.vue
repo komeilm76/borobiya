@@ -388,8 +388,7 @@
                 :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[item.severity] }" aria-hidden="true" />
               حادثه {{ item.label }}
             </li>
-            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--selected-sos mdi"
-              :class="isFireIncidentLabel(incidentLabel(adminSos.selectedRequest.incidentTypeId)) ? 'mdi-fire' : 'mdi-alert'"
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--selected-sos mdi mdi-alert"
               aria-hidden="true" />حادثه انتخاب‌شده</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
@@ -676,7 +675,7 @@ import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { palettes } from "@/styles/tokens";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
 import { dispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, ensureDispatchPinImages, isFireIncidentLabel, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -1024,9 +1023,12 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     id: RESPONDER_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "isSelected"], false]],
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 13, "text-anchor": "left", "text-radial-offset": 3.8,
-      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto", "text-max-width": 9 },
-    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 2 }
+      "text-size": 13, "text-radial-offset": 1.4,
+      "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto", "text-max-width": 9,
+      ...(pinReady ? { "icon-image": DISPATCH_PIN_IMAGES.name, "icon-text-fit": "both" as const,
+        "icon-text-fit-padding": [3, 7, 3, 7] } : {}) },
+    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 1,
+      "text-translate": pinReady ? [0, -35] : [0, 0], "icon-translate": pinReady ? [0, -35] : [0, 0] }
   }, before);
   if (!map.getLayer(RESPONDER_COUNT_LAYER_ID)) map.addLayer({
     id: RESPONDER_COUNT_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
@@ -1058,22 +1060,24 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   if (!map.getLayer(RESPONDER_SELECTED_NAME_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_NAME_LAYER_ID, type: "symbol", source: RESPONDER_SELECTED_SOURCE_ID,
     layout: { "text-field": ["get", "username"], "text-font": ["Borobiya Vazirmatn"],
-      "text-size": 14, "text-anchor": "left", "text-radial-offset": 3.8,
+      "text-size": 14, "text-radial-offset": 1.4,
       "text-variable-anchor": ["left", "right", "top", "bottom"], "text-justify": "auto",
-      "text-max-width": 9, "text-allow-overlap": true },
-    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 3 }
+      "text-max-width": 9, "text-allow-overlap": true,
+      "icon-allow-overlap": true,
+      ...(pinReady ? { "icon-image": DISPATCH_PIN_IMAGES.name, "icon-text-fit": "both" as const,
+        "icon-text-fit-padding": [3, 7, 3, 7] } : {}) },
+    paint: { "text-color": palette.text, "text-halo-color": palette.surface, "text-halo-width": 1,
+      "text-translate": pinReady ? [0, -35] : [0, 0], "icon-translate": pinReady ? [0, -35] : [0, 0] }
   }, before);
 }
 
 function ensureSosMapLayers(map: MapLibreMap): void {
   const alerts = buildSosAlertsGeoJson(adminSos.visibleRequests, adminSos.selectedId);
-  const selectedIncident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
-  const selectedIsFire = selectedIncident ? isFireIncidentLabel(incidentLabel(selectedIncident.incidentTypeId)) : false;
   // The selected incident title is a single DOM label with an opaque surface;
   // GeoJSON carries only actual SOS points, not an unbacked WebGL text glyph.
   const data = { ...alerts, features: alerts.features.map((feature) => ({
     ...feature, properties: { ...feature.properties,
-      pinImage: sosPinImage(feature.properties.status, feature.properties.severity, feature.properties.isSelected, selectedIsFire) }
+      pinImage: sosPinImage(feature.properties.status, feature.properties.severity, feature.properties.isSelected) }
   })) };
   registerPins(map);
   const pinReady = pinImagesSupported && Object.values(DISPATCH_PIN_IMAGES).every((id) => map.hasImage(id));
@@ -1681,7 +1685,7 @@ onBeforeUnmount(() => {
    zero-sized anchor stays at the exact SOS coordinates; only the chip moves. */
 :global(.dispatch-sos-label-anchor) { width: 0; height: 0; z-index: 4; pointer-events: none; }
 :global(.dispatch-sos-label-anchor[hidden]) { display: none; }
-:global(.dispatch-sos-label) { position: absolute; top: -35px; left: 24px;
+:global(.dispatch-sos-label) { position: absolute; top: -35px; left: 16px;
   transform: translateY(-50%); box-sizing: border-box; display: block;
   width: max-content; max-width: min(12rem, calc(100vw - 4rem)); min-height: 32px;
   padding: .34rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .2);
@@ -1689,13 +1693,13 @@ onBeforeUnmount(() => {
   border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 3px 12px rgba(8, 21, 38, .28); font: 800 .83rem/1.4 var(--bb-font-family, sans-serif);
   white-space: normal; overflow-wrap: anywhere; text-align: start; pointer-events: none; }
-:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) { left: -24px; transform: translate(-100%, -50%); }
-:global(.dispatch-sos-label-anchor--below .dispatch-sos-label) { top: 16px; transform: none; }
+:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) { left: -16px; transform: translate(-100%, -50%); }
+:global(.dispatch-sos-label-anchor--below .dispatch-sos-label) { top: 0; transform: none; }
 :global(.dispatch-sos-label-anchor--left.dispatch-sos-label-anchor--below .dispatch-sos-label) { transform: translateX(-100%); }
 :global(.dispatch-sos-label-anchor--center .dispatch-sos-label) {
-  left: 0; top: 16px; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px))); }
+  left: 0; top: 0; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px))); }
 :global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label) {
-  top: auto; bottom: 60px; }
+  top: auto; bottom: 51px; }
 @media (forced-colors: active) {
   :global(.dispatch-sos-label) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
 }

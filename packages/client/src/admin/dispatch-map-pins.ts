@@ -1,12 +1,9 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
 import { SOS_MAP_MARKER_COLORS } from "./sos-alerts";
 
-/** Selection identifies the incident in red; severity remains in the queue,
- * unselected pins, legend and selected label accent instead of turning a fire pin blue. */
+/** Red denotes a selected SOS regardless of its dynamic incident category.
+ * Severity remains in the queue, unselected pins and selected label accent. */
 export const SELECTED_SOS_COLOR = SOS_MAP_MARKER_COLORS.high;
-export function isFireIncidentLabel(label: string): boolean {
-  return /آتش|حریق|fire/iu.test(label);
-}
 
 /** Real on-map MapLibre image assets, not legend-only swatches. The bottom tip is
  * the geographic anchor; generated locally so no network image or sprite is needed. */
@@ -17,15 +14,13 @@ export const DISPATCH_PIN_IMAGES = {
   selectedHigh: "bb-dispatch-sos-selected-high",
   selectedMedium: "bb-dispatch-sos-selected-medium",
   selectedLow: "bb-dispatch-sos-selected-low",
-  selectedFire: "bb-dispatch-sos-selected-fire",
   helper: "bb-dispatch-responder",
-  selectedHelper: "bb-dispatch-responder-selected"
+  selectedHelper: "bb-dispatch-responder-selected",
+  name: "bb-dispatch-responder-name"
 } as const;
 
-export function sosPinImage(status: string, severity: "high" | "medium" | "low", selected: boolean,
-  fireIncident = false): string {
+export function sosPinImage(status: string, severity: "high" | "medium" | "low", selected: boolean): string {
   const level = status === "cancelled_by_rescuer" ? "high" : severity;
-  if (selected && fireIncident) return DISPATCH_PIN_IMAGES.selectedFire;
   return selected ? DISPATCH_PIN_IMAGES[({ high: "selectedHigh", medium: "selectedMedium", low: "selectedLow" } as const)[level]]
     : DISPATCH_PIN_IMAGES[level];
 }
@@ -33,7 +28,7 @@ export function sosPinImage(status: string, severity: "high" | "medium" | "low",
 export class DispatchPinCanvasUnavailable extends Error {}
 
 export function drawDispatchPin(color: string, kind: "sos" | "helper", selected = false,
-  canvas: HTMLCanvasElement = document.createElement("canvas"), pictogram: "alert" | "flame" = "alert"): ImageData {
+  canvas: HTMLCanvasElement = document.createElement("canvas")): ImageData {
   canvas.width = 64;
   canvas.height = 72;
   const ctx = canvas.getContext("2d");
@@ -60,32 +55,13 @@ export function drawDispatchPin(color: string, kind: "sos" | "helper", selected 
   ctx.stroke();
   ctx.fillStyle = "#ffffff";
   if (kind === "sos") {
-    // Paths render reliably without a map glyph font. Fire gets a flame only
-    // when the incident category says fire; other SOS incidents keep an alert.
-    if (pictogram === "flame") {
-      ctx.beginPath();
-      ctx.moveTo(33, 13);
-      ctx.bezierCurveTo(35, 19, 38, 21, 37, 26);
-      ctx.bezierCurveTo(40, 24, 41, 21, 41, 19);
-      ctx.bezierCurveTo(47, 28, 47, 35, 42, 39);
-      ctx.bezierCurveTo(37, 43, 27, 43, 22, 39);
-      ctx.bezierCurveTo(16, 33, 20, 25, 26, 19);
-      ctx.bezierCurveTo(25, 25, 30, 26, 33, 13);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(33, 29);
-      ctx.bezierCurveTo(36, 33, 37, 37, 33, 39);
-      ctx.bezierCurveTo(28, 40, 27, 36, 33, 29);
-      ctx.closePath(); ctx.fill();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(32, 14); ctx.lineTo(44, 37); ctx.lineTo(20, 37);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = color;
-      ctx.fillRect(30.5, 22, 3, 8);
-      ctx.beginPath(); ctx.arc(32, 33, 1.8, 0, Math.PI * 2); ctx.fill();
-    }
+    // Every incident category uses this same generic alert. The title names its type.
+    ctx.beginPath();
+    ctx.moveTo(32, 14); ctx.lineTo(44, 37); ctx.lineTo(20, 37);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.fillRect(30.5, 22, 3, 8);
+    ctx.beginPath(); ctx.arc(32, 33, 1.8, 0, Math.PI * 2); ctx.fill();
   } else {
     ctx.beginPath(); ctx.arc(32, 22, 6, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(32, 41, 12, Math.PI, 0); ctx.closePath(); ctx.fill();
@@ -93,24 +69,44 @@ export function drawDispatchPin(color: string, kind: "sos" | "helper", selected 
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
+/** Stretchable opaque name plate for MapLibre responder symbols. The text and
+ * plate move together when variable-anchor placement flips at map edges. */
+export function drawResponderNamePlate(dark: boolean, canvas: HTMLCanvasElement = document.createElement("canvas")): ImageData {
+  canvas.width = 32; canvas.height = 32;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new DispatchPinCanvasUnavailable("2D canvas is required for dispatch map labels.");
+  ctx.fillStyle = dark ? "#294043" : "#ffffff";
+  ctx.strokeStyle = dark ? "#afc1bc" : "#586f6f";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(12, 1); ctx.lineTo(20, 1); ctx.bezierCurveTo(27, 1, 31, 5, 31, 12);
+  ctx.lineTo(31, 20); ctx.bezierCurveTo(31, 27, 27, 31, 20, 31);
+  ctx.lineTo(12, 31); ctx.bezierCurveTo(5, 31, 1, 27, 1, 20);
+  ctx.lineTo(1, 12); ctx.bezierCurveTo(1, 5, 5, 1, 12, 1);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  return ctx.getImageData(0, 0, 32, 32);
+}
+
 /** Map style swaps discard runtime images. Re-register *before* adding symbol
  * layers, including when MapLibre preserves old GeoJSON sources across a diff. */
 export function ensureDispatchPinImages(map: Pick<MapLibreMap, "hasImage" | "addImage">, dark: boolean): void {
   const responderColor = dark ? "#205fd1" : "#0868c8";
   const specs = [
-    [DISPATCH_PIN_IMAGES.high, SOS_MAP_MARKER_COLORS.high, "sos", false, "alert"],
-    [DISPATCH_PIN_IMAGES.medium, SOS_MAP_MARKER_COLORS.medium, "sos", false, "alert"],
-    [DISPATCH_PIN_IMAGES.low, SOS_MAP_MARKER_COLORS.low, "sos", false, "alert"],
-    [DISPATCH_PIN_IMAGES.selectedHigh, SELECTED_SOS_COLOR, "sos", true, "alert"],
-    [DISPATCH_PIN_IMAGES.selectedMedium, SELECTED_SOS_COLOR, "sos", true, "alert"],
-    [DISPATCH_PIN_IMAGES.selectedLow, SELECTED_SOS_COLOR, "sos", true, "alert"],
-    [DISPATCH_PIN_IMAGES.selectedFire, SELECTED_SOS_COLOR, "sos", true, "flame"],
-    [DISPATCH_PIN_IMAGES.helper, responderColor, "helper", false, "alert"],
-    [DISPATCH_PIN_IMAGES.selectedHelper, responderColor, "helper", true, "alert"]
+    [DISPATCH_PIN_IMAGES.high, SOS_MAP_MARKER_COLORS.high, "sos", false],
+    [DISPATCH_PIN_IMAGES.medium, SOS_MAP_MARKER_COLORS.medium, "sos", false],
+    [DISPATCH_PIN_IMAGES.low, SOS_MAP_MARKER_COLORS.low, "sos", false],
+    [DISPATCH_PIN_IMAGES.selectedHigh, SELECTED_SOS_COLOR, "sos", true],
+    [DISPATCH_PIN_IMAGES.selectedMedium, SELECTED_SOS_COLOR, "sos", true],
+    [DISPATCH_PIN_IMAGES.selectedLow, SELECTED_SOS_COLOR, "sos", true],
+    [DISPATCH_PIN_IMAGES.helper, responderColor, "helper", false],
+    [DISPATCH_PIN_IMAGES.selectedHelper, responderColor, "helper", true]
   ] as const;
-  for (const [id, color, kind, selected, pictogram] of specs) {
-    if (!map.hasImage(id)) map.addImage(id, drawDispatchPin(color, kind, selected, undefined, pictogram), { pixelRatio: 1 });
+  for (const [id, color, kind, selected] of specs) {
+    if (!map.hasImage(id)) map.addImage(id, drawDispatchPin(color, kind, selected), { pixelRatio: 1 });
   }
+  if (!map.hasImage(DISPATCH_PIN_IMAGES.name)) map.addImage(DISPATCH_PIN_IMAGES.name, drawResponderNamePlate(dark), {
+    pixelRatio: 1, stretchX: [[12, 20]], stretchY: [[12, 20]], content: [8, 6, 24, 26]
+  });
 }
 
 /** The basemap can change palette without replacing the style (and therefore
@@ -120,4 +116,5 @@ export function refreshResponderPinImages(map: Pick<MapLibreMap, "hasImage" | "u
   for (const [id, selected] of [[DISPATCH_PIN_IMAGES.helper, false], [DISPATCH_PIN_IMAGES.selectedHelper, true]] as const) {
     if (map.hasImage(id)) map.updateImage(id, drawDispatchPin(color, "helper", selected));
   }
+  if (map.hasImage(DISPATCH_PIN_IMAGES.name)) map.updateImage(DISPATCH_PIN_IMAGES.name, drawResponderNamePlate(dark));
 }

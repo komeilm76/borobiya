@@ -29,9 +29,9 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point__icon { font-size: 21px; font-weight: 400; line-height: 1; }
 .bb-map-point--sos .bb-map-point__sign::before { box-shadow: 0 4px 10px rgba(9, 25, 44, .5), 0 0 0 6px rgba(214, 38, 59, .22); }
 .bb-map-point--stop .bb-map-point__sign { font-size: 16px; font-weight: 900; }
-/* The teardrop rises above the true coordinate. Captions clear its crown
-   above and stay below the tip when flipped; the anchor itself never moves. */
-.bb-map-point__caption { position: absolute; top: calc(50% + 15px); left: 50%;
+/* The teardrop rises above the true coordinate. Captions touch its crown
+   above or its tip below when flipped; the anchor itself never moves. */
+.bb-map-point__caption { position: absolute; top: 50%; left: 50%;
   transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
   box-sizing: border-box; display: inline-flex; align-items: center; gap: .3rem;
   max-width: min(9rem, 42vw); min-height: 28px; padding: .22rem .6rem;
@@ -52,19 +52,19 @@ button.bb-map-point { cursor: pointer; }
 .bb-map-point--helper .bb-map-point__caption,
 .bb-map-point--start .bb-map-point__caption,
 .bb-map-point--stop .bb-map-point__caption,
-.bb-map-point--director .bb-map-point__caption { top: auto; bottom: calc(50% + 56px); }
-.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption { top: auto; bottom: calc(50% + 56px); }
+.bb-map-point--director .bb-map-point__caption { top: auto; bottom: calc(50% + 51px); }
+.bb-map-point.bb-map-point--label-flipped .bb-map-point__caption { top: auto; bottom: calc(50% + 51px); }
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--sos .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--helper .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--start .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--stop .bb-map-point__caption,
 .bb-map-point.bb-map-point--label-flipped.bb-map-point--director .bb-map-point__caption {
-  top: calc(50% + 15px); bottom: auto;
+  top: 50%; bottom: auto;
 }
 .bb-map-point--stale .bb-map-point__sign::before { border-style: dashed; }
 .bb-map-point__age { flex: none; padding-inline-start: .3rem; border-inline-start: 1px solid currentColor;
   font-size: .67rem; font-weight: 700; }
-.bb-map-point__tooltip { position: absolute; bottom: calc(50% + 56px); left: 50%; z-index: 2;
+.bb-map-point__tooltip { position: absolute; bottom: calc(50% + 51px); left: 50%; z-index: 2;
   transform: translateX(-50%); display: block; max-width: min(13rem, calc(100vw - 1.5rem));
   width: max-content; padding: .35rem .55rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
   border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));

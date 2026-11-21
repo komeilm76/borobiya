@@ -41,8 +41,8 @@ describe("on-map labels for each user-workspace point state", () => {
     expect(css).not.toMatch(/\.bb-map-point \{ position: relative/);
     expect(css).toContain('.bb-map-point__sign::before { content: "";');
     expect(css).toContain('transform: rotate(-45deg);');
-    expect(css).toContain('.bb-map-point__caption { position: absolute; top: calc(50% + 15px); left: 50%;');
-    expect(css).toContain('bottom: calc(50% + 56px);');
+    expect(css).toContain('.bb-map-point__caption { position: absolute; top: 50%; left: 50%;');
+    expect(css).toContain('bottom: calc(50% + 51px);');
     expect(userMap).toContain('element: createMapPointElement("end", "مکان انتخاب‌شده؛ نمایش مسیر"), anchor: "center"');
     expect(userMap).not.toContain('new markerConstructor({ color: "#dc483e" })');
     expect(css).toContain('var(--bb-point-label-y, 0px)');

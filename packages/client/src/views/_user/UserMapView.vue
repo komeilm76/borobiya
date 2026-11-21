@@ -1273,7 +1273,7 @@ function syncResultMarkers(): void {
         button.addEventListener("keydown", event => {
           if (event.key === "Enter" || event.key === " ") event.stopPropagation();
         });
-        marker = new markerConstructor({ element: button, anchor: "bottom", offset: [0, -6] })
+        marker = new markerConstructor({ element: button, anchor: "center" })
           .setLngLat([place.lon, place.lat]).addTo(instance);
         resultClusterMarkers.set(key, marker);
       } else marker.setLngLat([place.lon, place.lat]);
@@ -1319,7 +1319,7 @@ function syncResultMarkers(): void {
       button.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") event.stopPropagation();
       }); // Native button activation; Tab still moves focus.
-      marker = new markerConstructor({ element: button, anchor: "bottom", offset: [0, -6] })
+      marker = new markerConstructor({ element: button, anchor: "center" })
         .setLngLat([place.lon, place.lat]).addTo(instance);
       resultMarkers.set(place.placeId, marker);
     } else marker.setLngLat([place.lon, place.lat]);
@@ -2342,31 +2342,41 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* Compact category pins leave the map visible; the selected pin alone has a
    persistent name. Photon names and addresses remain in each button's aria-label. */
 :global(.user-map-view .user-map-view__result-marker) {
-  display: grid; place-items: center; width: 48px; height: 48px; padding: 0;
-  border: 3px solid #fff; border-radius: 16px 16px 16px 5px;
-  background: var(--result-color, #475569); color: #fff;
-  box-shadow: 0 4px 12px rgba(3, 29, 31, .34), 0 0 0 1px rgba(5, 31, 44, .12);
+  position: absolute; top: 0; left: 0; display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 0; background: transparent; color: #fff;
   cursor: pointer; touch-action: manipulation;
   font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
   font-synthesis: none; letter-spacing: normal;
 }
-:global(.user-map-view .user-map-view__result-marker__icon) { font-size: 1.55rem; line-height: 1; }
-/* A title-only label lives outside the fixed 48px pin. No native browser title
+/* Same 44px coordinate-centered hit target and painted pin geometry as the
+   shared map points. The pin tip, not the middle of the glyph, marks the place. */
+:global(.user-map-view .user-map-view__result-marker::before) {
+  content: ""; position: absolute; top: -22px; left: 4px; width: 36px; height: 36px;
+  box-sizing: border-box; border: 2px solid #fff; border-radius: 50% 50% 50% 7px;
+  background: var(--result-color, #475569); transform: rotate(-45deg);
+  box-shadow: 0 4px 10px rgba(9, 25, 44, .5), 0 0 0 3px color-mix(in srgb, var(--result-color, #475569) 24%, transparent);
+}
+:global(.user-map-view .user-map-view__result-marker__icon) {
+  position: absolute; top: -22px; left: 4px; display: grid; place-items: center;
+  width: 36px; height: 36px; font-size: 1.35rem; line-height: 1;
+}
+/* A title-only label touches the coordinate-centered pin. No native browser title
    tooltip (which cannot use the app's Persian font) and no hover hitbox change. */
 :global(.user-map-view .user-map-view__result-marker__tooltip) {
-  position: absolute; bottom: calc(100% + .5rem); left: 50%;
+  position: absolute; bottom: calc(50% + 51px); left: 50%;
   transform: translateX(calc(-50% + var(--result-tooltip-shift, 0px)));
   display: block; width: max-content;
   max-width: min(16rem, calc(100vw - 2rem), var(--result-tooltip-map-width, 16rem));
-  padding: .35rem .7rem; border: 1px solid rgba(var(--v-theme-on-surface), .16);
-  border-radius: .75rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  padding: .35rem .7rem; border: 1px solid rgba(var(--v-theme-on-surface), .25);
+  border-inline-start: 3px solid var(--result-color, #475569);
+  border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 4px 14px rgba(3, 29, 31, .24);
   font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
   letter-spacing: normal; text-align: center; white-space: normal; overflow-wrap: anywhere;
   visibility: hidden; opacity: 0; pointer-events: none;
 }
 :global(.user-map-view .user-map-view__result-marker--tooltip-below .user-map-view__result-marker__tooltip) {
-  top: calc(100% + .5rem); bottom: auto;
+  top: 50%; bottom: auto;
 }
 @media (hover: hover) {
   :global(.user-map-view .user-map-view__result-marker:hover) { z-index: 4; }
@@ -2384,7 +2394,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 :global(.user-map-view .user-map-view__selected-place) { cursor: pointer; z-index: 3; }
 :global(.user-map-view .user-map-view__selected-place-label:not([hidden])) {
-  position: absolute; bottom: calc(100% + .45rem); left: 50%;
+  position: absolute; bottom: calc(50% + 51px); left: 50%;
   transform: translate(calc(-50% + var(--selected-label-shift, 0px)), var(--selected-label-y, 0px));
   display: block; width: max-content;
   max-width: min(15rem, calc(100vw - 2rem), var(--selected-label-map-width, 15rem));
@@ -2395,15 +2405,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
 }
 :global(.user-map-view .user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
-  top: calc(100% + .45rem); bottom: auto;
+  top: 50%; bottom: auto;
 }
 /* Both the route destination and the selected search POI use the centered
    painted teardrop; the callout clears its crown without moving its tip. */
 :global(.user-map-view .bb-map-point.user-map-view__selected-place .user-map-view__selected-place-label:not([hidden])) {
-  bottom: calc(50% + 56px);
+  bottom: calc(50% + 51px);
 }
 :global(.user-map-view .bb-map-point.user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
-  top: calc(50% + 15px); bottom: auto;
+  top: 50%; bottom: auto;
 }
 :global(.user-map-view .user-map-view__selected-place[data-bb-point-edge] .user-map-view__selected-place-label:not([hidden])) {
   border-color: rgb(var(--v-theme-primary));
@@ -2506,9 +2516,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 :global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face::after) { background: #64748b; }
 :global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face::before) { outline: 3px solid #f7b632; outline-offset: 2px; }
-:global(.user-map-view .user-map-view__peer-avatar .bb-map-point__caption) { top: auto; bottom: calc(50% + 56px); }
+:global(.user-map-view .user-map-view__peer-avatar .bb-map-point__caption) { top: auto; bottom: calc(50% + 51px); }
 :global(.user-map-view .user-map-view__peer-avatar.bb-map-point--label-flipped .bb-map-point__caption) {
-  top: calc(50% + 15px); bottom: auto;
+  top: 50%; bottom: auto;
 }
 :global(.user-map-view .user-map-view__peer-avatar[data-bb-point-edge] .bb-map-point__caption) {
   border-color: rgb(var(--v-theme-primary));
@@ -2601,7 +2611,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 :global(.user-map-view .user-map-view__own-marker-label) { display: none; }
 :global(.user-map-view .user-map-view__own-marker--mission .user-map-view__own-marker-label) {
-  position: absolute; top: calc(50% + 19px); left: 50%;
+  position: absolute; top: calc(50% + 18px); left: 50%;
   transform: translate(calc(-50% + var(--bb-point-label-shift, 0px)), var(--bb-point-label-y, 0px));
   display: block; width: max-content; max-width: min(7rem, 34vw); overflow: hidden; text-overflow: ellipsis;
   padding: .2rem .5rem; border: 1px solid rgba(var(--v-theme-on-surface), .25);
@@ -2611,7 +2621,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   white-space: nowrap; pointer-events: none;
 }
 :global(.user-map-view .user-map-view__own-marker--mission.bb-map-point--label-flipped .user-map-view__own-marker-label) {
-  top: auto; bottom: calc(50% + 19px);
+  top: auto; bottom: calc(50% + 18px);
 }
 :global(.user-map-view .user-map-view__own-marker--mission[data-bb-point-edge] .user-map-view__own-marker-label) {
   border-color: rgb(var(--v-theme-primary));

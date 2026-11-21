@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, drawDispatchPin, ensureDispatchPinImages, isFireIncidentLabel, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, drawDispatchPin, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
 
 // Do not mount Vue components in unit tests (docs/TASKS.md).
 const dispatch = readFileSync(new URL("../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8");
@@ -10,16 +10,13 @@ describe("actual Dispatch map symbols", () => {
     expect(sosPinImage("pending", "low", false)).toBe(DISPATCH_PIN_IMAGES.low);
     expect(sosPinImage("pending", "medium", true)).toBe(DISPATCH_PIN_IMAGES.selectedMedium);
     expect(sosPinImage("cancelled_by_rescuer", "low", true)).toBe(DISPATCH_PIN_IMAGES.selectedHigh);
-    expect(isFireIncidentLabel("آتش‌سوزی")).toBe(true);
-    expect(isFireIncidentLabel("حریق ساختمان")).toBe(true);
-    expect(isFireIncidentLabel("Fire in building")).toBe(true);
-    expect(isFireIncidentLabel("درخواست پزشکی")).toBe(false);
-    expect(sosPinImage("pending", "low", true, isFireIncidentLabel("آتش"))).toBe(DISPATCH_PIN_IMAGES.selectedFire);
-    expect(sosPinImage("pending", "low", true, false)).toBe(DISPATCH_PIN_IMAGES.selectedLow);
+    // Incident categories come from a dynamic catalog; no category changes the icon.
+    expect(sosPinImage("pending", "low", true)).toBe(DISPATCH_PIN_IMAGES.selectedLow);
+    expect(Object.keys(DISPATCH_PIN_IMAGES)).not.toContain("selectedFire");
     expect(SELECTED_SOS_COLOR).toBe("#dc2626");
   });
 
-  it("draws the target's red selected fire pictogram with a white rim, not the old blue/gold alert", () => {
+  it("draws the generic alert for all incident types", () => {
     const ctx = {
       beginPath: vi.fn(), moveTo: vi.fn(), bezierCurveTo: vi.fn(), closePath: vi.fn(),
       fill: vi.fn(), stroke: vi.fn(), lineTo: vi.fn(), fillRect: vi.fn(), arc: vi.fn(),
@@ -27,10 +24,9 @@ describe("actual Dispatch map symbols", () => {
       strokeStyle: "", fillStyle: "", lineWidth: 0
     };
     const canvas = { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement;
-    drawDispatchPin(SELECTED_SOS_COLOR, "sos", true, canvas, "flame");
+    drawDispatchPin(SELECTED_SOS_COLOR, "sos", true, canvas);
     expect(ctx.strokeStyle).toBe("#ffffff");
-    expect(ctx.bezierCurveTo.mock.calls.length).toBeGreaterThan(6);
-    expect(ctx.fillRect).not.toHaveBeenCalled(); // Only generic SOS alerts contain an exclamation.
+    expect(ctx.fillRect).toHaveBeenCalledWith(30.5, 22, 3, 8);
     expect(ctx.getImageData).toHaveBeenCalledWith(0, 0, 64, 72);
   });
 
@@ -47,19 +43,25 @@ describe("actual Dispatch map symbols", () => {
     try {
       const ids = new Set<string>();
       const addImage = vi.fn((id: string, image: { width: number; height: number }) => {
-        expect(image).toMatchObject({ width: 64, height: 72 });
-        if (id === DISPATCH_PIN_IMAGES.selectedLow || id === DISPATCH_PIN_IMAGES.selectedFire)
-          expect(context.fillStyle).toBe(SELECTED_SOS_COLOR); // Selected fire is red even when its severity is low.
+        expect(image).toMatchObject(id === DISPATCH_PIN_IMAGES.name
+          ? { width: 32, height: 32 } : { width: 64, height: 72 });
+        if (id === DISPATCH_PIN_IMAGES.selectedLow)
+          expect(context.fillStyle).toBe(SELECTED_SOS_COLOR); // Selection is red even when severity is low.
         ids.add(id);
       });
       const updateImage = vi.fn();
       const map = { hasImage: (id: string) => ids.has(id), addImage, updateImage };
       ensureDispatchPinImages(map as never, false);
+      expect(addImage).toHaveBeenCalledWith(DISPATCH_PIN_IMAGES.name,
+        expect.objectContaining({ width: 32, height: 32 }),
+        expect.objectContaining({ stretchX: [[12, 20]], stretchY: [[12, 20]], content: [8, 6, 24, 26] }));
       expect(ids.size).toBe(Object.keys(DISPATCH_PIN_IMAGES).length);
       ensureDispatchPinImages(map as never, false);
       expect(addImage).toHaveBeenCalledTimes(ids.size);
       refreshResponderPinImages(map as never, true);
-      expect(updateImage).toHaveBeenCalledTimes(2);
+      expect(updateImage).toHaveBeenCalledTimes(3);
+      expect(updateImage).toHaveBeenCalledWith(DISPATCH_PIN_IMAGES.name,
+        expect.objectContaining({ width: 32, height: 32 }));
       expect(updateImage).toHaveBeenCalledWith(DISPATCH_PIN_IMAGES.selectedHelper, expect.objectContaining({ width: 64, height: 72 }));
       ids.clear(); // setStyle discards runtime images
       ensureDispatchPinImages(map as never, true);

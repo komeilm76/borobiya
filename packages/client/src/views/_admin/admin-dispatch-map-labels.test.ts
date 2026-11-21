@@ -16,14 +16,17 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('element.style.setProperty("--dispatch-selected-sos-color"');
     expect(source).toContain('"text-field": ["get", "username"]');
     expect(source).toContain('RESPONDER_SELECTED_NAME_LAYER_ID');
-    expect(source).toContain('"text-radial-offset": 3.8');
+    expect(source).toContain('"text-radial-offset": 1.4');
     expect(source).toContain('"text-variable-anchor": ["left", "right", "top", "bottom"]');
     expect(source).toContain('"text-halo-color": palette.surface');
+    expect(source).toContain('"icon-text-fit": "both" as const');
+    expect(source).toContain('"icon-image": DISPATCH_PIN_IMAGES.name');
+    expect(source).toContain('"text-translate": pinReady ? [0, -35] : [0, 0]');
     expect(source).toContain('!adminSos.responderSearch');
     // Selection alone (before/without a nearest fetch) updates the opaque on-map title.
     expect(source).toMatch(/watch\(\(\) => \[adminSos\.visibleRequests, adminSos\.selectedId\][\s\S]*?syncMapData\(\); syncSelectedSosLabel\(\); updateMapEdgeCues\(\)/);
     expect(source).toContain('watch(incidentNameById, () => { syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); });');
-    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -35px; left: 24px;');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -35px; left: 16px;');
     expect(styles[0]!.content).toContain('border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
     expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--left .dispatch-sos-label)');
     expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--below .dispatch-sos-label)');
@@ -57,7 +60,8 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(template!.content).toContain('dispatch-map-key__icon--selected-sos');
     expect(source).toContain('id: SOS_AURA_LAYER_ID, type: "circle", source: SOS_SOURCE_ID');
     expect(source).toContain('"circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR');
-    expect(source).toContain('selectedIsFire = selectedIncident ? isFireIncidentLabel(incidentLabel(selectedIncident.incidentTypeId)) : false');
+    expect(source).not.toContain("isFireIncidentLabel");
+    expect(template!.content).not.toContain("mdi-fire");
     expect(styles[0]!.content).toContain('background: var(--dispatch-helper-color, #0868c8)');
     expect(template!.content).toContain('<li v-if="adminSos.selectedRequest">');
     expect(source).toContain('window.matchMedia?.("(prefers-reduced-motion: reduce)").matches');

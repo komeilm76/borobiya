@@ -29,7 +29,7 @@ describe("show all current POIs on the map", () => {
   it("shows compact category-colored, keyboard-reachable pins and a persistent selected name", () => {
     const sync = body("syncResultMarkers");
     for (const part of ['resultAppearance(place)', 'clusterAppearance(group)',
-      'button.append(icon, tooltip)', 'anchor: "bottom"', 'button.setAttribute("aria-label"',
+      'button.append(icon, tooltip)', 'anchor: "center"', 'button.setAttribute("aria-label"',
       '${place.name}، ${place.address}؛ انتخاب مقصد',
       'placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId)',
       'button.addEventListener("keydown"', 'count.textContent = `+']) {
@@ -89,7 +89,8 @@ describe("show all current POIs on the map", () => {
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);
     const style = descriptor.styles[0]!.content;
-    expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*width:\s*48px; height:\s*48px/s);
+    expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*width:\s*44px; height:\s*44px/s);
+    expect(style).toContain('bottom: calc(50% + 51px); left: 50%;');
     expect(style).toContain('.user-map-view__result-marker:hover .user-map-view__result-marker__tooltip');
     expect(style).toContain('.user-map-view__result-marker:focus-visible .user-map-view__result-marker__tooltip');
     expect(style).toContain('pointer-events: none;');
