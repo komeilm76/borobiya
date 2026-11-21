@@ -1,6 +1,6 @@
 <template>
   <main id="dispatch-workspace" class="admin-dispatch" aria-label="مرکز پایش و اعزام اضطراری">
-    <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="امدادگران نزدیک و صف SOS">
+    <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="صف SOS و امدادگران نزدیک">
     <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
         <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
@@ -36,31 +36,35 @@
           />
         </div>
 
-        <div class="admin-dispatch__toolbar-actions" role="group" aria-label="کنترل‌های هشدار و بازخوانی">
-          <v-btn id="dispatch-action-04"
-            density="compact"
-            size="small"
-            :aria-label="adminSos.soundMuted ? 'فعال‌سازی صدای هشدار' : 'بی‌صدا کردن هشدار'"
-            :color="adminSos.soundMuted ? 'warning' : 'primary'"
-            :prepend-icon="adminSos.soundMuted ? 'mdi-volume-off' : 'mdi-volume-high'"
-            rounded="lg"
-            variant="tonal"
-            @click="adminSos.toggleSoundMuted()"
-          >
-            {{ adminSos.soundMuted ? "بی‌صدا" : "صدای فعال" }}
-          </v-btn>
-
-          <v-btn id="dispatch-action-05"
-            density="compact"
-            size="small"
-            prepend-icon="mdi-bell-ring-outline"
-            rounded="lg"
-            variant="outlined"
-            @click="testSound"
-          >
-            تست صدا
-          </v-btn>
-
+        <div class="admin-dispatch__toolbar-actions" role="group" aria-label="تنظیمات و بازخوانی">
+          <v-menu v-model="soundSettingsOpen" location="bottom end" :close-on-content-click="false">
+            <template #activator="{ props: menuProps }">
+              <v-btn id="dispatch-voice-settings" v-bind="menuProps" icon="mdi-cog-outline"
+                size="small" variant="text"
+                :aria-label="`تنظیمات؛ ${adminSos.soundMuted ? 'هشدار بی‌صدا' : 'هشدار صوتی فعال'}`"
+                aria-controls="dispatch-voice-settings-panel" />
+            </template>
+            <div id="dispatch-voice-settings-panel" class="dispatch-voice-settings" dir="rtl"
+              role="group" aria-label="تنظیمات صدا">
+              <h2>تنظیمات</h2>
+              <h3>صدا</h3>
+              <div class="dispatch-voice-settings__row">
+                <v-btn id="dispatch-action-04" :icon="adminSos.soundMuted ? 'mdi-volume-off' : 'mdi-volume-high'"
+                  :color="adminSos.soundMuted ? 'warning' : 'primary'" variant="tonal" size="small"
+                  :aria-label="adminSos.soundMuted ? 'فعال‌سازی صدای هشدار' : 'بی‌صدا کردن هشدار'"
+                  :aria-pressed="!adminSos.soundMuted" @click="adminSos.toggleSoundMuted()" />
+                <span>{{ adminSos.soundMuted ? 'هشدار صوتی خاموش' : 'هشدار صوتی فعال' }}</span>
+              </div>
+              <div class="dispatch-voice-settings__row">
+                <v-btn id="dispatch-action-05" icon="mdi-bell-ring-outline" variant="tonal" size="small"
+                  aria-label="آزمایش صدای هشدار" @click="testSound" />
+                <span>آزمایش صدا</span>
+              </div>
+              <p v-if="soundTestError" id="dispatch-notice-01" role="alert" class="dispatch-voice-settings__error">
+                {{ soundTestError }}
+              </p>
+            </div>
+          </v-menu>
           <v-btn id="dispatch-action-06"
             :loading="adminSos.loading"
             aria-label="بازخوانی فهرست درخواست‌های اضطراری"
@@ -73,11 +77,6 @@
         </div>
       </div>
     </header>
-
-    <v-alert id="dispatch-notice-01" v-if="soundTestError" type="warning" variant="tonal" role="alert" closable class="mb-4"
-      @click:close="soundTestError = null">
-      {{ soundTestError }}
-    </v-alert>
 
     <v-alert id="dispatch-notice-02"
       v-if="adminSos.errorMessage"
@@ -129,6 +128,88 @@
     </v-alert>
 
     <section id="dispatch-queue-region" class="admin-dispatch__queue" aria-label="صف درخواست‌ها">
+        <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
+          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
+            <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
+            <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
+              {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
+            </v-chip>
+            <v-chip id="dispatch-chip-09" v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
+          </v-card-title>
+          <v-divider />
+
+          <v-card-text v-if="adminSos.visibleRequests.length === 0 && adminSos.loading" class="py-8 text-center" role="status">
+            <v-progress-circular indeterminate color="primary" size="28" class="me-2" />
+            در حال بررسی صف درخواست‌های اضطراری…
+          </v-card-text>
+          <v-card-text v-else-if="adminSos.visibleRequests.length === 0 && !adminSos.queueVerified"
+            class="py-8 text-center" role="status">
+            صف هنوز تأیید نشده است؛ نبودن درخواست اضطراری را نمی‌توان نتیجه گرفت.
+            <span v-if="adminSos.listTruncated">فقط بخشی از درخواست‌ها دریافت شده‌اند.</span>
+            <v-btn id="dispatch-action-18" variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
+          </v-card-text>
+          <v-card-text v-else-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis">
+            در حال حاضر درخواست اضطراری فعالی در این نما ثبت نشده است. به محض ارسال SOS جدید، نشانگر تپنده و هشدار صوتی فعال می‌شود.
+          </v-card-text>
+          <v-alert id="dispatch-notice-07" v-if="adminSos.visibleRequests.length && !adminSos.queueVerified" type="warning" variant="tonal"
+            density="compact" role="status" class="ma-3">
+            این فهرست هنوز تأیید نشده است؛ وضعیت موارد نمایشی ممکن است قدیمی باشد یا درخواست‌های بیشتری در صف باشند.
+            <span v-if="adminSos.listTruncated">فقط نخستین ۱۰۰ مورد خوانده شدند.</span>
+          </v-alert>
+
+          <v-list id="dispatch-list-02" v-if="adminSos.visibleRequests.length" class="dispatch-request-list" lines="two" aria-label="فهرست درخواست‌های SOS">
+            <v-list-item v-for="item in adminSos.visibleRequests" :key="item.id"
+              :id="`dispatch-sos-${item.id}`"
+              :active="item.id === adminSos.selectedId"
+              :aria-current="item.id === adminSos.selectedId ? 'true' : undefined"
+              :aria-pressed="item.id === adminSos.selectedId"
+              class="dispatch-request-row"
+              @click="toggleQueueRequest(item)"
+            >
+                <template #prepend>
+                  <span
+                    class="pulse-indicator me-3"
+                    :style="{ '--alert-color': item.status === 'cancelled_by_rescuer' ? '#dc2626' : severityMeta(item.severity).color }"
+                    aria-hidden="true"
+                  />
+                </template>
+
+                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
+                  <span>{{ incidentLabel(item.incidentTypeId) }}</span>
+                  <div class="d-flex flex-wrap align-center ga-1">
+                    <v-chip :id="`dispatch-chip-10-${item.id}`" v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
+                    <v-chip :id="`dispatch-chip-11-${item.id}`" v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
+                      نیازمند جایگزین
+                    </v-chip>
+                    <v-chip :id="`dispatch-chip-12-${item.id}`" v-else
+                      :color="statusMeta(item.status).badgeColor"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      {{ statusMeta(item.status).label }}
+                    </v-chip>
+                    <v-chip :id="`dispatch-chip-13-${item.id}`"
+                      :color="severityMeta(item.severity).badgeColor"
+                      size="x-small"
+                      variant="flat"
+                    >
+                      {{ severityMeta(item.severity).label }}
+                    </v-chip>
+                  </div>
+                </v-list-item-title>
+
+                <div class="d-flex flex-wrap align-center ga-2 mt-1 text-caption text-medium-emphasis">
+                  <span>{{ formatTimestamp(item.createdAt) }}</span>
+                  <span>•</span>
+                  <span><v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="15" aria-hidden="true" />
+                    {{ item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS' }}</span>
+                  <span v-if="item.photoUrl"><v-icon icon="mdi-image-outline" size="15" aria-hidden="true" /> تصویر</span>
+                </div>
+              </v-list-item>
+          </v-list>
+        </v-card>
+    </section>
+
         <section id="dispatch-nearby" class="admin-dispatch__nearby" aria-label="امدادگران نزدیک">
           <div v-if="!adminSos.selectedRequest" class="admin-dispatch__nearby-empty" role="status">
             <strong>امدادگران نزدیک</strong>
@@ -310,88 +391,6 @@
           </v-card-actions>
         </v-card>
         </section>
-        <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
-          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
-            <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
-            <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
-              {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
-            </v-chip>
-            <v-chip id="dispatch-chip-09" v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
-          </v-card-title>
-          <v-divider />
-
-          <v-card-text v-if="adminSos.visibleRequests.length === 0 && adminSos.loading" class="py-8 text-center" role="status">
-            <v-progress-circular indeterminate color="primary" size="28" class="me-2" />
-            در حال بررسی صف درخواست‌های اضطراری…
-          </v-card-text>
-          <v-card-text v-else-if="adminSos.visibleRequests.length === 0 && !adminSos.queueVerified"
-            class="py-8 text-center" role="status">
-            صف هنوز تأیید نشده است؛ نبودن درخواست اضطراری را نمی‌توان نتیجه گرفت.
-            <span v-if="adminSos.listTruncated">فقط بخشی از درخواست‌ها دریافت شده‌اند.</span>
-            <v-btn id="dispatch-action-18" variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
-          </v-card-text>
-          <v-card-text v-else-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis">
-            در حال حاضر درخواست اضطراری فعالی در این نما ثبت نشده است. به محض ارسال SOS جدید، نشانگر تپنده و هشدار صوتی فعال می‌شود.
-          </v-card-text>
-          <v-alert id="dispatch-notice-07" v-if="adminSos.visibleRequests.length && !adminSos.queueVerified" type="warning" variant="tonal"
-            density="compact" role="status" class="ma-3">
-            این فهرست هنوز تأیید نشده است؛ وضعیت موارد نمایشی ممکن است قدیمی باشد یا درخواست‌های بیشتری در صف باشند.
-            <span v-if="adminSos.listTruncated">فقط نخستین ۱۰۰ مورد خوانده شدند.</span>
-          </v-alert>
-
-          <v-list id="dispatch-list-02" v-if="adminSos.visibleRequests.length" class="dispatch-request-list" lines="two" aria-label="فهرست درخواست‌های SOS">
-            <v-list-item v-for="item in adminSos.visibleRequests" :key="item.id"
-              :id="`dispatch-sos-${item.id}`"
-              :active="item.id === adminSos.selectedId"
-              :aria-current="item.id === adminSos.selectedId ? 'true' : undefined"
-              :aria-pressed="item.id === adminSos.selectedId"
-              class="dispatch-request-row"
-              @click="toggleQueueRequest(item)"
-            >
-                <template #prepend>
-                  <span
-                    class="pulse-indicator me-3"
-                    :style="{ '--alert-color': item.status === 'cancelled_by_rescuer' ? '#dc2626' : severityMeta(item.severity).color }"
-                    aria-hidden="true"
-                  />
-                </template>
-
-                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
-                  <span>{{ incidentLabel(item.incidentTypeId) }}</span>
-                  <div class="d-flex flex-wrap align-center ga-1">
-                    <v-chip :id="`dispatch-chip-10-${item.id}`" v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
-                    <v-chip :id="`dispatch-chip-11-${item.id}`" v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
-                      نیازمند جایگزین
-                    </v-chip>
-                    <v-chip :id="`dispatch-chip-12-${item.id}`" v-else
-                      :color="statusMeta(item.status).badgeColor"
-                      size="x-small"
-                      variant="tonal"
-                    >
-                      {{ statusMeta(item.status).label }}
-                    </v-chip>
-                    <v-chip :id="`dispatch-chip-13-${item.id}`"
-                      :color="severityMeta(item.severity).badgeColor"
-                      size="x-small"
-                      variant="flat"
-                    >
-                      {{ severityMeta(item.severity).label }}
-                    </v-chip>
-                  </div>
-                </v-list-item-title>
-
-                <div class="d-flex flex-wrap align-center ga-2 mt-1 text-caption text-medium-emphasis">
-                  <span>{{ formatTimestamp(item.createdAt) }}</span>
-                  <span>•</span>
-                  <span><v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="15" aria-hidden="true" />
-                    {{ item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS' }}</span>
-                  <span v-if="item.photoUrl"><v-icon icon="mdi-image-outline" size="15" aria-hidden="true" /> تصویر</span>
-                </div>
-              </v-list-item>
-          </v-list>
-        </v-card>
-
-    </section>
     </aside>
     <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
         <div id="dispatch-search" class="admin-dispatch__search" role="search" aria-label="جست‌وجو روی نقشه">
@@ -1000,6 +999,7 @@ function focusSearchPlace(place: GeocodeResult): void {
   mapSearch.value = "";
 }
 const responderSearchInput = ref("");
+const soundSettingsOpen = ref(false);
 const soundTestError = ref<string | null>(null);
 async function testSound(): Promise<void> {
   soundTestError.value = null;
@@ -1934,6 +1934,17 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__toolbar :deep(.v-btn) { height: 46px; min-height: 46px; padding-inline: .7rem; font-size: .82rem; }
 .admin-dispatch__toolbar :deep(.v-btn--icon) { width: 46px; padding: 0; }
+.dispatch-voice-settings {
+  width: min(16rem, calc(100vw - 1rem)); padding: .65rem;
+  border-radius: .9rem; background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface)); box-shadow: var(--bb-shadow-overlay);
+  font-family: var(--bb-font-family);
+}
+.dispatch-voice-settings h2 { margin: 0; font-size: .9rem; }
+.dispatch-voice-settings h3 { margin: .35rem 0; font-size: .8rem; color: var(--bb-color-muted); }
+.dispatch-voice-settings__row { display: flex; align-items: center; gap: .5rem;
+  min-height: 44px; font-size: .8rem; }
+.dispatch-voice-settings__error { margin: .4rem 0 0; color: rgb(var(--v-theme-error)); font-size: .8rem; }
 
 /* Vuetify's text utilities force Roboto even when the page inherits Persian-first type. */
 .admin-dispatch :deep(.text-h5),
@@ -2373,24 +2384,23 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__sidebar {
   position: absolute; z-index: 12; top: 0; right: 0; bottom: 0;
-  width: var(--dispatch-sidebar-width); padding: .65rem .75rem;
-  padding-top: max(.65rem, env(safe-area-inset-top, 0px));
+  width: var(--dispatch-sidebar-width); padding: .4rem .5rem;
+  padding-top: max(.4rem, env(safe-area-inset-top, 0px));
   overflow-y: auto; overscroll-behavior: contain;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   border-left: 1px solid var(--bb-color-outline);
-  scrollbar-gutter: stable;
 }
-.admin-dispatch__header { display: block; margin-bottom: .4rem !important; }
-.admin-dispatch__heading { gap: .3rem !important; }
+.admin-dispatch__header { display: block; margin-bottom: .2rem !important; }
+.admin-dispatch__heading { gap: .2rem !important; }
 .admin-dispatch__heading h1 { font-size: 1rem !important; line-height: 1.4; }
 .admin-dispatch__eyebrow { margin-bottom: .15rem; font-size: .8rem; }
-.admin-dispatch__toolbar { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; gap: .35rem; }
-.admin-dispatch__filter-group, .admin-dispatch__toolbar-actions { min-width: 0; }
+.admin-dispatch__toolbar { display: flex; align-items: center; width: 100%; gap: .2rem; }
+.admin-dispatch__filter-group { flex: 1; min-width: 0; }
+.admin-dispatch__toolbar-actions { flex: none; min-width: 0; justify-content: flex-start; gap: .1rem; }
 .admin-dispatch__filter-select { width: 100%; max-width: none; }
-.admin-dispatch__toolbar-actions { justify-content: flex-start; gap: .25rem; }
-.admin-dispatch__queue { display: flex; flex-direction: column; min-height: 0;
-  padding-top: .3rem; border-top: 1px solid var(--bb-color-outline); }
-.admin-dispatch__nearby { margin-bottom: .35rem; }
+.admin-dispatch__queue { display: flex; flex-direction: column; min-height: 0; }
+.admin-dispatch__nearby { margin-top: .25rem; padding-top: .25rem;
+  border-top: 1px solid var(--bb-color-outline); }
 .admin-dispatch__nearby-empty { display: grid; gap: .15rem; padding: .6rem .5rem;
   background: rgba(var(--v-theme-on-surface), .035); border-radius: .65rem; }
 .admin-dispatch__nearby-empty span { color: var(--bb-color-muted); font-size: .8rem; }
@@ -2398,23 +2408,23 @@ onBeforeUnmount(() => {
 .admin-dispatch__queue .dispatch-request-list { max-height: max(8rem, 34dvh); }
 .admin-dispatch__queue .mb-4 { margin-bottom: 0 !important; }
 /* The pinned rail is one surface, not cards stacked inside another card.
-   Restrict these overrides to the rail; the incident card, map widgets and
-   confirmation dialogs keep their existing elevation and contrast. */
+   Restrict these overrides to the rail; the map, dialogs and floating incident
+   shell keep their own elevation and contrast. */
 #dispatch-sidebar .admin-dispatch__surface {
   border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
   background: transparent !important; backdrop-filter: none !important;
 }
 #dispatch-sidebar .admin-dispatch__surface :deep(.v-card-title) {
-  padding: .55rem .5rem .35rem; font-size: .9rem !important;
+  padding: .35rem .3rem .2rem; font-size: .9rem !important;
   line-height: 1.4; gap: .35rem !important;
 }
 #dispatch-sidebar .admin-dispatch__surface :deep(.v-divider) { opacity: .55; }
 #dispatch-sidebar .admin-dispatch__card-heading { gap: .35rem; }
 #dispatch-sidebar .dispatch-request-list, #dispatch-sidebar .responder-list {
-  padding: .2rem .3rem; background: transparent;
+  padding: .1rem .15rem; background: transparent;
 }
 #dispatch-sidebar .dispatch-request-row, #dispatch-sidebar .dispatch-responder-row {
-  margin: 0; padding: .3rem .4rem; min-height: 44px;
+  margin: 0; padding: .2rem .25rem; min-height: 44px;
   border: 0; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .09);
   border-radius: .5rem; background: transparent;
 }
@@ -2427,12 +2437,17 @@ onBeforeUnmount(() => {
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title),
 #dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-title) {
-  font-size: .85rem; line-height: 1.4;
+  font-size: .8rem; line-height: 1.35; gap: .25rem !important;
 }
-#dispatch-sidebar .admin-dispatch__responder-search { padding: .45rem .5rem .1rem !important; gap: .35rem; }
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-subtitle),
+#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-subtitle) {
+  font-size: .8rem; line-height: 1.3; gap: .25rem !important; margin-top: .1rem !important;
+}
+#dispatch-sidebar .dispatch-request-row :deep(.text-caption) { font-size: .8rem !important; gap: .25rem !important; }
+#dispatch-sidebar .admin-dispatch__responder-search { padding: .3rem .3rem .1rem !important; gap: .25rem; }
 #dispatch-sidebar .admin-dispatch__manual-warning { margin: .3rem .5rem 0; font-size: .8rem; }
-#dispatch-sidebar .admin-dispatch__search-help { margin: .2rem .5rem .35rem; }
-#dispatch-sidebar .admin-dispatch__submit { padding: .45rem .5rem !important; gap: .25rem !important; }
+#dispatch-sidebar .admin-dispatch__search-help { margin: .15rem .3rem .25rem; }
+#dispatch-sidebar .admin-dispatch__submit { padding: .3rem .3rem !important; gap: .2rem !important; }
 /* A compact desktop rail still retains 44px tap targets on touch widths. */
 #dispatch-sidebar :deep(.v-btn) { min-width: 38px; min-height: 38px; height: auto; font-size: .8rem; padding-inline: .5rem; }
 #dispatch-sidebar :deep(.v-btn--icon) { width: 38px; height: 38px; padding: 0; }
@@ -2459,11 +2474,42 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 9; top: calc(4.75rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px));
   width: min(23rem, calc(100% - var(--dispatch-sidebar-width) - 2rem));
-  max-height: min(62dvh, 36rem);
-  overflow: auto; overscroll-behavior: contain; pointer-events: auto;
-  scrollbar-gutter: stable; border-radius: var(--bb-radius-card, 24px);
+  max-height: min(86dvh, calc(100dvh - 6rem));
+  display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;
+  border-radius: var(--bb-radius-card, 24px);
   background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
   padding: .35rem;
+}
+/* Only the content scrolls: the scrollbar stays inset within the outer card,
+   while the collapse control remains visible even for long mission histories. */
+#dispatch-incident-content {
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; padding-inline: .15rem; border-radius: .65rem;
+}
+/* The floating panel already supplies the surface. Do not stack card borders,
+   shadows or shaded fact boxes inside it; retain the status chips and alerts. */
+.admin-dispatch__incident-panel #dispatch-incident {
+  border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  background: transparent !important; backdrop-filter: none !important; margin: 0;
+}
+.admin-dispatch__incident-panel .admin-dispatch__sender,
+.admin-dispatch__incident-panel .admin-dispatch__facts > div,
+.admin-dispatch__incident-panel .dispatch-mission-timeline,
+.admin-dispatch__incident-panel .admin-dispatch__followup {
+  border: 0; border-radius: 0; box-shadow: none; background: transparent;
+}
+.admin-dispatch__incident-panel #dispatch-incident :deep(.v-divider) { display: none; }
+.admin-dispatch__incident-panel .admin-dispatch__description,
+.admin-dispatch__incident-panel .admin-dispatch__location-details,
+.admin-dispatch__incident-panel .admin-dispatch__next { border: 0; }
+.admin-dispatch__incident-panel :deep(.live-panel) {
+  border: 0; border-radius: 0; box-shadow: none; background: transparent;
+  margin-block: .5rem; padding: .35rem 0;
+}
+.admin-dispatch__incident-panel :deep(.live-panel__members),
+.admin-dispatch__incident-panel :deep(.live-panel__privacy),
+.admin-dispatch__incident-panel .dispatch-mission-timeline :deep(.timeline) {
+  border: 0; box-shadow: none; background: transparent;
 }
 .admin-dispatch__incident-toggle {
   display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 48px;

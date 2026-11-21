@@ -16,8 +16,8 @@ describe("admin SOS triage flow", () => {
     const timeline = template.indexOf('class="mb-3 pa-3 dispatch-mission-timeline"');
     const live = template.indexOf('v-for="mission in activeMissions"');
     expect(responders).toBeGreaterThan(0);
-    expect(responders).toBeLessThan(queue);
-    expect(queue).toBeLessThan(map);
+    expect(queue).toBeLessThan(responders);
+    expect(responders).toBeLessThan(map);
     expect(map).toBeLessThan(detail);
     expect(detail).toBeLessThan(timeline);
     expect(timeline).toBeLessThan(live);
@@ -99,7 +99,7 @@ describe("admin SOS triage flow", () => {
     expect(source).toContain('showLivePanel.value = false;');
     expect(source).toContain('if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;');
     expect(template).toContain('@click="testSound"');
-    expect(template).toContain('v-if="soundTestError" type="warning"');
+    expect(template).toContain('v-if="soundTestError" id="dispatch-notice-01" role="alert"');
     expect(source).toContain('if (!await adminSos.testAlertSound())');
   });
 

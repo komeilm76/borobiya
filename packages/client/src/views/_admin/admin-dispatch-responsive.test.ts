@@ -18,14 +18,14 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-layout", source: template }).errors).toEqual([]);
   });
 
-  it("pins nearby responders ahead of the SOS queue, with the selected incident over the map", () => {
+  it("pins the SOS queue ahead of nearby responders, with the selected incident over the map", () => {
     const nearby = template.indexOf('id="dispatch-nearby"');
     const queue = template.indexOf('id="dispatch-queue"');
     const map = template.indexOf('id="dispatch-map"');
     const incident = template.indexOf('id="dispatch-incident"');
     expect(nearby).toBeGreaterThan(0);
-    expect(nearby).toBeLessThan(queue);
-    expect(queue).toBeLessThan(map);
+    expect(queue).toBeLessThan(nearby);
+    expect(nearby).toBeLessThan(map);
     expect(map).toBeLessThan(incident);
     expect(template).toContain('id="dispatch-sidebar"');
     expect(template).toContain('id="dispatch-incident-panel"');
@@ -35,7 +35,8 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(source).toContain('incidentExpanded.value = !compactDispatch.value;');
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(css).toContain('.admin-dispatch__incident-panel {');
-    expect(css).toContain('overflow: auto; overscroll-behavior: contain; pointer-events: auto;');
+    expect(css).toContain('display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;');
+    expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
     expect(template).toContain('@click="frameSelectedIncident"');
     expect(template).toContain('id="dispatch-map-legend"');
