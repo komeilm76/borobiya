@@ -710,16 +710,16 @@ const RESPONDER_SELECTED_GLYPH_LAYER_ID = "admin-sos-selected-rescuers-glyph";
 const RESPONDER_SELECTED_PIN_LAYER_ID = "admin-sos-selected-rescuers-pin";
 const RESPONDER_CLUSTER_LAYER_ID = "admin-sos-nearby-cluster";
 const RESPONDER_COUNT_LAYER_ID = "admin-sos-nearby-cluster-count";
-// MapLibre layer order is the canvas z-index. The selected SOS draws last;
-// labels are separate DOM markers above the canvas.
+// MapLibre layer order is the canvas z-index: ordinary SOS < nearby helpers
+// < selected SOS. The selected label is a DOM marker above responder labels.
 const DISPATCH_LAYER_ORDER = [
+  SOS_AURA_LAYER_ID, SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
+  SOS_PIN_LAYER_ID,
   RESPONDER_DOT_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_LABEL_LAYER_ID,
   RESPONDER_PIN_LAYER_ID, RESPONDER_COUNT_LAYER_ID,
   RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
   RESPONDER_SELECTED_PIN_LAYER_ID,
-  SOS_AURA_LAYER_ID, SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
-  SOS_PIN_LAYER_ID, SOS_SELECTED_CORE_LAYER_ID, SOS_SELECTED_GLYPH_LAYER_ID,
-  SOS_SELECTED_PIN_LAYER_ID
+  SOS_SELECTED_CORE_LAYER_ID, SOS_SELECTED_GLYPH_LAYER_ID, SOS_SELECTED_PIN_LAYER_ID
 ] as const;
 type MapPointChoice = { kind: "sos" | "responder" | "cluster"; id: string; label: string;
   clusterId?: number; coordinates?: [number, number] };
@@ -1091,7 +1091,9 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   // White glyphs must remain legible on both basemaps; the theme's pale dark-mode
   // primary is designed for dark text and cannot safely carry a white map symbol.
   const responderPin = themeStore.isDark ? "#205fd1" : "#0868c8";
-  const before = map.getLayer(SOS_PULSE_LAYER_ID) ? SOS_PULSE_LAYER_ID : undefined;
+  // On partial style restoration, insert helpers after ordinary SOS layers but
+  // before the selected SOS. The order pass also fixes preserved style layers.
+  const before = map.getLayer(SOS_SELECTED_CORE_LAYER_ID) ? SOS_SELECTED_CORE_LAYER_ID : undefined;
   if (!map.getLayer(RESPONDER_DOT_LAYER_ID)) map.addLayer({
     id: RESPONDER_DOT_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
     filter: ["!", ["has", "point_count"]],
@@ -1130,8 +1132,8 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
       "text-font": ["Borobiya Vazirmatn"], "text-size": 13, "text-allow-overlap": true },
     paint: { "text-color": "#ffffff" }
   }, before);
-  // Keep the selected fix above the cluster count while SOS icons retain
-  // priority at coincident incident coordinates.
+  // Keep the selected fix above the cluster count and unselected SOS points;
+  // only the selected SOS retains priority at coincident coordinates.
   if (!map.getLayer(RESPONDER_SELECTED_DOT_LAYER_ID)) map.addLayer({
     id: RESPONDER_SELECTED_DOT_LAYER_ID, type: "circle", source: RESPONDER_SELECTED_SOURCE_ID,
     paint: { "circle-color": responderPin, "circle-radius": 15,
