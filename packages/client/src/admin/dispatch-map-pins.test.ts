@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, drawDispatchPin, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, drawDispatchPin, drawResponderNamePlate, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
 
 // Do not mount Vue components in unit tests (docs/TASKS.md).
 const dispatch = readFileSync(new URL("../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8");
@@ -30,6 +30,25 @@ describe("actual Dispatch map symbols", () => {
     expect(ctx.getImageData).toHaveBeenCalledWith(0, 0, 64, 72);
   });
 
+  it("draws a blue pin-facing neck and accent on the opaque nearby-user label in both themes", () => {
+    const ctx = {
+      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), bezierCurveTo: vi.fn(),
+      closePath: vi.fn(), fill: vi.fn(), stroke: vi.fn(), fillRect: vi.fn(),
+      getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({ width, height })),
+      fillStyle: "", strokeStyle: "", lineWidth: 0
+    };
+    const canvas = { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement;
+    for (const [dark, accent] of [[false, "#0868c8"], [true, "#205fd1"]] as const) {
+      ctx.fillRect.mockClear();
+      expect(drawResponderNamePlate(dark, canvas)).toMatchObject({ width: 48, height: 32 });
+      expect(ctx.fillRect.mock.calls).toEqual([
+        [1, 14, 10, 8], [37, 14, 10, 8], [9, 11, 3, 10], [36, 11, 3, 10]
+      ]);
+      expect(ctx.fillStyle).toBe(accent);
+      expect(ctx.fill).toHaveBeenCalled(); // The opaque surface is not a text-only halo.
+    }
+  });
+
   it("registers image data for every map pin again after a map style swap", () => {
     const context = {
       beginPath: vi.fn(), moveTo: vi.fn(), bezierCurveTo: vi.fn(), closePath: vi.fn(),
@@ -44,7 +63,7 @@ describe("actual Dispatch map symbols", () => {
       const ids = new Set<string>();
       const addImage = vi.fn((id: string, image: { width: number; height: number }) => {
         expect(image).toMatchObject(id === DISPATCH_PIN_IMAGES.name
-          ? { width: 32, height: 32 } : { width: 64, height: 72 });
+          ? { width: 48, height: 32 } : { width: 64, height: 72 });
         if (id === DISPATCH_PIN_IMAGES.selectedLow)
           expect(context.fillStyle).toBe(SELECTED_SOS_COLOR); // Selection is red even when severity is low.
         ids.add(id);
@@ -53,15 +72,15 @@ describe("actual Dispatch map symbols", () => {
       const map = { hasImage: (id: string) => ids.has(id), addImage, updateImage };
       ensureDispatchPinImages(map as never, false);
       expect(addImage).toHaveBeenCalledWith(DISPATCH_PIN_IMAGES.name,
-        expect.objectContaining({ width: 32, height: 32 }),
-        expect.objectContaining({ stretchX: [[12, 20]], stretchY: [[12, 20]], content: [8, 6, 24, 26] }));
+        expect.objectContaining({ width: 48, height: 32 }),
+        expect.objectContaining({ stretchX: [[20, 28]], stretchY: [[12, 20]], content: [16, 6, 32, 26] }));
       expect(ids.size).toBe(Object.keys(DISPATCH_PIN_IMAGES).length);
       ensureDispatchPinImages(map as never, false);
       expect(addImage).toHaveBeenCalledTimes(ids.size);
       refreshResponderPinImages(map as never, true);
       expect(updateImage).toHaveBeenCalledTimes(3);
       expect(updateImage).toHaveBeenCalledWith(DISPATCH_PIN_IMAGES.name,
-        expect.objectContaining({ width: 32, height: 32 }));
+        expect.objectContaining({ width: 48, height: 32 }));
       expect(updateImage).toHaveBeenCalledWith(DISPATCH_PIN_IMAGES.selectedHelper, expect.objectContaining({ width: 64, height: 72 }));
       ids.clear(); // setStyle discards runtime images
       ensureDispatchPinImages(map as never, true);

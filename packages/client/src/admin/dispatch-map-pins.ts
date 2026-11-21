@@ -69,22 +69,34 @@ export function drawDispatchPin(color: string, kind: "sos" | "helper", selected 
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
-/** Stretchable opaque name plate for MapLibre responder symbols. The text and
- * plate move together when variable-anchor placement flips at map edges. */
+/** Stretchable opaque name plate for MapLibre responder symbols. Give it the
+ * same colored, pin-facing edge and short neck as the selected SOS chip. Two
+ * mirrored necks let MapLibre flip the text at map edges without leaving a gap
+ * or moving the responder's geographic pin; the unused neck is deliberately
+ * small and reads as part of the blue outline, not a second point. */
 export function drawResponderNamePlate(dark: boolean, canvas: HTMLCanvasElement = document.createElement("canvas")): ImageData {
-  canvas.width = 32; canvas.height = 32;
+  canvas.width = 48; canvas.height = 32;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new DispatchPinCanvasUnavailable("2D canvas is required for dispatch map labels.");
+  const accent = dark ? "#205fd1" : "#0868c8";
+  // Keep the connectors outside the text-fitting content, so resizing a long
+  // username stretches the pill rather than its pin-facing attachment.
+  ctx.fillStyle = accent;
+  ctx.fillRect(1, 14, 10, 8);
+  ctx.fillRect(37, 14, 10, 8);
   ctx.fillStyle = dark ? "#294043" : "#ffffff";
   ctx.strokeStyle = dark ? "#afc1bc" : "#586f6f";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(12, 1); ctx.lineTo(20, 1); ctx.bezierCurveTo(27, 1, 31, 5, 31, 12);
-  ctx.lineTo(31, 20); ctx.bezierCurveTo(31, 27, 27, 31, 20, 31);
-  ctx.lineTo(12, 31); ctx.bezierCurveTo(5, 31, 1, 27, 1, 20);
-  ctx.lineTo(1, 12); ctx.bezierCurveTo(1, 5, 5, 1, 12, 1);
+  ctx.moveTo(20, 1); ctx.lineTo(28, 1); ctx.bezierCurveTo(35, 1, 39, 5, 39, 12);
+  ctx.lineTo(39, 20); ctx.bezierCurveTo(39, 27, 35, 31, 28, 31);
+  ctx.lineTo(20, 31); ctx.bezierCurveTo(13, 31, 9, 27, 9, 20);
+  ctx.lineTo(9, 12); ctx.bezierCurveTo(9, 5, 13, 1, 20, 1);
   ctx.closePath(); ctx.fill(); ctx.stroke();
-  return ctx.getImageData(0, 0, 32, 32);
+  ctx.fillStyle = accent;
+  ctx.fillRect(9, 11, 3, 10);
+  ctx.fillRect(36, 11, 3, 10);
+  return ctx.getImageData(0, 0, 48, 32);
 }
 
 /** Map style swaps discard runtime images. Re-register *before* adding symbol
@@ -105,7 +117,7 @@ export function ensureDispatchPinImages(map: Pick<MapLibreMap, "hasImage" | "add
     if (!map.hasImage(id)) map.addImage(id, drawDispatchPin(color, kind, selected), { pixelRatio: 1 });
   }
   if (!map.hasImage(DISPATCH_PIN_IMAGES.name)) map.addImage(DISPATCH_PIN_IMAGES.name, drawResponderNamePlate(dark), {
-    pixelRatio: 1, stretchX: [[12, 20]], stretchY: [[12, 20]], content: [8, 6, 24, 26]
+    pixelRatio: 1, stretchX: [[20, 28]], stretchY: [[12, 20]], content: [16, 6, 32, 26]
   });
 }
 
