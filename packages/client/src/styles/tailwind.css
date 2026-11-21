@@ -612,6 +612,43 @@ a {
   }
 }
 
+/* Dispatch's fixed Broadcast/SOS actions belong over the map, not on top of
+   the SOS queue and its dispatch controls in the right-hand rail. Keep their
+   48px touch targets clear of the map legend on desktop; on small screens
+   place them clear of the left incident panel, top search and bottom rail. */
+@media (min-width: 901px) {
+  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
+  .app-shell--map:has(.admin-dispatch) .app-general-share {
+    inset-inline-start: calc(clamp(20rem, 28vw, 25rem) + 1rem);
+  }
+  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
+    inset-block-end: calc(8.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .app-shell--map:has(.admin-dispatch) .app-general-share {
+    inset-block-end: calc(12.25rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (min-width: 901px) and (max-width: 1100px) {
+  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
+  .app-shell--map:has(.admin-dispatch) .app-general-share {
+    inset-inline-start: 20rem;
+  }
+}
+@media (max-width: 900px) {
+  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
+  .app-shell--map:has(.admin-dispatch) .app-general-share {
+    inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
+    inset-inline-end: auto;
+    inset-block-end: auto;
+  }
+  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
+    inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));
+  }
+  .app-shell--map:has(.admin-dispatch) .app-general-share {
+    inset-block-start: calc(11.25rem + env(safe-area-inset-top, 0px));
+  }
+}
+
 :root.dark {
   color-scheme: dark;
 }

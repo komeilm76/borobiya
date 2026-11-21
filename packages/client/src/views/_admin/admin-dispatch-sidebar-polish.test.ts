@@ -7,6 +7,7 @@ const canvas = readFileSync(new URL("../../components/map/MapCanvas.vue", import
 const live = readFileSync(new URL("../../components/mission/MissionLivePanel.vue", import.meta.url), "utf8");
 const timeline = readFileSync(new URL("../../components/mission/MissionTimelinePanel.vue", import.meta.url), "utf8");
 const trace = readFileSync(new URL("../../components/mission/MissionTracePanel.vue", import.meta.url), "utf8");
+const shellCss = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
 const { template, styles } = parse(dispatch).descriptor;
 const css = styles[0]!.content;
 
@@ -57,12 +58,46 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(panel).not.toContain('scrollbar-gutter: stable');
   });
 
+  it("removes redundant rail rules, aligns RTL content and keeps compact actions usable", () => {
+    const markup = template!.content;
+    const railMarkup = markup.slice(markup.indexOf('id="dispatch-sidebar"'), markup.indexOf('</aside>'));
+    expect(railMarkup).not.toContain('<v-divider');
+    const rail = css.slice(css.indexOf('/* The pinned rail is one surface'));
+    expect(rail).not.toContain('#dispatch-sidebar .admin-dispatch__surface :deep(.v-divider)');
+    expect(css).toContain('.admin-dispatch__nearby { margin-top: .4rem; }');
+    expect(rail).toContain('border-top: 0; justify-content: flex-start !important;');
+    expect(rail).toContain('justify-content: flex-start !important;');
+    expect(markup).toContain('aria-label="انتخاب همهٔ امدادگران"');
+    expect(markup).toContain('aria-label="پاک‌سازی انتخاب امدادگران"');
+    expect(markup).toContain(':aria-label="`اعزام امدادگران انتخاب‌شده (${adminSos.selectedResponderIds.length})`"');
+    expect(rail).toContain('#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-text[role="status"])');
+    expect(shellCss).toContain('.app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,');
+    expect(shellCss).toContain('inset-inline-start: calc(clamp(20rem, 28vw, 25rem) + 1rem);');
+    expect(shellCss).toContain('inset-block-end: calc(8.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));');
+    expect(shellCss).toContain('inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));');
+  });
+
+  it("fits the selected SOS actions and facts without losing their labels or touch targets", () => {
+    const markup = template!.content;
+    const panel = css.slice(css.indexOf('/* Keep the information and actions on the RTL start edge.'));
+    expect(panel).toContain('.admin-dispatch__detail-heading { justify-content: flex-start;');
+    expect(panel).toContain('grid-template-columns: 2rem minmax(0, 1fr) auto;');
+    expect(panel).toContain('gap: .4rem; padding: .35rem .6rem .5rem;');
+    expect(panel).toContain('min-height: 44px; height: 44px; padding-inline: .5rem;');
+    expect(markup).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده"');
+    expect(markup).toContain('aria-label="نمایش حادثه روی نقشه"');
+    expect(markup).toContain('aria-label="انتخاب امدادگر و اعزام"');
+    expect(markup).toContain('aria-label="بازخوانی مأموریت‌ها"');
+    expect(markup).toContain('aria-controls="dispatch-responders" @click="focusResponders"');
+  });
+
   it("uses one rail surface without nested card elevation, borders or oversized desktop actions", () => {
     expect(css).toContain('--dispatch-sidebar-width: clamp(20rem, 28vw, 25rem);');
     const rail = css.slice(css.indexOf('/* The pinned rail is one surface'));
     expect(rail).toContain('#dispatch-sidebar .admin-dispatch__surface {\n  border: 0 !important; border-radius: 0 !important; box-shadow: none !important;');
     expect(rail).toContain('background: transparent !important; backdrop-filter: none !important;');
-    expect(rail).toContain('border: 0; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .09);');
+    expect(rail).toContain('border: 0; border-radius: .5rem; background: transparent;');
     expect(rail).toContain('font-size: .9rem !important;');
     expect(css).toContain('width: var(--dispatch-sidebar-width); padding: .4rem .5rem;');
     expect(rail).toContain('padding: .1rem .15rem; background: transparent;');
