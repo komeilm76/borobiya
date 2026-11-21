@@ -389,6 +389,7 @@
               حادثه {{ item.label }}
             </li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--selected-sos mdi mdi-alert"
+              :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[sosMapPriority(adminSos.selectedRequest.status, adminSos.selectedRequest.severity)] }"
               aria-hidden="true" />حادثه انتخاب‌شده</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
@@ -661,6 +662,7 @@ import {
   buildEligibleResponderGeoJson,
   formatResponderDistance,
   SOS_MAP_MARKER_COLORS,
+  sosMapPriority,
   SOS_SEVERITY_PRESENTATION,
   SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
@@ -676,7 +678,7 @@ import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-
 import { dispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
 import { raiseDispatchLayers } from "@/admin/dispatch-map-layer-order";
 import { nonOverlappingResponderLabelIds, selectedSosPinBounds, visibleResponderLabelIds } from "@/admin/dispatch-responder-labels";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -996,8 +998,7 @@ function syncSelectedSosLabel(): void {
   const element = selectedSosLabelMarker.getElement();
   const chip = element.firstElementChild as HTMLElement | null;
   if (chip) chip.textContent = incidentLabel(incident.incidentTypeId); // Never interpret catalog names as HTML.
-  element.style.setProperty("--dispatch-label-color", SOS_MAP_MARKER_COLORS[
-    incident.status === "cancelled_by_rescuer" ? "high" : incident.severity]);
+  element.style.setProperty("--dispatch-label-color", SOS_MAP_MARKER_COLORS[sosMapPriority(incident.status, incident.severity)]);
   updateSelectedSosLabelPosition();
 }
 
@@ -1171,13 +1172,13 @@ function ensureSosMapLayers(map: MapLibreMap): void {
     existingSource.setData(data as unknown as GeoJsonSourceData);
   }
 
-  // The selected SOS has a soft stationary aura even when reduced motion
-  // disables pulse animation; its severity remains in the label accent/card.
+  // The selected SOS has a soft stationary aura in its actual priority hue,
+  // including when reduced motion disables pulse animation.
   if (!map.getLayer(SOS_AURA_LAYER_ID)) map.addLayer({
     id: SOS_AURA_LAYER_ID, type: "circle", source: SOS_SOURCE_ID,
     filter: ["==", ["get", "isSelected"], true],
-    paint: { "circle-color": SELECTED_SOS_COLOR, "circle-radius": 23,
-      "circle-opacity": .08, "circle-stroke-color": SELECTED_SOS_COLOR,
+    paint: { "circle-color": ["get", "color"], "circle-radius": 23,
+      "circle-opacity": .08, "circle-stroke-color": ["get", "color"],
       "circle-stroke-width": 3, "circle-stroke-opacity": .06,
       "circle-translate": pinReady ? [0, -35] : [0, 0],
       "circle-translate-anchor": "viewport" }
@@ -1192,7 +1193,7 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       // avoid a large animated ring behind the compact joined marker.
       filter: ["==", ["get", "isSelected"], false],
       paint: {
-        "circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR, ["get", "color"]],
+        "circle-color": ["get", "color"],
         "circle-radius": 18,
         // The canvas pin's head is ~35px above its geographic tip. In the
         // no-canvas circle fallback, the head is centered on the coordinate.
@@ -1237,7 +1238,7 @@ function ensureSosMapLayers(map: MapLibreMap): void {
   if (!map.getLayer(SOS_SELECTED_CORE_LAYER_ID)) map.addLayer({
     id: SOS_SELECTED_CORE_LAYER_ID, type: "circle", source: SOS_SOURCE_ID,
     filter: ["==", ["get", "isSelected"], true],
-    paint: { "circle-color": SELECTED_SOS_COLOR,
+    paint: { "circle-color": ["get", "color"],
       "circle-opacity": pinReady ? 0 : 1, "circle-stroke-opacity": pinReady ? 0 : 1,
       "circle-radius": 14, "circle-stroke-width": 3.5, "circle-stroke-color": "#ffffff" }
   });
@@ -1870,8 +1871,8 @@ onBeforeUnmount(() => {
   width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50% 50% 50% 4px;
   background: var(--dispatch-sos-color, #dc2626);
   box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: rotate(-45deg); }
-.dispatch-map-key__icon--selected-sos::after { background: #dc2626;
-  box-shadow: 0 0 0 5px rgba(220, 38, 38, .19); }
+.dispatch-map-key__icon--selected-sos::after {
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--dispatch-sos-color, #dc2626) 19%, transparent); }
 .dispatch-map-key__icon--helper::after { background: var(--dispatch-helper-color, #0868c8); }
 .dispatch-map-key__selected::before { background: var(--dispatch-helper-color, #0868c8); border-color: #f7b632; }
 .dispatch-map-key__cluster { display: inline-grid; place-items: center; flex: 0 0 32px;

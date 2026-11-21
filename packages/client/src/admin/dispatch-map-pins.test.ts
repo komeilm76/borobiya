@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, drawDispatchPin, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, drawDispatchPin, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
+import { SOS_MAP_MARKER_COLORS, sosMapPriority } from "./sos-alerts";
 
 // Do not mount Vue components in unit tests (docs/TASKS.md).
 const dispatch = readFileSync(new URL("../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8");
@@ -14,7 +15,9 @@ describe("actual Dispatch map symbols", () => {
     expect(sosPinImage("pending", "low", true)).toBe(DISPATCH_PIN_IMAGES.selectedLow);
     expect(Object.keys(DISPATCH_PIN_IMAGES)).not.toContain("selectedFire");
     expect(Object.keys(DISPATCH_PIN_IMAGES)).not.toContain("name"); // Names are direction-aware DOM chips, not fixed raster tabs.
-    expect(SELECTED_SOS_COLOR).toBe("#dc2626");
+    expect(sosMapPriority("pending", "low")).toBe("low");
+    expect(sosMapPriority("pending", "medium")).toBe("medium");
+    expect(sosMapPriority("cancelled_by_rescuer", "low")).toBe("high");
   });
 
   it("draws the generic alert for all incident types", () => {
@@ -25,7 +28,7 @@ describe("actual Dispatch map symbols", () => {
       strokeStyle: "", fillStyle: "", lineWidth: 0
     };
     const canvas = { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement;
-    drawDispatchPin(SELECTED_SOS_COLOR, "sos", true, canvas);
+    drawDispatchPin(SOS_MAP_MARKER_COLORS.low, "sos", true, canvas);
     expect(ctx.strokeStyle).toBe("#ffffff");
     expect(ctx.fillRect).toHaveBeenCalledWith(30.5, 22, 3, 8);
     expect(ctx.getImageData).toHaveBeenCalledWith(0, 0, 64, 72);
@@ -45,8 +48,13 @@ describe("actual Dispatch map symbols", () => {
       const ids = new Set<string>();
       const addImage = vi.fn((id: string, image: { width: number; height: number }) => {
         expect(image).toMatchObject({ width: 64, height: 72 });
-        if (id === DISPATCH_PIN_IMAGES.selectedLow)
-          expect(context.fillStyle).toBe(SELECTED_SOS_COLOR); // Selection is red even when severity is low.
+        for (const [severity, selectedId] of [
+          ["high", DISPATCH_PIN_IMAGES.selectedHigh],
+          ["medium", DISPATCH_PIN_IMAGES.selectedMedium],
+          ["low", DISPATCH_PIN_IMAGES.selectedLow]
+        ] as const) {
+          if (id === selectedId) expect(context.fillStyle).toBe(SOS_MAP_MARKER_COLORS[severity]);
+        }
         ids.add(id);
       });
       const updateImage = vi.fn();

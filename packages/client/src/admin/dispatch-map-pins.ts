@@ -1,11 +1,9 @@
 import type { Map as MapLibreMap } from "maplibre-gl";
-import { SOS_MAP_MARKER_COLORS } from "./sos-alerts";
+import { SOS_MAP_MARKER_COLORS, sosMapPriority } from "./sos-alerts";
 
-/** Red denotes a selected SOS regardless of its dynamic incident category.
- * Severity remains in the queue, unselected pins and selected label accent. */
-export const SELECTED_SOS_COLOR = SOS_MAP_MARKER_COLORS.high;
-
-/** Real on-map MapLibre image assets, not legend-only swatches. The bottom tip is
+/** Selection is expressed by the topmost layer and aura, not by changing a
+ * medium/low priority SOS into a misleading red high-priority pin.
+ * Real on-map MapLibre image assets, not legend-only swatches. The bottom tip is
  * the geographic anchor; generated locally so no network image or sprite is needed. */
 export const DISPATCH_PIN_IMAGES = {
   high: "bb-dispatch-sos-high",
@@ -19,7 +17,7 @@ export const DISPATCH_PIN_IMAGES = {
 } as const;
 
 export function sosPinImage(status: string, severity: "high" | "medium" | "low", selected: boolean): string {
-  const level = status === "cancelled_by_rescuer" ? "high" : severity;
+  const level = sosMapPriority(status, severity);
   return selected ? DISPATCH_PIN_IMAGES[({ high: "selectedHigh", medium: "selectedMedium", low: "selectedLow" } as const)[level]]
     : DISPATCH_PIN_IMAGES[level];
 }
@@ -76,9 +74,9 @@ export function ensureDispatchPinImages(map: Pick<MapLibreMap, "hasImage" | "add
     [DISPATCH_PIN_IMAGES.high, SOS_MAP_MARKER_COLORS.high, "sos", false],
     [DISPATCH_PIN_IMAGES.medium, SOS_MAP_MARKER_COLORS.medium, "sos", false],
     [DISPATCH_PIN_IMAGES.low, SOS_MAP_MARKER_COLORS.low, "sos", false],
-    [DISPATCH_PIN_IMAGES.selectedHigh, SELECTED_SOS_COLOR, "sos", true],
-    [DISPATCH_PIN_IMAGES.selectedMedium, SELECTED_SOS_COLOR, "sos", true],
-    [DISPATCH_PIN_IMAGES.selectedLow, SELECTED_SOS_COLOR, "sos", true],
+    [DISPATCH_PIN_IMAGES.selectedHigh, SOS_MAP_MARKER_COLORS.high, "sos", true],
+    [DISPATCH_PIN_IMAGES.selectedMedium, SOS_MAP_MARKER_COLORS.medium, "sos", true],
+    [DISPATCH_PIN_IMAGES.selectedLow, SOS_MAP_MARKER_COLORS.low, "sos", true],
     [DISPATCH_PIN_IMAGES.helper, responderColor, "helper", false],
     [DISPATCH_PIN_IMAGES.selectedHelper, responderColor, "helper", true]
   ] as const;

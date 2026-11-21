@@ -121,8 +121,10 @@ describe("admin SOS alert helpers (T3.2.5)", () => {
       SOS_MAP_MARKER_COLORS.low
     ]);
     expect(geojson.features.map((f) => f.properties.isSelected)).toEqual([false, true, false]);
-    expect(buildSosAlertsGeoJson([sampleSos({ severity: "low", status: "cancelled_by_rescuer" })], null)
-      .features[0]?.properties.color).toBe(SOS_MAP_MARKER_COLORS.high);
+    expect(buildSosAlertsGeoJson([low], low.id).features[0]?.properties.color).toBe(SOS_MAP_MARKER_COLORS.low);
+    const cancelled = sampleSos({ severity: "low", status: "cancelled_by_rescuer" });
+    expect(buildSosAlertsGeoJson([cancelled], cancelled.id).features[0]?.properties.color)
+      .toBe(SOS_MAP_MARKER_COLORS.high);
   });
 
   it("synthesizes severity-graded Web Audio chimes, respects mute, and closes AudioContext", async () => {

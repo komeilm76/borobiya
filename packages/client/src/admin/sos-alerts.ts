@@ -202,6 +202,12 @@ export const SOS_MAP_MARKER_COLORS: Record<Severity, string> = {
   high: "#dc2626", medium: "#a94d04", low: "#075c94"
 };
 
+/** A rescuer cancellation needs immediate redispatch; otherwise both selected
+ * and unselected map symbols must keep the incident's actual priority hue. */
+export function sosMapPriority(status: string, severity: Severity): Severity {
+  return status === "cancelled_by_rescuer" ? "high" : severity;
+}
+
 /** Builds the MapLibre GeoJSON feature collection for pulsing severity-colored SOS markers. */
 export function buildSosAlertsGeoJson(
   requests: readonly SosRequestRecord[],
@@ -219,9 +225,7 @@ export function buildSosAlertsGeoJson(
       properties: {
         id: req.id,
         severity: req.severity,
-        color: req.status === "cancelled_by_rescuer"
-          ? SOS_MAP_MARKER_COLORS.high
-          : SOS_MAP_MARKER_COLORS[req.severity],
+        color: SOS_MAP_MARKER_COLORS[sosMapPriority(req.status, req.severity)],
         isSelected: req.id === selectedId,
         isManual: req.location.isManual,
         status: req.status

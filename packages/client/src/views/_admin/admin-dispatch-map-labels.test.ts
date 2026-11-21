@@ -50,7 +50,9 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(labelCss).toContain('top: auto; bottom: 18px;'); // Circle fallback stays attached above too.
     expect(source).toContain('element.classList.toggle("dispatch-sos-label-anchor--above", placement.side === "above")');
     expect(source).toContain('filter: ["==", ["get", "isSelected"], false]');
-    expect(source).toContain('"circle-color": SELECTED_SOS_COLOR, "circle-radius": 23');
+    expect(source).toContain('"circle-color": ["get", "color"], "circle-radius": 23');
+    expect(source).toContain('"circle-stroke-color": ["get", "color"]');
+    expect(source).toContain('element.style.setProperty("--dispatch-label-color", SOS_MAP_MARKER_COLORS[sosMapPriority(incident.status, incident.severity)])');
     // Clustered responders otherwise lose both their pin and username at low zoom.
     expect(source).toContain('features: nearbyFeatures.value.features.filter((feature) => feature.properties.isSelected)');
     expect(source).toContain('visibleResponderLabelIds(map.queryRenderedFeatures({ layers })');
@@ -85,7 +87,11 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(template!.content).toContain('nearbyFeatures.features.length > 1');
     expect(template!.content).toContain('dispatch-map-key__icon--selected-sos');
     expect(source).toContain('id: SOS_AURA_LAYER_ID, type: "circle", source: SOS_SOURCE_ID');
-    expect(source).toContain('"circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR');
+    expect(source).toContain('id: SOS_SELECTED_CORE_LAYER_ID, type: "circle", source: SOS_SOURCE_ID');
+    expect(source).toMatch(/id: SOS_SELECTED_CORE_LAYER_ID,[\s\S]*?paint: \{ "circle-color": \["get", "color"\]/);
+    expect(template!.content).toContain('SOS_MAP_MARKER_COLORS[sosMapPriority(adminSos.selectedRequest.status, adminSos.selectedRequest.severity)]');
+    expect(styles[0]!.content).toContain('box-shadow: 0 0 0 5px color-mix(in srgb, var(--dispatch-sos-color, #dc2626) 19%, transparent)');
+    expect(styles[0]!.content).not.toContain('.dispatch-map-key__icon--selected-sos::after { background: #dc2626');
     expect(source).not.toContain("isFireIncidentLabel");
     expect(template!.content).not.toContain("mdi-fire");
     expect(styles[0]!.content).toContain('background: var(--dispatch-helper-color, #0868c8)');
