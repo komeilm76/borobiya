@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { dispatchSosLabelPlacement } from "./dispatch-sos-label";
 
 describe("selected Dispatch SOS label placement", () => {
-  it("keeps a short label by the pin head rather than far from its coordinate", () => {
+  it("keeps a short label tucked beside the pin head rather than far from its coordinate", () => {
     expect(dispatchSosLabelPlacement(100, 110, 400, 240, 95, 30)).toEqual({
       side: "right", belowPin: false, visible: true
     });
@@ -10,6 +10,9 @@ describe("selected Dispatch SOS label placement", () => {
 
   it("flips to the other side at the right edge and below the pin at the top", () => {
     expect(dispatchSosLabelPlacement(370, 110, 400, 240, 95, 30).side).toBe("left");
+    // At x=170 there is 110px to the right; the new 24px gap makes this fit
+    // whereas the old 30px gap would place the same label on the wrong side.
+    expect(dispatchSosLabelPlacement(170, 110, 280, 240, 76, 30).side).toBe("right");
     expect(dispatchSosLabelPlacement(100, 20, 400, 240, 95, 30)).toMatchObject({
       side: "right", belowPin: true
     });

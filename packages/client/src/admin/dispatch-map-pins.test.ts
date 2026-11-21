@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, drawDispatchPin, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, drawDispatchPin, ensureDispatchPinImages, isFireIncidentLabel, refreshResponderPinImages, sosPinImage } from "./dispatch-map-pins";
 
 // Do not mount Vue components in unit tests (docs/TASKS.md).
 const dispatch = readFileSync(new URL("../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8");
@@ -10,12 +10,35 @@ describe("actual Dispatch map symbols", () => {
     expect(sosPinImage("pending", "low", false)).toBe(DISPATCH_PIN_IMAGES.low);
     expect(sosPinImage("pending", "medium", true)).toBe(DISPATCH_PIN_IMAGES.selectedMedium);
     expect(sosPinImage("cancelled_by_rescuer", "low", true)).toBe(DISPATCH_PIN_IMAGES.selectedHigh);
+    expect(isFireIncidentLabel("آتش‌سوزی")).toBe(true);
+    expect(isFireIncidentLabel("حریق ساختمان")).toBe(true);
+    expect(isFireIncidentLabel("Fire in building")).toBe(true);
+    expect(isFireIncidentLabel("درخواست پزشکی")).toBe(false);
+    expect(sosPinImage("pending", "low", true, isFireIncidentLabel("آتش"))).toBe(DISPATCH_PIN_IMAGES.selectedFire);
+    expect(sosPinImage("pending", "low", true, false)).toBe(DISPATCH_PIN_IMAGES.selectedLow);
+    expect(SELECTED_SOS_COLOR).toBe("#dc2626");
+  });
+
+  it("draws the target's red selected fire pictogram with a white rim, not the old blue/gold alert", () => {
+    const ctx = {
+      beginPath: vi.fn(), moveTo: vi.fn(), bezierCurveTo: vi.fn(), closePath: vi.fn(),
+      fill: vi.fn(), stroke: vi.fn(), lineTo: vi.fn(), fillRect: vi.fn(), arc: vi.fn(),
+      getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({ width, height })),
+      strokeStyle: "", fillStyle: "", lineWidth: 0
+    };
+    const canvas = { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement;
+    drawDispatchPin(SELECTED_SOS_COLOR, "sos", true, canvas, "flame");
+    expect(ctx.strokeStyle).toBe("#ffffff");
+    expect(ctx.bezierCurveTo.mock.calls.length).toBeGreaterThan(6);
+    expect(ctx.fillRect).not.toHaveBeenCalled(); // Only generic SOS alerts contain an exclamation.
+    expect(ctx.getImageData).toHaveBeenCalledWith(0, 0, 64, 72);
   });
 
   it("registers image data for every map pin again after a map style swap", () => {
     const context = {
       beginPath: vi.fn(), moveTo: vi.fn(), bezierCurveTo: vi.fn(), closePath: vi.fn(),
       fill: vi.fn(), stroke: vi.fn(), lineTo: vi.fn(), fillRect: vi.fn(), arc: vi.fn(),
+      fillStyle: "", strokeStyle: "",
       getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => ({ width, height }))
     };
     const canvas = { width: 0, height: 0, getContext: () => context };
@@ -25,6 +48,8 @@ describe("actual Dispatch map symbols", () => {
       const ids = new Set<string>();
       const addImage = vi.fn((id: string, image: { width: number; height: number }) => {
         expect(image).toMatchObject({ width: 64, height: 72 });
+        if (id === DISPATCH_PIN_IMAGES.selectedLow || id === DISPATCH_PIN_IMAGES.selectedFire)
+          expect(context.fillStyle).toBe(SELECTED_SOS_COLOR); // Selected fire is red even when its severity is low.
         ids.add(id);
       });
       const updateImage = vi.fn();

@@ -22,9 +22,9 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(source).toContain('!adminSos.responderSearch');
     // Selection alone (before/without a nearest fetch) updates the opaque on-map title.
     expect(source).toMatch(/watch\(\(\) => \[adminSos\.visibleRequests, adminSos\.selectedId\][\s\S]*?syncMapData\(\); syncSelectedSosLabel\(\); updateMapEdgeCues\(\)/);
-    expect(source).toContain('watch(incidentNameById, () => { syncSelectedSosLabel(); updateMapEdgeCues(); });');
-    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -30px; left: 30px;');
-    expect(styles[0]!.content).toContain('border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
+    expect(source).toContain('watch(incidentNameById, () => { syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); });');
+    expect(styles[0]!.content).toContain(':global(.dispatch-sos-label) { position: absolute; top: -35px; left: 24px;');
+    expect(styles[0]!.content).toContain('border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));');
     expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--left .dispatch-sos-label)');
     expect(styles[0]!.content).toContain(':global(.dispatch-sos-label-anchor--below .dispatch-sos-label)');
     // Clustered responders otherwise lose both their pin and username at low zoom.
@@ -54,6 +54,10 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(template!.content).toContain('v-for="item in sosSeverityKey"');
     expect(template!.content).toContain('SOS_MAP_MARKER_COLORS[item.severity]');
     expect(template!.content).toContain('nearbyFeatures.features.length > 1');
+    expect(template!.content).toContain('dispatch-map-key__icon--selected-sos');
+    expect(source).toContain('id: SOS_AURA_LAYER_ID, type: "circle", source: SOS_SOURCE_ID');
+    expect(source).toContain('"circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR');
+    expect(source).toContain('selectedIsFire = selectedIncident ? isFireIncidentLabel(incidentLabel(selectedIncident.incidentTypeId)) : false');
     expect(styles[0]!.content).toContain('background: var(--dispatch-helper-color, #0868c8)');
     expect(template!.content).toContain('<li v-if="adminSos.selectedRequest">');
     expect(source).toContain('window.matchMedia?.("(prefers-reduced-motion: reduce)").matches');

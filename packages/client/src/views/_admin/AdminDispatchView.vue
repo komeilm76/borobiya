@@ -388,6 +388,9 @@
                 :style="{ '--dispatch-sos-color': SOS_MAP_MARKER_COLORS[item.severity] }" aria-hidden="true" />
               حادثه {{ item.label }}
             </li>
+            <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--selected-sos mdi"
+              :class="isFireIncidentLabel(incidentLabel(adminSos.selectedRequest.incidentTypeId)) ? 'mdi-fire' : 'mdi-alert'"
+              aria-hidden="true" />حادثه انتخاب‌شده</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__icon dispatch-map-key__icon--helper mdi mdi-account" aria-hidden="true" />امدادگر واجد شرایط</li>
             <li v-if="adminSos.selectedRequest"><span class="dispatch-map-key__selected" aria-hidden="true"><span class="mdi mdi-account" /></span>امدادگر انتخاب‌شده</li>
             <li v-if="adminSos.selectedRequest && nearbyFeatures.features.length > 1"><span class="dispatch-map-key__cluster" aria-hidden="true">+۲</span>چند امدادگر در یک ناحیه</li>
@@ -673,7 +676,7 @@ import { shortestLongitudeBounds } from "@/map/longitude-bounds";
 import { palettes } from "@/styles/tokens";
 import { dispatchMapEdgeCues, type DispatchEdgeCue } from "@/admin/dispatch-map-edge";
 import { dispatchSosLabelPlacement } from "@/admin/dispatch-sos-label";
-import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, ensureDispatchPinImages, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
+import { DISPATCH_PIN_IMAGES, DispatchPinCanvasUnavailable, SELECTED_SOS_COLOR, ensureDispatchPinImages, isFireIncidentLabel, refreshResponderPinImages, sosPinImage } from "@/admin/dispatch-map-pins";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -687,6 +690,7 @@ const sosSeverityKey = [
 ] as const;
 
 const SOS_SOURCE_ID = "admin-sos-requests";
+const SOS_AURA_LAYER_ID = "admin-sos-selected-aura";
 const SOS_PULSE_LAYER_ID = "admin-sos-pulse";
 const SOS_CORE_LAYER_ID = "admin-sos-core";
 const SOS_GLYPH_LAYER_ID = "admin-sos-glyph";
@@ -851,7 +855,7 @@ function updateSelectedSosLabelPosition(): void {
   // measure the real text width before choosing a side on re-entry.
   element.hidden = false;
   const canvas = map.getCanvas();
-  chip.style.maxWidth = `${Math.max(64, Math.min(192, canvas.clientWidth - 72))}px`;
+  chip.style.maxWidth = `${Math.max(64, Math.min(192, canvas.clientWidth - 60))}px`;
   const pixel = map.project([incident.location.lon, incident.location.lat]);
   const placement = dispatchSosLabelPlacement(pixel.x, pixel.y, canvas.clientWidth, canvas.clientHeight,
     chip.offsetWidth, chip.offsetHeight);
@@ -1063,11 +1067,13 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
 
 function ensureSosMapLayers(map: MapLibreMap): void {
   const alerts = buildSosAlertsGeoJson(adminSos.visibleRequests, adminSos.selectedId);
+  const selectedIncident = adminSos.visibleRequests.find((item) => item.id === adminSos.selectedId);
+  const selectedIsFire = selectedIncident ? isFireIncidentLabel(incidentLabel(selectedIncident.incidentTypeId)) : false;
   // The selected incident title is a single DOM label with an opaque surface;
   // GeoJSON carries only actual SOS points, not an unbacked WebGL text glyph.
   const data = { ...alerts, features: alerts.features.map((feature) => ({
     ...feature, properties: { ...feature.properties,
-      pinImage: sosPinImage(feature.properties.status, feature.properties.severity, feature.properties.isSelected) }
+      pinImage: sosPinImage(feature.properties.status, feature.properties.severity, feature.properties.isSelected, selectedIsFire) }
   })) };
   registerPins(map);
   const pinReady = pinImagesSupported && Object.values(DISPATCH_PIN_IMAGES).every((id) => map.hasImage(id));
@@ -1081,13 +1087,25 @@ function ensureSosMapLayers(map: MapLibreMap): void {
     existingSource.setData(data as unknown as GeoJsonSourceData);
   }
 
+  // The selected SOS has a soft stationary aura even when reduced motion
+  // disables pulse animation; its severity remains in the label accent/card.
+  if (!map.getLayer(SOS_AURA_LAYER_ID)) map.addLayer({
+    id: SOS_AURA_LAYER_ID, type: "circle", source: SOS_SOURCE_ID,
+    filter: ["==", ["get", "isSelected"], true],
+    paint: { "circle-color": SELECTED_SOS_COLOR, "circle-radius": 30,
+      "circle-opacity": .13, "circle-stroke-color": SELECTED_SOS_COLOR,
+      "circle-stroke-width": 8, "circle-stroke-opacity": .08,
+      "circle-translate": pinReady ? [0, -35] : [0, 0],
+      "circle-translate-anchor": "viewport" }
+  });
+
   if (!map.getLayer(SOS_PULSE_LAYER_ID)) {
     map.addLayer({
       id: SOS_PULSE_LAYER_ID,
       type: "circle",
       source: SOS_SOURCE_ID,
       paint: {
-        "circle-color": ["get", "color"],
+        "circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR, ["get", "color"]],
         "circle-radius": 18,
         // The canvas pin's head is ~35px above its geographic tip. In the
         // no-canvas circle fallback, the head is centered on the coordinate.
@@ -1104,7 +1122,7 @@ function ensureSosMapLayers(map: MapLibreMap): void {
       type: "circle",
       source: SOS_SOURCE_ID,
       paint: {
-        "circle-color": ["get", "color"],
+        "circle-color": ["case", ["boolean", ["get", "isSelected"], false], SELECTED_SOS_COLOR, ["get", "color"]],
         "circle-opacity": pinReady ? 0 : 1,
         "circle-stroke-opacity": pinReady ? 0 : 1,
         "circle-radius": ["case", ["boolean", ["get", "isSelected"], false], 14, 12],
@@ -1147,7 +1165,7 @@ function restoreMapLayers(): void {
     hasSource: (id) => Boolean(map.getSource(id)),
     hasLayer: (id) => Boolean(map.getLayer(id))
   }, [SOS_SOURCE_ID, RESPONDER_SOURCE_ID, RESPONDER_SELECTED_SOURCE_ID],
-  [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
+  [SOS_AURA_LAYER_ID, SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID, SOS_GLYPH_LAYER_ID,
     RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID, RESPONDER_NAME_LAYER_ID,
     RESPONDER_SELECTED_DOT_LAYER_ID, RESPONDER_SELECTED_GLYPH_LAYER_ID,
     RESPONDER_SELECTED_NAME_LAYER_ID, RESPONDER_CLUSTER_LAYER_ID, RESPONDER_COUNT_LAYER_ID,
@@ -1389,7 +1407,7 @@ watch(() => themeStore.isDark, () => {
     }
   } catch { /* MapCanvas is swapping styles; restoreMapLayers recreates removed layers. */ }
 });
-watch(incidentNameById, () => { syncSelectedSosLabel(); updateMapEdgeCues(); });
+watch(incidentNameById, () => { syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); });
 watch(nearbyFeatures, () => { mapPointChoices.value = []; syncMapData(); updateMapEdgeCues(); }, { flush: "sync" });
 watch(() => [adminSos.visibleRequests, adminSos.selectedId] as const,
   () => { mapPointChoices.value = []; syncMapData(); syncSelectedSosLabel(); updateMapEdgeCues(); }, { flush: "sync" });
@@ -1663,19 +1681,19 @@ onBeforeUnmount(() => {
    zero-sized anchor stays at the exact SOS coordinates; only the chip moves. */
 :global(.dispatch-sos-label-anchor) { width: 0; height: 0; z-index: 4; pointer-events: none; }
 :global(.dispatch-sos-label-anchor[hidden]) { display: none; }
-:global(.dispatch-sos-label) { position: absolute; top: -30px; left: 30px;
+:global(.dispatch-sos-label) { position: absolute; top: -35px; left: 24px;
   transform: translateY(-50%); box-sizing: border-box; display: block;
-  width: max-content; max-width: min(12rem, calc(100vw - 4rem)); min-height: 30px;
-  padding: .32rem .65rem; border: 1px solid rgba(var(--v-theme-on-surface), .28);
+  width: max-content; max-width: min(12rem, calc(100vw - 4rem)); min-height: 32px;
+  padding: .34rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .2);
   border-inline-start: 3px solid var(--dispatch-selected-sos-color, #dc2626);
-  border-radius: .65rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: 0 3px 12px rgba(8, 21, 38, .36); font: 800 .8rem/1.4 var(--bb-font-family, sans-serif);
+  border-radius: 999px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 3px 12px rgba(8, 21, 38, .28); font: 800 .83rem/1.4 var(--bb-font-family, sans-serif);
   white-space: normal; overflow-wrap: anywhere; text-align: start; pointer-events: none; }
-:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) { left: -30px; transform: translate(-100%, -50%); }
-:global(.dispatch-sos-label-anchor--below .dispatch-sos-label) { top: 18px; transform: none; }
+:global(.dispatch-sos-label-anchor--left .dispatch-sos-label) { left: -24px; transform: translate(-100%, -50%); }
+:global(.dispatch-sos-label-anchor--below .dispatch-sos-label) { top: 16px; transform: none; }
 :global(.dispatch-sos-label-anchor--left.dispatch-sos-label-anchor--below .dispatch-sos-label) { transform: translateX(-100%); }
 :global(.dispatch-sos-label-anchor--center .dispatch-sos-label) {
-  left: 0; top: 18px; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px))); }
+  left: 0; top: 16px; transform: translateX(calc(-50% + var(--dispatch-sos-label-shift, 0px))); }
 :global(.dispatch-sos-label-anchor--center.dispatch-sos-label-anchor--above .dispatch-sos-label) {
   top: auto; bottom: 60px; }
 @media (forced-colors: active) {
@@ -1693,6 +1711,8 @@ onBeforeUnmount(() => {
   width: 20px; height: 20px; border: 2px solid #fff; border-radius: 50% 50% 50% 4px;
   background: var(--dispatch-sos-color, #dc2626);
   box-shadow: 0 2px 4px rgba(9, 25, 44, .4); transform: rotate(-45deg); }
+.dispatch-map-key__icon--selected-sos::after { background: #dc2626;
+  box-shadow: 0 0 0 5px rgba(220, 38, 38, .19); }
 .dispatch-map-key__icon--helper::after { background: var(--dispatch-helper-color, #0868c8); }
 .dispatch-map-key__selected::before { background: var(--dispatch-helper-color, #0868c8); border-color: #f7b632; }
 .dispatch-map-key__cluster { display: inline-grid; place-items: center; flex: 0 0 32px;
