@@ -160,7 +160,7 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(legend).toContain('v-show="legendOpen"');
     expect(legend).toContain('v-for="item in sosSeverityKey"');
     const css = styles[0]!.content;
-    expect(css).toContain('.admin-dispatch__legend-toggle {\n  position: absolute; z-index: 5; right: .75rem;');
+    expect(css).toContain('.admin-dispatch__legend-toggle {\n  position: absolute; z-index: 5; right: 1.125rem;');
     expect(css).toContain('width: 44px; height: 44px; min-width: 44px; min-height: 44px;');
     expect(css).toContain('right: 4.25rem; left: 24rem;');
     expect(css).toContain('left: .75rem; right: 4.25rem; width: calc(100% - 5rem);');

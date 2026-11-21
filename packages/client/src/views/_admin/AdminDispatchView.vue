@@ -2157,7 +2157,7 @@ onBeforeUnmount(() => {
   padding: .55rem .85rem; list-style: none; background: rgb(var(--v-theme-surface));
   color: rgb(var(--v-theme-on-surface)); font: 700 .76rem/1.5 var(--bb-font-family); }
 .admin-dispatch__legend-toggle {
-  position: absolute; z-index: 5; right: .75rem;
+  position: absolute; z-index: 5; right: 1.125rem;
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   width: 44px; height: 44px; min-width: 44px; min-height: 44px;
   box-shadow: var(--bb-shadow-overlay);
@@ -2403,8 +2403,13 @@ onBeforeUnmount(() => {
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   border-left: 1px solid var(--bb-color-outline);
 }
-.admin-dispatch__header { display: block; flex: none; margin-bottom: .35rem !important; }
-.admin-dispatch__intro-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .15rem .35rem; }
+.admin-dispatch__header {
+  display: block; flex: none; padding: .45rem .35rem .3rem;
+  margin-bottom: .45rem !important;
+}
+/* Keep the status row, SOS title and outlined filter on separate readable lines. */
+.admin-dispatch__intro { display: grid; gap: .75rem; margin-bottom: .85rem; }
+.admin-dispatch__intro-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .25rem .35rem; }
 .admin-dispatch__intro-top .admin-dispatch__eyebrow { margin: 0; }
 .admin-dispatch__intro-top :deep(.v-chip) { flex: none; max-width: 100%; }
 .admin-dispatch__heading { gap: .2rem !important; }
@@ -2684,7 +2689,7 @@ onBeforeUnmount(() => {
   .admin-dispatch__map-and-actions > #dispatch-map {
     inset: 0 0 min(38dvh, 21rem) 0; width: 100%; height: calc(100% - min(38dvh, 21rem));
   }
-  .admin-dispatch__header { margin-bottom: .5rem !important; }
+  .admin-dispatch__header { padding: 0; margin-bottom: .5rem !important; }
   .admin-dispatch__intro { display: none; }
   .admin-dispatch__filter-select { display: block !important; }
   .admin-dispatch__toolbar-actions { flex-wrap: wrap; }
@@ -2700,7 +2705,9 @@ onBeforeUnmount(() => {
     width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
   }
   .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
-  .admin-dispatch__legend-toggle { bottom: calc(.5rem + env(safe-area-inset-bottom, 0px)); }
+  .admin-dispatch__legend-toggle {
+    right: .875rem; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
+  }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
     left: .75rem; right: 4.25rem; width: calc(100% - 5rem);

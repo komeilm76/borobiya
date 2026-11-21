@@ -72,6 +72,8 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(markup).toContain('class="admin-dispatch__request-chips d-flex flex-wrap align-center ga-1"');
     expect(markup).toContain('class="admin-dispatch__intro-top"');
     expect(markup).toContain('متصل به اتاق زندهٔ ادمین');
+    expect(css).toContain('display: block; flex: none; padding: .45rem .35rem .3rem;');
+    expect(css).toContain('.admin-dispatch__intro { display: grid; gap: .75rem; margin-bottom: .85rem; }');
     expect(rail).toContain('border-top: 0; justify-content: flex-start !important;');
     expect(rail).toContain('justify-content: flex-start !important;');
     expect(markup).toContain('aria-label="انتخاب همهٔ امدادگران"');
@@ -80,9 +82,19 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(rail).toContain('#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-text[role="status"])');
     expect(shellCss).toContain('.app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,');
     expect(shellCss).toContain('inset-inline-start: calc(clamp(20rem, 28vw, 25rem) + 1rem);');
-    expect(shellCss).toContain('inset-block-end: calc(8.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('inset-block-end: calc(4rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('inset-block-end: calc(7.5rem + env(safe-area-inset-bottom, 0px));');
     expect(shellCss).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));');
-    expect(shellCss).toContain('inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));');
+    expect(shellCss).toContain('inset-block-end: calc(min(38dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('inset-block-end: calc(min(38dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('position: absolute; z-index: 5; right: 1.125rem;');
+    expect(css).toContain('right: .875rem; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
+    expect((4 - .75) * 16 - 44).toBe(8); // Desktop legend to SOS.
+    expect((3.75 - .5) * 16 - 44).toBe(8); // Mobile legend to SOS.
+    expect((7.5 - 4) * 16 - 48).toBe(8); // Desktop SOS to Broadcast.
+    expect((7.25 - 3.75) * 16 - 48).toBe(8); // Mobile SOS to Broadcast.
+    expect((1.125 * 16 + 44 / 2) - (1 * 16 + 48 / 2)).toBe(0); // Desktop centers.
+    expect((.875 * 16 + 44 / 2) - (.75 * 16 + 48 / 2)).toBe(0); // Mobile centers.
   });
 
   it("uses a single map search widget and a compact recenter action in its heading", () => {
