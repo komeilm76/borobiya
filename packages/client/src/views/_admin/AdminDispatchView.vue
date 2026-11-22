@@ -178,7 +178,7 @@
                   </span>
                 </v-list-item-title>
                 <div class="dispatch-request-row__details">
-                  <span class="dispatch-request-row__status" :class="{ 'dispatch-request-row__status--urgent': item.status === 'cancelled_by_rescuer' }"
+                  <span class="dispatch-request-row__status" :class="`dispatch-request-row__status--${item.status}`"
                     :title="statusMeta(item.status).label">
                     <v-icon :icon="statusMeta(item.status).icon" size="16" aria-hidden="true" />
                     {{ statusMeta(item.status).queueLabel }}
@@ -526,7 +526,8 @@
               <h2>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</h2>
             </div>
             <div class="admin-dispatch__detail-badges">
-              <v-chip id="dispatch-chip-14" :color="statusMeta(adminSos.selectedRequest.status).badgeColor" size="small" variant="tonal">
+              <v-chip id="dispatch-chip-14" :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
+                :prepend-icon="statusMeta(adminSos.selectedRequest.status).icon" size="small" variant="tonal">
                 {{ statusMeta(adminSos.selectedRequest.status).label }}
               </v-chip>
               <span id="dispatch-chip-15" class="admin-dispatch__priority-pill"
@@ -536,13 +537,37 @@
             </div>
           </v-card-title>
           <v-divider />
+          <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
+            <h3>تصویر پیوست حادثه</h3>
+            <button id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
+              :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
+              <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
+                class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
+            </button>
+            <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
+            <v-btn id="dispatch-action-20" v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
+              color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
+            <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
+          </div>
           <div class="admin-dispatch__sender" role="group" aria-label="ارسال‌کنندهٔ درخواست">
             <span class="admin-dispatch__sender-icon" aria-hidden="true"><v-icon icon="mdi-account-circle-outline" size="23" /></span>
             <div class="admin-dispatch__sender-copy">
               <strong>ارسال‌کنندهٔ درخواست</strong>
-              <details id="dispatch-details-02" class="admin-dispatch__sender-id"><summary>شناسهٔ ثبت‌شده</summary>
-                <bdi dir="ltr">{{ adminSos.selectedRequest.requesterId }}</bdi>
-              </details>
+              <span class="admin-dispatch__sender-name" dir="ltr" v-if="requesterName">@{{ requesterName }}</span>
+              <span v-else class="admin-dispatch__sender-placeholder" role="status">{{ requesterLoading ? 'در حال دریافت نام کاربری…' : 'نام کاربری در دسترس نیست' }}</span>
+              <button id="dispatch-button-06" v-if="requesterFailed" type="button" class="admin-dispatch__inline-retry" @click="requesterRetry++">تلاش دوباره</button>
+              <div class="admin-dispatch__sender-id">
+                <span>شناسهٔ حساب</span>
+                <bdi dir="ltr" :title="adminSos.selectedRequest.requesterId">{{ shortRequesterId(adminSos.selectedRequest.requesterId) }}</bdi>
+                <v-btn id="dispatch-action-28" icon="mdi-content-copy" variant="text" size="small" aria-label="کپی شناسهٔ کامل ارسال‌کننده"
+                  :disabled="!adminSession" @click="copyRequesterId" />
+              </div>
+              <small v-if="requesterCopyStatus === 'copied'" role="status">شناسهٔ کامل کپی شد.</small>
+              <label v-else-if="requesterCopyStatus === 'failed'" class="admin-dispatch__copy-fallback">
+                کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
+                <input :value="adminSos.selectedRequest.requesterId" readonly dir="ltr" aria-label="شناسهٔ کامل ارسال‌کننده برای کپی دستی"
+                  @focus="($event.target as HTMLInputElement).select()" />
+              </label>
             </div>
             <v-btn id="dispatch-action-19" color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-account-details-outline"
               aria-label="مشاهدهٔ پروفایل ارسال‌کننده" class="admin-dispatch__sender-action"
@@ -584,9 +609,17 @@
             <details id="dispatch-details-03" :key="adminSos.selectedRequest.id" class="admin-dispatch__location-details">
               <summary>جزئیات موقعیت و مختصات <v-icon icon="mdi-chevron-down" size="18" aria-hidden="true" /></summary>
               <dl class="admin-dispatch__facts">
-                <div>
+                <div class="admin-dispatch__address">
+                  <dt>محل حادثه · نشانی تقریبی</dt>
+                  <dd v-if="addressLoading" role="status">در حال یافتن نشانی…</dd>
+                  <dd v-else-if="incidentAddress">{{ incidentAddress }}</dd>
+                  <dd v-else>{{ addressFailed ? 'دریافت نشانی ممکن نشد.' : 'نشانی در دسترس نیست؛ نقطهٔ حادثه روی نقشه ثبت شده است.' }}
+                    <button id="dispatch-button-05" v-if="addressFailed" type="button" class="admin-dispatch__inline-retry" @click="addressRetry++">تلاش دوباره</button>
+                  </dd>
+                </div>
+                <div class="admin-dispatch__location-coordinates">
                   <dt>مختصات ثبت‌شدهٔ حادثه</dt>
-                  <dd><bdi dir="ltr">{{ adminSos.selectedRequest.location.lat.toFixed(6) }}, {{ adminSos.selectedRequest.location.lon.toFixed(6) }}</bdi></dd>
+                  <dd class="admin-dispatch__coordinates" dir="ltr"><span>lat: {{ adminSos.selectedRequest.location.lat.toFixed(6) }}</span><span>lng: {{ adminSos.selectedRequest.location.lon.toFixed(6) }}</span></dd>
                 </div>
                 <div v-if="adminSos.selectedRequest.location.accuracy !== undefined">
                   <dt>دقت گزارش‌شده</dt>
@@ -594,18 +627,6 @@
                 </div>
               </dl>
             </details>
-            <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
-              <h3>تصویر پیوست حادثه</h3>
-              <button id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
-                :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
-                <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
-                  class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
-              </button>
-              <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
-              <v-btn id="dispatch-action-20" v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
-                color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
-              <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
-            </div>
             <p v-if="adminSos.selectedRequestProposals.length > 0" class="admin-dispatch__proposal-note">
               {{ adminSos.selectedRequestProposals.length.toLocaleString('fa-IR') }} پیشنهاد در این نشست ارسال شد؛ وضعیت پذیرش آن‌ها در این بخش تأیید نمی‌شود.
             </p>
@@ -707,8 +728,9 @@ import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
 import type { GeocodeResult, IncidentType, Severity, SosRequestRecord, UserProfile } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
-import { searchPlaces } from "@/api/geocoding";
-import { listAdminUsers } from "@/api/admin-users";
+import { reversePlace, searchPlaces } from "@/api/geocoding";
+import { getAdminUser, listAdminUsers } from "@/api/admin-users";
+import { accountSessionKey } from "@/composables/device-identity";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { sosPriorityStyle } from "@/sos/severity-palette";
 import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
@@ -792,6 +814,84 @@ const dispatchFilters = [
 const auth = useAuthStore(pinia);
 const senderProfileOpen = ref(false);
 const profileUserId = ref<string | null>(null);
+const requesterName = ref<string | null>(null);
+const requesterLoading = ref(false);
+const requesterFailed = ref(false);
+const requesterRetry = ref(0);
+const requesterCopyStatus = ref<"copied" | "failed" | null>(null);
+let requesterCopyGeneration = 0;
+const incidentAddress = ref<string | null>(null);
+const addressLoading = ref(false);
+const addressFailed = ref(false);
+const addressRetry = ref(0);
+const adminSession = computed(() => auth.user?.role === "admin"
+  ? accountSessionKey(auth.user.id, auth.accessToken) : null);
+
+function shortRequesterId(id: string): string {
+  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+}
+
+async function copyRequesterId(): Promise<void> {
+  const id = adminSos.selectedRequest?.requesterId;
+  const session = adminSession.value;
+  if (!id || !session) return;
+  const attempt = ++requesterCopyGeneration;
+  requesterCopyStatus.value = null;
+  try {
+    await navigator.clipboard.writeText(id);
+    if (attempt === requesterCopyGeneration && adminSos.selectedRequest?.requesterId === id && adminSession.value === session)
+      requesterCopyStatus.value = "copied";
+  } catch {
+    if (attempt === requesterCopyGeneration && adminSos.selectedRequest?.requesterId === id && adminSession.value === session)
+      requesterCopyStatus.value = "failed";
+  }
+}
+
+// The SOS record has no username or postal address. Resolve both from the
+// exact admin user endpoint and the approximate, same-origin reverse endpoint.
+// Never let responses for another selection or admin session replace this one.
+watch(() => [adminSos.selectedRequest?.requesterId, adminSession.value, requesterRetry.value] as const,
+  ([userId, session], _previous, onCleanup) => {
+    const controller = new AbortController();
+    let active = true;
+    onCleanup(() => { active = false; controller.abort(); });
+    requesterName.value = null;
+    requesterLoading.value = Boolean(userId && session);
+    requesterFailed.value = false;
+    requesterCopyGeneration++;
+    requesterCopyStatus.value = null;
+    if (!userId || !session) return;
+    void (async () => {
+      try {
+        await auth.ensureSession();
+        if (!active || adminSession.value !== session || !auth.accessToken) return;
+        const profile = await getAdminUser(userId, auth.accessToken, controller.signal);
+        if (active && adminSession.value === session && adminSos.selectedRequest?.requesterId === userId)
+          requesterName.value = profile.username;
+      } catch {
+        if (active) requesterFailed.value = true;
+      } finally {
+        if (active) requesterLoading.value = false;
+      }
+    })();
+  }, { immediate: true, flush: "sync" });
+watch(() => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.location.lat,
+  adminSos.selectedRequest?.location.lon, adminSession.value, addressRetry.value] as const,
+  ([id, lat, lon, session], _previous, onCleanup) => {
+    const controller = new AbortController();
+    let active = true;
+    onCleanup(() => { active = false; controller.abort(); });
+    incidentAddress.value = null;
+    addressLoading.value = Boolean(id && lat !== undefined && lon !== undefined && session);
+    addressFailed.value = false;
+    if (!id || lat === undefined || lon === undefined || !session) return;
+    void reversePlace({ lat, lon }, controller.signal).then((result) => {
+      if (active && adminSession.value === session && adminSos.selectedRequest?.id === id)
+        incidentAddress.value = result?.formattedAddress ?? null;
+    }).catch((error: unknown) => {
+      if (active && (error as { name?: unknown } | null)?.name !== "AbortError") addressFailed.value = true;
+    }).finally(() => { if (active) addressLoading.value = false; });
+  }, { immediate: true, flush: "sync" });
 const photoDialogOpen = ref(false);
 const photoOpenLoading = ref(false);
 const photoOpenError = ref<string | null>(null);
@@ -2034,15 +2134,16 @@ onBeforeUnmount(() => {
 .admin-dispatch__location-details summary .v-icon { margin-inline-start: auto; transition: transform .2s; }
 .admin-dispatch__location-details[open] summary .v-icon { transform: rotate(180deg); }
 .admin-dispatch__location-details .admin-dispatch__facts { padding-bottom: .35rem; }
-.admin-dispatch__photo { min-width: 0; }
-.admin-dispatch__photo-open { display: block; width: 4rem; height: 4rem; margin-top: .4rem; padding: 0;
-  overflow: hidden; border: 1px solid var(--bb-color-outline); background: var(--bb-color-inset);
-  border-radius: .75rem; cursor: zoom-in; }
+.admin-dispatch__photo { min-width: 0; margin: .55rem 1rem .2rem; }
+.admin-dispatch__photo h3 { margin: 0; font-size: .85rem; }
+.admin-dispatch__photo-open { display: block; width: 100%; height: clamp(8rem, 23vh, 13rem);
+  margin-top: .4rem; padding: 0; overflow: hidden; border: 1px solid var(--bb-color-outline);
+  background: var(--bb-color-inset); border-radius: .75rem; cursor: zoom-in; }
 .admin-dispatch__photo-open:hover { border-color: rgb(var(--v-theme-primary)); }
 .admin-dispatch__photo-open:disabled { opacity: .65; cursor: progress; }
 .admin-dispatch__photo-error { margin: .4rem 0 0; color: rgb(var(--v-theme-error)); font-size: .82rem; }
 .admin-dispatch__photo-open:focus-visible, .admin-dispatch__location-details summary:focus-visible,
-.admin-dispatch__sender-id summary:focus-visible, .admin-dispatch__search-help summary:focus-visible,
+.admin-dispatch__search-help summary:focus-visible,
 .dispatch-mission-timeline summary:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -2081,9 +2182,20 @@ onBeforeUnmount(() => {
   border-radius: 50%; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
 .admin-dispatch__sender-copy { display: grid; flex: 1 1 10rem; min-width: 0; gap: .12rem; }
 .admin-dispatch__sender-copy strong { font-size: .9rem; }
-.admin-dispatch__sender-id { color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__sender-id summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }
-.admin-dispatch__sender-id bdi { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-weight: 750; overflow-wrap: anywhere; }
+.admin-dispatch__sender-placeholder { color: var(--bb-color-muted); font-size: .8rem; }
+.admin-dispatch__sender-id { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .4rem;
+  min-width: 0; color: var(--bb-color-muted); font-size: .8rem; }
+.admin-dispatch__sender-id bdi { color: var(--bb-color-text); white-space: nowrap; }
+.admin-dispatch__sender-id :deep(.v-btn) { min-width: 44px; min-height: 44px; width: 44px; height: 44px; }
+.admin-dispatch__inline-retry { display: inline-block; min-height: 36px; padding: .2rem .35rem; border: 0;
+  background: transparent; color: rgb(var(--v-theme-primary)); cursor: pointer; font: inherit; font-size: .8rem; }
+.admin-dispatch__inline-retry:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); border-radius: .35rem; }
+.admin-dispatch__copy-fallback { display: grid; gap: .25rem; color: var(--bb-color-muted); font-size: .8rem; }
+.admin-dispatch__copy-fallback input { width: 100%; padding: .35rem; border: 1px solid var(--bb-color-outline);
+  border-radius: .4rem; background: var(--bb-color-surface); color: var(--bb-color-text); }
+.admin-dispatch__address, .admin-dispatch__location-coordinates { grid-column: 1 / -1; }
+.admin-dispatch__coordinates { display: flex; flex-wrap: wrap; gap: .2rem .8rem; justify-content: flex-end; }
 .admin-dispatch__sender-action { flex: none; min-height: 44px; }
 
 /* The timeline sits between other cards; give it a boundary, not another shadow. */
@@ -2505,10 +2617,10 @@ onBeforeUnmount(() => {
   border-color: var(--bb-color-primary);
   background: color-mix(in srgb, var(--bb-color-inset) 87%, var(--bb-color-primary));
 }
-#dispatch-sidebar .dispatch-request-row.v-list-item--active::before {
-  content: ""; position: absolute; z-index: 1; inset-inline-start: 0; top: .3rem; bottom: .3rem;
-  width: 3px; border-radius: 3px; background: var(--bb-color-primary);
-}
+/* Vuetify also paints active rows with ::before. Keep selection on the full
+   rounded border, without an inset side stripe or a rectangular overlay. */
+#dispatch-sidebar .dispatch-request-row.v-list-item--active::before { opacity: 0 !important; }
+#dispatch-sidebar .dispatch-request-row.v-list-item--active :deep(.v-list-item__overlay) { opacity: 0; }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item__prepend) { align-self: flex-start; padding-top: .25rem; }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item__content) { display: grid; gap: .15rem; }
 #dispatch-sidebar .dispatch-request-row__marker {
@@ -2537,16 +2649,28 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .dispatch-request-row__details {
   display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .3rem; min-width: 0;
 }
+/* Mission state is separate from severity. A small icon + named, tinted badge
+   makes pending, dispatched and replacement legible without enlarging rows. */
 #dispatch-sidebar .dispatch-request-row__status {
-  display: inline-flex; align-items: center; gap: .15rem; min-width: 0; max-width: 100%;
-  padding: 0 .3rem; min-height: 20px; border-radius: .4rem;
-  border: 1px solid color-mix(in srgb, var(--bb-color-outline) 40%, transparent);
-  background: var(--bb-color-surface); color: var(--bb-color-text);
-  font-size: .8rem; line-height: 1.25; font-weight: 650;
+  --dispatch-status-color: var(--bb-color-muted);
+  display: inline-flex; align-items: center; gap: .2rem; min-width: 0; max-width: 100%;
+  padding: 0 .35rem; min-height: 20px; border-radius: .45rem;
+  border: 1px solid color-mix(in srgb, var(--dispatch-status-color) 42%, transparent);
+  background: color-mix(in srgb, var(--dispatch-status-color) 13%, var(--bb-color-surface));
+  color: var(--dispatch-status-color); font-size: .8rem; line-height: 1.25; font-weight: 700;
 }
-#dispatch-sidebar .dispatch-request-row__status--urgent {
-  color: #a2241e; background: #ffe8e7; border-color: #dc2626; font-weight: 800;
-}
+#dispatch-sidebar .dispatch-request-row__status--pending { --dispatch-status-color: #956200; }
+#dispatch-sidebar .dispatch-request-row__status--dispatched { --dispatch-status-color: #075c94; }
+#dispatch-sidebar .dispatch-request-row__status--accepted,
+#dispatch-sidebar .dispatch-request-row__status--completed { --dispatch-status-color: #08734a; }
+#dispatch-sidebar .dispatch-request-row__status--cancelled_by_rescuer { --dispatch-status-color: #a2241e; }
+#dispatch-sidebar .dispatch-request-row__status--cancelled_by_requester,
+#dispatch-sidebar .dispatch-request-row__status--expired { --dispatch-status-color: var(--bb-color-muted); }
+:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--pending) { --dispatch-status-color: #ffd68a; }
+:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--dispatched) { --dispatch-status-color: #8ed1ff; }
+:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--accepted),
+:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--completed) { --dispatch-status-color: #8de5b8; }
+:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--cancelled_by_rescuer) { --dispatch-status-color: #ffadad; }
 #dispatch-sidebar .dispatch-request-row__meta {
   display: inline-flex; flex-wrap: wrap; align-items: center; gap: .1rem .35rem;
   margin-inline-start: auto; color: var(--bb-color-muted); line-height: 1.3;
@@ -2560,9 +2684,6 @@ onBeforeUnmount(() => {
 :global(:root.dark .dispatch-request-row__priority),
 :global(:root.dark .admin-dispatch__priority-pill) {
   color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
-}
-:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--urgent) {
-  color: #ffadad; background: #422b2b; border-color: #ffadad;
 }
 /* Nearby responders use the same inset card language, but with two scan lines:
    identity + distance first; specialty, rating and last activity underneath.
@@ -2703,7 +2824,8 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__incident-panel .admin-dispatch__sender-icon { width: 32px; height: 32px; }
 .admin-dispatch__incident-panel .admin-dispatch__sender-copy { min-width: 0; }
-.admin-dispatch__incident-panel .admin-dispatch__sender-id summary { padding-block: .2rem; }
+.admin-dispatch__incident-panel .admin-dispatch__photo { margin: .3rem .6rem .45rem; }
+.admin-dispatch__incident-panel .admin-dispatch__photo-open { height: clamp(8rem, 22vh, 12rem); }
 .admin-dispatch__incident-panel .admin-dispatch__sender-action :deep(.v-btn__content) { white-space: nowrap; }
 .admin-dispatch__incident-panel #dispatch-incident :deep(.admin-dispatch__detail-body) {
   gap: .4rem; padding: .35rem .6rem .5rem; line-height: 1.45;

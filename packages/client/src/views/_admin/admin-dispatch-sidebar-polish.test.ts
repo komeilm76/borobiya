@@ -64,7 +64,9 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(css).toContain('box-shadow: 0 2px 7px rgba(14, 42, 45, .12);');
     expect(css).toContain('min-height: 20px; padding: 0 .35rem; line-height: 1.25;');
     expect(css).toContain('margin-inline-start: auto; color: var(--bb-color-muted);');
-    expect(css).toContain('background: #422b2b; border-color: #ffadad;');
+    expect(queue).toContain(':class="`dispatch-request-row__status--${item.status}`"');
+    expect(css).toContain('--dispatch-status-color: #ffadad;');
+    expect(css).toContain('border: 1px solid color-mix(in srgb, var(--dispatch-status-color) 42%, transparent);');
     for (const status of Object.values(SOS_STATUS_PRESENTATION)) {
       expect(status.icon).toMatch(/^mdi-/);
       expect(status.queueLabel.length).toBeLessThanOrEqual(status.label.length + 5);

@@ -63,7 +63,10 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
     expect(template).toContain(':aria-pressed="item.id === adminSos.selectedId"');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
-    expect(css).toContain('#dispatch-sidebar .dispatch-request-row.v-list-item--active::before {');
+    expect(css).toContain('#dispatch-sidebar .dispatch-request-row.v-list-item--active::before { opacity: 0 !important; }');
+    const selectedRowStyle = css.slice(css.indexOf('#dispatch-sidebar .dispatch-request-row.v-list-item--active::before {'),
+      css.indexOf('#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__prepend)'));
+    expect(selectedRowStyle).not.toContain('inset-inline-start: 0;');
     expect(source).toMatch(/function toggleQueueRequest\(item: SosRequestRecord\): void \{[\s\S]*?toggleSosQueueSelection\(adminSos.selectedId, item.id\) === null\)[\s\S]*?adminSos.selectRequest\(null\);[\s\S]*?focusRequest\(item\);/);
     const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-map-region"'));
     expect(queue).toContain('item.location.isManual');
@@ -74,6 +77,17 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain(':key="adminSos.selectedRequest.id" class="admin-dispatch__location-details"');
     expect(template).toContain('class="admin-dispatch__sender-id"');
     expect(template).toContain('class="admin-dispatch__photo-open"');
+    expect(template.indexOf('class="admin-dispatch__photo"')).toBeLessThan(template.indexOf('class="admin-dispatch__sender"'));
+    expect(template).toContain('class="admin-dispatch__sender-name"');
+    expect(template).not.toContain('شناسهٔ ثبت‌شده');
+    expect(template).toContain('shortRequesterId(adminSos.selectedRequest.requesterId)');
+    expect(template).toContain('aria-label="شناسهٔ کامل ارسال‌کننده برای کپی دستی"');
+    expect(template).toContain('lat: {{ adminSos.selectedRequest.location.lat.toFixed(6) }}');
+    expect(template).toContain('lng: {{ adminSos.selectedRequest.location.lon.toFixed(6) }}');
+    expect(template).toContain('محل حادثه · نشانی تقریبی');
+    expect(source).toContain('getAdminUser(userId, auth.accessToken, controller.signal)');
+    expect(source).toContain('reversePlace({ lat, lon }, controller.signal)');
+    expect(source).toContain('onCleanup(() => { active = false; controller.abort(); });');
     expect(template).toContain('v-model="photoDialogOpen"');
     expect(template).toContain('@click="openPhoto"');
     expect(template).toContain('@click="photoRetryNonce++"');
@@ -113,6 +127,7 @@ describe("admin SOS triage flow", () => {
     expect(css).toContain('.admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }');
     expect(css).toContain('flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px;');
     expect(css).toContain('.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }');
+    expect(css).toContain('.admin-dispatch__photo-open { display: block; width: 100%; height: clamp(');
     expect(css).toContain('width: auto; height: auto; object-fit: contain;');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: template }).errors).toEqual([]);
     expect(compileStyle({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: css, scoped: true }).errors).toEqual([]);

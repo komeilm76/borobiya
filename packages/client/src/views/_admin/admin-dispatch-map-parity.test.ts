@@ -46,7 +46,7 @@ describe('dispatch controls match the map Mission and Travel design language', (
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn) { height: 38px; min-height: 38px; }');
     expect(css).toContain('min-width: 44px; min-height: 44px; height: auto;');
     expect(css).toContain('font-family: var(--bb-font-family); letter-spacing: normal;');
-    expect(css).toContain('.admin-dispatch__sender-id summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }');
+    expect(css).toContain('.admin-dispatch__sender-id { display: flex; flex-wrap: wrap; align-items: center;');
     expect(css).toContain('.admin-dispatch__search-help summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }');
     expect(template!.content).toContain('class="admin-dispatch__confirmation" rounded="xl"');
     expect(template!.content).toContain('color="error" variant="flat" rounded="lg"');
