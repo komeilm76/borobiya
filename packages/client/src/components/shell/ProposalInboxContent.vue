@@ -79,13 +79,14 @@
             <button v-for="offer in inbox.proposals" :key="offer.id" class="offer-card" type="button"
               :class="{ 'offer-card--selected': selected?.id === offer.id && (!compactMap || detailOpen) }"
               :data-offer-id="offer.id" :aria-pressed="selected?.id === offer.id && (!compactMap || detailOpen)"
+              :style="sosPriorityStyle(offer.details?.sosRequest.severity ?? 'medium')"
               @click="selectOffer(offer.id)">
-              <span class="offer-card__stripe" :class="`offer-card__stripe--${severity(offer).tone}`" />
+              <span class="offer-card__stripe" aria-hidden="true" />
               <span class="offer-card__body">
                 <span class="offer-card__top">
                   <span class="offer-card__icon"><v-icon icon="mdi-lifebuoy" size="21" /></span>
                   <span class="offer-card__title">{{ offer.details?.incidentTypeName ?? 'درخواست امداد' }}</span>
-                  <span class="offer-card__severity" :class="`offer-card__severity--${severity(offer).tone}`">
+                  <span class="offer-card__severity">
                     {{ severity(offer).label }}
                   </span>
                 </span>
@@ -113,7 +114,7 @@
             <div class="offer-detail__top">
               <span class="offer-detail__kicker">پیشنهاد امداد · {{ proposalTime(selected.createdAt) }}</span>
               <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
-              <span class="offer-detail__pill" :class="`offer-card__severity--${severity(selected).tone}`">
+              <span class="offer-detail__pill" :style="sosPriorityStyle(selected.details?.sosRequest.severity ?? 'medium')">
                 <v-icon icon="mdi-alert-circle-outline" size="16" /> {{ severity(selected).label }}
               </span>
             </div>
@@ -261,6 +262,7 @@ import type { ProposalInboxItem } from "@shared/index";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { mapTripSession } from "@/map/trip-session";
 import { proposalDistance, proposalSeverity, proposalTime } from "@/sos/proposal-presentation";
+import { sosPriorityStyle } from "@/sos/severity-palette";
 import { useAuthStore } from "@/stores/auth";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
 
@@ -590,14 +592,13 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
 .offer-card:not(:disabled):not(.offer-card--selected):hover { transform: translateY(-2px); box-shadow: var(--bb-shadow-item-hover); }
 .offer-card:focus-visible, .offers__pages :focus-visible { outline: 3px solid #398c7d; outline-offset: 2px; }
 .offer-card--selected { border-color: #319581; box-shadow: 0 0 0 2px rgba(49,149,129,.22), var(--bb-shadow-item); }
-.offer-card__stripe { width: 5px; flex-shrink: 0; }
-.offer-card__stripe--urgent { background: #df554f; }.offer-card__stripe--important { background: #db9837; }.offer-card__stripe--standard { background: #3a9a8a; }
+.offer-card__stripe { width: 5px; flex-shrink: 0; background: var(--sos-priority-accent); }
 .offer-card__body { min-width: 0; width: 100%; display: grid; padding: 20px 19px; gap: 12px; }
 .offer-card__top, .offer-card__foot { display: flex; align-items: center; gap: 10px; }
 .offer-card__icon { display: inline-flex; justify-content: center; align-items: center; background: rgba(49,149,129,.12); color: rgb(var(--v-theme-primary)); border-radius: 11px; width: 36px; height: 36px; flex-shrink: 0; }
 .offer-card__title { font-weight: 800; font-size: .95rem; line-height: 1.55; flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .offer-card__severity, .offer-detail__pill { font-weight: 750; font-size: 0.82rem; border-radius: 50px; padding: 5px 10px; white-space: nowrap; }
-.offer-card__severity--urgent { background: #ffe7e4; color: #a2241e; }.offer-card__severity--important { background: #fff0d4; color: #875000; }.offer-card__severity--standard { background: #d9f4ed; color: #066b57; }
+.offer-card__severity, .offer-detail__pill { background: var(--sos-priority-surface); color: var(--sos-priority-ink); }
 .offer-card__description { font-size: .85rem; line-height: 1.65; opacity: .9; overflow: hidden; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .offer-card__foot { justify-content: space-between; flex-wrap: wrap; font-size: 0.82rem; color: rgb(var(--v-theme-primary)); }
 .offer-card__foot span { min-width: 0; overflow-wrap: anywhere; }
@@ -768,7 +769,8 @@ onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value 
   border: 1px solid var(--bb-color-outline);
 }
 :global(:root.dark .offers--map .offer-detail__facts > div) { background: transparent; border: 0; }
-:global(:root.dark .offer-card__severity--urgent) { color: #ffadad; background: #422b2b; }
-:global(:root.dark .offer-card__severity--important) { color: #f9ca76; background: #443522; }
-:global(:root.dark .offer-card__severity--standard) { color: var(--bb-color-primary); background: #1d4038; }
+:global(:root.dark .offer-card__severity),
+:global(:root.dark .offer-detail__pill) {
+  color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
+}
 </style>

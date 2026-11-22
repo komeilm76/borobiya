@@ -73,7 +73,7 @@
             <button type="button" class="map-proposal__item" @click="openOffer(offer.id)">
               <span class="map-proposal__item-head">
                 <span class="map-proposal__incident">{{ offer.details?.incidentTypeName ?? 'درخواست امداد' }}</span>
-                <span class="map-proposal__severity" :class="`map-proposal__severity--${proposalSeverity[offer.details?.sosRequest.severity ?? 'medium'].tone}`">
+                <span class="map-proposal__severity" :style="sosPriorityStyle(offer.details?.sosRequest.severity ?? 'medium')">
                   {{ proposalSeverity[offer.details?.sosRequest.severity ?? 'medium'].label }}
                 </span>
               </span>
@@ -128,6 +128,7 @@
 import { computed, defineAsyncComponent, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { proposalSeverity, proposalTime } from "@/sos/proposal-presentation";
+import { sosPriorityStyle } from "@/sos/severity-palette";
 import { proposalEntryIntent } from "@/map/workspace-tab-query";
 import type { useProposalInboxStore } from "@/stores/proposal-inbox";
 
@@ -273,10 +274,11 @@ watch(() => route.fullPath, () => {
 .map-proposal__item:hover { border-color: rgba(var(--v-theme-primary), 0.5); background: rgba(var(--v-theme-primary), 0.08); }
 .map-proposal__item-head, .map-proposal__item-foot { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
 .map-proposal__incident { min-width: 0; font-weight: 800; line-height: 1.4; overflow-wrap: anywhere; }
-.map-proposal__severity { flex: 0 0 auto; padding: 0.15rem 0.4rem; border-radius: 0.45rem; font-size: 0.82rem; font-weight: 800; }
-.map-proposal__severity--urgent { color: #ad2525; background: rgba(220, 38, 38, 0.12); }
-.map-proposal__severity--important { color: #915509; background: rgba(217, 119, 6, 0.12); }
-.map-proposal__severity--standard { color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.12); }
+.map-proposal__severity {
+  flex: 0 0 auto; padding: 0.15rem 0.4rem; border-radius: 0.45rem;
+  font-size: 0.82rem; font-weight: 800;
+  color: var(--sos-priority-ink); background: var(--sos-priority-surface);
+}
 .map-proposal__description { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.55; font-size: 0.82rem; overflow-wrap: anywhere; }
 .map-proposal__requester { display: flex; align-items: center; gap: 0.25rem; font-size: 0.82rem; opacity: 0.8; overflow-wrap: anywhere; }
 .map-proposal__requester > span { min-width: 0; }
@@ -318,8 +320,9 @@ watch(() => route.fullPath, () => {
 :global(.map-proposal__details-scroll .offers .offers__items) {
   max-height: none; overflow: visible; padding: 0;
 }
-:global(:root.dark .map-proposal__severity--urgent) { color: #ffadad; }
-:global(:root.dark .map-proposal__severity--important) { color: #f9ca76; }
+:global(:root.dark .map-proposal__severity) {
+  color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
+}
 @media (forced-colors: active) {
   .map-proposal__bell, .map-proposal__item, .map-proposal__severity { border: 1px solid CanvasText; }
 }

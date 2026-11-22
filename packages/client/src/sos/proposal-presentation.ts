@@ -2,8 +2,8 @@ import type { ProposalInboxItem, Severity } from "@shared/index";
 
 export const proposalSeverity: Record<Severity, { label: string; tone: string }> = {
   high: { label: "فوری", tone: "urgent" },
-  medium: { label: "مهم", tone: "important" },
-  low: { label: "عادی", tone: "standard" }
+  medium: { label: "متوسط", tone: "important" },
+  low: { label: "کم‌خطر", tone: "standard" }
 };
 
 /** Approximate straight-line distance, never a promised driving distance or ETA. */

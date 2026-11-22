@@ -85,8 +85,8 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("testAlertSound");
     expect(viewSource).toContain("#dc2626");
     const severity = readFileSync(new URL("../../admin/sos-alerts.ts", import.meta.url), "utf8");
-    expect(severity).toContain("#d97706");
-    expect(severity).toContain("#0284c7");
+    expect(severity).toContain("SOS_PRIORITY_PALETTE.medium.accent");
+    expect(severity).toContain("SOS_PRIORITY_PALETTE.low.accent");
 
     // T3.3.4 nearest responder suggestions + multi-select dispatch console
     expect(viewSource).toContain("map-selected-alert-card");

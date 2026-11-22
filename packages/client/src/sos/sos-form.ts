@@ -7,6 +7,7 @@ import {
   type Severity,
   type SosLocation
 } from "@shared/index";
+import { SOS_PRIORITY_PALETTE } from "./severity-palette";
 import { ApiError } from "../api/http";
 import { friendlyErrorMessage } from "../api/error-message";
 
@@ -36,21 +37,21 @@ export const SOS_SEVERITY_OPTIONS: readonly SosSeverityOption[] = [
     label: "کم‌خطر",
     hint: "نیاز به همراهی یا امداد غیرفوری",
     color: "info",
-    hex: "#0284c7"
+    hex: SOS_PRIORITY_PALETTE.low.accent
   },
   {
     value: "medium",
     label: "متوسط",
     hint: "آسیب یا گرفتاری نیازمند اعزام امدادگر",
     color: "warning",
-    hex: "#d97706"
+    hex: SOS_PRIORITY_PALETTE.medium.accent
   },
   {
     value: "high",
     label: "بحرانی / فوری",
     hint: "خطر جانی یا شرایط اضطراری فوری",
     color: "error",
-    hex: "#dc2626"
+    hex: SOS_PRIORITY_PALETTE.high.accent
   }
 ] as const;
 

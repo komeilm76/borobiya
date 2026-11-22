@@ -68,8 +68,10 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(css).toContain('flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;');
     expect(css).toContain('.admin-dispatch__nearby-empty { display: flex; flex: 1 1 auto;');
     expect(css).toContain('.admin-dispatch__queue, .admin-dispatch__nearby { display: block; min-height: 0; }');
-    expect(rail).toContain('margin-inline-start: auto; justify-content: flex-end; max-width: 100%;');
-    expect(markup).toContain('class="admin-dispatch__request-chips d-flex flex-wrap align-center ga-1"');
+    expect(rail).toContain('background: var(--bb-color-inset); overflow: hidden;'); // One neutral row surface.
+    expect(markup).toContain('class="dispatch-request-row__priority"');
+    expect(markup).toContain('class="dispatch-request-row__status"');
+    expect(markup).toContain('class="dispatch-request-row__meta text-caption"');
     expect(markup).toContain('class="admin-dispatch__intro-top"');
     expect(markup).toContain('متصل به اتاق زندهٔ ادمین');
     expect(css).toContain('display: block; flex: none; padding: .45rem .35rem .3rem;');

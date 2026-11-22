@@ -58,12 +58,12 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('class="admin-dispatch__filter-select"');
     expect(template).toContain('label="فیلتر SOS"');
     expect(template).not.toContain('admin-dispatch__filter-toggle');
-    expect(template).toContain('v-if="adminSos.queueVerified" color="error"');
+    expect(template).toContain('v-if="adminSos.queueVerified" size="small" variant="tonal"');
     expect(template).toContain("adminSos.visibleRequests.length.toLocaleString('fa-IR')");
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
     expect(template).toContain(':aria-pressed="item.id === adminSos.selectedId"');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
-    expect(template).toContain('variant="outlined">لغو انتخاب</v-chip>');
+    expect(template).toContain('v-if="item.id === adminSos.selectedId" icon="mdi-check-circle-outline"');
     expect(source).toMatch(/function toggleQueueRequest\(item: SosRequestRecord\): void \{[\s\S]*?toggleSosQueueSelection\(adminSos.selectedId, item.id\) === null\)[\s\S]*?adminSos.selectRequest\(null\);[\s\S]*?focusRequest\(item\);/);
     const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-map-region"'));
     expect(queue).toContain('item.location.isManual');

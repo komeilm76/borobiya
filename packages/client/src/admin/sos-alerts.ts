@@ -1,3 +1,4 @@
+import { SOS_PRIORITY_PALETTE } from "@/sos/severity-palette";
 import {
   rescuerCancellationEventSchema,
   sosNewRequestEventSchema,
@@ -16,19 +17,19 @@ export interface SeverityAlertPresentation {
 
 export const SOS_SEVERITY_PRESENTATION: Record<Severity, SeverityAlertPresentation> = {
   high: {
-    color: "#dc2626",
+    color: SOS_PRIORITY_PALETTE.high.accent,
     label: "بحرانی (فوری)",
     badgeColor: "error",
     frequenciesHz: [880, 659.25, 880]
   },
   medium: {
-    color: "#d97706",
+    color: SOS_PRIORITY_PALETTE.medium.accent,
     label: "متوسط",
     badgeColor: "warning",
     frequenciesHz: [659.25, 523.25]
   },
   low: {
-    color: "#0284c7",
+    color: SOS_PRIORITY_PALETTE.low.accent,
     label: "کم‌خطر",
     badgeColor: "info",
     frequenciesHz: [523.25]
@@ -202,10 +203,11 @@ export function mergeSosAlertSnapshot(
   return sortSosRequests([...byId.values()]);
 }
 
-// The map's white exclamation must remain legible on each severity hue;
-// chips/cards use their separate presentation colors above.
+// White exclamation marks stay legible on the same priority accents as the list and form.
 export const SOS_MAP_MARKER_COLORS: Record<Severity, string> = {
-  high: "#dc2626", medium: "#a94d04", low: "#075c94"
+  high: SOS_PRIORITY_PALETTE.high.accent,
+  medium: SOS_PRIORITY_PALETTE.medium.accent,
+  low: SOS_PRIORITY_PALETTE.low.accent
 };
 // Other incidents stay recognizable and clickable while a selected SOS and
 // its nearby responders stand out. Never use opacity 0 (MapLibre hit-testing).

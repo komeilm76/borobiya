@@ -130,7 +130,7 @@
         <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
-            <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
+            <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" size="small" variant="tonal">
               {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
             </v-chip>
             <v-chip id="dispatch-chip-09" v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
@@ -162,43 +162,29 @@
               :aria-current="item.id === adminSos.selectedId ? 'true' : undefined"
               :aria-pressed="item.id === adminSos.selectedId"
               class="dispatch-request-row"
+              :class="{ 'dispatch-request-row--replacement': item.status === 'cancelled_by_rescuer' }"
+              :style="sosPriorityStyle(item.severity)"
               @click="toggleQueueRequest(item)"
             >
                 <template #prepend>
-                  <span
-                    class="pulse-indicator me-3"
-                    :style="{ '--alert-color': item.status === 'cancelled_by_rescuer' ? '#dc2626' : severityMeta(item.severity).color }"
-                    aria-hidden="true"
-                  />
+                  <span class="dispatch-request-row__marker" :class="{ 'pulse-indicator': item.severity === 'high' || item.status === 'cancelled_by_rescuer' }"
+                    aria-hidden="true" />
                 </template>
 
-                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
-                  <span>{{ incidentLabel(item.incidentTypeId) }}</span>
-                  <div class="admin-dispatch__request-chips d-flex flex-wrap align-center ga-1">
-                    <v-chip :id="`dispatch-chip-10-${item.id}`" v-if="item.id === adminSos.selectedId" color="primary" size="x-small" variant="outlined">لغو انتخاب</v-chip>
-                    <v-chip :id="`dispatch-chip-11-${item.id}`" v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
-                      نیازمند جایگزین
-                    </v-chip>
-                    <v-chip :id="`dispatch-chip-12-${item.id}`" v-else
-                      :color="statusMeta(item.status).badgeColor"
-                      size="x-small"
-                      variant="tonal"
-                    >
-                      {{ statusMeta(item.status).label }}
-                    </v-chip>
-                    <v-chip :id="`dispatch-chip-13-${item.id}`"
-                      :color="severityMeta(item.severity).badgeColor"
-                      size="x-small"
-                      variant="flat"
-                    >
-                      {{ severityMeta(item.severity).label }}
-                    </v-chip>
-                  </div>
+                <v-list-item-title class="dispatch-request-row__title font-weight-bold">
+                  <span class="dispatch-request-row__name">{{ incidentLabel(item.incidentTypeId) }}</span>
+                  <span :id="`dispatch-chip-13-${item.id}`" class="dispatch-request-row__priority">
+                    {{ severityMeta(item.severity).label }}
+                  </span>
                 </v-list-item-title>
-
-                <div class="d-flex flex-wrap align-center ga-2 mt-1 text-caption text-medium-emphasis">
-                  <span>{{ formatTimestamp(item.createdAt) }}</span>
-                  <span>•</span>
+                <div class="dispatch-request-row__status" :class="{ 'dispatch-request-row__status--urgent': item.status === 'cancelled_by_rescuer' }">
+                  <v-icon :icon="item.status === 'cancelled_by_rescuer' ? 'mdi-alert-circle-outline' : 'mdi-circle-small'" size="16" aria-hidden="true" />
+                  <span>{{ item.status === 'cancelled_by_rescuer' ? 'نیازمند اعزام جایگزین' : statusMeta(item.status).label }}</span>
+                  <v-icon v-if="item.id === adminSos.selectedId" icon="mdi-check-circle-outline" size="17" aria-hidden="true" />
+                </div>
+                <div class="dispatch-request-row__meta text-caption">
+                  <time :datetime="item.createdAt">{{ formatTimestamp(item.createdAt) }}</time>
+                  <span aria-hidden="true">·</span>
                   <span><v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="15" aria-hidden="true" />
                     {{ item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS' }}</span>
                   <span v-if="item.photoUrl"><v-icon icon="mdi-image-outline" size="15" aria-hidden="true" /> تصویر</span>
@@ -536,9 +522,10 @@
               <v-chip id="dispatch-chip-14" :color="statusMeta(adminSos.selectedRequest.status).badgeColor" size="small" variant="tonal">
                 {{ statusMeta(adminSos.selectedRequest.status).label }}
               </v-chip>
-              <v-chip id="dispatch-chip-15" :color="severityMeta(adminSos.selectedRequest.severity).badgeColor" size="small" variant="flat">
+              <span id="dispatch-chip-15" class="admin-dispatch__priority-pill"
+                :style="sosPriorityStyle(adminSos.selectedRequest.severity)">
                 {{ severityMeta(adminSos.selectedRequest.severity).label }}
-              </v-chip>
+              </span>
             </div>
           </v-card-title>
           <v-divider />
@@ -716,6 +703,7 @@ import { listSosIncidentTypes } from "@/api/sos";
 import { searchPlaces } from "@/api/geocoding";
 import { listAdminUsers } from "@/api/admin-users";
 import { getSosPhotoSrc } from "@/api/admin-sos";
+import { sosPriorityStyle } from "@/sos/severity-palette";
 import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
 import {
   buildSosAlertsGeoJson,
@@ -2476,14 +2464,67 @@ onBeforeUnmount(() => {
   justify-content: flex-start !important;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title) { justify-content: space-between !important; }
-#dispatch-sidebar .admin-dispatch__request-chips {
-  margin-inline-start: auto; justify-content: flex-end; max-width: 100%;
-}
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-subtitle),
 #dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-subtitle) {
   font-size: .8rem; line-height: 1.3; gap: .25rem !important; margin-top: .1rem !important;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.text-caption) { font-size: .8rem !important; gap: .25rem !important; }
+/* Each SOS is one quiet, tappable group: priority lives beside the title,
+   mission status on its own line, evidence/time in a separate muted footer. */
+#dispatch-sidebar .dispatch-request-list { padding: .3rem .15rem .5rem; }
+#dispatch-sidebar .dispatch-request-row {
+  position: relative; margin-bottom: .35rem; padding: .5rem .55rem;
+  min-height: 68px; border: 0; border-radius: .75rem;
+  background: var(--bb-color-inset); overflow: hidden;
+}
+#dispatch-sidebar .dispatch-request-row:last-child { margin-bottom: 0; }
+#dispatch-sidebar .dispatch-request-row:hover { background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary)); }
+#dispatch-sidebar .dispatch-request-row.v-list-item--active {
+  background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary));
+  border: 0;
+}
+#dispatch-sidebar .dispatch-request-row.v-list-item--active::before {
+  content: ""; position: absolute; inset-inline-start: 0; top: .4rem; bottom: .4rem;
+  width: 3px; border-radius: 3px; background: var(--bb-color-primary);
+}
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__prepend) { align-self: flex-start; padding-top: .35rem; }
+#dispatch-sidebar .dispatch-request-row__marker {
+  display: block; flex: none; width: 10px; height: 10px; margin-inline-end: .5rem;
+  border-radius: 50%; background: var(--sos-priority-accent);
+  --alert-color: var(--sos-priority-accent);
+}
+#dispatch-sidebar .dispatch-request-row--replacement .dispatch-request-row__marker {
+  background: #dc2626; --alert-color: #dc2626;
+}
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {
+  display: flex; align-items: flex-start; justify-content: space-between !important;
+  flex-wrap: wrap; gap: .2rem .5rem !important; white-space: normal; min-width: 0;
+  font-size: .86rem; line-height: 1.45;
+}
+#dispatch-sidebar .dispatch-request-row__name { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
+.dispatch-request-row__priority, .admin-dispatch__priority-pill {
+  display: inline-flex; align-items: center; flex: none; min-height: 23px;
+  padding: .1rem .5rem; border-radius: 100px; font-size: .8rem;
+  line-height: 1.4; font-weight: 800; color: var(--sos-priority-ink);
+  background: var(--sos-priority-surface);
+}
+#dispatch-sidebar .dispatch-request-row__status {
+  display: flex; align-items: center; gap: .2rem; min-width: 0;
+  color: var(--bb-color-text); font-size: .8rem; line-height: 1.45;
+}
+#dispatch-sidebar .dispatch-request-row__status--urgent { color: #a2241e; font-weight: 700; }
+#dispatch-sidebar .dispatch-request-row__status--urgent .v-icon { color: #dc2626; }
+#dispatch-sidebar .dispatch-request-row__status .v-icon:last-child:not(:first-child) { margin-inline-start: auto; color: var(--bb-color-primary); }
+#dispatch-sidebar .dispatch-request-row__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .35rem;
+  margin-top: .15rem; color: var(--bb-color-muted); line-height: 1.45;
+}
+#dispatch-sidebar .dispatch-request-row__meta span { display: inline-flex; align-items: center; gap: .15rem; }
+:global(:root.dark .dispatch-request-row__priority),
+:global(:root.dark .admin-dispatch__priority-pill) {
+  color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
+}
+:global(:root.dark .dispatch-request-row__status--urgent) { color: #ffadad !important; }
 #dispatch-sidebar .admin-dispatch__responder-search { padding: .3rem .3rem .1rem !important; gap: .25rem; }
 #dispatch-sidebar .admin-dispatch__manual-warning { margin: .3rem .5rem 0; font-size: .8rem; }
 #dispatch-sidebar .admin-dispatch__search-help { margin: .15rem .3rem .25rem; }
