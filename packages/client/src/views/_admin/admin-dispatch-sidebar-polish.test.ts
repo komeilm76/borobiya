@@ -60,7 +60,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(queue).toContain('formatQueueTimestamp(item.createdAt)');
     expect(queue).toContain(':title="formatTimestamp(item.createdAt)"');
     expect(css).toContain('min-height: 52px; border: 1px solid color-mix(');
-    expect(css).toContain('border-radius: .875rem; background: var(--bb-color-inset);');
+    expect(css).toContain('border-radius: var(--bb-radius-nested, 16px) !important; background: var(--bb-color-inset);');
     expect(css).toContain('box-shadow: 0 2px 7px rgba(14, 42, 45, .12);');
     expect(css).toContain('min-height: 20px; padding: 0 .35rem; line-height: 1.25;');
     expect(css).toContain('margin-inline-start: auto; color: var(--bb-color-muted);');
@@ -95,7 +95,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(css).toContain('flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;');
     expect(css).toContain('.admin-dispatch__nearby-empty { display: flex; flex: 1 1 auto;');
     expect(css).toContain('.admin-dispatch__queue, .admin-dispatch__nearby { display: block; min-height: 0; }');
-    expect(rail).toContain('border-radius: .875rem; background: var(--bb-color-inset);'); // Raised SOS rows, flat rail.
+    expect(rail).toContain('border-radius: var(--bb-radius-nested, 16px) !important; background: var(--bb-color-inset);'); // Rounded SOS rows, flat rail.
     expect(markup).toContain('class="dispatch-request-row__priority"');
     expect(markup).toContain('class="dispatch-request-row__status"');
     expect(markup).toContain('class="dispatch-request-row__meta text-caption"');
