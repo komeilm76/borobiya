@@ -210,38 +210,32 @@
 
     <v-snackbar
       :model-value="Boolean(adminSos.latestAlert) && !adminSos.urgentReplacement"
-      color="error"
-      location="top"
-      multi-line
-      :timeout="-1"
+      :content-props="{ class: 'admin-sos-toast__wrapper' }"
+      location="top" variant="flat" :timeout="-1"
     >
-      <div v-if="adminSos.latestAlert" role="alert" aria-live="assertive">
-        <strong>هشدار اضطراری SOS جدید:</strong>
-        <span class="ms-1">{{ adminSos.latestAlert.description }}</span>
+      <div v-if="adminSos.latestAlert" class="admin-sos-toast__message" role="alert" aria-live="assertive">
+        <v-icon icon="mdi-alarm-light-outline" size="20" aria-hidden="true" />
+        <span><strong>درخواست SOS جدید</strong><small>{{ shortSosNotice(adminSos.latestAlert.description) }}</small></span>
       </div>
       <template #actions>
-        <v-btn variant="text" @click="openAlertOnMap">مشاهده روی نقشه</v-btn>
-        <v-btn variant="text" @click="adminSos.dismissLatestAlert()">بستن</v-btn>
+        <v-btn color="primary" size="small" variant="tonal" @click="openAlertOnMap">بررسی</v-btn>
+        <v-btn icon="mdi-close" size="small" variant="text" aria-label="بستن هشدار SOS" @click="adminSos.dismissLatestAlert()" />
       </template>
     </v-snackbar>
 
     <v-snackbar
-      :model-value="Boolean(adminSos.urgentReplacement)"
-      color="error"
-      location="top"
-      multi-line
-      :timeout="-1"
+      :model-value="Boolean(adminSos.urgentReplacement) && route.name !== 'admin-dispatch'"
+      :content-props="{ class: 'admin-sos-toast__wrapper' }"
+      location="top" variant="flat" :timeout="-1"
     >
-      <div v-if="adminSos.urgentReplacement" class="replacement-signal" role="alert" aria-live="assertive">
-        <strong>NEEDS REPLACEMENT · اعزام جایگزین فوری</strong>
-        <span class="ms-1">امدادگر مأموریت را لغو کرده است. درخواست را بررسی و امدادگر دیگری اعزام کنید.</span>
-        <span v-if="adminSos.urgentReplacement.reviewRequired" class="d-block mt-1">
-          این لغو به بررسی مدیریتی نیاز دارد.
-        </span>
+      <div v-if="adminSos.urgentReplacement" class="admin-sos-toast__message" role="alert" aria-live="assertive">
+        <v-icon icon="mdi-alert-circle-outline" size="20" aria-hidden="true" />
+        <span><strong>اعزام جایگزین</strong><small>مأموریت توسط امدادگر لغو شد{{ adminSos.urgentReplacement.reviewRequired ? ' · نیازمند بررسی' : '' }}</small></span>
       </div>
       <template #actions>
-        <v-btn variant="text" @click="openReplacementOnMap">مشاهده و اعزام</v-btn>
-        <v-btn variant="text" @click="adminSos.dismissUrgentReplacement()">بستن</v-btn>
+        <v-btn color="primary" size="small" variant="tonal" @click="openReplacementOnMap">بررسی</v-btn>
+        <v-btn icon="mdi-close" size="small" variant="text" aria-label="بستن هشدار اعزام جایگزین"
+          @click="adminSos.dismissUrgentReplacement()" />
       </template>
     </v-snackbar>
 
@@ -395,6 +389,12 @@ function restoreLogoutFocus(): void {
   document.querySelector<HTMLButtonElement>(selector)?.focus({ preventScroll: true });
 }
 
+// Keep the toast scannable; the full description remains in the selected SOS.
+function shortSosNotice(description: string): string {
+  const text = description.replace(/\s+/g, " ").trim();
+  return text.length > 65 ? `${text.slice(0, 65).trimEnd()}…` : text;
+}
+
 async function openAlertOnMap(): Promise<void> {
   const alertId = adminSos.latestAlert?.id;
   adminSos.dismissLatestAlert();
@@ -432,13 +432,37 @@ onMounted(async () => {
 }
 .app-general-share--idle { border-color: var(--bb-color-outline); }
 .app-general-share:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
-.replacement-signal { animation: urgent-outline 1.1s ease-in-out 2; }
-@keyframes urgent-outline { 50% { outline: 3px solid currentColor; outline-offset: 4px; } }
+/* One compact, theme-aware treatment for both admin SOS notices. Vuetify
+   teleports snackbars, so the content-props class is styled globally. */
+:global(.v-snackbar__wrapper.admin-sos-toast__wrapper) {
+  display: flex; flex-wrap: wrap; align-items: center; width: min(30rem, calc(100vw - 1rem));
+  min-width: 0; max-width: calc(100vw - 1rem); min-height: 0;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); direction: rtl; font-family: var(--bb-font-family);
+}
+:global(.admin-sos-toast__wrapper .v-snackbar__content) {
+  flex: 1 1 12rem; min-width: 0; padding: .55rem .7rem;
+  font-family: var(--bb-font-family); letter-spacing: normal;
+}
+:global(.admin-sos-toast__message) { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+:global(.admin-sos-toast__message > .v-icon) { flex: none; color: rgb(var(--v-theme-error)); }
+:global(.admin-sos-toast__message > span) { display: grid; min-width: 0; gap: .1rem; }
+:global(.admin-sos-toast__message strong) { font-size: .85rem; line-height: 1.3; }
+:global(.admin-sos-toast__message small) { color: var(--bb-color-muted); font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere; }
+:global(.admin-sos-toast__wrapper .v-snackbar__actions) { gap: .15rem; margin: 0; padding: .35rem .4rem; }
+:global(.admin-sos-toast__wrapper .v-snackbar__actions .v-btn) {
+  min-width: 38px; min-height: 38px; height: 38px; border-radius: .7rem;
+  font-family: var(--bb-font-family); font-size: .8rem; letter-spacing: normal;
+}
+:global(.admin-sos-toast__wrapper .v-snackbar__actions .v-btn:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
+}
 @media (max-width: 599px) {
+  :global(.admin-sos-toast__wrapper .v-snackbar__actions .v-btn) { min-width: 44px; min-height: 44px; height: 44px; }
   .logout-confirm-actions { flex-direction: column; align-items: stretch; gap: 8px; }
   .logout-confirm-actions :deep(.v-spacer) { display: none; }
   .logout-confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
   .logout-confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
-@media (prefers-reduced-motion: reduce) { .replacement-signal { animation: none; } }
 </style>

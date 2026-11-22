@@ -85,39 +85,29 @@
       variant="tonal" rounded="lg" role="status" class="mb-4">
       {{ adminSos.quickDispatchFeedback.message }}
     </v-alert>
-    <v-alert id="dispatch-notice-04"
-      v-if="adminSos.urgentReplacement"
-      class="replacement-flash mb-4"
-      color="error"
-      icon="mdi-alert-octagon"
-      variant="tonal"
-      role="alert"
-      aria-live="assertive"
-    >
-      <div class="d-flex flex-wrap align-center justify-space-between ga-3">
-        <div>
-          <strong>NEEDS REPLACEMENT · اعزام جایگزین فوری</strong>
-          <p class="mb-0">امدادگر مأموریت را لغو کرده است؛ درخواست را بررسی و امدادگر دیگری اعزام کنید.</p>
-          <p v-if="adminSos.urgentReplacement.reviewRequired" class="mb-0 font-weight-bold">
-            این لغو به بررسی مدیریتی نیاز دارد.
-          </p>
-          <p v-if="adminSos.urgentReplacement.rescuerLocation" class="mb-0 text-caption">
-            آخرین موقعیت امدادگر: <span dir="ltr">{{ adminSos.urgentReplacement.rescuerLocation.lat.toFixed(5) }}, {{ adminSos.urgentReplacement.rescuerLocation.lon.toFixed(5) }}</span>
-          </p>
-        </div>
-        <div class="d-flex flex-wrap ga-2">
-          <v-btn id="dispatch-action-07" color="error" variant="flat" :loading="adminSos.dispatchSubmitting"
-            :disabled="adminSos.dispatchSubmitting"
-            @click="quickRedispatch(adminSos.urgentReplacement.sosRequestId)">
-            اعزام فوری به امدادگران جدید
-          </v-btn>
-          <v-btn id="dispatch-action-08" color="error" variant="tonal" @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">
-            مشاهدهٔ درخواست و اعزام
-          </v-btn>
-          <v-btn id="dispatch-action-09" color="error" variant="text" @click="adminSos.dismissUrgentReplacement()">بستن هشدار</v-btn>
-        </div>
+    <section id="dispatch-notice-04" v-if="adminSos.urgentReplacement"
+      class="dispatch-replacement" role="alert" aria-live="assertive" aria-label="اعزام جایگزین لازم است">
+      <div class="dispatch-replacement__heading">
+        <v-icon icon="mdi-alert-circle-outline" size="19" aria-hidden="true" />
+        <strong>اعزام جایگزین</strong>
+        <v-btn id="dispatch-action-09" icon="mdi-close" size="small" variant="text"
+          aria-label="بستن هشدار اعزام جایگزین" @click="adminSos.dismissUrgentReplacement()" />
       </div>
-    </v-alert>
+      <p>امدادگر مأموریت را لغو کرد.</p>
+      <span v-if="adminSos.urgentReplacement.reviewRequired" class="dispatch-replacement__review">نیازمند بررسی مدیریتی</span>
+      <details v-if="adminSos.urgentReplacement.rescuerLocation" class="dispatch-replacement__location">
+        <summary>آخرین موقعیت امدادگر</summary>
+        <bdi dir="ltr">{{ adminSos.urgentReplacement.rescuerLocation.lat.toFixed(5) }}, {{ adminSos.urgentReplacement.rescuerLocation.lon.toFixed(5) }}</bdi>
+      </details>
+      <div class="dispatch-replacement__actions">
+        <v-btn id="dispatch-action-08" color="primary" variant="tonal" size="small"
+          @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">بررسی درخواست</v-btn>
+        <v-btn id="dispatch-action-07" color="error" variant="tonal" size="small"
+          title="ارسال پیشنهاد به امدادگران جدید نزدیک، پس از بررسی مجدد وضعیت درخواست"
+          :loading="adminSos.dispatchSubmitting" :disabled="adminSos.dispatchSubmitting"
+          @click="quickRedispatch(adminSos.urgentReplacement.sosRequestId)">اعزام خودکار</v-btn>
+      </div>
+    </section>
 
     <section id="dispatch-queue-region" class="admin-dispatch__queue" aria-label="صف درخواست‌ها">
         <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
@@ -545,24 +535,19 @@
               aria-label="مشاهدهٔ پروفایل ارسال‌کننده" class="admin-dispatch__sender-action"
               @click="profileUserId = null; senderProfileOpen = true">پروفایل</v-btn>
           </div>
-          <v-alert id="dispatch-notice-08"
+          <div id="dispatch-notice-08"
             v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer' &&
               adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
-            class="ma-4 mb-0 replacement-flash"
-            color="error"
-            icon="mdi-alert-octagon"
-            variant="tonal"
-            role="status"
-          >
-            <strong>NEEDS REPLACEMENT · اعزام جایگزین</strong>
-            <p class="mb-0">این مأموریت لغو شده است. امدادگران واجد شرایط را در ادامه انتخاب و پیشنهاد جدید ارسال کنید.</p>
-            <template v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]">
-              <p v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]?.reviewRequired" class="mb-0">این لغو به بررسی مدیریتی نیاز دارد.</p>
-              <p v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation" class="mb-0 text-caption">
-                آخرین موقعیت امدادگر: <span dir="ltr">{{ adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation?.lat.toFixed(5) }}, {{ adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation?.lon.toFixed(5) }}</span>
-              </p>
-            </template>
-          </v-alert>
+            class="admin-dispatch__replacement-note" role="status">
+            <v-icon icon="mdi-alert-circle-outline" size="18" aria-hidden="true" />
+            <span>اعزام جایگزین لازم است.</span>
+            <small v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]?.reviewRequired">نیازمند بررسی مدیریتی</small>
+            <details v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation"
+              class="dispatch-replacement__location">
+              <summary>آخرین موقعیت امدادگر</summary>
+              <bdi dir="ltr">{{ adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation?.lat.toFixed(5) }}, {{ adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation?.lon.toFixed(5) }}</bdi>
+            </details>
+          </div>
           <v-card-text class="admin-dispatch__detail-body">
             <div class="admin-dispatch__description">
               <h3>شرح حادثه</h3>
@@ -631,11 +616,10 @@
 
         <v-btn id="dispatch-action-24" v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer' &&
           adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
-          color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
-          :disabled="adminSos.dispatchSubmitting"
-          @click="quickRedispatch(adminSos.selectedRequest.id)">
-          اعزام فوری به امدادگران جدید
-        </v-btn>
+          color="error" variant="tonal" size="small" class="admin-dispatch__replacement-action"
+          title="ارسال پیشنهاد به امدادگران جدید نزدیک، پس از بررسی مجدد وضعیت درخواست"
+          :loading="adminSos.dispatchSubmitting" :disabled="adminSos.dispatchSubmitting"
+          @click="quickRedispatch(adminSos.selectedRequest.id)">اعزام خودکار</v-btn>
         <div v-if="adminSos.selectedRequest" class="admin-dispatch__mission-header">
           <h2>پیگیری مأموریت</h2>
           <v-btn id="dispatch-action-25" size="small" variant="text" color="primary" icon="mdi-refresh"
@@ -2403,21 +2387,48 @@ onBeforeUnmount(() => {
   animation: sos-pulse 1.6s infinite ease-out;
 }
 
-.replacement-flash {
-  border: 2px solid rgb(var(--v-theme-error));
-  border-radius: var(--bb-radius-nested, 16px);
-  background: rgb(var(--v-theme-surface)) !important;
-  color: rgb(var(--v-theme-on-surface)) !important;
-  animation: replacement-arrival 1.1s ease-in-out 2;
+/* Replacement is a compact work item, not a red modal-style alert. The
+   same quiet surface and nested radius as the SOS and responder rows apply. */
+#dispatch-sidebar .dispatch-replacement {
+  flex: none; display: grid; gap: .25rem; margin: .25rem .2rem .55rem; padding: .45rem .55rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);
+  background: var(--bb-color-inset); color: var(--bb-color-text); font-size: .8rem; line-height: 1.4;
+  box-shadow: 0 2px 7px rgba(14, 42, 45, .12);
 }
-.replacement-flash :deep(.v-alert__underlay) { display: none; }
-
-@keyframes replacement-arrival {
-  50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, .3); }
+#dispatch-sidebar .dispatch-replacement__heading { display: flex; align-items: center; gap: .35rem; }
+#dispatch-sidebar .dispatch-replacement__heading > .v-icon { color: rgb(var(--v-theme-error)); }
+#dispatch-sidebar .dispatch-replacement__heading strong { font-size: .85rem; }
+#dispatch-sidebar .dispatch-replacement__heading :deep(.v-btn) { margin-inline-start: auto; }
+#dispatch-sidebar .dispatch-replacement p { margin: 0; }
+#dispatch-sidebar .dispatch-replacement__review { color: rgb(var(--v-theme-error)); font-weight: 700; }
+.dispatch-replacement__location { color: var(--bb-color-muted); font-size: .8rem; }
+.dispatch-replacement__location summary { width: max-content; max-width: 100%; min-height: 32px;
+  display: flex; align-items: center; cursor: pointer; }
+.dispatch-replacement__location summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); border-radius: .35rem; }
+.dispatch-replacement__location bdi { display: block; overflow-wrap: anywhere; }
+#dispatch-sidebar .dispatch-replacement__actions { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .1rem; }
+#dispatch-sidebar .dispatch-replacement__actions :deep(.v-btn) {
+  min-width: 0; min-height: 36px; height: 36px; padding-inline: .55rem; font-size: .8rem;
 }
-
+.admin-dispatch__incident-panel .admin-dispatch__replacement-note {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .4rem;
+  margin: .35rem .65rem 0; padding: .35rem .5rem; border-radius: .65rem;
+  background: var(--bb-color-inset); color: var(--bb-color-text); font-size: .8rem;
+}
+.admin-dispatch__replacement-note > .v-icon,
+.admin-dispatch__replacement-note small { color: rgb(var(--v-theme-error)); }
+.admin-dispatch__replacement-note small { font-size: .8rem; }
+.admin-dispatch__replacement-note .dispatch-replacement__location { flex-basis: 100%; }
+.admin-dispatch__incident-panel .admin-dispatch__replacement-action {
+  margin: .35rem .65rem .25rem; min-height: 38px; height: 38px; font-size: .8rem;
+}
+@media (max-width: 900px) {
+  #dispatch-sidebar .dispatch-replacement__actions :deep(.v-btn),
+  .admin-dispatch__incident-panel .admin-dispatch__replacement-action { min-height: 44px; height: 44px; }
+  .dispatch-replacement__location summary { min-height: 44px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .replacement-flash, .pulse-indicator { animation: none; }
+  .pulse-indicator { animation: none; }
 }
 
 @keyframes sos-pulse {
@@ -2713,7 +2724,6 @@ onBeforeUnmount(() => {
 #dispatch-sidebar :deep(.v-btn) { min-width: 38px; min-height: 38px; height: auto; font-size: .8rem; padding-inline: .5rem; }
 #dispatch-sidebar :deep(.v-btn--icon) { width: 38px; height: 38px; padding: 0; }
 #dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn) { height: 38px; min-height: 38px; }
-#dispatch-sidebar .replacement-flash :deep(.v-btn) { min-height: 44px; }
 @media (max-width: 900px) {
   #dispatch-sidebar :deep(.v-btn), #dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn),
   #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn),

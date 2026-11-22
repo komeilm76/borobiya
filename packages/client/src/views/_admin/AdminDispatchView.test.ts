@@ -108,8 +108,8 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("@click=\"confirmManualDispatch\"");
 
     // T3.6.5: persistent accessible replacement signposting survives sound autoplay denial.
-    expect(viewSource).toContain("NEEDS REPLACEMENT");
-    expect(viewSource).toContain('aria-live="assertive"');
+    expect(viewSource).toContain('class="dispatch-replacement" role="alert" aria-live="assertive"');
+    expect(viewSource).toContain('اعزام جایگزین');
     expect(viewSource).toContain("rescuerLocation");
     expect(viewSource).toContain("prefers-reduced-motion");
     expect(viewSource).toContain("redispatchNearest(requestId)");
