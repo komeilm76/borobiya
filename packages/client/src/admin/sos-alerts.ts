@@ -38,17 +38,19 @@ export const SOS_SEVERITY_PRESENTATION: Record<Severity, SeverityAlertPresentati
 
 export interface SosStatusPresentation {
   label: string;
+  queueLabel: string;
+  icon: string;
   badgeColor: "warning" | "info" | "success" | "error" | "secondary";
 }
 
 export const SOS_STATUS_PRESENTATION: Record<SosRequestRecord["status"], SosStatusPresentation> = {
-  pending: { label: "در انتظار اعزام", badgeColor: "warning" },
-  dispatched: { label: "در انتظار پذیرش امدادگر", badgeColor: "info" },
-  accepted: { label: "پذیرفته‌شده در مأموریت", badgeColor: "success" },
-  cancelled_by_requester: { label: "لغوشده توسط امدادخواه", badgeColor: "secondary" },
-  cancelled_by_rescuer: { label: "لغو توسط امدادگر (نیازمند اعزام مجدد)", badgeColor: "error" },
-  expired: { label: "منقضی‌شده", badgeColor: "secondary" },
-  completed: { label: "تکمیل‌شده", badgeColor: "success" }
+  pending: { label: "در انتظار اعزام", queueLabel: "منتظر اعزام", icon: "mdi-timer-sand", badgeColor: "warning" },
+  dispatched: { label: "در انتظار پذیرش امدادگر", queueLabel: "منتظر پذیرش", icon: "mdi-send-outline", badgeColor: "info" },
+  accepted: { label: "پذیرفته‌شده در مأموریت", queueLabel: "پذیرفته شد", icon: "mdi-account-check-outline", badgeColor: "success" },
+  cancelled_by_requester: { label: "لغوشده توسط امدادخواه", queueLabel: "لغو توسط امدادخواه", icon: "mdi-close-circle-outline", badgeColor: "secondary" },
+  cancelled_by_rescuer: { label: "لغو توسط امدادگر (نیازمند اعزام مجدد)", queueLabel: "نیازمند اعزام جایگزین", icon: "mdi-alert-circle-outline", badgeColor: "error" },
+  expired: { label: "منقضی‌شده", queueLabel: "منقضی‌شده", icon: "mdi-timer-off-outline", badgeColor: "secondary" },
+  completed: { label: "تکمیل‌شده", queueLabel: "تکمیل‌شده", icon: "mdi-check-circle-outline", badgeColor: "success" }
 };
 
 export function isDispatchableSosStatus(status: SosRequestRecord["status"]): boolean {

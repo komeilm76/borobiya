@@ -46,8 +46,8 @@ describe("SOS severity language across all surfaces", () => {
     expect(queue).toContain('dispatch-request-row__priority');
     expect(queue).toContain('dispatch-request-row__status');
     expect(queue).toContain('dispatch-request-row__meta');
-    expect(queue).toContain('v-if="item.id === adminSos.selectedId" icon="mdi-check-circle-outline"');
-    expect(queue).toContain('item.status === \'cancelled_by_rescuer\' ? \'نیازمند اعزام جایگزین\'');
+    expect(queue).toContain(':aria-pressed="item.id === adminSos.selectedId"');
+    expect(queue).toContain('statusMeta(item.status).queueLabel');
     expect(queue).not.toContain(':color="statusMeta(item.status).badgeColor"');
     expect(queue).not.toContain('variant="flat"');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "priority-queue", source: template }).errors).toEqual([]);

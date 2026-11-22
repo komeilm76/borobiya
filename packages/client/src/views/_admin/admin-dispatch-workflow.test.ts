@@ -63,7 +63,7 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain(':aria-current="item.id === adminSos.selectedId ? \'true\' : undefined"');
     expect(template).toContain(':aria-pressed="item.id === adminSos.selectedId"');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
-    expect(template).toContain('v-if="item.id === adminSos.selectedId" icon="mdi-check-circle-outline"');
+    expect(css).toContain('#dispatch-sidebar .dispatch-request-row.v-list-item--active::before {');
     expect(source).toMatch(/function toggleQueueRequest\(item: SosRequestRecord\): void \{[\s\S]*?toggleSosQueueSelection\(adminSos.selectedId, item.id\) === null\)[\s\S]*?adminSos.selectRequest\(null\);[\s\S]*?focusRequest\(item\);/);
     const queue = template.slice(template.indexOf('class="dispatch-request-list"'), template.indexOf('id="dispatch-map-region"'));
     expect(queue).toContain('item.location.isManual');

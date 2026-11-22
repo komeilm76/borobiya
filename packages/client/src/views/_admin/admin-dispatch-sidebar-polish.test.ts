@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+import { SOS_STATUS_PRESENTATION } from "@/admin/sos-alerts";
 
 const dispatch = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
 const canvas = readFileSync(new URL("../../components/map/MapCanvas.vue", import.meta.url), "utf8");
@@ -45,6 +46,32 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(css).toContain('width: min(16rem, calc(100vw - 1rem));');
   });
 
+  it("keeps SOS rows compact and legible, with accessible icon-only location and a distinct status badge", () => {
+    const markup = template!.content;
+    const queue = markup.slice(markup.indexOf('id="dispatch-list-02"'), markup.indexOf('</v-list>', markup.indexOf('id="dispatch-list-02"')));
+    expect(markup).toContain('<v-icon icon="mdi-alarm-light" color="error" size="20" aria-hidden="true" /> صف درخواست‌های اضطراری');
+    expect(queue).toContain('class="dispatch-request-row__details"');
+    expect(queue).toContain('statusMeta(item.status).icon');
+    expect(queue).toContain('statusMeta(item.status).queueLabel');
+    expect(queue).toContain(':title="statusMeta(item.status).label"');
+    expect(queue).toContain(':aria-label="item.location.isManual ? \'موقعیت دستی\' : \'موقعیت GPS\'"');
+    expect(queue).toContain('role="img" aria-label="تصویر پیوست"');
+    expect(queue).not.toContain("{{ item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS' }}");
+    expect(queue).toContain('formatQueueTimestamp(item.createdAt)');
+    expect(queue).toContain(':title="formatTimestamp(item.createdAt)"');
+    expect(css).toContain('min-height: 52px; border: 1px solid color-mix(');
+    expect(css).toContain('border-radius: .875rem; background: var(--bb-color-inset);');
+    expect(css).toContain('box-shadow: 0 2px 7px rgba(14, 42, 45, .12);');
+    expect(css).toContain('min-height: 20px; padding: 0 .35rem; line-height: 1.25;');
+    expect(css).toContain('margin-inline-start: auto; color: var(--bb-color-muted);');
+    expect(css).toContain('background: #422b2b; border-color: #ffadad;');
+    for (const status of Object.values(SOS_STATUS_PRESENTATION)) {
+      expect(status.icon).toMatch(/^mdi-/);
+      expect(status.queueLabel.length).toBeLessThanOrEqual(status.label.length + 5);
+    }
+    expect(SOS_STATUS_PRESENTATION.cancelled_by_rescuer.queueLabel).toContain('جایگزین');
+  });
+
   it("keeps the desktop incident panel taller with scroll contained within its single surface", () => {
     const panel = css.slice(css.indexOf('.admin-dispatch__incident-panel {'),
       css.indexOf('.admin-dispatch__search {', css.indexOf('.admin-dispatch__incident-panel {')));
@@ -68,7 +95,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(css).toContain('flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto;');
     expect(css).toContain('.admin-dispatch__nearby-empty { display: flex; flex: 1 1 auto;');
     expect(css).toContain('.admin-dispatch__queue, .admin-dispatch__nearby { display: block; min-height: 0; }');
-    expect(rail).toContain('background: var(--bb-color-inset); overflow: hidden;'); // One neutral row surface.
+    expect(rail).toContain('border-radius: .875rem; background: var(--bb-color-inset);'); // Raised SOS rows, flat rail.
     expect(markup).toContain('class="dispatch-request-row__priority"');
     expect(markup).toContain('class="dispatch-request-row__status"');
     expect(markup).toContain('class="dispatch-request-row__meta text-caption"');

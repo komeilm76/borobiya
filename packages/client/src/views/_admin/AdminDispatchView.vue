@@ -129,7 +129,7 @@
     <section id="dispatch-queue-region" class="admin-dispatch__queue" aria-label="صف درخواست‌ها">
         <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
-            <span class="admin-dispatch__card-heading"><v-icon icon="mdi-format-list-bulleted" color="primary" size="21" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
+            <span class="admin-dispatch__card-heading"><v-icon icon="mdi-alarm-light" color="error" size="20" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
             <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" size="small" variant="tonal">
               {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
             </v-chip>
@@ -177,17 +177,22 @@
                     {{ severityMeta(item.severity).label }}
                   </span>
                 </v-list-item-title>
-                <div class="dispatch-request-row__status" :class="{ 'dispatch-request-row__status--urgent': item.status === 'cancelled_by_rescuer' }">
-                  <v-icon :icon="item.status === 'cancelled_by_rescuer' ? 'mdi-alert-circle-outline' : 'mdi-circle-small'" size="16" aria-hidden="true" />
-                  <span>{{ item.status === 'cancelled_by_rescuer' ? 'نیازمند اعزام جایگزین' : statusMeta(item.status).label }}</span>
-                  <v-icon v-if="item.id === adminSos.selectedId" icon="mdi-check-circle-outline" size="17" aria-hidden="true" />
-                </div>
-                <div class="dispatch-request-row__meta text-caption">
-                  <time :datetime="item.createdAt">{{ formatTimestamp(item.createdAt) }}</time>
-                  <span aria-hidden="true">·</span>
-                  <span><v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="15" aria-hidden="true" />
-                    {{ item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS' }}</span>
-                  <span v-if="item.photoUrl"><v-icon icon="mdi-image-outline" size="15" aria-hidden="true" /> تصویر</span>
+                <div class="dispatch-request-row__details">
+                  <span class="dispatch-request-row__status" :class="{ 'dispatch-request-row__status--urgent': item.status === 'cancelled_by_rescuer' }"
+                    :title="statusMeta(item.status).label">
+                    <v-icon :icon="statusMeta(item.status).icon" size="16" aria-hidden="true" />
+                    {{ statusMeta(item.status).queueLabel }}
+                  </span>
+                  <div class="dispatch-request-row__meta text-caption">
+                    <time :datetime="item.createdAt" :title="formatTimestamp(item.createdAt)">{{ formatQueueTimestamp(item.createdAt) }}</time>
+                    <span role="img" :aria-label="item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS'"
+                      :title="item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS'">
+                      <v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="16" aria-hidden="true" />
+                    </span>
+                    <span v-if="item.photoUrl" role="img" aria-label="تصویر پیوست" title="تصویر پیوست">
+                      <v-icon icon="mdi-image-outline" size="16" aria-hidden="true" />
+                    </span>
+                  </div>
                 </div>
               </v-list-item>
           </v-list>
@@ -1287,6 +1292,16 @@ function incidentLabel(incidentTypeId: string): string {
 function formatTimestamp(iso: string): string {
   const parsed = new Date(iso);
   return Number.isNaN(parsed.getTime()) ? iso : parsed.toLocaleString("fa-IR");
+}
+
+function formatQueueTimestamp(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  const persianYear = new Intl.DateTimeFormat("fa-IR", { year: "numeric" });
+  return parsed.toLocaleString("fa-IR", {
+    ...(persianYear.format(parsed) === persianYear.format(new Date()) ? {} : { year: "numeric" as const }),
+    month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit"
+  });
 }
 
 function onFilterChange(value: unknown): void {
@@ -2469,27 +2484,32 @@ onBeforeUnmount(() => {
   font-size: .8rem; line-height: 1.3; gap: .25rem !important; margin-top: .1rem !important;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.text-caption) { font-size: .8rem !important; gap: .25rem !important; }
-/* Each SOS is one quiet, tappable group: priority lives beside the title,
-   mission status on its own line, evidence/time in a separate muted footer. */
-#dispatch-sidebar .dispatch-request-list { padding: .3rem .15rem .5rem; }
+/* SOS rows are compact, separate tappable surfaces within the otherwise flat
+   rail. Priority stays by the title; status and evidence share a second line. */
+#dispatch-sidebar .dispatch-request-list { padding: .25rem .2rem .5rem; }
 #dispatch-sidebar .dispatch-request-row {
-  position: relative; margin-bottom: .35rem; padding: .5rem .55rem;
-  min-height: 68px; border: 0; border-radius: .75rem;
-  background: var(--bb-color-inset); overflow: hidden;
+  position: relative; margin-bottom: .3rem; padding: .35rem .45rem;
+  min-height: 52px; border: 1px solid color-mix(in srgb, var(--bb-color-outline) 42%, transparent);
+  border-radius: .875rem; background: var(--bb-color-inset);
+  box-shadow: 0 2px 7px rgba(14, 42, 45, .12); overflow: hidden;
 }
 #dispatch-sidebar .dispatch-request-row:last-child { margin-bottom: 0; }
-#dispatch-sidebar .dispatch-request-row:hover { background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary)); }
+#dispatch-sidebar .dispatch-request-row:hover {
+  border-color: var(--bb-color-outline);
+  background: color-mix(in srgb, var(--bb-color-inset) 88%, var(--bb-color-primary));
+}
 #dispatch-sidebar .dispatch-request-row.v-list-item--active {
-  background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary));
-  border: 0;
+  border-color: var(--bb-color-primary);
+  background: color-mix(in srgb, var(--bb-color-inset) 87%, var(--bb-color-primary));
 }
 #dispatch-sidebar .dispatch-request-row.v-list-item--active::before {
-  content: ""; position: absolute; inset-inline-start: 0; top: .4rem; bottom: .4rem;
+  content: ""; position: absolute; z-index: 1; inset-inline-start: 0; top: .3rem; bottom: .3rem;
   width: 3px; border-radius: 3px; background: var(--bb-color-primary);
 }
-#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__prepend) { align-self: flex-start; padding-top: .35rem; }
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__prepend) { align-self: flex-start; padding-top: .25rem; }
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__content) { display: grid; gap: .15rem; }
 #dispatch-sidebar .dispatch-request-row__marker {
-  display: block; flex: none; width: 10px; height: 10px; margin-inline-end: .5rem;
+  display: block; flex: none; width: 9px; height: 9px; margin-inline-end: .35rem;
   border-radius: 50%; background: var(--sos-priority-accent);
   --alert-color: var(--sos-priority-accent);
 }
@@ -2497,9 +2517,9 @@ onBeforeUnmount(() => {
   background: #dc2626; --alert-color: #dc2626;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {
-  display: flex; align-items: flex-start; justify-content: space-between !important;
-  flex-wrap: wrap; gap: .2rem .5rem !important; white-space: normal; min-width: 0;
-  font-size: .86rem; line-height: 1.45;
+  display: flex; align-items: center; justify-content: space-between !important;
+  flex-wrap: wrap; gap: .1rem .35rem !important; white-space: normal; min-width: 0;
+  font-size: .84rem; line-height: 1.35;
 }
 #dispatch-sidebar .dispatch-request-row__name { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
 .dispatch-request-row__priority, .admin-dispatch__priority-pill {
@@ -2508,23 +2528,36 @@ onBeforeUnmount(() => {
   line-height: 1.4; font-weight: 800; color: var(--sos-priority-ink);
   background: var(--sos-priority-surface);
 }
+#dispatch-sidebar .dispatch-request-row__priority { min-height: 20px; padding: 0 .35rem; line-height: 1.25; }
+#dispatch-sidebar .dispatch-request-row__details {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .3rem; min-width: 0;
+}
 #dispatch-sidebar .dispatch-request-row__status {
-  display: flex; align-items: center; gap: .2rem; min-width: 0;
-  color: var(--bb-color-text); font-size: .8rem; line-height: 1.45;
+  display: inline-flex; align-items: center; gap: .15rem; min-width: 0; max-width: 100%;
+  padding: 0 .3rem; min-height: 20px; border-radius: .4rem;
+  border: 1px solid color-mix(in srgb, var(--bb-color-outline) 40%, transparent);
+  background: var(--bb-color-surface); color: var(--bb-color-text);
+  font-size: .8rem; line-height: 1.25; font-weight: 650;
 }
-#dispatch-sidebar .dispatch-request-row__status--urgent { color: #a2241e; font-weight: 700; }
-#dispatch-sidebar .dispatch-request-row__status--urgent .v-icon { color: #dc2626; }
-#dispatch-sidebar .dispatch-request-row__status .v-icon:last-child:not(:first-child) { margin-inline-start: auto; color: var(--bb-color-primary); }
+#dispatch-sidebar .dispatch-request-row__status--urgent {
+  color: #a2241e; background: #ffe8e7; border-color: #dc2626; font-weight: 800;
+}
 #dispatch-sidebar .dispatch-request-row__meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .35rem;
-  margin-top: .15rem; color: var(--bb-color-muted); line-height: 1.45;
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: .1rem .35rem;
+  margin-inline-start: auto; color: var(--bb-color-muted); line-height: 1.3;
 }
-#dispatch-sidebar .dispatch-request-row__meta span { display: inline-flex; align-items: center; gap: .15rem; }
+#dispatch-sidebar .dispatch-request-row__meta time { white-space: nowrap; }
+#dispatch-sidebar .dispatch-request-row__meta span { display: inline-flex; align-items: center; }
+:global(:root.dark .dispatch-request-row) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .32) !important;
+}
 :global(:root.dark .dispatch-request-row__priority),
 :global(:root.dark .admin-dispatch__priority-pill) {
   color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
 }
-:global(:root.dark .dispatch-request-row__status--urgent) { color: #ffadad !important; }
+:global(:root.dark #dispatch-sidebar .dispatch-request-row__status--urgent) {
+  color: #ffadad; background: #422b2b; border-color: #ffadad;
+}
 #dispatch-sidebar .admin-dispatch__responder-search { padding: .3rem .3rem .1rem !important; gap: .25rem; }
 #dispatch-sidebar .admin-dispatch__manual-warning { margin: .3rem .5rem 0; font-size: .8rem; }
 #dispatch-sidebar .admin-dispatch__search-help { margin: .15rem .3rem .25rem; }
