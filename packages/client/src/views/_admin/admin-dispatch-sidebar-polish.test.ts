@@ -101,10 +101,12 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(markup).toContain('class="dispatch-request-row__priority"');
     expect(markup).toContain('class="dispatch-request-row__status"');
     expect(markup).toContain('class="dispatch-request-row__meta text-caption"');
-    expect(markup).toContain('class="admin-dispatch__intro-top"');
-    expect(markup).toContain('متصل به اتاق زندهٔ ادمین');
+    expect(markup).toContain('مرکز پایش و اعزام اضطراری (SOS)');
+    expect(markup).not.toContain('پنل مدیریت · عملیات اضطراری');
+    expect(markup).not.toContain('متصل به اتاق زندهٔ ادمین');
+    expect(markup).not.toContain('در حال اتصال زنده…');
     expect(css).toContain('display: block; flex: none; padding: .45rem .35rem .3rem;');
-    expect(css).toContain('.admin-dispatch__intro { display: grid; gap: .75rem; margin-bottom: .85rem; }');
+    expect(css).toContain('.admin-dispatch__intro { display: block; margin-bottom: .55rem; }');
     expect(rail).toContain('border-top: 0; justify-content: flex-start !important;');
     expect(rail).toContain('justify-content: flex-start !important;');
     expect(markup).toContain('aria-label="انتخاب همهٔ امدادگران"');
@@ -149,7 +151,8 @@ describe("dispatch pinned rail and uncluttered map", () => {
     const panel = css.slice(css.indexOf('/* Keep the information and actions on the RTL start edge.'));
     expect(panel).toContain('.admin-dispatch__detail-heading { justify-content: flex-start;');
     expect(panel).toContain('grid-template-columns: 2rem minmax(0, 1fr) auto;');
-    expect(panel).toContain('gap: .4rem; padding: .35rem .6rem .5rem;');
+    expect(panel).toContain('gap: .5rem; padding: .45rem .65rem .65rem;');
+    expect(panel).toContain('border-radius: .75rem; background: var(--bb-color-inset);');
     expect(panel).toContain('min-height: 44px; height: 44px; padding-inline: .5rem;');
     expect(markup).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده"');
     expect(markup).toContain('aria-label="نمایش حادثه روی نقشه"');

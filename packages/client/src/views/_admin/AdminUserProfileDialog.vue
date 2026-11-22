@@ -26,7 +26,17 @@
             <span class="admin-profile__avatar" aria-hidden="true">{{ profile.username.slice(0, 1).toUpperCase() }}</span>
             <div class="admin-profile__name">
               <strong dir="ltr">{{ profile.username }}</strong>
-              <span>شناسهٔ حساب: <bdi dir="ltr">{{ profile.id }}</bdi></span>
+              <span class="admin-profile__id">شناسهٔ حساب:
+                <bdi dir="ltr" :title="profile.id">{{ shortId(profile.id) }}</bdi>
+                <v-btn icon="mdi-content-copy" size="small" variant="text" aria-label="کپی شناسهٔ کامل حساب"
+                  @click="copyProfileId" />
+              </span>
+              <small v-if="copyStatus === 'copied'" role="status">شناسهٔ کامل کپی شد.</small>
+              <label v-else-if="copyStatus === 'failed'" class="admin-profile__copy-fallback">
+                کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
+                <input :value="profile.id" readonly dir="ltr" aria-label="شناسهٔ کامل حساب برای کپی دستی"
+                  @focus="($event.target as HTMLInputElement).select()" />
+              </label>
             </div>
           </div>
           <dl class="admin-profile__facts">
@@ -69,6 +79,26 @@ const loading = ref(false);
 const error = ref("");
 const attempt = ref(0);
 const retry = () => { attempt.value += 1; };
+const copyStatus = ref<"copied" | "failed" | null>(null);
+let copyGeneration = 0;
+function shortId(id: string): string {
+  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
+}
+async function copyProfileId(): Promise<void> {
+  const id = profile.value?.id;
+  const currentSession = session.value;
+  if (!props.modelValue || !id || !currentSession) return;
+  const generation = ++copyGeneration;
+  copyStatus.value = null;
+  try {
+    await navigator.clipboard.writeText(id);
+    if (generation === copyGeneration && props.modelValue && session.value === currentSession && profile.value?.id === id)
+      copyStatus.value = "copied";
+  } catch {
+    if (generation === copyGeneration && props.modelValue && session.value === currentSession && profile.value?.id === id)
+      copyStatus.value = "failed";
+  }
+}
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -82,6 +112,8 @@ watch(() => [props.modelValue, props.userId, session.value, attempt.value] as co
     const controller = new AbortController();
     onCleanup(() => { active = false; controller.abort(); });
     profile.value = null;
+    copyGeneration++;
+    copyStatus.value = null;
     error.value = "";
     loading.value = Boolean(open && userId && sessionKey);
     if (!open || !userId) return;
@@ -119,6 +151,12 @@ watch(() => [props.modelValue, props.userId, session.value, attempt.value] as co
 .admin-profile__name { display: grid; min-width: 0; gap: .2rem; }
 .admin-profile__name strong { justify-self: start; font-size: 1.08rem; overflow-wrap: anywhere; }
 .admin-profile__name span { color: var(--bb-color-muted); font-size: .8rem; overflow-wrap: anywhere; }
+.admin-profile__id { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .4rem; }
+.admin-profile__id bdi { color: rgb(var(--v-theme-on-surface)); white-space: nowrap; }
+.admin-profile__id :deep(.v-btn) { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+.admin-profile__copy-fallback { display: grid; gap: .25rem; color: var(--bb-color-muted); font-size: .8rem; }
+.admin-profile__copy-fallback input { width: 100%; padding: .35rem; border: 1px solid var(--bb-color-outline);
+  border-radius: .4rem; background: var(--bb-color-inset); color: rgb(var(--v-theme-on-surface)); }
 .admin-profile__facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin: 0; }
 .admin-profile__facts > div { min-width: 0; padding: .65rem .75rem; background: var(--bb-color-inset);
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }

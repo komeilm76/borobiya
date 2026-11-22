@@ -10,7 +10,9 @@ const profile = readFileSync(new URL("./AdminUserProfileDialog.vue", import.meta
 describe("admin sender identity and profile access", () => {
   it("links the selected SOS requester by exact ID without interrupting dispatch", () => {
     expect(dispatch).toContain('class="admin-dispatch__sender" role="group"');
-    expect(dispatch).toContain('adminSos.selectedRequest.requesterId');
+    const incident = dispatch.slice(dispatch.indexOf('id="dispatch-incident"'), dispatch.indexOf('id="dispatch-dialog-01"'));
+    expect(incident).not.toContain('adminSos.selectedRequest.requesterId');
+    expect(incident).toContain('class="admin-dispatch__sender-name"');
     expect(dispatch).toContain('@click="profileUserId = null; senderProfileOpen = true"');
     expect(dispatch).toContain(':user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"');
     expect(dispatch).toMatch(/watch\(\(\) => adminSos\.selectedRequest\?\.id, \(\) => \{\s*senderProfileOpen\.value = false;\s*profileUserId\.value = null;\s*photoDialogOpen\.value = false;[\s\S]*?\}, \{ flush: "sync" \}\);/);
@@ -31,6 +33,10 @@ describe("admin sender identity and profile access", () => {
     expect(profile).toContain('getAdminUser(userId, auth.accessToken, controller.signal)');
     expect(profile).toContain('role="alert"');
     expect(profile).toContain('role="status" aria-live="polite"');
+    expect(profile).toContain('shortId(profile.id)');
+    expect(profile).toContain('await navigator.clipboard.writeText(id)');
+    expect(profile).toContain('generation === copyGeneration && props.modelValue && session.value === currentSession && profile.value?.id === id');
+    expect(profile).toContain('aria-label="شناسهٔ کامل حساب برای کپی دستی"');
     expect(profile).not.toContain('profile.devices'); // Avoid exposing device IPs in a sender summary.
     for (const [filename, source] of [["AdminDispatchView.vue", dispatch], ["AdminUsersView.vue", users],
       ["AdminUserProfileDialog.vue", profile]] as const) {

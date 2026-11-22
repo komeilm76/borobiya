@@ -3,13 +3,6 @@
     <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="صف SOS و امدادگران نزدیک">
     <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
-        <div class="admin-dispatch__intro-top">
-          <span class="admin-dispatch__eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت · عملیات اضطراری</span>
-          <v-chip id="dispatch-chip-01" :color="adminSos.connected ? 'success' : 'warning'"
-            size="x-small" variant="tonal" role="status">
-            {{ adminSos.connected ? "متصل به اتاق زندهٔ ادمین" : "در حال اتصال زنده…" }}
-          </v-chip>
-        </div>
         <div class="admin-dispatch__heading d-flex align-center ga-2">
           <v-icon color="error" icon="mdi-radar" size="24" />
           <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
@@ -510,16 +503,19 @@
             <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
           </button>
           <div v-show="incidentExpanded" id="dispatch-incident-content">
-        <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
-          (adminSos.nearestLoading || adminSos.nearestError || adminSos.nearestLoaded)"
-          class="admin-dispatch__map-note" role="status">
-          {{ adminSos.nearestLoading ? 'در حال بررسی امدادگران نزدیک…'
-            : adminSos.nearestError ? 'موقعیت امدادگران تأیید نشد؛ فهرست را بازخوانی کنید.'
-              : nearbyFeatures.features.length ? `نقاط ${nearbyFeatures.features.length.toLocaleString('fa-IR')} امدادگر واجد شرایط، آخرین موقعیت ثبت‌شده‌اند؛ موقعیت زنده نیستند.`
-                : adminSos.nearestLoaded ? 'موقعیت ثبت‌شده‌ای از امدادگران واجد شرایط در دسترس نیست.' : '' }}
-        </p>
-
         <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
+          <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
+            <button id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
+              :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
+              <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
+                class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
+              <span class="admin-dispatch__photo-caption" aria-hidden="true"><v-icon icon="mdi-arrow-expand-all" size="17" /> تصویر حادثه · مشاهدهٔ کامل</span>
+            </button>
+            <span v-else role="status" class="admin-dispatch__photo-state">{{ photoLoading ? "در حال دریافت تصویر حادثه…" : "تصویر حادثه در دسترس نیست." }}</span>
+            <v-btn id="dispatch-action-20" v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
+              color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
+            <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
+          </div>
           <v-card-title class="admin-dispatch__detail-heading">
             <div class="admin-dispatch__detail-title">
               <small>درخواست انتخاب‌شده</small>
@@ -537,18 +533,6 @@
             </div>
           </v-card-title>
           <v-divider />
-          <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
-            <h3>تصویر پیوست حادثه</h3>
-            <button id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
-              :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
-              <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
-                class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
-            </button>
-            <span v-else role="status">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
-            <v-btn id="dispatch-action-20" v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
-              color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
-            <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
-          </div>
           <div class="admin-dispatch__sender" role="group" aria-label="ارسال‌کنندهٔ درخواست">
             <span class="admin-dispatch__sender-icon" aria-hidden="true"><v-icon icon="mdi-account-circle-outline" size="23" /></span>
             <div class="admin-dispatch__sender-copy">
@@ -556,18 +540,6 @@
               <span class="admin-dispatch__sender-name" dir="ltr" v-if="requesterName">@{{ requesterName }}</span>
               <span v-else class="admin-dispatch__sender-placeholder" role="status">{{ requesterLoading ? 'در حال دریافت نام کاربری…' : 'نام کاربری در دسترس نیست' }}</span>
               <button id="dispatch-button-06" v-if="requesterFailed" type="button" class="admin-dispatch__inline-retry" @click="requesterRetry++">تلاش دوباره</button>
-              <div class="admin-dispatch__sender-id">
-                <span>شناسهٔ حساب</span>
-                <bdi dir="ltr" :title="adminSos.selectedRequest.requesterId">{{ shortRequesterId(adminSos.selectedRequest.requesterId) }}</bdi>
-                <v-btn id="dispatch-action-28" icon="mdi-content-copy" variant="text" size="small" aria-label="کپی شناسهٔ کامل ارسال‌کننده"
-                  :disabled="!adminSession" @click="copyRequesterId" />
-              </div>
-              <small v-if="requesterCopyStatus === 'copied'" role="status">شناسهٔ کامل کپی شد.</small>
-              <label v-else-if="requesterCopyStatus === 'failed'" class="admin-dispatch__copy-fallback">
-                کپی خودکار ممکن نشد؛ شناسهٔ کامل را از این کادر کپی کنید.
-                <input :value="adminSos.selectedRequest.requesterId" readonly dir="ltr" aria-label="شناسهٔ کامل ارسال‌کننده برای کپی دستی"
-                  @focus="($event.target as HTMLInputElement).select()" />
-              </label>
             </div>
             <v-btn id="dispatch-action-19" color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-account-details-outline"
               aria-label="مشاهدهٔ پروفایل ارسال‌کننده" class="admin-dispatch__sender-action"
@@ -648,7 +620,14 @@
             </v-card>
           </v-dialog>
         </v-card>
-
+        <p v-if="adminSos.selectedRequest && !adminSos.responderSearch &&
+          (adminSos.nearestLoading || adminSos.nearestError || adminSos.nearestLoaded)"
+          class="admin-dispatch__map-note" role="status">
+          {{ adminSos.nearestLoading ? 'در حال بررسی امدادگران نزدیک…'
+            : adminSos.nearestError ? 'موقعیت امدادگران تأیید نشد؛ فهرست را بازخوانی کنید.'
+              : nearbyFeatures.features.length ? `نقاط ${nearbyFeatures.features.length.toLocaleString('fa-IR')} امدادگر واجد شرایط، آخرین موقعیت ثبت‌شده‌اند؛ موقعیت زنده نیستند.`
+                : adminSos.nearestLoaded ? 'موقعیت ثبت‌شده‌ای از امدادگران واجد شرایط در دسترس نیست.' : '' }}
+        </p>
 
         <v-btn id="dispatch-action-24" v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer' &&
           adminSos.urgentReplacement?.sosRequestId !== adminSos.selectedRequest.id"
@@ -818,34 +797,12 @@ const requesterName = ref<string | null>(null);
 const requesterLoading = ref(false);
 const requesterFailed = ref(false);
 const requesterRetry = ref(0);
-const requesterCopyStatus = ref<"copied" | "failed" | null>(null);
-let requesterCopyGeneration = 0;
 const incidentAddress = ref<string | null>(null);
 const addressLoading = ref(false);
 const addressFailed = ref(false);
 const addressRetry = ref(0);
 const adminSession = computed(() => auth.user?.role === "admin"
   ? accountSessionKey(auth.user.id, auth.accessToken) : null);
-
-function shortRequesterId(id: string): string {
-  return id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
-}
-
-async function copyRequesterId(): Promise<void> {
-  const id = adminSos.selectedRequest?.requesterId;
-  const session = adminSession.value;
-  if (!id || !session) return;
-  const attempt = ++requesterCopyGeneration;
-  requesterCopyStatus.value = null;
-  try {
-    await navigator.clipboard.writeText(id);
-    if (attempt === requesterCopyGeneration && adminSos.selectedRequest?.requesterId === id && adminSession.value === session)
-      requesterCopyStatus.value = "copied";
-  } catch {
-    if (attempt === requesterCopyGeneration && adminSos.selectedRequest?.requesterId === id && adminSession.value === session)
-      requesterCopyStatus.value = "failed";
-  }
-}
 
 // The SOS record has no username or postal address. Resolve both from the
 // exact admin user endpoint and the approximate, same-origin reverse endpoint.
@@ -858,8 +815,6 @@ watch(() => [adminSos.selectedRequest?.requesterId, adminSession.value, requeste
     requesterName.value = null;
     requesterLoading.value = Boolean(userId && session);
     requesterFailed.value = false;
-    requesterCopyGeneration++;
-    requesterCopyStatus.value = null;
     if (!userId || !session) return;
     void (async () => {
       try {
@@ -2019,12 +1974,9 @@ onBeforeUnmount(() => {
   font-family: var(--bb-font-family);
 }
 .admin-dispatch__header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: .75rem 1.5rem; }
-.admin-dispatch__intro-note { margin: .35rem 0 0; color: var(--bb-color-muted); font-size: .85rem; }
 .admin-dispatch__followup-toggle:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__intro { min-width: 0; flex: 1 1 22rem; }
-.admin-dispatch__eyebrow { display: inline-flex; align-items: center; gap: .35rem; margin-bottom: .35rem;
-  color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
 .admin-dispatch__heading h1 { min-width: 0; font-size: clamp(1.1rem, 2vw, 1.5rem) !important; overflow-wrap: anywhere; }
 .admin-dispatch__header p { max-width: 56ch; line-height: 1.65; }
 .admin-dispatch__toolbar {
@@ -2117,7 +2069,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__detail-title h2 { margin: 0; font-size: 1.05rem; font-weight: 800; overflow-wrap: anywhere; }
 .admin-dispatch__detail-badges { display: flex; flex-wrap: wrap; gap: .35rem; }
 .admin-dispatch__detail-body { display: grid; gap: .75rem; font-size: .87rem; line-height: 1.6; }
-.admin-dispatch__detail-body h3 { margin: 0 0 .25rem; font-size: .88rem; }
+.admin-dispatch__detail-body h3 { margin: 0 0 .2rem; font-size: .8rem; font-weight: 650; }
 .admin-dispatch__description { padding: .2rem .1rem .7rem;
   border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .admin-dispatch__description p, .admin-dispatch__proposal-note { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -2135,12 +2087,16 @@ onBeforeUnmount(() => {
 .admin-dispatch__location-details[open] summary .v-icon { transform: rotate(180deg); }
 .admin-dispatch__location-details .admin-dispatch__facts { padding-bottom: .35rem; }
 .admin-dispatch__photo { min-width: 0; margin: .55rem 1rem .2rem; }
-.admin-dispatch__photo h3 { margin: 0; font-size: .85rem; }
 .admin-dispatch__photo-open { display: block; width: 100%; height: clamp(8rem, 23vh, 13rem);
-  margin-top: .4rem; padding: 0; overflow: hidden; border: 1px solid var(--bb-color-outline);
-  background: var(--bb-color-inset); border-radius: .75rem; cursor: zoom-in; }
+  position: relative; padding: 0; overflow: hidden; border: 1px solid var(--bb-color-outline);
+  background: var(--bb-color-inset); border-radius: .85rem; cursor: zoom-in; text-align: start; }
 .admin-dispatch__photo-open:hover { border-color: rgb(var(--v-theme-primary)); }
 .admin-dispatch__photo-open:disabled { opacity: .65; cursor: progress; }
+.admin-dispatch__photo-caption { position: absolute; inset: auto 0 0; display: flex; align-items: center; gap: .35rem;
+  padding: 1.5rem .75rem .55rem; color: white; background: linear-gradient(transparent, rgba(0, 0, 0, .75));
+  font-size: .8rem; font-weight: 700; pointer-events: none; }
+.admin-dispatch__photo-state { display: block; padding: .8rem; border-radius: .75rem;
+  background: var(--bb-color-inset); color: var(--bb-color-muted); font-size: .8rem; }
 .admin-dispatch__photo-error { margin: .4rem 0 0; color: rgb(var(--v-theme-error)); font-size: .82rem; }
 .admin-dispatch__photo-open:focus-visible, .admin-dispatch__location-details summary:focus-visible,
 .admin-dispatch__search-help summary:focus-visible,
@@ -2182,18 +2138,12 @@ onBeforeUnmount(() => {
   border-radius: 50%; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
 .admin-dispatch__sender-copy { display: grid; flex: 1 1 10rem; min-width: 0; gap: .12rem; }
 .admin-dispatch__sender-copy strong { font-size: .9rem; }
-.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-weight: 750; overflow-wrap: anywhere; }
+.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .8rem;
+  font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
 .admin-dispatch__sender-placeholder { color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__sender-id { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .4rem;
-  min-width: 0; color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__sender-id bdi { color: var(--bb-color-text); white-space: nowrap; }
-.admin-dispatch__sender-id :deep(.v-btn) { min-width: 44px; min-height: 44px; width: 44px; height: 44px; }
 .admin-dispatch__inline-retry { display: inline-block; min-height: 36px; padding: .2rem .35rem; border: 0;
   background: transparent; color: rgb(var(--v-theme-primary)); cursor: pointer; font: inherit; font-size: .8rem; }
 .admin-dispatch__inline-retry:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); border-radius: .35rem; }
-.admin-dispatch__copy-fallback { display: grid; gap: .25rem; color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__copy-fallback input { width: 100%; padding: .35rem; border: 1px solid var(--bb-color-outline);
-  border-radius: .4rem; background: var(--bb-color-surface); color: var(--bb-color-text); }
 .admin-dispatch__address, .admin-dispatch__location-coordinates { grid-column: 1 / -1; }
 .admin-dispatch__coordinates { display: flex; flex-wrap: wrap; gap: .2rem .8rem; justify-content: flex-end; }
 .admin-dispatch__sender-action { flex: none; min-height: 44px; }
@@ -2524,14 +2474,10 @@ onBeforeUnmount(() => {
   display: block; flex: none; padding: .45rem .35rem .3rem;
   margin-bottom: .45rem !important;
 }
-/* Keep the status row, SOS title and outlined filter on separate readable lines. */
-.admin-dispatch__intro { display: grid; gap: .75rem; margin-bottom: .85rem; }
-.admin-dispatch__intro-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .25rem .35rem; }
-.admin-dispatch__intro-top .admin-dispatch__eyebrow { margin: 0; }
-.admin-dispatch__intro-top :deep(.v-chip) { flex: none; max-width: 100%; }
-.admin-dispatch__heading { gap: .2rem !important; }
+/* One purposeful heading and a compact filter/refresh toolbar, no ambient status copy. */
+.admin-dispatch__intro { display: block; margin-bottom: .55rem; }
+.admin-dispatch__heading { gap: .3rem !important; }
 .admin-dispatch__heading h1 { font-size: 1rem !important; line-height: 1.4; }
-.admin-dispatch__eyebrow { margin-bottom: .15rem; font-size: .8rem; }
 .admin-dispatch__toolbar { display: flex; align-items: center; width: 100%; gap: .2rem; }
 .admin-dispatch__filter-group { flex: 1; min-width: 0; }
 .admin-dispatch__toolbar-actions { flex: none; min-width: 0; justify-content: flex-start; gap: .1rem; }
@@ -2795,13 +2741,12 @@ onBeforeUnmount(() => {
   min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: thin; padding-inline: .15rem; border-radius: .65rem;
 }
-/* The floating panel already supplies the surface. Do not stack card borders,
-   shadows or shaded fact boxes inside it; retain the status chips and alerts. */
+/* The floating panel supplies the surface. Keep facts flat; only the sender
+   identity gets a subtle inset treatment, while status chips and alerts remain. */
 .admin-dispatch__incident-panel #dispatch-incident {
   border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
   background: transparent !important; backdrop-filter: none !important; margin: 0;
 }
-.admin-dispatch__incident-panel .admin-dispatch__sender,
 .admin-dispatch__incident-panel .admin-dispatch__facts > div,
 .admin-dispatch__incident-panel .dispatch-mission-timeline,
 .admin-dispatch__incident-panel .admin-dispatch__followup {
@@ -2814,27 +2759,34 @@ onBeforeUnmount(() => {
 /* Keep the information and actions on the RTL start edge. The ordinary page
    card's wide spacing would otherwise wrap every action in this narrow overlay. */
 .admin-dispatch__incident-panel #dispatch-incident :deep(.v-card-title) {
-  padding: .4rem .6rem; line-height: 1.35;
+  padding: .5rem .65rem .35rem; line-height: 1.35;
 }
-.admin-dispatch__incident-panel .admin-dispatch__detail-heading { justify-content: flex-start; gap: .3rem; }
-.admin-dispatch__incident-panel .admin-dispatch__detail-badges { gap: .25rem; }
+.admin-dispatch__incident-panel .admin-dispatch__detail-heading { justify-content: flex-start; gap: .4rem; }
+.admin-dispatch__incident-panel .admin-dispatch__detail-badges { gap: .3rem; }
 .admin-dispatch__incident-panel .admin-dispatch__sender {
   display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center;
-  gap: .4rem; margin: .2rem .6rem 0; padding: .2rem 0;
+  gap: .5rem; margin: .4rem .6rem .2rem; padding: .4rem .55rem;
+  border: 1px solid color-mix(in srgb, var(--bb-color-outline) 50%, transparent);
+  border-radius: .75rem; background: var(--bb-color-inset);
 }
 .admin-dispatch__incident-panel .admin-dispatch__sender-icon { width: 32px; height: 32px; }
 .admin-dispatch__incident-panel .admin-dispatch__sender-copy { min-width: 0; }
-.admin-dispatch__incident-panel .admin-dispatch__photo { margin: .3rem .6rem .45rem; }
+.admin-dispatch__incident-panel .admin-dispatch__sender-copy strong { color: var(--bb-color-muted); font-size: .8rem; font-weight: 600; }
+.admin-dispatch__incident-panel .admin-dispatch__photo { margin: .05rem .3rem .15rem; }
 .admin-dispatch__incident-panel .admin-dispatch__photo-open { height: clamp(8rem, 22vh, 12rem); }
 .admin-dispatch__incident-panel .admin-dispatch__sender-action :deep(.v-btn__content) { white-space: nowrap; }
 .admin-dispatch__incident-panel #dispatch-incident :deep(.admin-dispatch__detail-body) {
-  gap: .4rem; padding: .35rem .6rem .5rem; line-height: 1.45;
+  gap: .5rem; padding: .45rem .65rem .65rem; line-height: 1.5;
 }
-.admin-dispatch__incident-panel .admin-dispatch__description { padding: 0 0 .15rem; }
-.admin-dispatch__incident-panel .admin-dispatch__facts { gap: .4rem; }
-.admin-dispatch__incident-panel .admin-dispatch__facts > div { padding: .15rem 0; }
+.admin-dispatch__incident-panel .admin-dispatch__description {
+  padding: 0 0 .55rem; border-bottom: 1px solid var(--bb-color-outline);
+}
+.admin-dispatch__incident-panel .admin-dispatch__description p { line-height: 1.6; }
+.admin-dispatch__incident-panel .admin-dispatch__facts { gap: .45rem; }
+.admin-dispatch__incident-panel .admin-dispatch__facts > div { padding: .2rem 0; }
 .admin-dispatch__incident-panel .admin-dispatch__next {
-  display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem; padding: .2rem 0 0;
+  display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem;
+  padding: .55rem 0 0; border-top: 1px solid var(--bb-color-outline);
 }
 .admin-dispatch__incident-panel .admin-dispatch__next :deep(.v-btn),
 .admin-dispatch__incident-panel .admin-dispatch__sender-action {

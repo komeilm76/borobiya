@@ -28,8 +28,9 @@ describe("admin SOS triage flow", () => {
   });
 
   it("keeps incident evidence visible and uses the jump only for navigation, not dispatch", () => {
-    const detail = template.slice(template.indexOf('class="admin-dispatch__detail-heading"'), template.indexOf('id="dispatch-dialog-01"'));
-    expect(detail).toContain('adminSos.selectedRequest.requesterId');
+    const detail = template.slice(template.indexOf('id="dispatch-incident"'), template.indexOf('id="dispatch-dialog-01"'));
+    expect(detail).not.toContain('adminSos.selectedRequest.requesterId');
+    expect(template).toContain(':user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"');
     expect(detail).toContain('adminSos.selectedRequest.description');
     expect(detail).toContain('class="admin-dispatch__facts"');
     expect(detail).toContain('adminSos.selectedRequest.location.isManual');
@@ -75,13 +76,16 @@ describe("admin SOS triage flow", () => {
     expect(queue).not.toContain('item.location.lat.toFixed'); // Coordinates live in incident facts and on the map.
     expect(template).toContain('adminSos.selectedRequest.location.lat.toFixed(6)');
     expect(template).toContain(':key="adminSos.selectedRequest.id" class="admin-dispatch__location-details"');
-    expect(template).toContain('class="admin-dispatch__sender-id"');
     expect(template).toContain('class="admin-dispatch__photo-open"');
-    expect(template.indexOf('class="admin-dispatch__photo"')).toBeLessThan(template.indexOf('class="admin-dispatch__sender"'));
+    const incident = template.slice(template.indexOf('id="dispatch-incident"'), template.indexOf('id="dispatch-dialog-01"'));
+    expect(incident.indexOf('class="admin-dispatch__photo"')).toBeLessThan(incident.indexOf('class="admin-dispatch__detail-heading"'));
+    expect(incident.indexOf('class="admin-dispatch__detail-heading"')).toBeLessThan(incident.indexOf('class="admin-dispatch__sender"'));
+    expect(template.indexOf('class="admin-dispatch__photo"')).toBeLessThan(template.indexOf('class="admin-dispatch__map-note"'));
     expect(template).toContain('class="admin-dispatch__sender-name"');
-    expect(template).not.toContain('شناسهٔ ثبت‌شده');
-    expect(template).toContain('shortRequesterId(adminSos.selectedRequest.requesterId)');
-    expect(template).toContain('aria-label="شناسهٔ کامل ارسال‌کننده برای کپی دستی"');
+    expect(incident).not.toContain('شناسهٔ حساب');
+    expect(source).not.toContain('copyRequesterId');
+    expect(css).toContain('.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .8rem;');
+    expect(css).toContain('.admin-dispatch__detail-body h3 { margin: 0 0 .2rem; font-size: .8rem;');
     expect(template).toContain('lat: {{ adminSos.selectedRequest.location.lat.toFixed(6) }}');
     expect(template).toContain('lng: {{ adminSos.selectedRequest.location.lon.toFixed(6) }}');
     expect(template).toContain('محل حادثه · نشانی تقریبی');
