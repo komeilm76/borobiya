@@ -214,12 +214,12 @@
             <div class="d-flex align-center ga-1">
               <v-btn id="dispatch-action-10"
                 :disabled="!adminSos.nearestLoaded || adminSos.nearestLoading || adminSos.nearestResponders.length === 0"
-                icon="mdi-checkbox-multiple-marked-outline" size="small" variant="text"
+                icon="mdi-account-multiple-check-outline" size="small" variant="text"
                 aria-label="انتخاب همهٔ امدادگران" title="انتخاب همهٔ امدادگران"
                 @click="adminSos.selectAllNearestResponders()" />
               <v-btn id="dispatch-action-11"
                 v-if="adminSos.selectedResponderIds.length > 0"
-                icon="mdi-checkbox-multiple-blank-outline" size="small" variant="text"
+                icon="mdi-account-multiple-remove-outline" size="small" variant="text"
                 aria-label="پاک‌سازی انتخاب امدادگران" title="پاک‌سازی انتخاب امدادگران"
                 @click="adminSos.clearResponderSelection()" />
               <v-btn id="dispatch-action-12"
@@ -250,8 +250,9 @@
               ? 'تا ۱۰ حساب فعال و آزاد با نام کاربری منطبق؛ موقعیت/فاصله در جست‌وجوی دستی نمایش داده نمی‌شود و تخصص مرتبط ممکن است ثبت نشده باشد.'
               : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند. فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده در فهرست نزدیک‌ترین‌ها هستند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}</p>
           </details>
-          <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
-            <v-chip :id="`dispatch-chip-04-${id}`" v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
+          <div v-if="hiddenSelectedResponderIds.length" class="admin-dispatch__hidden-selections" aria-label="انتخاب‌های خارج از فهرست کنونی">
+            <span>انتخاب‌های دیگر:</span>
+            <v-chip :id="`dispatch-chip-04-${id}`" v-for="id in hiddenSelectedResponderIds" :key="id" closable size="small" color="primary"
               variant="tonal" @click:close="adminSos.toggleResponderSelection(id)">
               @{{ adminSos.selectedResponderNames[id] ?? id }}
             </v-chip>
@@ -290,41 +291,39 @@
               : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
           </v-card-text>
 
-          <v-list id="dispatch-list-01" v-else-if="adminSos.nearestLoaded" class="responder-list" lines="two" aria-label="امدادگران واجد شرایط یا جست‌وجوشده">
-            <v-list-item v-for="responder in adminSos.nearestResponders" :key="responder.userId"
-              :id="`dispatch-responder-${responder.userId}`"
-              :active="adminSos.selectedResponderIds.includes(responder.userId)"
-              :aria-pressed="adminSos.selectedResponderIds.includes(responder.userId)"
-              class="dispatch-responder-row" rounded="lg"
-              @click="adminSos.toggleResponderSelection(responder.userId)"
-            >
-                <template #prepend>
-                  <v-checkbox-btn  :id="`dispatch-check-${responder.userId}`"
-                    :model-value="adminSos.selectedResponderIds.includes(responder.userId)"
-                    :aria-label="`انتخاب امدادگر ${responder.username}`"
-                    color="primary"
-                    @click.stop="adminSos.toggleResponderSelection(responder.userId)"
-                  />
-                </template>
-
-                <v-list-item-title class="dispatch-responder-row__title">
-                  <bdi class="dispatch-responder-row__name" dir="ltr">@{{ responder.username }}</bdi>
+          <div id="dispatch-list-01" v-else-if="adminSos.nearestLoaded" class="responder-list" role="group"
+            aria-label="امدادگران واجد شرایط یا جست‌وجوشده">
+            <div v-for="responder in adminSos.nearestResponders" :key="responder.userId"
+              :id="`dispatch-responder-${responder.userId}`" class="dispatch-responder-row"
+              :class="{ 'dispatch-responder-row--selected': adminSos.selectedResponderIds.includes(responder.userId) }">
+              <button :id="`dispatch-select-${responder.userId}`" type="button" class="dispatch-responder-row__select"
+                :aria-pressed="adminSos.selectedResponderIds.includes(responder.userId)"
+                :aria-describedby="`dispatch-chip-06-${responder.userId} dispatch-meta-${responder.userId}`"
+                :aria-label="`${adminSos.selectedResponderIds.includes(responder.userId) ? 'لغو انتخاب' : 'انتخاب'} امدادگر ${responder.username} برای اعزام`"
+                @click="adminSos.toggleResponderSelection(responder.userId)">
+                <span class="dispatch-responder-row__title">
+                  <span class="dispatch-responder-row__identity">
+                    <v-icon v-if="adminSos.selectedResponderIds.includes(responder.userId)" icon="mdi-check-circle" size="17" aria-hidden="true" />
+                    <bdi class="dispatch-responder-row__name" dir="ltr" :title="responder.username">@{{ responder.username }}</bdi>
+                  </span>
                   <span :id="`dispatch-chip-06-${responder.userId}`" class="dispatch-responder-row__distance"
                     :class="{ 'dispatch-responder-row__distance--unknown': responder.distance === null }"
                     :title="responder.distance === null ? 'فاصله و موقعیت تأیید نشده' : 'فاصله تا آخرین موقعیت ثبت‌شده، نه زمان رسیدن'">
                     <v-icon :icon="responder.distance === null ? 'mdi-map-marker-question-outline' : 'mdi-map-marker-distance'" size="15" aria-hidden="true" />
                     {{ responder.distance === null ? 'فاصله نامشخص' : formatDistance(responder.distance) }}
                   </span>
-                </v-list-item-title>
-                <div class="dispatch-responder-row__meta">
+                </span>
+                <span :id="`dispatch-meta-${responder.userId}`" class="dispatch-responder-row__meta">
                   <span class="dispatch-responder-row__specialty" :class="{ 'dispatch-responder-row__specialty--missing': !responder.categoryName }"
                     :title="responder.categoryName ? `تخصص: ${responder.categoryName}` : 'تخصص مرتبط ثبت نشده'">
                     <v-icon icon="mdi-medical-bag" size="15" aria-hidden="true" />
-                    {{ responder.categoryName ? `تخصص: ${responder.categoryName}` : 'تخصص مرتبط ثبت نشده' }}
+                    <span class="sr-only">تخصص:</span>
+                    {{ responder.categoryName ?? 'تخصص مرتبط ثبت نشده' }}
                   </span>
                   <span :id="`dispatch-chip-07-${responder.userId}`" class="dispatch-responder-row__rating"
                     :title="responder.avgRating !== null ? `میانگین امتیاز ${responder.avgRating.toFixed(1)} از ۵` : 'بدون امتیاز'">
                     <v-icon icon="mdi-star-outline" size="15" aria-hidden="true" />
+                    <span v-if="responder.avgRating !== null" class="sr-only">امتیاز از ۵:</span>
                     {{ responder.avgRating !== null ? responder.avgRating.toFixed(1) : 'بدون امتیاز' }}
                   </span>
                   <span class="dispatch-responder-row__activity" :title="`آخرین فعالیت: ${formatTimestamp(responder.lastActiveAt)}`">
@@ -336,14 +335,15 @@
                     class="dispatch-responder-row__proposed">
                     <v-icon icon="mdi-send-check-outline" size="15" aria-hidden="true" /> پیشنهاد ارسال‌شده
                   </span>
-                </div>
-                <template v-if="!adminSos.responderSearch && nearbyFeatures.features.some((feature) => feature.id === responder.userId)" #append>
-                  <v-btn :id="`dispatch-action-15-${responder.userId}`" icon="mdi-map-marker-radius-outline" variant="text" color="primary"
-                    :aria-label="`نمایش آخرین موقعیت ثبت‌شدهٔ ${responder.username} روی نقشه`"
-                    :title="`نمایش ${responder.username} روی نقشه`" @click.stop="focusNearbyResponder(responder.userId)" />
-                </template>
-              </v-list-item>
-          </v-list>
+                </span>
+              </button>
+              <v-btn v-if="!adminSos.responderSearch && nearbyFeatures.features.some((feature) => feature.id === responder.userId)"
+                :id="`dispatch-action-15-${responder.userId}`" class="dispatch-responder-row__map"
+                icon="mdi-map-marker-radius-outline" variant="text" color="primary"
+                :aria-label="`نمایش آخرین موقعیت ثبت‌شدهٔ ${responder.username} روی نقشه`"
+                :title="`نمایش ${responder.username} روی نقشه`" @click="focusNearbyResponder(responder.userId)" />
+            </div>
+          </div>
           <v-card-text v-else class="py-6 text-center text-medium-emphasis" role="status">
             فهرست امدادگران هنوز تأیید نشده است؛ نتیجهٔ خالی نمی‌توان گرفت.
             <v-btn id="dispatch-action-16" variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
@@ -1080,6 +1080,10 @@ function toggleIncidentPanel(): void {
 }
 const showLivePanel = ref(false);
 const manualDispatchConfirmation = ref(false);
+// Visible rows already show their selection. Keep removable chips only for
+// selections retained across a refresh or a different manual-search query.
+const hiddenSelectedResponderIds = computed(() => adminSos.selectedResponderIds.filter((id) =>
+  !adminSos.nearestResponders.some((responder) => responder.userId === id)));
 const selectedDispatchWarnings = computed(() => adminSos.selectedResponderIds
   .filter((id) => !!adminSos.selectedResponderWarnings[id])
   .map((id) => ({ id, username: adminSos.selectedResponderNames[id] ?? id,
@@ -2055,10 +2059,10 @@ onBeforeUnmount(() => {
 }
 .dispatch-request-row:last-child, .dispatch-responder-row:last-child { margin-bottom: 0; }
 .dispatch-request-row:hover, .dispatch-responder-row:hover { background: rgba(var(--v-theme-primary), .07); }
-.dispatch-request-row.v-list-item--active, .dispatch-responder-row.v-list-item--active {
+.dispatch-request-row.v-list-item--active, .dispatch-responder-row--selected {
   border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12);
 }
-.dispatch-request-row:focus-visible, .dispatch-responder-row:focus-visible {
+.dispatch-request-row:focus-visible, .dispatch-responder-row__select:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
 }
 .dispatch-request-list, .responder-list { padding: .55rem; }
@@ -2449,7 +2453,7 @@ onBeforeUnmount(() => {
   border-color: var(--bb-color-outline);
 }
 :global(:root.dark .dispatch-request-row.v-list-item--active),
-:global(:root.dark .dispatch-responder-row.v-list-item--active) {
+:global(:root.dark .dispatch-responder-row--selected) {
   background: rgba(var(--v-theme-primary), .12); border-color: rgb(var(--v-theme-primary));
 }
 :global(:root.dark .mission-timeline-select) { background: var(--bb-color-inset); }
@@ -2525,22 +2529,19 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .dispatch-request-list, #dispatch-sidebar .responder-list {
   padding: .1rem .15rem; background: transparent;
 }
-#dispatch-sidebar .dispatch-request-row, #dispatch-sidebar .dispatch-responder-row {
+#dispatch-sidebar .dispatch-request-row {
   margin: 0; padding: .2rem .25rem; min-height: 44px;
   border: 0; border-radius: .5rem; background: transparent;
 }
-#dispatch-sidebar .dispatch-request-row.v-list-item--active,
-#dispatch-sidebar .dispatch-responder-row.v-list-item--active {
+#dispatch-sidebar .dispatch-request-row.v-list-item--active {
   border-color: transparent; background: rgba(var(--v-theme-primary), .12);
 }
-#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title),
-#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-title) {
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title) {
   font-size: .8rem; line-height: 1.35; gap: .25rem !important;
   justify-content: flex-start !important;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title) { justify-content: space-between !important; }
-#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-subtitle),
-#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-subtitle) {
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-subtitle) {
   font-size: .8rem; line-height: 1.3; gap: .25rem !important; margin-top: .1rem !important;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.text-caption) { font-size: .8rem !important; gap: .25rem !important; }
@@ -2631,63 +2632,70 @@ onBeforeUnmount(() => {
 :global(:root.dark .admin-dispatch__priority-pill) {
   color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
 }
-/* Nearby responders use the same inset card language, but with two scan lines:
-   identity + distance first; specialty, rating and last activity underneath.
-   Only exceptional records (no location/specialty or sent offer) need extra room. */
-#dispatch-sidebar .responder-list { padding: .25rem .2rem .5rem; }
+/* Independent pressed button and map action: no nested controls, checkbox,
+   Vuetify active overlay, or selection stripe. Standard rows stay two lines. */
+#dispatch-sidebar .responder-list { padding: .2rem .2rem .4rem; }
 #dispatch-sidebar .dispatch-responder-row {
-  --v-list-prepend-gap: .25rem;
-  position: relative; margin-bottom: .3rem; padding: .35rem .4rem;
-  min-height: 52px; border: 1px solid color-mix(in srgb, var(--bb-color-outline) 42%, transparent);
-  border-radius: var(--bb-radius-nested, 16px) !important; background: var(--bb-color-inset);
-  box-shadow: 0 2px 7px rgba(14, 42, 45, .12); overflow: hidden;
+  display: flex; align-items: center; min-width: 0; min-height: 0; margin-bottom: .25rem; padding: 0;
+  border: 1px solid color-mix(in srgb, var(--bb-color-outline) 50%, transparent);
+  border-radius: .75rem; background: var(--bb-color-inset);
+  box-shadow: 0 2px 7px rgba(14, 42, 45, .12);
+  transition: background-color .15s, border-color .15s;
 }
 #dispatch-sidebar .dispatch-responder-row:last-child { margin-bottom: 0; }
 #dispatch-sidebar .dispatch-responder-row:hover {
   border-color: var(--bb-color-outline);
+  background: color-mix(in srgb, var(--bb-color-inset) 90%, var(--bb-color-primary));
+}
+#dispatch-sidebar .dispatch-responder-row--selected {
+  border-color: var(--bb-color-primary);
   background: color-mix(in srgb, var(--bb-color-inset) 88%, var(--bb-color-primary));
 }
-#dispatch-sidebar .dispatch-responder-row.v-list-item--active {
-  border-color: var(--bb-color-primary);
-  background: color-mix(in srgb, var(--bb-color-inset) 87%, var(--bb-color-primary));
+#dispatch-sidebar .dispatch-responder-row__select {
+  display: grid; align-content: center; gap: .12rem; flex: 1 1 auto;
+  min-width: 0; min-height: 48px; padding: .3rem .5rem;
+  border: 0; border-radius: .7rem; background: transparent; color: var(--bb-color-text);
+  font: inherit; text-align: start; cursor: pointer;
 }
-#dispatch-sidebar .dispatch-responder-row.v-list-item--active::before {
-  content: ""; position: absolute; z-index: 1; inset-inline-start: 0; top: .3rem; bottom: .3rem;
-  width: 3px; border-radius: 3px; background: var(--bb-color-primary);
+#dispatch-sidebar .dispatch-responder-row__select:focus-visible {
+  outline: 3px solid var(--bb-color-primary); outline-offset: -3px;
 }
-#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item__prepend) { margin-inline-end: .15rem; }
-#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item__append) { margin-inline-start: .15rem; }
-#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item__content) {
-  display: grid; gap: .15rem; min-width: 0;
+#dispatch-sidebar .dispatch-responder-row__title {
+  display: flex; align-items: center; justify-content: space-between; gap: .3rem;
+  min-width: 0; font-size: .84rem; line-height: 1.25;
 }
-#dispatch-sidebar .dispatch-responder-row :deep(.v-list-item-title.dispatch-responder-row__title) {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between !important;
-  gap: .1rem .35rem !important; min-width: 0; white-space: normal;
-  font-size: .84rem; line-height: 1.3;
+#dispatch-sidebar .dispatch-responder-row__identity { display: flex; align-items: center; gap: .25rem; min-width: 0; }
+#dispatch-sidebar .dispatch-responder-row__identity .v-icon { flex: none; color: var(--bb-color-primary); }
+#dispatch-sidebar .dispatch-responder-row__name {
+  display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;
 }
-#dispatch-sidebar .dispatch-responder-row__name { min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
 #dispatch-sidebar .dispatch-responder-row__distance {
   display: inline-flex; align-items: center; flex: none; gap: .15rem;
-  margin-inline-start: auto; padding: 0 .3rem; min-height: 20px;
+  margin-inline-start: auto; padding: 0 .3rem; min-height: 18px;
   border-radius: .4rem; background: var(--bb-color-surface);
-  color: var(--bb-color-primary); font-size: .8rem; font-weight: 600;
+  color: var(--bb-color-primary); font-size: .8rem; font-weight: 600; white-space: nowrap;
 }
 #dispatch-sidebar .dispatch-responder-row__distance--unknown { color: var(--bb-color-text); }
 #dispatch-sidebar .dispatch-responder-row__meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: .1rem .45rem;
-  min-width: 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.3;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .05rem .4rem;
+  min-width: 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.2;
 }
 #dispatch-sidebar .dispatch-responder-row__meta > span { display: inline-flex; align-items: center; gap: .15rem; }
 #dispatch-sidebar .dispatch-responder-row__specialty {
-  flex: 1 1 7rem; min-width: 0; overflow-wrap: anywhere;
+  flex: 1 1 4rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-#dispatch-sidebar .dispatch-responder-row__specialty--missing { flex-basis: 100%; color: var(--bb-color-error); }
+#dispatch-sidebar .dispatch-responder-row__specialty--missing { color: var(--bb-color-error); }
 #dispatch-sidebar .dispatch-responder-row__rating,
 #dispatch-sidebar .dispatch-responder-row__activity { flex: none; white-space: nowrap; }
 #dispatch-sidebar .dispatch-responder-row__proposed {
   flex: 0 1 auto; padding: 0 .3rem; border-radius: .4rem;
   color: var(--bb-color-primary);
   background: color-mix(in srgb, var(--bb-color-primary) 12%, var(--bb-color-inset));
+}
+#dispatch-sidebar .dispatch-responder-row__map { flex: none; margin-inline-end: .2rem; }
+#dispatch-sidebar .admin-dispatch__hidden-selections {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .3rem;
+  padding: .25rem .4rem; color: var(--bb-color-muted); font-size: .8rem;
 }
 #dispatch-sidebar .admin-dispatch__responder-search { padding: .3rem .3rem .1rem !important; gap: .25rem; }
 #dispatch-sidebar .admin-dispatch__manual-warning { margin: .3rem .5rem 0; font-size: .8rem; }
