@@ -1,5 +1,26 @@
 <template>
   <main id="dispatch-workspace" class="admin-dispatch" aria-label="مرکز پایش و اعزام اضطراری">
+    <!-- Teleported above the workspace: feedback must not shrink or hide the responder list. -->
+    <v-snackbar id="dispatch-notice-05"
+      :model-value="Boolean(adminSos.dispatchFeedback)"
+      :content-props="{ class: 'admin-sos-toast__wrapper dispatch-feedback-toast__wrapper' }"
+      location="top" variant="flat"
+      :timeout="adminSos.dispatchFeedback?.type === 'success' ? 6500 : -1"
+      @update:model-value="dismissDispatchFeedback"
+    >
+      <div v-if="adminSos.dispatchFeedback" class="admin-sos-toast__message"
+        :role="adminSos.dispatchFeedback.type === 'error' ? 'alert' : 'status'"
+        :aria-live="adminSos.dispatchFeedback.type === 'error' ? 'assertive' : 'polite'">
+        <v-icon :icon="adminSos.dispatchFeedback.type === 'success' ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline'"
+          :color="adminSos.dispatchFeedback.type" size="20" aria-hidden="true" />
+        <span><strong>{{ adminSos.dispatchFeedback.type === 'success' ? 'ارسال موفق' : 'ارسال پیشنهاد ناموفق' }}</strong>
+          <small>{{ adminSos.dispatchFeedback.message }}</small></span>
+      </div>
+      <template #actions>
+        <v-btn id="dispatch-action-28" icon="mdi-close" size="small" variant="text"
+          aria-label="بستن نتیجهٔ ارسال پیشنهاد" @click="adminSos.dispatchFeedback = null" />
+      </template>
+    </v-snackbar>
     <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="صف SOS و امدادگران نزدیک">
     <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
@@ -105,7 +126,8 @@
         <v-btn id="dispatch-action-07" color="error" variant="tonal" size="small"
           title="ارسال پیشنهاد به امدادگران جدید نزدیک، پس از بررسی مجدد وضعیت درخواست"
           :loading="adminSos.dispatchSubmitting" :disabled="adminSos.dispatchSubmitting"
-          @click="quickRedispatch(adminSos.urgentReplacement.sosRequestId)">اعزام خودکار</v-btn>
+          aria-label="ارسال پیشنهاد جایگزین به امدادگران نزدیک"
+          @click="quickRedispatch(adminSos.urgentReplacement.sosRequestId)">ارسال پیشنهاد</v-btn>
       </div>
     </section>
 
@@ -248,18 +270,6 @@
             </v-chip>
           </div>
 
-          <v-alert id="dispatch-notice-05"
-            v-if="adminSos.dispatchFeedback"
-            :type="adminSos.dispatchFeedback.type"
-            class="ma-4 mb-0"
-            closable
-            density="comfortable"
-            variant="tonal"
-            @click:close="adminSos.dispatchFeedback = null"
-          >
-            {{ adminSos.dispatchFeedback.message }}
-          </v-alert>
-
           <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis" role="status">
             <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
             در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
@@ -341,10 +351,10 @@
 
           <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
             <span class="text-caption text-medium-emphasis">
-              {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
+              {{ adminSos.selectedResponderIds.length }} امدادگر انتخاب شده است.
             </span>
             <v-btn id="dispatch-action-17"
-              :aria-label="`اعزام امدادگران انتخاب‌شده (${adminSos.selectedResponderIds.length})`"
+              :aria-label="`ارسال پیشنهاد مأموریت به ${adminSos.selectedResponderIds.length} امدادگر انتخاب‌شده`"
               :disabled="!adminSos.canDispatchSelected"
               :loading="adminSos.dispatchSubmitting"
               color="error"
@@ -353,7 +363,7 @@
               variant="flat"
               @click="requestDispatch"
             >
-              اعزام ({{ adminSos.selectedResponderIds.length }})
+              ارسال پیشنهاد ({{ adminSos.selectedResponderIds.length }})
             </v-btn>
           </v-card-actions>
         </v-card>
@@ -619,7 +629,8 @@
           color="error" variant="tonal" size="small" class="admin-dispatch__replacement-action"
           title="ارسال پیشنهاد به امدادگران جدید نزدیک، پس از بررسی مجدد وضعیت درخواست"
           :loading="adminSos.dispatchSubmitting" :disabled="adminSos.dispatchSubmitting"
-          @click="quickRedispatch(adminSos.selectedRequest.id)">اعزام خودکار</v-btn>
+          aria-label="ارسال پیشنهاد جایگزین به امدادگران نزدیک"
+          @click="quickRedispatch(adminSos.selectedRequest.id)">ارسال پیشنهاد</v-btn>
         <div v-if="adminSos.selectedRequest" class="admin-dispatch__mission-header">
           <h2>پیگیری مأموریت</h2>
           <v-btn id="dispatch-action-25" size="small" variant="text" color="primary" icon="mdi-refresh"
@@ -660,8 +671,8 @@
         </section>
           </div>
         </div>
-        <v-dialog id="dispatch-dialog-02" v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
-          <v-card id="dispatch-card-02" title="تأیید اعزام دستی" class="admin-dispatch__confirmation" rounded="xl">
+        <v-dialog id="dispatch-dialog-02" v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید ارسال پیشنهاد دستی">
+          <v-card id="dispatch-card-02" title="تأیید ارسال پیشنهاد دستی" class="admin-dispatch__confirmation" rounded="xl">
             <v-card-text>
               موقعیت یا تخصص مرتبط برای افراد زیر تأیید نشده است. پیش از ارسال پیشنهاد مأموریت، صلاحیت و دسترسی آن‌ها را بررسی کنید:
               <ul class="mt-2 ps-6">
@@ -1078,6 +1089,9 @@ watch(() => adminSos.selectedId, () => {
   showLivePanel.value = false;
   incidentExpanded.value = !compactDispatch.value;
 }, { flush: "sync" });
+function dismissDispatchFeedback(isOpen: boolean): void {
+  if (!isOpen) adminSos.dispatchFeedback = null;
+}
 function requestDispatch(): void {
   if (!adminSos.canDispatchSelected) return;
   if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;
@@ -2389,6 +2403,9 @@ onBeforeUnmount(() => {
 
 /* Replacement is a compact work item, not a red modal-style alert. The
    same quiet surface and nested radius as the SOS and responder rows apply. */
+:global(.dispatch-feedback-toast__wrapper .admin-sos-toast__message > .v-icon.text-success) {
+  color: rgb(var(--v-theme-success));
+}
 #dispatch-sidebar .dispatch-replacement {
   flex: none; display: grid; gap: .25rem; margin: .25rem .2rem .55rem; padding: .45rem .55rem;
   border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px);

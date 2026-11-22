@@ -111,7 +111,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(rail).toContain('justify-content: flex-start !important;');
     expect(markup).toContain('aria-label="انتخاب همهٔ امدادگران"');
     expect(markup).toContain('aria-label="پاک‌سازی انتخاب امدادگران"');
-    expect(markup).toContain(':aria-label="`اعزام امدادگران انتخاب‌شده (${adminSos.selectedResponderIds.length})`"');
+    expect(markup).toContain(':aria-label="`ارسال پیشنهاد مأموریت به ${adminSos.selectedResponderIds.length} امدادگر انتخاب‌شده`"');
     expect(rail).toContain('#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-text[role="status"])');
     expect(shellCss).toContain('.app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,');
     expect(shellCss).toContain('inset-inline-start: calc(clamp(20rem, 28vw, 25rem) + 1rem);');
