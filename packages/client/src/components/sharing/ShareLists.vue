@@ -782,10 +782,10 @@ defineExpose({ refresh });
 .share-lists__device-line :deep(.v-select) { flex: 1 1 auto; min-width: 0; }
 .share-lists__device-line > .v-btn { min-width: 50px; min-height: 44px; }
 .share-lists__device-status { margin: 0.65rem 0 0; color: var(--bb-color-muted); font-size: 0.82rem; line-height: 1.7; }
-.share-lists__device-status--ok { color: #195e46; }
-.share-lists__device-status--error { color: #b3261e; }
-:global(:root.dark .share-lists__device-status--ok) { color: #7fdcb2; }
-:global(:root.dark .share-lists__device-status--error) { color: #ffb4ab; }
+.share-lists__device-status--ok { color: var(--bb-audience-shareSuccess); }
+.share-lists__device-status--error { color: var(--bb-color-error-text); }
+:global(:root.dark .share-lists__device-status--ok) { color: var(--bb-audience-shareSuccess); }
+:global(:root.dark .share-lists__device-status--error) { color: var(--bb-color-error-text); }
 
 .share-lists__row-main {
   min-width: 0;

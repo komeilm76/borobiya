@@ -287,7 +287,9 @@ the tokens (tests pin both values). Settings UI also uses theme-specific
 non-map chrome and welcome/placeholder surface use `shellColors.light/dark`,
 `shellTypography`, `shellLayout` and `shellRadii` in `tokens.ts`. Edit both
 shell color themes together; these produce `--bb-shell-*` variables for the
-app bar, footer, welcome state and error alerts. Some legacy component-local
+app bar, footer, welcome state and error alerts. Guest auth/public chrome and
+sharing feedback use `audienceColors.light/dark`, `audienceTypography` and
+`audienceRadii` (emitted as `--bb-audience-*`). Some legacy component-local
 colors and explicit radius overrides have not yet been migrated;
 this configuration is the source of truth for token-backed styles, **not** a claim
 that every existing CSS declaration is centralized. Track the staged all-page

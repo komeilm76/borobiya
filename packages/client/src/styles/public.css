@@ -2,8 +2,8 @@
 .app-shell--public .app-main {
   min-height: 100dvh;
   padding: 0 !important;
-  background: #f6f5ef;
-  color: #193536;
+  background: var(--bb-audience-publicCanvas);
+  color: var(--bb-audience-publicInk);
 }
 .public-chrome {
   display: flex;
@@ -14,20 +14,20 @@
   margin-inline: auto;
   padding: 0.8rem clamp(1rem, 4vw, 2.5rem);
 }
-.public-chrome__brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.7rem; color: #163c3b; font-size: 1.05rem; font-weight: 900; line-height: 1.2; }
-.public-chrome__brand small { display: block; margin-top: 0.12rem; color: #687f78; font-size: 0.8rem; font-weight: 600; }
-.public-chrome__mark { display: grid; width: 44px; height: 44px; place-items: center; border-radius: 14px; color: #fff; background: #0d5c5b; }
+.public-chrome__brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 0.7rem; color: var(--bb-audience-publicBrand); font-size: var(--bb-audience-font-chromeBrand); font-weight: 900; line-height: 1.2; }
+.public-chrome__brand small { display: block; margin-top: 0.12rem; color: var(--bb-audience-publicCaption); font-size: var(--bb-audience-font-publicCaption); font-weight: 600; }
+.public-chrome__mark { display: grid; width: 44px; height: 44px; place-items: center; border-radius: var(--bb-audience-radius-publicMark); color: var(--bb-audience-publicMarkInk); background: var(--bb-audience-publicMarkFill); }
 .public-chrome__nav { display: flex; align-items: center; gap: 1.7rem; margin-inline: auto; }
-.public-chrome__nav a { color: #45645f; font-size: 0.9rem; font-weight: 750; }
-.public-chrome__nav a.router-link-active { color: #0c5553; }
+.public-chrome__nav a { color: var(--bb-audience-publicNav); font-size: var(--bb-audience-font-publicNav); font-weight: 750; }
+.public-chrome__nav a.router-link-active { color: var(--bb-audience-publicNavActive); }
 .public-chrome__actions { display: flex; align-items: center; gap: 0.55rem; }
-.public-chrome__theme { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border: 1px solid #cadbd4; border-radius: 50%; color: #214c49; background: transparent; cursor: pointer; }
-.public-chrome__login, .public-chrome__join { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 0.95rem; border-radius: 999px; font-size: 0.88rem; font-weight: 800; white-space: nowrap; }
-.public-chrome__login { color: #164d4a; }
-.public-chrome__join { color: #fff; background: #0d5c5b; }
-.public-chrome__theme:hover, .public-chrome__login:hover { background: #e4f0eb; }
-.public-chrome__join:hover { background: #124c4b; }
-.app-shell--public a:focus-visible, .app-shell--public button:focus-visible { outline: 3px solid #bb7b2e; outline-offset: 3px; }
+.public-chrome__theme { display: grid; width: 44px; height: 44px; flex: 0 0 auto; place-items: center; border: 1px solid var(--bb-audience-publicThemeEdge); border-radius: 50%; color: var(--bb-audience-publicThemeInk); background: transparent; cursor: pointer; }
+.public-chrome__login, .public-chrome__join { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.55rem 0.95rem; border-radius: var(--bb-shell-radius-pill); font-size: var(--bb-audience-font-chromeAction); font-weight: 800; white-space: nowrap; }
+.public-chrome__login { color: var(--bb-audience-publicLoginInk); }
+.public-chrome__join { color: var(--bb-audience-publicJoinInk); background: var(--bb-audience-publicJoinFill); }
+.public-chrome__theme:hover, .public-chrome__login:hover { background: var(--bb-audience-publicThemeHover); }
+.public-chrome__join:hover { background: var(--bb-audience-publicJoinHover); }
+.app-shell--public a:focus-visible, .app-shell--public button:focus-visible { outline: 3px solid var(--bb-audience-publicFocus); outline-offset: 3px; }
 
 .public-landing { max-width: 80rem; margin-inline: auto; padding: 0 clamp(1rem, 4vw, 2.5rem) 5rem; }
 .public-hero {
@@ -163,18 +163,20 @@
 @media (prefers-reduced-motion: reduce) { .public-button { transition: none; } }
 @media (forced-colors: active) { .public-network__node, .public-button, .public-chrome__theme { border: 1px solid ButtonText; } }
 
-:root.dark .app-shell--public .app-main { color: #edf5f2; background: #111c1d; }
-:root.dark .public-chrome__brand, :root.dark .public-section__heading h2,
+:root.dark .app-shell--public .app-main { color: var(--bb-audience-publicInk); background: var(--bb-audience-publicCanvas); }
+:root.dark .public-chrome__brand { color: var(--bb-audience-publicBrand); }
+:root.dark .public-section__heading h2,
 :root.dark .public-steps h2, :root.dark .public-health h1 { color: #edf5f2; }
-:root.dark .public-chrome__brand small, :root.dark .public-health__heading > p:last-child { color: #aec2bc; }
-:root.dark .public-chrome__nav a, :root.dark .public-chrome__login { color: #d0e8de; }
-:root.dark .public-chrome__nav a.router-link-active, :root.dark .public-eyebrow,
-:root.dark .public-section__eyebrow, :root.dark .public-text-link { color: #9be1d1; }
-:root.dark .public-chrome__theme { border-color: var(--bb-color-outline); color: #e2f0e9; }
-:root.dark .public-chrome__join, :root.dark .public-button--primary { color: #111c1d; background: #91d9c7; }
-:root.dark .public-chrome__join:hover, :root.dark .public-button--primary:hover { background: #b4ecdc; }
-:root.dark .public-chrome__theme:hover, :root.dark .public-chrome__login:hover { background: #24403c; }
-:root.dark .app-shell--public a:focus-visible, :root.dark .app-shell--public button:focus-visible { outline-color: #f4d796; }
+:root.dark .public-chrome__brand small { color: var(--bb-audience-publicCaption); }
+:root.dark .public-health__heading > p:last-child { color: #aec2bc; }
+:root.dark .public-chrome__nav a, :root.dark .public-chrome__login { color: var(--bb-audience-publicNav); }
+:root.dark .public-chrome__nav a.router-link-active { color: var(--bb-audience-publicNavActive); }
+:root.dark .public-eyebrow, :root.dark .public-section__eyebrow, :root.dark .public-text-link { color: #9be1d1; }
+:root.dark .public-chrome__theme { border-color: var(--bb-audience-publicThemeEdge); color: var(--bb-audience-publicThemeInk); }
+:root.dark .public-chrome__join, :root.dark .public-button--primary { color: var(--bb-audience-publicJoinInk); background: var(--bb-audience-publicJoinFill); }
+:root.dark .public-chrome__join:hover, :root.dark .public-button--primary:hover { background: var(--bb-audience-publicJoinHover); }
+:root.dark .public-chrome__theme:hover, :root.dark .public-chrome__login:hover { background: var(--bb-audience-publicThemeHover); }
+:root.dark .app-shell--public a:focus-visible, :root.dark .app-shell--public button:focus-visible { outline-color: var(--bb-audience-publicFocus); }
 :root.dark .public-hero { border-color: var(--bb-color-outline); background: radial-gradient(circle at 18% 6%, #28443e, transparent 47%), #1c3331; }
 :root.dark .public-hero h1, :root.dark .public-value h3, :root.dark .public-steps h3,
 :root.dark .public-health__body h2 { color: #edf5f2; }

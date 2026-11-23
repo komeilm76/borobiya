@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { palettes } from "../styles/tokens";
+import { audienceColors, palettes } from "../styles/tokens";
 
 // CSS/source audit only: the repository deliberately does not mount Vue SFCs in unit tests.
 const dialog = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
@@ -47,10 +47,10 @@ describe("share privacy flow small text contrast (T4.4.3 partial)", () => {
 
   it("keeps selected preset, keyboard focus and warning text legible in both themes", () => {
     expect(dialog).toMatch(/\.share-dialog__chip:focus-visible \{[^}]*outline: 2px solid var\(--bb-color-text\);/);
-    expect(contrast("#ffffff", "#2f6b46")).toBeGreaterThanOrEqual(4.5);
-    expect(colorOf(dialog, ".share-dialog__chip--on")).toBe("#ffffff");
-    expect(contrast("#a8560e", palettes.light.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(colorOf(dialog, ".share-dialog__warn")).toBe("#a8560e");
+    expect(contrast(audienceColors.light.shareChipInk, audienceColors.light.shareChipOn)).toBeGreaterThanOrEqual(4.5);
+    expect(colorOf(dialog, ".share-dialog__chip--on")).toBe("var(--bb-audience-shareChipInk)");
+    expect(contrast(audienceColors.light.shareWarning, palettes.light.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(colorOf(dialog, ".share-dialog__warn")).toBe("var(--bb-audience-shareWarning)");
     expect(colorOf(dialog, ":global(:root.dark .share-dialog__warn)")).toBe("var(--bb-color-secondary)");
     expect(contrast(palettes.dark.secondary, palettes.dark.surface)).toBeGreaterThanOrEqual(4.5);
   });

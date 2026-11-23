@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { audienceTypography } from "./tokens";
 
 const auth = readFileSync(new URL("./auth.css", import.meta.url), "utf8");
 const publicCss = readFileSync(new URL("./public.css", import.meta.url), "utf8");
@@ -11,7 +12,9 @@ describe("guest and account page typography", () => {
       const declarations = [...css.matchAll(/font-size:\s*([^;]+);/g)];
       expect(declarations.length, name).toBeGreaterThan(20);
       for (const declaration of declarations) {
-        const rems = [...declaration[1]!.matchAll(/([\d.]+)rem/g)].map((match) => Number(match[1]));
+        const token = declaration[1]!.match(/var\(--bb-audience-font-([a-zA-Z]+)\)/)?.[1] as keyof typeof audienceTypography | undefined;
+        const value = token ? audienceTypography[token] : declaration[1]!;
+        const rems = [...value.matchAll(/([\d.]+)rem/g)].map((match) => Number(match[1]));
         expect(rems.length, `${name}: ${declaration[0]}`).toBeGreaterThan(0);
         expect(Math.min(...rems), `${name}: ${declaration[0]}`).toBeGreaterThanOrEqual(0.8);
         expect(Math.max(...rems), `${name}: ${declaration[0]}`).toBeLessThanOrEqual(2.85);

@@ -140,6 +140,60 @@ export const shellLayout = {
 export const shellRadii = { brand: 15, symbol: 34, pill: 999, noteIcon: 12, focus: 2,
   profileChip: 10.4, profileTheme: 12, toastAction: 11.2 } as const;
 
+// Guest entry chrome and sharing feedback have different semantic foregrounds
+// from the signed-in shell. Keep light/dark pairs here so all consuming routes
+// can be rethemed together without changing per-page CSS.
+export const audienceColors = {
+  light: {
+    authCanvas: "radial-gradient(ellipse at 5% 8%, rgba(233, 179, 90, 0.18), transparent 34%), radial-gradient(ellipse at 92% 92%, rgba(14, 102, 102, 0.12), transparent 38%), #eef5f1",
+    authBrand: "#173b3c", authTheme: "#214c49", authFocus: "#0e6666",
+    authMarkInk: "#fff", authMarkFill: "#0e6666", authHomeEdge: "#b9d1ca",
+    authHomeFill: "rgba(255, 255, 255, 0.75)", authHomeHover: "#fff",
+    authIntro: "linear-gradient(155deg, #0c5154 0%, #164c4b 55%, #193c42 100%)",
+    publicCanvas: "#f6f5ef", publicInk: "#193536", publicBrand: "#163c3b",
+    publicCaption: "#687f78", publicNav: "#45645f", publicNavActive: "#0c5553",
+    publicThemeEdge: "#cadbd4", publicThemeInk: "#214c49",
+    publicMarkInk: "#fff", publicMarkFill: "#0d5c5b", publicLoginInk: "#164d4a",
+    publicJoinInk: "#fff", publicJoinFill: "#0d5c5b", publicJoinHover: "#124c4b",
+    publicThemeHover: "#e4f0eb", publicFocus: "#bb7b2e",
+    shareSuccess: "#195e46",
+    broadcastIdle: "#7d9291", broadcastActive: "#1f8a5b",
+    broadcastHalo: "0 0 0 4px rgba(31, 138, 91, 0.18)",
+    broadcastWarn: "#c57b14", broadcastError: "#b3261e",
+    broadcastTitle: "#173b3c", broadcastDetail: "#536d6c",
+    shareChipOn: "#2f6b46", shareChipInk: "#ffffff",
+    shareRating: "#986000", shareDotIdle: "#758989", shareDotOnline: "#268251",
+    shareWarning: "#a8560e", shareSelected: "#1d4038"
+  },
+  dark: {
+    authCanvas: "radial-gradient(ellipse at 5% 8%, rgba(233, 179, 90, 0.08), transparent 34%), radial-gradient(ellipse at 92% 92%, rgba(113, 199, 190, 0.1), transparent 38%), #101d1e",
+    authBrand: "#edf5f2", authTheme: "#edf5f2", authFocus: "#71c7be",
+    authMarkInk: "#fff", authMarkFill: "#0e6666", authHomeEdge: "var(--bb-color-outline)",
+    authHomeFill: "var(--bb-color-surface)", authHomeHover: "#2c4a49",
+    authIntro: "linear-gradient(155deg, #103b3c 0%, #1b3535 55%, #282f35 100%)",
+    publicCanvas: "#111c1d", publicInk: "#edf5f2", publicBrand: "#edf5f2",
+    publicCaption: "#aec2bc", publicNav: "#d0e8de", publicNavActive: "#9be1d1",
+    publicThemeEdge: "var(--bb-color-outline)", publicThemeInk: "#e2f0e9",
+    publicMarkInk: "#fff", publicMarkFill: "#0d5c5b", publicLoginInk: "#d0e8de",
+    publicJoinInk: "#111c1d", publicJoinFill: "#91d9c7", publicJoinHover: "#b4ecdc",
+    publicThemeHover: "#24403c", publicFocus: "#f4d796",
+    shareSuccess: "#7fdcb2",
+    broadcastIdle: "#7d9291", broadcastActive: "#1f8a5b",
+    broadcastHalo: "0 0 0 4px rgba(31, 138, 91, 0.18)",
+    broadcastWarn: "#c57b14", broadcastError: "#b3261e",
+    broadcastTitle: "#edf5f2", broadcastDetail: "var(--bb-color-muted)",
+    shareChipOn: "#2f6b46", shareChipInk: "#ffffff",
+    shareRating: "#986000", shareDotIdle: "#758989", shareDotOnline: "#268251",
+    shareWarning: "#a8560e", shareSelected: "#1d4038"
+  }
+} as const;
+
+export const audienceTypography = {
+  chromeBrand: "1.05rem", chromeAction: "0.88rem", publicCaption: "0.8rem",
+  publicNav: "0.9rem", broadcastTitle: "0.86rem", broadcastDetail: "0.82rem"
+} as const;
+export const audienceRadii = { authMark: 13, publicMark: 14 } as const;
+
 export type DesignTheme = keyof typeof palettes;
 
 /** Vuetify and plain CSS derive from one palette; no second palette to drift. */
@@ -154,6 +208,8 @@ export function designTokenStylesheet(): string {
     ...Object.entries(spacing).map(([key, value]) => `--bb-space-${key}: ${value}px`),
     ...Object.entries(radii).map(([key, value]) => `--bb-radius-${key}: ${value}px`),
     ...Object.entries(shellRadii).map(([key, value]) => `--bb-shell-radius-${key}: ${value}px`),
+    ...Object.entries(audienceRadii).map(([key, value]) => `--bb-audience-radius-${key}: ${value}px`),
+    ...Object.entries(audienceTypography).map(([key, value]) => `--bb-audience-font-${key}: ${value}`),
     ...Object.entries(shellTypography).map(([key, value]) => `--bb-shell-font-${key}: ${value}`),
     ...Object.entries(shellLayout).map(([key, value]) => `--bb-shell-layout-${key}: ${value}`),
     `--bb-font-family: ${typography.fontFamily}`,
@@ -164,6 +220,7 @@ export function designTokenStylesheet(): string {
   const colors = (theme: DesignTheme) => [
     ...Object.entries(palettes[theme]).map(([key, value]) => `--bb-color-${key}: ${value}`),
     ...Object.entries(shellColors[theme]).map(([key, value]) => `--bb-shell-${key}: ${value}`),
+    ...Object.entries(audienceColors[theme]).map(([key, value]) => `--bb-audience-${key}: ${value}`),
     `--bb-shadow-surface: ${shadows[theme].surface}`,
     `--bb-shadow-overlay: ${shadows[theme].overlay}`,
     `--bb-shadow-hero: ${shadows[theme].hero}`,

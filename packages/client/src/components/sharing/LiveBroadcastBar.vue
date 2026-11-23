@@ -80,20 +80,20 @@ onMounted(() => {
   width: 0.65rem;
   height: 0.65rem;
   border-radius: 50%;
-  background: #7d9291;
+  background: var(--bb-audience-broadcastIdle);
 }
 
 .broadcast-bar--active .broadcast-bar__indicator {
-  background: #1f8a5b;
-  box-shadow: 0 0 0 4px rgba(31, 138, 91, 0.18);
+  background: var(--bb-audience-broadcastActive);
+  box-shadow: var(--bb-audience-broadcastHalo);
 }
 
 .broadcast-bar--warn .broadcast-bar__indicator {
-  background: #c57b14;
+  background: var(--bb-audience-broadcastWarn);
 }
 
 .broadcast-bar--error .broadcast-bar__indicator {
-  background: #b3261e;
+  background: var(--bb-audience-broadcastError);
 }
 
 .broadcast-bar__copy {
@@ -103,16 +103,16 @@ onMounted(() => {
 
 .broadcast-bar__headline {
   margin: 0;
-  color: #173b3c;
-  font-size: 0.86rem;
+  color: var(--bb-audience-broadcastTitle);
+  font-size: var(--bb-audience-font-broadcastTitle);
   font-weight: 800;
   line-height: 1.4;
 }
 
 .broadcast-bar__detail {
   margin: 0.12rem 0 0;
-  color: #536d6c;
-  font-size: 0.82rem;
+  color: var(--bb-audience-broadcastDetail);
+  font-size: var(--bb-audience-font-broadcastDetail);
   line-height: 1.55;
 }
 
@@ -140,10 +140,10 @@ onMounted(() => {
 }
 
 :global(:root.dark .broadcast-bar__headline) {
-  color: #edf5f2;
+  color: var(--bb-audience-broadcastTitle);
 }
 
 :global(:root.dark .broadcast-bar__detail) {
-  color: var(--bb-color-muted);
+  color: var(--bb-audience-broadcastDetail);
 }
 </style>

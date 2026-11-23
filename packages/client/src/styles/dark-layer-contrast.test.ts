@@ -100,7 +100,7 @@ describe("dark surfaces and widget boundaries", () => {
     expect(source("components/shell/MapProposalSidebar.vue"))
       .toContain(":global(:root.dark .map-proposal__bell) { border-color: var(--bb-color-outline); }");
     expect(source("styles/public.css")).toContain(":root.dark .public-health__retry { border-color: var(--bb-color-outline);");
-    expect(source("styles/auth.css")).toContain(":root.dark .auth-chrome__home {\n  border-color: var(--bb-color-outline);");
+    expect(source("styles/auth.css")).toContain(":root.dark .auth-chrome__home {\n  border-color: var(--bb-audience-authHomeEdge);");
     expect(contrast(dark.outline, "#28453d")).toBeGreaterThanOrEqual(3);
   });
 

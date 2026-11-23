@@ -750,7 +750,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__warn {
-  color: #a8560e;
+  color: var(--bb-audience-shareWarning);
   font-weight: 700;
 }
 
@@ -790,10 +790,10 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   color: var(--bb-color-muted); font-size: 0.82rem; line-height: 1.5;
 }
 .share-dialog__result-rating { display: inline-flex; align-items: center; gap: 0.1rem; }
-.share-dialog__result-rating :deep(.v-icon) { color: #986000; }
+.share-dialog__result-rating :deep(.v-icon) { color: var(--bb-audience-shareRating); }
 .share-dialog__result-presence { display: inline-flex; align-items: center; gap: 0.25rem; }
-.share-dialog__result-dot { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: #758989; }
-.share-dialog__result-presence--online .share-dialog__result-dot { background: #268251; }
+.share-dialog__result-dot { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--bb-audience-shareDotIdle); }
+.share-dialog__result-presence--online .share-dialog__result-dot { background: var(--bb-audience-shareDotOnline); }
 .share-dialog__result-action { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
 .share-dialog__result-action:focus-visible { outline: 2px solid var(--bb-color-primary); outline-offset: 2px; }
 
@@ -852,9 +852,9 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__chip--on {
-  background-color: #2f6b46;
-  border-color: #2f6b46;
-  color: #ffffff;
+  background-color: var(--bb-audience-shareChipOn);
+  border-color: var(--bb-audience-shareChipOn);
+  color: var(--bb-audience-shareChipInk);
 }
 
 .share-dialog__actions {
@@ -891,7 +891,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 :global(:root.dark .share-dialog__results) { border-color: var(--bb-color-outline); }
 :global(:root.dark .share-dialog__result + .share-dialog__result) { border-top-color: var(--bb-color-outline); }
 :global(:root.dark .share-dialog__result--selected) {
-  background: #1d4038;
+  background: var(--bb-audience-shareSelected);
   border-inline-start: 3px solid var(--bb-color-success);
 }
 :global(:root.dark .share-dialog__chip:not(.share-dialog__chip--on)) {

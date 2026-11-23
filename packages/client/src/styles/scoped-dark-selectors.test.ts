@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileStyle, parse } from "vue/compiler-sfc";
 import { describe, expect, it } from "vitest";
-import { palettes } from "./tokens";
+import { audienceColors, palettes } from "./tokens";
 
 const clientSrc = fileURLToPath(new URL("../", import.meta.url));
 
@@ -38,8 +38,10 @@ function darkTextColor(css: string, selector: string): string {
   const target = `:root.dark ${selector}`;
   for (const block of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!block[1]!.split(",").map((part) => part.trim()).includes(target)) continue;
-    const color = block[2]!.match(/(?:^|;)\s*color:\s*(#[0-9a-f]{6}|var\(--bb-color-muted\))\s*;/i)?.[1];
-    if (color) return color === "var(--bb-color-muted)" ? palettes.dark.muted : color;
+    const color = block[2]!.match(/(?:^|;)\s*color:\s*(#[0-9a-f]{6}|var\(--bb-(?:color-muted|audience-broadcast(?:Title|Detail))\))\s*;/i)?.[1];
+    if (color === "var(--bb-color-muted)" || color === "var(--bb-audience-broadcastDetail)") return palettes.dark.muted;
+    if (color === "var(--bb-audience-broadcastTitle)") return audienceColors.dark.broadcastTitle;
+    if (color) return color;
   }
   throw new Error(`Missing compiled dark text color for ${target}`);
 }

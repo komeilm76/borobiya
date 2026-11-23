@@ -781,10 +781,7 @@
 .app-shell--auth .app-main {
   min-height: 100dvh;
   padding: 0 !important;
-  background:
-    radial-gradient(ellipse at 5% 8%, rgba(233, 179, 90, 0.18), transparent 34%),
-    radial-gradient(ellipse at 92% 92%, rgba(14, 102, 102, 0.12), transparent 38%),
-    #eef5f1;
+  background: var(--bb-audience-authCanvas);
 }
 .auth-chrome {
   display: flex;
@@ -797,22 +794,22 @@
   padding: 1rem clamp(1rem, 4vw, 2.5rem);
 }
 .auth-chrome__actions { display: flex; align-items: center; gap: 0.5rem; }
-.auth-chrome__theme { min-width: 44px; min-height: 44px; color: #214c49 !important; }
-.auth-chrome__theme:focus-visible { outline: 3px solid #0e6666; outline-offset: 3px; }
+.auth-chrome__theme { min-width: 44px; min-height: 44px; color: var(--bb-audience-authTheme) !important; }
+.auth-chrome__theme:focus-visible { outline: 3px solid var(--bb-audience-authFocus); outline-offset: 3px; }
 .auth-chrome__brand, .auth-chrome__home { display: inline-flex; align-items: center; gap: 0.65rem; }
-.auth-chrome__brand { color: #173b3c; font-size: 1.05rem; font-weight: 850; }
+.auth-chrome__brand { color: var(--bb-audience-authBrand); font-size: var(--bb-audience-font-chromeBrand); font-weight: 850; }
 .auth-chrome__mark {
   display: grid; width: 42px; height: 42px; place-items: center;
-  border-radius: 13px; color: #fff; background: #0e6666;
+  border-radius: var(--bb-audience-radius-authMark); color: var(--bb-audience-authMarkInk); background: var(--bb-audience-authMarkFill);
 }
 .auth-chrome__home {
   min-height: 44px; padding: 0.55rem 0.9rem;
-  border: 1px solid #b9d1ca; border-radius: 999px;
-  color: #214c49; background: rgba(255, 255, 255, 0.75);
-  font-size: 0.88rem; font-weight: 750;
+  border: 1px solid var(--bb-audience-authHomeEdge); border-radius: var(--bb-shell-radius-pill);
+  color: var(--bb-audience-authTheme); background: var(--bb-audience-authHomeFill);
+  font-size: var(--bb-audience-font-chromeAction); font-weight: 750;
 }
-.auth-chrome a:focus-visible { outline: 3px solid #0e6666; outline-offset: 3px; }
-.auth-chrome__home:hover { background: #fff; }
+.auth-chrome a:focus-visible { outline: 3px solid var(--bb-audience-authFocus); outline-offset: 3px; }
+.auth-chrome__home:hover { background: var(--bb-audience-authHomeHover); }
 .app-shell--auth .auth-page { min-height: calc(100dvh - 5.5rem); }
 .app-shell--auth .auth-layout {
   gap: 0;
@@ -826,7 +823,7 @@
   min-height: 35rem;
   border: 0;
   border-radius: 0;
-  background: linear-gradient(155deg, #0c5154 0%, #164c4b 55%, #193c42 100%);
+  background: var(--bb-audience-authIntro);
   box-shadow: none;
 }
 .app-shell--auth .auth-kicker {
@@ -882,24 +879,21 @@
   .app-shell--auth .auth-card-body { padding: 1.5rem !important; }
 }
 :root.dark .app-shell--auth .app-main {
-  background:
-    radial-gradient(ellipse at 5% 8%, rgba(233, 179, 90, 0.08), transparent 34%),
-    radial-gradient(ellipse at 92% 92%, rgba(113, 199, 190, 0.1), transparent 38%),
-    #101d1e;
+  background: var(--bb-audience-authCanvas);
 }
-:root.dark .auth-chrome__brand { color: #edf5f2; }
-:root.dark .auth-chrome__theme { color: #edf5f2 !important; }
-:root.dark .auth-chrome__theme:focus-visible { outline-color: #71c7be; }
+:root.dark .auth-chrome__brand { color: var(--bb-audience-authBrand); }
+:root.dark .auth-chrome__theme { color: var(--bb-audience-authTheme) !important; }
+:root.dark .auth-chrome__theme:focus-visible { outline-color: var(--bb-audience-authFocus); }
 :root.dark .auth-chrome__home {
-  border-color: var(--bb-color-outline);
-  color: #edf5f2;
-  background: var(--bb-color-surface);
+  border-color: var(--bb-audience-authHomeEdge);
+  color: var(--bb-audience-authTheme);
+  background: var(--bb-audience-authHomeFill);
 }
-:root.dark .auth-chrome__home:hover { background: #2c4a49; }
-:root.dark .auth-chrome a:focus-visible { outline-color: #71c7be; }
+:root.dark .auth-chrome__home:hover { background: var(--bb-audience-authHomeHover); }
+:root.dark .auth-chrome a:focus-visible { outline-color: var(--bb-audience-authFocus); }
 :root.dark .app-shell--auth .auth-layout { border-color: var(--bb-color-outline); background: var(--bb-color-surface); }
 :root.dark .app-shell--auth .auth-intro {
-  background: linear-gradient(155deg, #103b3c 0%, #1b3535 55%, #282f35 100%);
+  background: var(--bb-audience-authIntro);
 }
 :root.dark .app-shell--auth .auth-hero-title span { color: #f4d796; }
 :root.dark .app-shell--auth .auth-card { background: var(--bb-color-surface) !important; }
