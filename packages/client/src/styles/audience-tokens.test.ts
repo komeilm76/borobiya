@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { audienceColors, audienceRadii, audienceTypography, designTokenStylesheet, palettes } from "./tokens";
+import { audienceColors, audienceFinishes, audienceRadii, audienceTypography, designTokenStylesheet, palettes } from "./tokens";
 
 const auth = readFileSync(new URL("./auth.css", import.meta.url), "utf8");
 const publicCss = readFileSync(new URL("./public.css", import.meta.url), "utf8");
@@ -30,7 +30,12 @@ describe("guest chrome and sharing feedback tokens", () => {
       const rule = mode === "light" ? output.split(":root.dark {")[0]! : output.split(":root.dark {")[1]!;
       for (const [key, value] of Object.entries(audienceColors[mode])) {
         expect(rule, `${mode} ${key}`).toContain(`--bb-audience-${key}: ${value}`);
-        expect(consumers, key).toContain(`var(--bb-audience-${key})`);
+        if (key === "shareSelected") {
+          expect(audienceFinishes.dark.shareResultSelected).toBe("var(--bb-audience-shareSelected)");
+          expect(dialog).toContain("background: var(--bb-finish-shareResultSelected);");
+        } else {
+          expect(consumers, key).toContain(`var(--bb-audience-${key})`);
+        }
       }
     }
     for (const [key, value] of Object.entries(audienceTypography)) {

@@ -694,7 +694,7 @@ defineExpose({ refresh });
 
 <style scoped>
 .share-lists {
-  padding: clamp(1rem, 2.5vw, 1.5rem);
+  padding: var(--bb-content-layout-sharingListInset);
 }
 
 .share-lists__header {
@@ -763,25 +763,26 @@ defineExpose({ refresh });
 .share-lists__row {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0.65rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  gap: var(--bb-content-layout-sharingRowGap);
+  padding: var(--bb-content-layout-sharingRowInset);
+  border: 1px solid var(--bb-finish-shareListRowEdge);
   border-radius: var(--bb-radius-nested, 16px);
+  background: var(--bb-finish-shareListRowFill);
 }
 
 .share-lists__bulk { margin-bottom: 0.6rem; min-height: 44px; max-width: 100%; height: auto; }
 .share-lists__bulk :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .share-lists__device-caption { flex: 0 0 auto; color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); font-weight: var(--bb-weight-bold); }
-.share-lists__tabs { margin-top: 1rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.1); }
+.share-lists__tabs { margin-top: 1rem; border-bottom: 1px solid var(--bb-finish-shareListRule); }
 .share-lists__tabs :deep(.v-tab) { min-width: 0; min-height: 48px; white-space: normal; font-size: var(--bb-sharing-font-caption); }
 .share-lists__row--owned { display: block; }
-.share-lists__row-top { display: flex; align-items: center; gap: 0.6rem; }
+.share-lists__row-top { display: flex; align-items: center; gap: var(--bb-content-layout-sharingRowGap); }
 .share-lists__row-top > .v-btn { min-width: 44px; min-height: 44px; }
 .share-lists__device-line { display: flex; align-items: center; gap: 0.5rem; padding-top: 0.5rem; margin-top: 0.45rem;
-  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08); color: var(--bb-color-muted); }
+  border-top: 1px solid var(--bb-finish-shareListDeviceRule); color: var(--bb-color-muted); }
 .share-lists__device-line :deep(.v-select) { flex: 1 1 auto; min-width: 0; }
 .share-lists__device-line > .v-btn { min-width: 50px; min-height: 44px; }
-.share-lists__device-status { margin: 0.65rem 0 0; color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: 1.7; }
+.share-lists__device-status { margin: 0.65rem 0 0; color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: var(--bb-content-leading-supporting); }
 .share-lists__device-status--ok { color: var(--bb-audience-shareSuccess); }
 .share-lists__device-status--error { color: var(--bb-color-error-text); }
 :global(:root.dark .share-lists__device-status--ok) { color: var(--bb-audience-shareSuccess); }
@@ -814,14 +815,14 @@ defineExpose({ refresh });
   margin: 0.15rem 0 0;
   color: var(--bb-color-muted);
   font-size: var(--bb-sharing-font-caption);
-  line-height: 1.6;
+  line-height: var(--bb-content-leading-caption);
   overflow-wrap: anywhere;
 }
 
 .share-lists__confirm {
   margin: 0;
   font-size: var(--bb-sharing-font-body);
-  line-height: 1.8;
+  line-height: var(--bb-content-leading-detail);
   overflow-wrap: anywhere;
 }
 
@@ -829,10 +830,10 @@ defineExpose({ refresh });
 
 /* Share rows are a separate tier inside the dark list card, including owned-device rows. */
 :global(:root.dark .share-lists__row) {
-  background: var(--bb-color-inset);
-  border-color: var(--bb-color-outline);
+  background: var(--bb-finish-shareListRowFill);
+  border-color: var(--bb-finish-shareListRowEdge);
 }
-:global(:root.dark .share-lists__device-line) { border-top-color: var(--bb-color-outline); }
+:global(:root.dark .share-lists__device-line) { border-top-color: var(--bb-finish-shareListDeviceRule); }
 
 @media (max-width: 599px) {
   .share-lists__header > div:first-child { width: 100%; }

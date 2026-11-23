@@ -101,14 +101,14 @@ describe("cards, actions and fields across the app", () => {
     expect(contrast(audienceDetails.light.publicValueEdge, palettes.light.surface)).toBeGreaterThanOrEqual(1.5); // Noninteractive card boundary.
     expect(publicCss).toContain('border: 1px solid var(--bb-detail-publicValueEdge); border-radius: var(--bb-radius-card, 24px); background: var(--bb-detail-publicValueFill); box-shadow: var(--bb-shadow-item);');
     expect(publicCss).toContain('.public-value__number {');
-    expect(publicCss).toContain('color: var(--bb-color-muted); font-size: 1rem; font-weight: 850;');
+    expect(publicCss).toContain('color: var(--bb-finish-publicValueNumber); font-size: var(--bb-font-body); font-weight: var(--bb-content-weight-strong);');
     expect(publicCss).toContain(':root.dark .public-value { border-color: var(--bb-detail-publicValueEdge); background: var(--bb-detail-publicValueFill); }');
     expect(publicCss).toContain(':root.dark .public-health__card { border-color: var(--bb-detail-publicHealthEdge); background: var(--bb-detail-publicHealthFill); }');
     expect(publicCss).toContain(':root.dark .public-steps { border-color: var(--bb-detail-publicValueEdge); background: var(--bb-detail-publicStepsFill); }');
     expect(publicCss).toContain(':root.dark .public-health__note { border: 1px solid var(--bb-color-outline);');
     expect(publicCss).toContain('.public-button {');
     expect(publicCss).toContain('.public-button--primary { color: var(--bb-audience-publicJoinInk); background: var(--bb-audience-publicJoinFill); box-shadow: var(--bb-shadow-item-hover); }');
-    expect(publicCss).toContain('border-radius: var(--bb-radius-nested, 16px); font-size: 0.95rem;');
+    expect(publicCss).toContain('border-radius: var(--bb-radius-nested, 16px); font-size: var(--bb-content-font-button);');
     expect(publicCss).toContain('border-radius: var(--bb-radius-nested, 16px); color: var(--bb-detail-publicRetryInk);');
   });
 });

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileStyle, parse } from "vue/compiler-sfc";
 import { describe, expect, it } from "vitest";
-import { audienceDetails, palettes, vuetifyThemeColors } from "./tokens";
+import { audienceDetails, audienceFinishes, palettes, vuetifyThemeColors } from "./tokens";
 
 // Source-level audit: do not mount .vue components (docs/TASKS.md).
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -96,7 +96,9 @@ describe("dark surfaces and widget boundaries", () => {
 
   it("separates remaining share rows, float launchers, public links and auth controls", () => {
     expect(source("components/sharing/ShareLists.vue"))
-      .toContain(":global(:root.dark .share-lists__row) {\n  background: var(--bb-color-inset);\n  border-color: var(--bb-color-outline);");
+      .toContain(":global(:root.dark .share-lists__row) {\n  background: var(--bb-finish-shareListRowFill);\n  border-color: var(--bb-finish-shareListRowEdge);");
+    expect(audienceFinishes.dark.shareListRowFill).toBe("var(--bb-color-inset)");
+    expect(audienceFinishes.dark.shareListRowEdge).toBe("var(--bb-color-outline)");
     expect(source("components/shell/MapSidebar.vue"))
       .toContain(":global(:root.dark .map-sidebar__menu-button) { border-color: var(--bb-color-outline); }");
     expect(source("components/shell/MapProposalSidebar.vue"))

@@ -292,11 +292,15 @@ sharing feedback use `audienceColors.light/dark`, `audienceTypography` and
 `audienceRadii` (emitted as `--bb-audience-*`). Guest form, landing, health,
 footer and not-found color roles now use `audienceDetails.light/dark` (emitted
 as `--bb-detail-*`); repeated sharing-dialog/list text sizes use
-`sharingTypography` (`--bb-sharing-font-*`). The 32px hero radius is
-`radii.hero`; the step/not-found badge corners use `audienceDetailRadii`.
-Functional touch targets, responsive breakpoints and map coordinates remain
-local. Some legacy component-local colors, type/spacing and explicit radius
-overrides have not yet been migrated;
+`sharingTypography` (`--bb-sharing-font-*`). The decorative auth/public and
+sharing surface effects are `audienceFinishes.light/dark` (`--bb-finish-*`),
+while `audienceContentType`, `audienceContentLayout`, `audienceContentRadii` and
+`audienceContentMotion` configure their reusable text hierarchy, primary
+insets, responsive panel corners and hover timing. The 32px hero radius is
+`radii.hero`; the step/not-found and other guest badge corners use
+`audienceDetailRadii`. Functional touch targets, responsive breakpoints and
+map coordinates remain local. Some isolated component-local optical spacing
+and presentation values have not yet been migrated;
 this configuration is the source of truth for token-backed styles, **not** a claim
 that every existing CSS declaration is centralized. Track the staged all-page
 migration in [CLIENT_STYLE_TOKEN_MIGRATION.md](CLIENT_STYLE_TOKEN_MIGRATION.md).

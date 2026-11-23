@@ -32,7 +32,7 @@ describe("auth/public content and sharing typography tokens", () => {
     }
     for (const [key, value] of Object.entries(audienceDetailRadii)) {
       expect(sheet).toContain(`--bb-detail-radius-${key}: ${value}px`);
-      expect(publicCss).toContain(`var(--bb-detail-radius-${key})`);
+      expect(auth + publicCss).toContain(`var(--bb-detail-radius-${key})`);
     }
     for (const [key, value] of Object.entries(sharingTypography)) {
       expect(sheet).toContain(`--bb-sharing-font-${key}: ${value}`);

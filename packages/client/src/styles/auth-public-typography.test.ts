@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { audienceDetails, audienceTypography } from "./tokens";
+import { audienceContentType, audienceDetails, audienceTypography, typography } from "./tokens";
 
 const auth = readFileSync(new URL("./auth.css", import.meta.url), "utf8");
 const publicCss = readFileSync(new URL("./public.css", import.meta.url), "utf8");
@@ -12,8 +12,11 @@ describe("guest and account page typography", () => {
       const declarations = [...css.matchAll(/font-size:\s*([^;]+);/g)];
       expect(declarations.length, name).toBeGreaterThan(20);
       for (const declaration of declarations) {
-        const token = declaration[1]!.match(/var\(--bb-audience-font-([a-zA-Z]+)\)/)?.[1] as keyof typeof audienceTypography | undefined;
-        const value = token ? audienceTypography[token] : declaration[1]!;
+        const audienceRole = declaration[1]!.match(/var\(--bb-audience-font-([a-zA-Z]+)\)/)?.[1] as keyof typeof audienceTypography | undefined;
+        const contentRole = declaration[1]!.match(/var\(--bb-content-font-([a-zA-Z]+)\)/)?.[1] as keyof typeof audienceContentType.sizes | undefined;
+        const value = audienceRole ? audienceTypography[audienceRole]
+          : contentRole ? audienceContentType.sizes[contentRole]
+          : declaration[1] === "var(--bb-font-body)" ? typography.sizes.body : declaration[1]!;
         const rems = [...value.matchAll(/([\d.]+)rem/g)].map((match) => Number(match[1]));
         expect(rems.length, `${name}: ${declaration[0]}`).toBeGreaterThan(0);
         expect(Math.min(...rems), `${name}: ${declaration[0]}`).toBeGreaterThanOrEqual(0.8);
@@ -24,26 +27,27 @@ describe("guest and account page typography", () => {
   });
 
   it("keeps all auth display titles, including onboarding, smaller at desktop, tablet and phone widths", () => {
-    expect(auth).toContain("font-size: clamp(2rem, 3vw, 2.85rem)");
-    expect(auth).toContain("font-size: clamp(1.9rem, 3.8vw, 2.5rem)");
-    expect(auth).toContain("font-size: clamp(1.75rem, 5vw, 1.95rem)");
+    expect(audienceContentType.sizes.hero).toBe("clamp(2rem, 3vw, 2.85rem)");
+    expect(auth).toContain("font-size: var(--bb-content-font-hero)");
+    expect(auth).toContain("font-size: var(--bb-content-font-heroTablet)");
+    expect(auth).toContain("font-size: var(--bb-content-font-heroPhone)");
     expect(auth).toContain(".auth-card-heading h2,\n.auth-success-state h2");
-    expect(auth).toContain("font-size: 1.2rem;");
-    expect(auth).toContain(".auth-form .v-input__details {\n  padding-inline: 0.8rem;\n  font-size: 0.82rem;");
+    expect(auth).toContain("font-size: var(--bb-content-font-formHeading);");
+    expect(auth).toContain(".auth-form .v-input__details {\n  padding-inline: 0.8rem;\n  font-size: var(--bb-content-font-caption);");
     for (const view of ["LoginView.vue", "RegisterView.vue", "ForgotPasswordView.vue", "../_user/CompleteSecurityQuestionsView.vue"]) {
       expect(readFileSync(new URL(`../views/_auth/${view}`, import.meta.url), "utf8")).toContain('class="auth-hero-title"');
     }
   });
 
   it("scales the public hero, sections and status headings without losing mobile legibility", () => {
-    expect(publicCss).toContain("font-size: clamp(2rem, 3vw, 2.85rem)");
+    expect(publicCss).toContain("font-size: var(--bb-content-font-hero)");
     expect(publicCss).not.toContain("max-width: 13ch"); // Let Persian lines wrap to the actual column width.
-    expect(publicCss).toContain("font-size: clamp(1.9rem, 6.5vw, 2.15rem)");
-    expect(publicCss).toContain("font-size: clamp(1.55rem, 2.15vw, 2.1rem)");
-    expect(publicCss).toContain("font-size: clamp(1.7rem, 2.3vw, 2.25rem)");
+    expect(publicCss).toContain("font-size: var(--bb-content-font-publicHeroPhone)");
+    expect(publicCss).toContain("font-size: var(--bb-content-font-section)");
+    expect(publicCss).toContain("font-size: var(--bb-content-font-notFound)");
     expect(audienceDetails.light.publicValueCopy).toBe("#556e68");
     expect(audienceDetails.light.publicHealthSmall).toBe("#4c6962");
-    expect(publicCss).toContain(".public-value p, .public-steps li p { margin: 0; color: var(--bb-detail-publicValueCopy); font-size: 0.94rem;");
-    expect(publicCss).toContain(".public-health__body small { display: block; margin-top: 0.7rem; color: var(--bb-detail-publicHealthSmall); font-size: 0.84rem; }");
+    expect(publicCss).toContain(".public-value p, .public-steps li p { margin: 0; color: var(--bb-detail-publicValueCopy); font-size: var(--bb-content-font-lead);");
+    expect(publicCss).toContain(".public-health__body small { display: block; margin-top: 0.7rem; color: var(--bb-detail-publicHealthSmall); font-size: var(--bb-content-font-supporting); }");
   });
 });

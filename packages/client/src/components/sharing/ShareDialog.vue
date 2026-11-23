@@ -711,14 +711,14 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   width: 100%;
   max-width: 45rem;
   margin-inline: auto;
-  padding-inline: clamp(1rem, 3vw, 1.75rem);
+  padding-inline: var(--bb-content-layout-sharingDialogInset);
 }
 
 .share-dialog__lead {
   margin: 0 0 1rem;
   color: var(--bb-color-text);
   font-size: var(--bb-sharing-font-lead);
-  line-height: 1.7;
+  line-height: var(--bb-content-leading-supporting);
 }
 
 .share-dialog__field + .share-dialog__field {
@@ -746,7 +746,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   margin: 0.5rem 0 0;
   color: var(--bb-color-muted);
   font-size: var(--bb-sharing-font-caption);
-  line-height: 1.6;
+  line-height: var(--bb-content-leading-caption);
 }
 
 .share-dialog__warn {
@@ -762,11 +762,11 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   list-style: none;
   padding: 0;
   margin: 0.6rem 0 0;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border: 1px solid var(--bb-finish-shareResultsEdge);
   border-radius: var(--bb-radius-nested, 16px);
   /* The scrollable dialog body is the only vertical scroller. A second 17rem
      search-results viewport trapped swipes and hid selected companions. */
-  background: rgb(var(--v-theme-surface));
+  background: var(--bb-finish-shareResultsFill);
 }
 
 .share-dialog__result {
@@ -775,19 +775,19 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   gap: 0.65rem;
   min-width: 0;
   min-height: 66px;
-  padding: 0.55rem 0.7rem;
+  padding: var(--bb-content-layout-sharingResultInset);
 }
-.share-dialog__result + .share-dialog__result { border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08); }
-.share-dialog__result--selected { background: rgba(var(--v-theme-success), 0.07); }
+.share-dialog__result + .share-dialog__result { border-top: 1px solid var(--bb-finish-shareResultDivider); }
+.share-dialog__result--selected { background: var(--bb-finish-shareResultSelected); }
 .share-dialog__result-avatar { flex: 0 0 auto; font-size: var(--bb-sharing-font-avatar); font-weight: var(--bb-weight-heavy); }
 .share-dialog__result-main { flex: 1 1 auto; min-width: 0; }
 .share-dialog__result-name {
   display: block; color: var(--bb-color-text); font-size: var(--bb-sharing-font-label);
-  line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  line-height: var(--bb-content-leading-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .share-dialog__result-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.6rem;
-  color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: 1.5;
+  color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: var(--bb-content-leading-meta);
 }
 .share-dialog__result-rating { display: inline-flex; align-items: center; gap: 0.1rem; }
 .share-dialog__result-rating :deep(.v-icon) { color: var(--bb-audience-shareRating); }
@@ -831,19 +831,19 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__chip {
   min-height: 2.5rem;
   padding: 0.25rem 0.6rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
+  border: 1px solid var(--bb-finish-shareChipEdge);
   border-radius: var(--bb-shell-radius-pill);
-  background: rgba(var(--v-theme-on-surface), 0.03);
+  background: var(--bb-finish-shareChipFill);
   color: var(--bb-color-text);
   cursor: pointer;
   font: inherit;
   font-size: var(--bb-sharing-font-caption);
   font-weight: var(--bb-weight-bold);
-  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+  transition: border-color var(--bb-content-motion-hover) ease, background-color var(--bb-content-motion-hover) ease, color var(--bb-content-motion-hover) ease;
 }
 
 .share-dialog__chip:hover {
-  border-color: rgba(var(--v-theme-on-surface), 0.34);
+  border-color: var(--bb-finish-shareChipHoverEdge);
 }
 
 .share-dialog__chip:focus-visible {
@@ -861,7 +861,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   width: 100%;
   max-width: 45rem;
   margin-inline: auto;
-  padding: 0.75rem clamp(1rem, 3vw, 1.75rem) 1rem;
+  padding: 0.75rem var(--bb-content-layout-sharingDialogInset) 1rem;
 }
 
 /* Only the device choices scroll; the confirmation controls remain reachable. */
@@ -888,15 +888,15 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   .share-device-chooser__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 
-:global(:root.dark .share-dialog__results) { border-color: var(--bb-color-outline); }
-:global(:root.dark .share-dialog__result + .share-dialog__result) { border-top-color: var(--bb-color-outline); }
+:global(:root.dark .share-dialog__results) { border-color: var(--bb-finish-shareResultsEdge); }
+:global(:root.dark .share-dialog__result + .share-dialog__result) { border-top-color: var(--bb-finish-shareResultDivider); }
 :global(:root.dark .share-dialog__result--selected) {
-  background: var(--bb-audience-shareSelected);
-  border-inline-start: 3px solid var(--bb-color-success);
+  background: var(--bb-finish-shareResultSelected);
+  border-inline-start: 3px solid var(--bb-finish-shareSelectedEdge);
 }
 :global(:root.dark .share-dialog__chip:not(.share-dialog__chip--on)) {
-  background: var(--bb-color-inset);
-  border-color: var(--bb-color-outline);
+  background: var(--bb-finish-shareChipFill);
+  border-color: var(--bb-finish-shareChipEdge);
 }
 :global(:root.dark .share-dialog__result-rating .v-icon) { color: var(--bb-color-secondary); }
 </style>
