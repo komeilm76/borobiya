@@ -590,8 +590,8 @@ onBeforeUnmount(() => {
   width: 2.6rem;
   height: 2.6rem;
   border-radius: 0.9rem;
-  background: rgba(220, 38, 38, 0.14);
-  color: #dc2626;
+  background: var(--bb-rescue-sosBadgeFill);
+  color: var(--bb-rescue-sosBadgeInk);
   flex-shrink: 0;
 }
 
@@ -618,12 +618,12 @@ onBeforeUnmount(() => {
 
 .sos-sheet__readiness, .sos-sheet__ready { margin: 0 0 1rem; padding: .7rem .85rem; border-radius: 12px;
   font-size: .86rem; line-height: 1.55; }
-.sos-sheet__readiness { border: 1px solid rgba(var(--v-theme-warning), .45);
-  background: rgba(var(--v-theme-warning), .1); color: rgb(var(--v-theme-on-surface)); }
+.sos-sheet__readiness { border: 1px solid var(--bb-rescue-sosReadinessEdge);
+  background: var(--bb-rescue-sosReadinessFill); color: rgb(var(--v-theme-on-surface)); }
 .sos-sheet__readiness ul { margin: .3rem 0; padding-inline-start: 1.2rem; }
 .sos-sheet__readiness small { font-size: .82rem; }
-.sos-sheet__ready { border: 1px solid rgba(var(--v-theme-success), .4);
-  background: rgba(var(--v-theme-success), .1); color: rgb(var(--v-theme-on-surface)); }
+.sos-sheet__ready { border: 1px solid var(--bb-rescue-sosReadyEdge);
+  background: var(--bb-rescue-sosReadyFill); color: rgb(var(--v-theme-on-surface)); }
 .sos-sheet__help { margin: .3rem 0 0; font-size: .85rem; line-height: 1.55; }
 .sos-sheet__section + .sos-sheet__section {
   margin-top: 1.15rem;
@@ -655,7 +655,7 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 0.2rem;
   padding: 0.7rem 0.8rem;
-  border: 1.5px solid rgba(120, 140, 140, 0.28);
+  border: 1.5px solid var(--bb-rescue-sosSeverityEdge);
   border-radius: var(--bb-radius-nested, 16px);
   background: transparent;
   text-align: start;
@@ -673,7 +673,7 @@ onBeforeUnmount(() => {
 }
 
 .sos-severity-card.is-selected {
-  background: rgba(220, 38, 38, 0.06);
+  background: var(--bb-rescue-sosSelectedFill);
 }
 
 .sos-severity-dot {
@@ -697,7 +697,7 @@ onBeforeUnmount(() => {
   height: 15.5rem;
   border-radius: var(--bb-radius-nested, 16px);
   overflow: hidden;
-  border: 1px solid rgba(120, 140, 140, 0.25);
+  border: 1px solid var(--bb-rescue-sosMapEdge);
 }
 
 .sos-sheet__map-wrap :deep(.map-canvas) {
@@ -726,13 +726,13 @@ onBeforeUnmount(() => {
 }
 
 :global(:root.dark .sos-sheet__badge) {
-  color: var(--bb-color-error);
-  background: #422b2b;
+  color: var(--bb-rescue-sosBadgeInk);
+  background: var(--bb-rescue-sosBadgeFill);
 }
-:global(:root.dark .sos-severity-card) { border-color: var(--bb-color-outline); }
+:global(:root.dark .sos-severity-card) { border-color: var(--bb-rescue-sosSeverityEdge); }
 :global(:root.dark .sos-severity-card.is-selected) {
-  border-color: var(--bb-color-error);
-  background: #422b2b;
+  border-color: var(--bb-rescue-sosSelectedEdge);
+  background: var(--bb-rescue-sosSelectedFill);
 }
-:global(:root.dark .sos-sheet__map-wrap) { border-color: var(--bb-color-outline); }
+:global(:root.dark .sos-sheet__map-wrap) { border-color: var(--bb-rescue-sosMapEdge); }
 </style>

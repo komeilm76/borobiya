@@ -78,7 +78,7 @@ describe("T4.4.5 design primitives", () => {
     }
     expect(readFileSync(new URL("../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8"))
       .toContain("color: rgb(var(--v-theme-primary));");
-    expect(views("_user/UserRescuerHistoryView")).toContain(":global(:root.dark .history__stars) { color: var(--bb-color-secondary); }");
+    expect(views("_user/UserRescuerHistoryView")).toContain(":global(:root.dark .history__stars) { color: var(--bb-rescue-historyStars); }");
   });
 
   it("installs one style element and updates it idempotently", () => {

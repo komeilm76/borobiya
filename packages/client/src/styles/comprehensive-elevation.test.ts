@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { designTokenStylesheet, shadows } from "./tokens";
+import { designTokenStylesheet, rescueColors, shadows } from "./tokens";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const vueRoot = new URL("../", import.meta.url).pathname;
@@ -19,7 +19,8 @@ describe("all page and component elevation roles", () => {
     expect(templates).not.toMatch(/\bshadow-(?:sm|md|lg|xl|2xl|inner|none)\b/);
     const css = source("./tailwind.css");
     expect(css).not.toMatch(/\.v-card\s*\{[^}]*box-shadow:/);
-    expect(source("../components/sos/SosTriggerButton.vue")).toContain("box-shadow: 0 0.75rem 1.9rem rgba(185, 28, 28, 0.45);");
+    expect(source("../components/sos/SosTriggerButton.vue")).toContain("box-shadow: var(--bb-rescue-sosFabShadow);");
+    expect(rescueColors.light.sosFabShadow).toBe("0 0.75rem 1.9rem rgba(185, 28, 28, 0.45)");
     expect(source("../components/map/LiveCompanionPanel.vue")).toContain(".live-companions__avatar");
   });
 

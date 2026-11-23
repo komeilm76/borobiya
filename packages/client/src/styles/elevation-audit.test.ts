@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { designTokenStylesheet, shadows } from "./tokens";
+import { designTokenStylesheet, rescueColors, shadows } from "./tokens";
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 function rule(css: string, selector: string): string {
@@ -26,8 +26,14 @@ describe("remaining CSS, Tailwind and Vuetify elevation audit", () => {
     for (const [css, selector] of [[offers, ".offer-card"], [sos, ".history__item"], [rescuer, ".history__item"]]) {
       expect(rule(css, selector)).toContain("box-shadow: var(--bb-shadow-item);");
       expect(rule(css, `${selector}:not(:disabled):not(${selector}--selected):hover`)).toContain("box-shadow: var(--bb-shadow-item-hover);");
-      expect(rule(css, `${selector}--selected`)).toContain("var(--bb-shadow-item)");
-      expect(rule(css, `${selector}--selected`)).toContain("0 0 0 2px");
+      if (css === offers) {
+        expect(rule(css, `${selector}--selected`)).toContain("var(--bb-shadow-item)");
+        expect(rule(css, `${selector}--selected`)).toContain("0 0 0 2px");
+      } else {
+        expect(rule(css, `${selector}--selected`)).toContain("box-shadow: var(--bb-rescue-historyRowSelectedHalo)");
+        expect(rescueColors.light.historyRowSelectedHalo).toContain("0 0 0 2px");
+        expect(rescueColors.light.historyRowSelectedHalo).toContain("var(--bb-shadow-item)");
+      }
     }
     expect(sos).toContain(".history__item:focus-visible { outline:");
     expect(offers).toContain(".offer-card:focus-visible, .offers__pages :focus-visible { outline:");

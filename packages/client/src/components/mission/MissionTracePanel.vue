@@ -173,6 +173,6 @@ watch(trace, () => draw());
 .mission-trace__legend { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; font-size: .85rem; }
 .mission-trace__legend li { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem; }
 .mission-trace__dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-.mission-trace__dot.requester { background: #dc593b; }.mission-trace__dot.rescuer { background: #16826c; }.mission-trace__dot.admin { background: #5555ae; }
+.mission-trace__dot.requester { background: var(--bb-rescue-avatarRequesterInk); }.mission-trace__dot.rescuer { background: var(--bb-rescue-avatarRescuerInk); }.mission-trace__dot.admin { background: var(--bb-rescue-avatarAdminInk); }
 .mission-trace__comparison { padding: .7rem; background: var(--bb-color-inset); border-radius: var(--bb-radius-nested, 16px); }
 </style>

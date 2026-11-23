@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { designTokenStylesheet, shadows } from "./tokens";
+import { designTokenStylesheet, rescueColors, shadows } from "./tokens";
 
 // No .vue mounting in this workspace. Pin the actual surface wiring and the shadow cascade:
 // Vuetify's elevation-0 class uses !important, so an ordinary scoped box-shadow does not win.
@@ -61,6 +61,8 @@ describe("surface depth across light and dark UI", () => {
     expect(mission).toContain('class="mission-desk__map-legend bb-floating-card"');
     expect(mission).toContain('box-shadow: var(--bb-shadow-overlay);');
     expect(proposals).toContain(".offer-card--selected { border-color: #319581; box-shadow: 0 0 0 2px");
-    expect(history).toContain(".history__item--selected { border-color: #269b7c; box-shadow: 0 0 0 2px");
+    expect(history).toContain(".history__item--selected { border-color: var(--bb-rescue-historyRowSelected); box-shadow: var(--bb-rescue-historyRowSelectedHalo);");
+    expect(rescueColors.light.historyRowSelected).toBe("#269b7c");
+    expect(rescueColors.light.historyRowSelectedHalo).toContain("0 0 0 2px");
   });
 });

@@ -30,22 +30,22 @@ defineEmits<{
   width: 48px;
   height: 48px;
   padding: 0;
-  border: 2px solid rgba(255, 255, 255, 0.92);
+  border: 2px solid var(--bb-rescue-sosFabEdge);
   border-radius: 50%;
-  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-  color: #ffffff;
+  background: var(--bb-rescue-sosFabFill);
+  color: var(--bb-rescue-sosFabInk);
   cursor: pointer;
-  box-shadow: 0 0.75rem 1.9rem rgba(185, 28, 28, 0.45);
+  box-shadow: var(--bb-rescue-sosFabShadow);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .sos-fab:hover {
   transform: translateY(-2px);
-  box-shadow: 0 1rem 2.2rem rgba(185, 28, 28, 0.58);
+  box-shadow: var(--bb-rescue-sosFabHoverShadow);
 }
 
 .sos-fab:focus-visible {
-  outline: 3px solid #fecaca;
+  outline: 3px solid var(--bb-rescue-sosFabFocus);
   outline-offset: 3px;
 }
 
@@ -53,7 +53,7 @@ defineEmits<{
   position: absolute;
   inset: -4px;
   border-radius: inherit;
-  border: 2px solid rgba(220, 38, 38, 0.55);
+  border: 2px solid var(--bb-rescue-sosFabRing);
   pointer-events: none;
   animation: sos-pulse 2.4s ease-out infinite;
 }

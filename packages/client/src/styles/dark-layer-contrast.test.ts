@@ -133,7 +133,7 @@ describe("dark surfaces and widget boundaries", () => {
         .toContain(`:global(:root.dark ${selector})`);
     }
     for (const path of ["views/_user/UserSosHistoryView.vue", "views/_user/UserRescuerHistoryView.vue"]) {
-      expect(source(path)).toContain(":global(:root.dark .history__item--selected) {\n  border-color: var(--bb-color-primary);");
+      expect(source(path)).toContain(":global(:root.dark .history__item--selected) {\n  border-color: var(--bb-rescue-historyRowSelected);");
     }
     expect(source("components/shell/ProposalInboxContent.vue"))
       .toContain(":global(:root.dark .offer-card--selected) {\n  border-color: var(--bb-color-primary);");

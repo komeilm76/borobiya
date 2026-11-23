@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { palettes } from "@/styles/tokens";
+import { palettes, rescueColors } from "@/styles/tokens";
 
 // CSS/contrast at the unit seam; .vue components are deliberately not mounted in this workspace.
 const live = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
@@ -78,10 +78,13 @@ describe("mission member and rating controls contrast", () => {
     for (const mode of ["light", "dark"] as const) {
       expect(contrast(palettes[mode].muted, palettes[mode].surface)).toBeGreaterThanOrEqual(3);
     }
-    expect(rating).toMatch(/\.rating__choice\s*\{[^}]*border: 1px solid var\(--bb-color-muted\);[^}]*color: #915800;/);
-    expect(rating).toMatch(/\.rating__saved span\s*\{[^}]*color: #915800;/);
-    expect(rating).toMatch(/:global\(:root\.dark \.rating__choice\),[\s\S]*?:global\(:root\.dark \.rating__saved span\)\s*\{\s*color: var\(--bb-color-secondary\);/);
-    expect(rating).toContain(".rating__choice:focus-within { outline: 3px solid #26977b;");
+    expect(rating).toMatch(/\.rating__choice\s*\{[^}]*border: 1px solid var\(--bb-color-muted\);[^}]*color: var\(--bb-rescue-ratingStar\);/);
+    expect(rating).toMatch(/\.rating__saved span\s*\{[^}]*color: var\(--bb-rescue-ratingStar\);/);
+    expect(rating).toMatch(/:global\(:root\.dark \.rating__choice\),[\s\S]*?:global\(:root\.dark \.rating__saved span\)\s*\{\s*color: var\(--bb-rescue-ratingStar\);/);
+    expect(rescueColors.light.ratingStar).toBe(lightStar);
+    expect(rescueColors.dark.ratingStar).toBe("var(--bb-color-secondary)");
+    expect(rating).toContain(".rating__choice:focus-within { outline: 3px solid var(--bb-rescue-ratingFocus);");
+    expect(rescueColors.light.ratingFocus).toBe("#26977b");
     expect(rating).toContain(".rating__fieldset:disabled .rating__choice { opacity: .5;");
   });
 });
