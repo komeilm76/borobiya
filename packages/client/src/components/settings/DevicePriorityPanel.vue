@@ -10,9 +10,12 @@
         <v-icon icon="mdi-refresh" class="me-1" size="18" />تازه‌سازی
       </v-btn>
     </header>
-    <p class="device-priority__hint">فقط نشست‌هایی که هنوز وارد حساب هستند نمایش داده می‌شوند. نشانی IP، محل تقریبی نیست.</p>
+    <p class="device-priority__hint">فقط نشست‌هایی که هنوز وارد حساب هستند نمایش داده می‌شوند. IP محل دقیق ورود را نشان نمی‌دهد.</p>
     <p v-if="api.loading.value && api.loaded.value" class="device-priority__hint" role="status">
       در حال به‌روزرسانی؛ جزئیات زیر ممکن است کهنه باشند…
+    </p>
+    <p v-if="api.failed.value && api.deviceRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
+      آخرین خواندن ناموفق بود؛ نشست‌های زیر ممکن است دیگر فعال نباشند. برای پایان نشست، فهرست را تازه کنید.
     </p>
     <div v-if="api.loading.value && !api.loaded.value" class="device-priority__skeleton" role="status">
       <span>در حال خواندن دستگاه‌ها…</span>
@@ -44,9 +47,6 @@
       فهرست نشست‌ها تأیید نشد؛ دوباره تلاش کنید.
     </p>
     <p v-else class="device-priority__hint">نشست واردشده‌ای پیدا نشد.</p>
-    <p v-if="api.failed.value && api.deviceRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
-      آخرین خواندن ناموفق بود؛ نشست‌های بالا ممکن است دیگر فعال نباشند. برای پایان نشست، فهرست را تازه کنید.
-    </p>
     <p v-if="api.deviceRows.value.some(row => row.isCurrent)" class="device-priority__hint">
       برای پایان همین نشست، از گزینهٔ «خروج» در منوی حساب استفاده کنید.
     </p>

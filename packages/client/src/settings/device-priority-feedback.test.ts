@@ -21,6 +21,16 @@ describe("active-device read feedback", () => {
     expect(panel.match(/aria-hidden="true"/g)).toHaveLength(2); // Session icon + skeleton.
   });
 
+  it("explains stale, disabled session rows before they appear and keeps the IP caveat close to IP", () => {
+    const staleWarning = 'v-if="api.failed.value && api.deviceRows.value.length"';
+    expect(panel.split(staleWarning)).toHaveLength(2); // Announce it once, ahead of the rows.
+    expect(panel.indexOf(staleWarning)).toBeLessThan(panel.indexOf('<ul v-else-if="api.deviceRows.value.length"'));
+    expect(panel).toContain("نشست‌های زیر ممکن است دیگر فعال نباشند");
+    expect(panel).toContain("IP محل دقیق ورود را نشان نمی‌دهد.");
+    expect(view).not.toContain("IP نشان‌دهندهٔ محل دقیق ورود نیست");
+    expect(view).toContain('to="/_user/location-shares"');
+  });
+
   it("never claims no sessions on a failed or still-running read and keeps a manual retry", () => {
     expect(panel).toContain('v-else-if="api.loading.value"');
     expect(panel).toContain('v-else-if="api.failed.value"');

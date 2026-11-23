@@ -23,7 +23,7 @@
 
     <p class="user-devices__intro">
       نشست‌های فعلی حساب را از دستگاه‌های مختلف ببینید و دسترسی دستگاه‌های دیگر را در صورت نیاز قطع کنید.
-      IP نشان‌دهندهٔ محل دقیق ورود نیست. انتخاب دستگاه پخش‌کنندهٔ هر همراه در صفحهٔ اشتراک موقعیت انجام می‌شود.
+      انتخاب دستگاه پخش‌کنندهٔ هر همراه در صفحهٔ اشتراک موقعیت انجام می‌شود.
     </p>
 
     <v-btn class="user-devices__shares-link" to="/_user/location-shares" variant="tonal" color="primary" prepend-icon="mdi-account-multiple-outline">
