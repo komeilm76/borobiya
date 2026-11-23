@@ -129,18 +129,53 @@ export type MissionTrace = { points: MissionTracePoint[]; suggestedRoute: z.infe
   incomplete: boolean };
 
 /** Page by durable insert ID; never silently treat a capped or failed history as a full GPS trace. */
+export const MISSION_TRACE_DEADLINE_MS = 45_000;
+
 export async function getMissionLocationTrace(token: string, id: string, signal?: AbortSignal): Promise<MissionTrace> {
+  if (signal?.aborted) throw new DOMException("Mission trace cancelled", "AbortError");
   const path = `/_user/missions/${encodeURIComponent(missionSchema.shape.id.parse(id))}/location-trace`;
+  const request = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let cancel: (error: Error) => void = () => undefined;
+  const onAbort = () => {
+    cancel(new DOMException("Mission trace cancelled", "AbortError"));
+    request.abort();
+  };
+  const deadline = new Promise<never>((_resolve, reject) => {
+    cancel = reject;
+    signal?.addEventListener("abort", onAbort, { once: true });
+    timer = setTimeout(() => {
+      reject(new Error("MISSION_TRACE_UNAVAILABLE"));
+      request.abort();
+    }, MISSION_TRACE_DEADLINE_MS);
+  });
+  try {
+    // A service worker can ignore abort while connecting or reading a body.
+    // Race the entire sequence, not just each page's initial fetch.
+    return await Promise.race([loadTracePages(path, token, request.signal), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    signal?.removeEventListener("abort", onAbort);
+  }
+}
+
+async function loadTracePages(path: string, token: string, signal: AbortSignal): Promise<MissionTrace> {
   const points: MissionTracePoint[] = [];
   let cursor: number | null = null;
   let suggestedRoute: MissionTrace["suggestedRoute"] = null;
   for (let page = 0; page < 20; page++) {
+    if (signal.aborted) throw new DOMException("Mission trace cancelled", "AbortError");
     const result = tracePageSchema.parse(await requestJson<unknown>(
       `${path}${cursor ? `?cursor=${cursor}` : ""}`, { accessToken: token, cache: "no-store", signal }));
+    // A late response from a transport that ignored abort must not start more
+    // pages for a mission panel that has already timed out or been closed.
+    if (signal.aborted) throw new DOMException("Mission trace cancelled", "AbortError");
     points.push(...result.points);
     suggestedRoute = result.suggestedRoute;
     if (!result.nextCursor) return { points, suggestedRoute, incomplete: false };
-    if (result.nextCursor === cursor || result.points.length === 0) throw new Error("INVALID_MISSION_TRACE_CURSOR");
+    // The server pages by monotonically increasing durable insert ID. A
+    // backwards cursor can replay old GPS pages and fabricate a complete trace.
+    if (result.nextCursor <= (cursor ?? 0) || result.points.length === 0) throw new Error("INVALID_MISSION_TRACE_CURSOR");
     cursor = result.nextCursor;
   }
   return { points, suggestedRoute, incomplete: true };
