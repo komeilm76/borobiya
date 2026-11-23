@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { audienceTypography } from "./tokens";
+import { audienceDetails, audienceTypography } from "./tokens";
 
 const auth = readFileSync(new URL("./auth.css", import.meta.url), "utf8");
 const publicCss = readFileSync(new URL("./public.css", import.meta.url), "utf8");
@@ -41,7 +41,9 @@ describe("guest and account page typography", () => {
     expect(publicCss).toContain("font-size: clamp(1.9rem, 6.5vw, 2.15rem)");
     expect(publicCss).toContain("font-size: clamp(1.55rem, 2.15vw, 2.1rem)");
     expect(publicCss).toContain("font-size: clamp(1.7rem, 2.3vw, 2.25rem)");
-    expect(publicCss).toContain(".public-value p, .public-steps li p { margin: 0; color: #556e68; font-size: 0.94rem;");
-    expect(publicCss).toContain(".public-health__body small { display: block; margin-top: 0.7rem; color: #4c6962; font-size: 0.84rem; }");
+    expect(audienceDetails.light.publicValueCopy).toBe("#556e68");
+    expect(audienceDetails.light.publicHealthSmall).toBe("#4c6962");
+    expect(publicCss).toContain(".public-value p, .public-steps li p { margin: 0; color: var(--bb-detail-publicValueCopy); font-size: 0.94rem;");
+    expect(publicCss).toContain(".public-health__body small { display: block; margin-top: 0.7rem; color: var(--bb-detail-publicHealthSmall); font-size: 0.84rem; }");
   });
 });

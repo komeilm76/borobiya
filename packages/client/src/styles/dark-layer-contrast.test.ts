@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileStyle, parse } from "vue/compiler-sfc";
 import { describe, expect, it } from "vitest";
-import { palettes, vuetifyThemeColors } from "./tokens";
+import { audienceDetails, palettes, vuetifyThemeColors } from "./tokens";
 
 // Source-level audit: do not mount .vue components (docs/TASKS.md).
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -70,8 +70,10 @@ describe("dark surfaces and widget boundaries", () => {
     for (const path of files) {
       expect(source(path), path).not.toMatch(/rgba?\(27,\s*41,\s*42(?:,|\))/);
     }
-    expect(source("styles/auth.css")).toContain("background: var(--bb-color-inset);");
-    expect(source("styles/public.css")).toContain(".public-value, :root.dark .public-health__card { border-color: var(--bb-color-outline);");
+    expect(audienceDetails.dark.authField).toBe("var(--bb-color-inset)");
+    expect(source("styles/auth.css")).toContain("background: var(--bb-detail-authField);");
+    expect(audienceDetails.dark.publicValueEdge).toBe("var(--bb-color-outline)");
+    expect(source("styles/public.css")).toContain(":root.dark .public-value { border-color: var(--bb-detail-publicValueEdge);");
     expect(source("styles/tailwind.css")).toContain(":root.dark .v-card.bb-map-navigation-card {\n  border-color: var(--bb-color-outline);");
   });
 
@@ -99,9 +101,10 @@ describe("dark surfaces and widget boundaries", () => {
       .toContain(":global(:root.dark .map-sidebar__menu-button) { border-color: var(--bb-color-outline); }");
     expect(source("components/shell/MapProposalSidebar.vue"))
       .toContain(":global(:root.dark .map-proposal__bell) { border-color: var(--bb-color-outline); }");
-    expect(source("styles/public.css")).toContain(":root.dark .public-health__retry { border-color: var(--bb-color-outline);");
+    expect(source("styles/public.css")).toContain(":root.dark .public-health__retry { border-color: var(--bb-detail-publicRetryEdge);");
     expect(source("styles/auth.css")).toContain(":root.dark .auth-chrome__home {\n  border-color: var(--bb-audience-authHomeEdge);");
-    expect(contrast(dark.outline, "#28453d")).toBeGreaterThanOrEqual(3);
+    expect(audienceDetails.dark.publicRetryEdge).toBe("var(--bb-color-outline)");
+    expect(contrast(dark.outline, audienceDetails.dark.publicRetryFill)).toBeGreaterThanOrEqual(3);
   });
 
   it("distinguishes actionable rows without obscuring selected, warning or SOS states", () => {

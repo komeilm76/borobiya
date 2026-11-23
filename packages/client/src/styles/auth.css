@@ -256,14 +256,14 @@
   place-items: center;
   border: 1px solid rgba(14, 102, 102, 0.1);
   border-radius: 17px;
-  color: #0e6666;
-  background: linear-gradient(145deg, #e4f3ee, #f8fbf9);
+  color: var(--bb-detail-authCardIcon);
+  background: var(--bb-detail-authCardIconFill);
 }
 
 .auth-card-heading h2,
 .auth-success-state h2 {
   margin: 0.12rem 0 0;
-  color: #1a3b3c;
+  color: var(--bb-detail-authHeading);
   font-size: 1.2rem;
   font-weight: 850;
   line-height: 1.6;
@@ -271,7 +271,7 @@
 
 .auth-eyebrow {
   margin: 0;
-  color: #6d8985;
+  color: var(--bb-detail-authEyebrow);
   font-size: 0.82rem;
   font-weight: 800;
 }
@@ -282,7 +282,7 @@
 }
 
 .auth-form .v-field {
-  background: #fff;
+  background: var(--bb-detail-authField);
 }
 
 .auth-form .v-input__details {
@@ -299,7 +299,7 @@
 }
 
 .text-link {
-  color: #0e7772;
+  color: var(--bb-detail-authLink);
   font-size: 0.88rem;
   font-weight: 700;
   text-decoration: underline;
@@ -309,7 +309,7 @@
 }
 
 .text-link:hover {
-  color: #084e4c;
+  color: var(--bb-detail-authLinkHover);
   text-decoration-color: currentColor;
 }
 
@@ -338,7 +338,7 @@
   align-items: center;
   gap: 0.8rem;
   margin: 1.3rem 0 0.9rem;
-  color: var(--bb-color-muted);
+  color: var(--bb-detail-authDivider);
   font-size: 0.82rem;
 }
 
@@ -346,13 +346,13 @@
 .auth-divider::after {
   height: 1px;
   flex: 1;
-  background: rgba(26, 67, 68, 0.1);
+  background: var(--bb-detail-authDividerRule);
   content: "";
 }
 
 .auth-switch-copy {
   margin: 0;
-  color: var(--bb-color-muted);
+  color: var(--bb-detail-authSwitch);
   font-size: 0.9rem;
   text-align: center;
 }
@@ -372,7 +372,7 @@
   justify-content: center;
   gap: 0.45rem;
   margin: 1.25rem 0 0;
-  color: var(--bb-color-muted);
+  color: var(--bb-detail-authPrivacy);
   font-size: 0.84rem;
 }
 
@@ -423,7 +423,7 @@
 
 .question-section-heading h3 {
   margin: 0.15rem 0 0;
-  color: #244748;
+  color: var(--bb-detail-authQuestionHeading);
   font-size: 1rem;
   font-weight: 850;
 }
@@ -452,8 +452,8 @@
   margin-top: 0.5rem;
   border: 1px solid rgba(14, 102, 102, 0.1);
   border-radius: 10px;
-  color: #0e6666;
-  background: #edf7f3;
+  color: var(--bb-detail-authQuestionIndex);
+  background: var(--bb-detail-authQuestionIndexFill);
   font-size: 0.82rem;
   font-weight: 850;
 }
@@ -497,7 +497,7 @@
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  color: #849695;
+  color: var(--bb-detail-authRecoveryStep);
   font-size: 0.9rem;
   font-weight: 700;
 }
@@ -531,12 +531,12 @@
   padding: 0.9rem;
   border: 1px solid rgba(26, 67, 68, 0.08);
   border-radius: var(--bb-radius-nested, 16px);
-  background: #fbfdfc;
+  background: var(--bb-detail-authRecoveryFill);
 }
 
 .recovery-question p {
   margin: 0 0 0.55rem;
-  color: #35595a;
+  color: var(--bb-detail-authRecoveryQuestion);
   font-size: 0.94rem;
   font-weight: 750;
   line-height: 1.8;
@@ -564,8 +564,8 @@
   place-items: center;
   border: 1px solid rgba(53, 161, 118, 0.16);
   border-radius: 23px;
-  color: #347c61;
-  background: #eff8f3;
+  color: var(--bb-detail-authSuccess);
+  background: var(--bb-detail-authSuccessFill);
 }
 
 @media (max-width: 900px) {
@@ -655,13 +655,13 @@
 :root.dark .auth-hero-title,
 :root.dark .auth-card-heading h2,
 :root.dark .auth-success-state h2 {
-  color: #e3efeb;
+  color: var(--bb-detail-authHeading);
 }
 
 :root.dark .auth-hero-title span,
 :root.dark .text-link,
 :root.dark .recovery-step.is-current {
-  color: #8bd2c8;
+  color: var(--bb-detail-authLink);
 }
 
 :root.dark .auth-hero-copy,
@@ -680,19 +680,19 @@
 :root.dark .trust-icon,
 :root.dark .auth-card-icon {
   border-color: rgba(139, 210, 200, 0.16);
-  color: #8bd2c8;
-  background: linear-gradient(145deg, #24413e, var(--bb-color-surface));
+  color: var(--bb-detail-authCardIcon);
+  background: var(--bb-detail-authCardIconFill);
 }
 
 :root.dark .auth-trust-row strong,
 :root.dark .auth-feature-item strong,
-:root.dark .question-section-heading h3,
-:root.dark .recovery-question p {
-  color: #d5e5df;
+:root.dark .question-section-heading h3 {
+  color: var(--bb-detail-authQuestionHeading);
 }
+:root.dark .recovery-question p { color: var(--bb-detail-authRecoveryQuestion); }
 
 :root.dark .auth-eyebrow {
-  color: #9abdb5;
+  color: var(--bb-detail-authEyebrow);
 }
 
 :root.dark .auth-ring {
@@ -724,39 +724,39 @@
 }
 
 :root.dark .auth-form .v-field {
-  background: var(--bb-color-inset);
+  background: var(--bb-detail-authField);
 }
 
 :root.dark .text-link:hover {
-  color: #b9e8e1;
+  color: var(--bb-detail-authLinkHover);
 }
 
 :root.dark .auth-divider {
-  color: #91a7a2;
+  color: var(--bb-detail-authDivider);
 }
 
 :root.dark .auth-divider::before,
 :root.dark .auth-divider::after {
-  background: rgba(190, 221, 213, 0.14);
+  background: var(--bb-detail-authDividerRule);
 }
 
 :root.dark .auth-switch-copy {
-  color: #aec1bc;
+  color: var(--bb-detail-authSwitch);
 }
 
 :root.dark .auth-privacy-note,
 :root.dark .auth-form-intro {
-  color: #9fb3ae;
+  color: var(--bb-detail-authPrivacy);
 }
 
 :root.dark .question-index {
   border-color: rgba(139, 210, 200, 0.17);
-  color: #8bd2c8;
-  background: #213a38;
+  color: var(--bb-detail-authQuestionIndex);
+  background: var(--bb-detail-authQuestionIndexFill);
 }
 
 :root.dark .recovery-step {
-  color: #98aca7;
+  color: var(--bb-detail-authRecoveryStep);
 }
 
 :root.dark .recovery-step-number {
@@ -767,13 +767,13 @@
 
 :root.dark .recovery-question {
   border-color: var(--bb-color-outline);
-  background: #192728;
+  background: var(--bb-detail-authRecoveryFill);
 }
 
 :root.dark .auth-success-icon {
   border-color: rgba(107, 190, 147, 0.2);
-  color: #8bd7aa;
-  background: #1d382d;
+  color: var(--bb-detail-authSuccess);
+  background: var(--bb-detail-authSuccessFill);
 }
 
 /* Account routes have their own quiet, full-height entry experience instead of

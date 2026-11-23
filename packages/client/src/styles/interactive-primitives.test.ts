@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { palettes } from "./tokens";
+import { audienceDetails, palettes } from "./tokens";
 
 const src = fileURLToPath(new URL("../", import.meta.url));
 const read = (path: string) => readFileSync(join(src, path), "utf8");
@@ -78,10 +78,17 @@ describe("cards, actions and fields across the app", () => {
       expect(css.split(`${selector} {`).slice(1).some((block) =>
         block.split("}")[0]!.includes(`color: ${token};`)), selector).toBe(true);
     }
-    for (const selector of [".auth-trust-row small", ".auth-divider", ".auth-switch-copy", ".auth-privacy-note",
-      ".auth-form-intro", ".auth-success-state > p:not(.auth-eyebrow)"]) {
+    const authForegrounds = {
+      ".auth-trust-row small": "--bb-color-muted",
+      ".auth-divider": "--bb-detail-authDivider",
+      ".auth-switch-copy": "--bb-detail-authSwitch",
+      ".auth-privacy-note": "--bb-detail-authPrivacy",
+      ".auth-form-intro": "--bb-color-muted",
+      ".auth-success-state > p:not(.auth-eyebrow)": "--bb-color-muted"
+    } as const;
+    for (const [selector, role] of Object.entries(authForegrounds)) {
       expect(auth.split(`${selector} {`).slice(1).some((block) =>
-        block.split("}")[0]!.includes("color: var(--bb-color-muted);")), selector).toBe(true);
+        block.split("}")[0]!.includes(`color: var(${role});`)), selector).toBe(true);
     }
     expect(css).toContain(':root.dark .app-footer {');
     expect(auth).toContain(':root.dark .auth-switch-copy {');
@@ -91,16 +98,17 @@ describe("cards, actions and fields across the app", () => {
   it("raises formerly indistinct public dark cards and fixes low-contrast light card numbers", () => {
     expect(contrast(palettes.dark.surface, palettes.dark.background)).toBeGreaterThanOrEqual(1.5);
     expect(contrast(palettes.light.muted, palettes.light.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast("#bfd4ca", palettes.light.surface)).toBeGreaterThanOrEqual(1.5); // Noninteractive card boundary.
-    expect(publicCss).toContain('border: 1px solid #bfd4ca; border-radius: var(--bb-radius-card, 24px); background: #fff; box-shadow: var(--bb-shadow-item);');
+    expect(contrast(audienceDetails.light.publicValueEdge, palettes.light.surface)).toBeGreaterThanOrEqual(1.5); // Noninteractive card boundary.
+    expect(publicCss).toContain('border: 1px solid var(--bb-detail-publicValueEdge); border-radius: var(--bb-radius-card, 24px); background: var(--bb-detail-publicValueFill); box-shadow: var(--bb-shadow-item);');
     expect(publicCss).toContain('.public-value__number {');
     expect(publicCss).toContain('color: var(--bb-color-muted); font-size: 1rem; font-weight: 850;');
-    expect(publicCss).toContain(':root.dark .public-value, :root.dark .public-health__card { border-color: var(--bb-color-outline); background: var(--bb-color-surface); }');
-    expect(publicCss).toContain(':root.dark .public-steps { border-color: var(--bb-color-outline); background: var(--bb-color-surface); }');
+    expect(publicCss).toContain(':root.dark .public-value { border-color: var(--bb-detail-publicValueEdge); background: var(--bb-detail-publicValueFill); }');
+    expect(publicCss).toContain(':root.dark .public-health__card { border-color: var(--bb-detail-publicHealthEdge); background: var(--bb-detail-publicHealthFill); }');
+    expect(publicCss).toContain(':root.dark .public-steps { border-color: var(--bb-detail-publicValueEdge); background: var(--bb-detail-publicStepsFill); }');
     expect(publicCss).toContain(':root.dark .public-health__note { border: 1px solid var(--bb-color-outline);');
     expect(publicCss).toContain('.public-button {');
-    expect(publicCss).toContain('.public-button--primary { color: #fff; background: #0d5c5b; box-shadow: var(--bb-shadow-item-hover); }');
+    expect(publicCss).toContain('.public-button--primary { color: var(--bb-audience-publicJoinInk); background: var(--bb-audience-publicJoinFill); box-shadow: var(--bb-shadow-item-hover); }');
     expect(publicCss).toContain('border-radius: var(--bb-radius-nested, 16px); font-size: 0.95rem;');
-    expect(publicCss).toContain('border-radius: var(--bb-radius-nested, 16px); color: #1a5953;');
+    expect(publicCss).toContain('border-radius: var(--bb-radius-nested, 16px); color: var(--bb-detail-publicRetryInk);');
   });
 });

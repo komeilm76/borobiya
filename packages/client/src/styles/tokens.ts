@@ -18,7 +18,7 @@ export const spacing = {
 // throughout the app; main.ts installs the resulting CSS variables at startup.
 // Card and nested surfaces are intentionally rounder than text buttons. Compact
 // buttons (such as the 28px-high refresh action) should not become pill-shaped.
-export const radii = { card: 24, nested: 16, button: 12, "button-compact": 8 } as const;
+export const radii = { card: 24, nested: 16, hero: 32, button: 12, "button-compact": 8 } as const;
 
 export const typography = {
   fontFamily: '"Vazirmatn Variable", "Segoe UI", Tahoma, sans-serif',
@@ -194,6 +194,102 @@ export const audienceTypography = {
 } as const;
 export const audienceRadii = { authMark: 13, publicMark: 14 } as const;
 
+// Form, health and footer roles are separate from the outer guest chrome.
+// Avoid replacing colors with near-matches: the contrast and light/dark meanings
+// of each role have been reviewed independently.
+export const audienceDetails = {
+  light: {
+    publicHeroEdge: "#d8e5de",
+    authDividerRule: "rgba(26, 67, 68, 0.1)", authDivider: "var(--bb-color-muted)",
+    authSwitch: "var(--bb-color-muted)", authPrivacy: "var(--bb-color-muted)",
+    publicEyebrow: "#0d6963", publicEyebrowRule: "#d6984e",
+    publicHeroAssurance: "#49635e", publicHeroAssuranceIcon: "#0d6963",
+    publicValueIcon: "#0d6963", publicValueIconFill: "#e9f5ef",
+    publicStepsFill: "#edf5ee", publicStepsLine: "#cddfd3",
+    publicStepsNumberInk: "#fff", publicStepsNumberFill: "#0d5c5b",
+    publicTextLink: "#0d6660", publicFinalFill: "#183f40",
+    publicFinalInk: "#fff", publicFinalEyebrow: "#f4d796",
+    publicFinalButtonInk: "#173b3a", publicFinalButtonFill: "#f4d796",
+    publicFinalButtonHover: "#ffe4ad", publicHealthHeading: "#193e3c",
+    publicNotFoundEdge: "#cde3d8", publicNotFoundInk: "#0d6963",
+    publicNotFoundFill: "#e6f3ec", publicNotFoundCopy: "#506b65",
+    authHeading: "#1a3b3c", authEyebrow: "#6d8985",
+    authLink: "#0e7772", authLinkHover: "#084e4c",
+    authField: "#fff", authCardIcon: "#0e6666",
+    authCardIconFill: "linear-gradient(145deg, #e4f3ee, #f8fbf9)",
+    authQuestionHeading: "#244748", authQuestionIndex: "#0e6666",
+    authQuestionIndexFill: "#edf7f3", authRecoveryStep: "#849695",
+    authRecoveryQuestion: "#35595a", authRecoveryFill: "#fbfdfc",
+    authSuccess: "#347c61", authSuccessFill: "#eff8f3",
+    publicHeroInk: "#173b3a", publicHeroAccent: "#0e7772",
+    publicHeroFill: "radial-gradient(circle at 18% 6%, #fffdf4, transparent 47%), linear-gradient(145deg, #f4f7ef, #e9f2ec)",
+    publicHeroCopy: "#45645e", publicHeading: "#173b3a",
+    publicButtonEdge: "#b8d1c7", publicButtonInk: "#1d5752",
+    publicButtonFill: "rgba(255, 255, 255, 0.65)", publicButtonHover: "#fff",
+    publicSectionCopy: "#526c65", publicValueEdge: "#bfd4ca",
+    publicValueFill: "#fff", publicValueHeading: "#1b4442", publicValueCopy: "#556e68",
+    publicHealthEdge: "#dae8df", publicHealthFill: "#fff",
+    publicHealthIntro: "#506b65", publicHealthCopy: "#506b65", publicHealthSmall: "#4c6962",
+    publicHealthBadge: "#765818", publicHealthBadgeFill: "#fff1d2",
+    publicHealthOnline: "#165741", publicHealthOnlineFill: "#e2f4e9",
+    publicHealthOffline: "#8c3135", publicHealthOfflineFill: "#fbe9e9",
+    publicRetryEdge: "#b5d2c4", publicRetryInk: "#1a5953",
+    publicRetryFill: "#f3f8f4", publicRetryHover: "#e1f1e8",
+    publicHealthNoteInk: "#385e57", publicHealthNoteFill: "#eaf3ea",
+    publicFooterEdge: "#dce7df", publicFooterFill: "#edf3ed",
+    publicFooterCopy: "#547069", publicFooterHeading: "#1d4946", publicFooterNav: "#28534e"
+  },
+  dark: {
+    publicHeroEdge: "var(--bb-color-outline)",
+    authDividerRule: "rgba(190, 221, 213, 0.14)", authDivider: "#91a7a2",
+    authSwitch: "#aec1bc", authPrivacy: "#9fb3ae",
+    publicEyebrow: "#9be1d1", publicEyebrowRule: "#d6984e",
+    publicHeroAssurance: "#c0d6cc", publicHeroAssuranceIcon: "#91d9c7",
+    publicValueIcon: "#9be1d1", publicValueIconFill: "#284840",
+    publicStepsFill: "var(--bb-color-surface)", publicStepsLine: "#3d5650",
+    publicStepsNumberInk: "#102221", publicStepsNumberFill: "#91d9c7",
+    publicTextLink: "#9be1d1", publicFinalFill: "#234541",
+    publicFinalInk: "#fff", publicFinalEyebrow: "#f4d796",
+    publicFinalButtonInk: "#173b3a", publicFinalButtonFill: "#f4d796",
+    publicFinalButtonHover: "#ffe4ad", publicHealthHeading: "#edf5f2",
+    publicNotFoundEdge: "#41655a", publicNotFoundInk: "#91d9c7",
+    publicNotFoundFill: "#264039", publicNotFoundCopy: "#c0d6cc",
+    authHeading: "#e3efeb", authEyebrow: "#9abdb5",
+    authLink: "#8bd2c8", authLinkHover: "#b9e8e1",
+    authField: "var(--bb-color-inset)", authCardIcon: "#8bd2c8",
+    authCardIconFill: "linear-gradient(145deg, #24413e, var(--bb-color-surface))",
+    authQuestionHeading: "#d5e5df", authQuestionIndex: "#8bd2c8",
+    authQuestionIndexFill: "#213a38", authRecoveryStep: "#98aca7",
+    authRecoveryQuestion: "#d5e5df", authRecoveryFill: "#192728",
+    authSuccess: "#8bd7aa", authSuccessFill: "#1d382d",
+    publicHeroInk: "#edf5f2", publicHeroAccent: "#9be1d1",
+    publicHeroFill: "radial-gradient(circle at 18% 6%, #28443e, transparent 47%), #1c3331",
+    publicHeroCopy: "#c0d6cc", publicHeading: "#edf5f2",
+    publicButtonEdge: "var(--bb-color-outline)", publicButtonInk: "#e4f4ec",
+    publicButtonFill: "#2a4842", publicButtonHover: "#37564d",
+    publicSectionCopy: "#c0d6cc", publicValueEdge: "var(--bb-color-outline)",
+    publicValueFill: "var(--bb-color-surface)", publicValueHeading: "#edf5f2", publicValueCopy: "#c0d6cc",
+    publicHealthEdge: "var(--bb-color-outline)", publicHealthFill: "var(--bb-color-surface)",
+    publicHealthIntro: "#aec2bc", publicHealthCopy: "#c0d6cc", publicHealthSmall: "#c0d6cc",
+    publicHealthBadge: "#f5dea4", publicHealthBadgeFill: "#403720",
+    publicHealthOnline: "#a5e6bc", publicHealthOnlineFill: "#224334",
+    publicHealthOffline: "#ffc3c4", publicHealthOfflineFill: "#452a2d",
+    publicRetryEdge: "var(--bb-color-outline)", publicRetryInk: "#dcf4e9",
+    publicRetryFill: "#28453d", publicRetryHover: "#35584c",
+    publicHealthNoteInk: "#d6e7da", publicHealthNoteFill: "var(--bb-color-inset)",
+    publicFooterEdge: "var(--bb-color-outline)", publicFooterFill: "#192a29",
+    publicFooterCopy: "#c0d6cc", publicFooterHeading: "#edf5f2", publicFooterNav: "#c0d6cc"
+  }
+} as const;
+
+export const audienceDetailRadii = { step: 13, notFound: 26 } as const;
+
+export const sharingTypography = {
+  caption: "0.82rem", label: "0.88rem", body: "0.9rem",
+  supporting: "0.84rem", heading: "1.1rem",
+  lead: "0.92rem", avatar: "0.85rem"
+} as const;
+
 export type DesignTheme = keyof typeof palettes;
 
 /** Vuetify and plain CSS derive from one palette; no second palette to drift. */
@@ -210,6 +306,8 @@ export function designTokenStylesheet(): string {
     ...Object.entries(shellRadii).map(([key, value]) => `--bb-shell-radius-${key}: ${value}px`),
     ...Object.entries(audienceRadii).map(([key, value]) => `--bb-audience-radius-${key}: ${value}px`),
     ...Object.entries(audienceTypography).map(([key, value]) => `--bb-audience-font-${key}: ${value}`),
+    ...Object.entries(audienceDetailRadii).map(([key, value]) => `--bb-detail-radius-${key}: ${value}px`),
+    ...Object.entries(sharingTypography).map(([key, value]) => `--bb-sharing-font-${key}: ${value}`),
     ...Object.entries(shellTypography).map(([key, value]) => `--bb-shell-font-${key}: ${value}`),
     ...Object.entries(shellLayout).map(([key, value]) => `--bb-shell-layout-${key}: ${value}`),
     `--bb-font-family: ${typography.fontFamily}`,
@@ -221,6 +319,7 @@ export function designTokenStylesheet(): string {
     ...Object.entries(palettes[theme]).map(([key, value]) => `--bb-color-${key}: ${value}`),
     ...Object.entries(shellColors[theme]).map(([key, value]) => `--bb-shell-${key}: ${value}`),
     ...Object.entries(audienceColors[theme]).map(([key, value]) => `--bb-audience-${key}: ${value}`),
+    ...Object.entries(audienceDetails[theme]).map(([key, value]) => `--bb-detail-${key}: ${value}`),
     `--bb-shadow-surface: ${shadows[theme].surface}`,
     `--bb-shadow-overlay: ${shadows[theme].overlay}`,
     `--bb-shadow-hero: ${shadows[theme].hero}`,
