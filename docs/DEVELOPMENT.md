@@ -282,10 +282,12 @@ do not edit individual page styles for that adjustment.
 
 The pre-paint `public/theme-init.js` must remain a small static script to prevent
 a theme flash: when changing its background or foreground, update it alongside
-the tokens (tests pin both values). Some legacy component-local colors and explicit
-radius overrides have not all been migrated; this configuration is the source of
-truth for token-backed styles, **not** a claim that every existing CSS declaration
-is centralized. A comprehensive migration and visual audit would be separate work.
+the tokens (tests pin both values). Settings UI also uses theme-specific
+`supporting-text`, `error-text`, and `row-outline` palette tokens. Some legacy
+component-local colors and explicit radius overrides have not yet been migrated;
+this configuration is the source of truth for token-backed styles, **not** a claim
+that every existing CSS declaration is centralized. Track the staged all-page
+migration in [CLIENT_STYLE_TOKEN_MIGRATION.md](CLIENT_STYLE_TOKEN_MIGRATION.md).
 
 ## 8. Testing
 

@@ -86,14 +86,14 @@ onMounted(() => {
 
 .user-devices__title-block p {
   margin: 0;
-  color: #536d6c;
+  color: var(--bb-color-supporting-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .user-devices__title-block h1 {
   margin: 0.15rem 0 0;
-  color: #193536;
+  color: var(--bb-color-text);
   font-size: 1.28rem;
   font-weight: 800;
   line-height: 1.45;
@@ -106,17 +106,17 @@ onMounted(() => {
 .user-devices__intro {
   margin: 0;
   max-width: 58rem;
-  color: #536d6c;
+  color: var(--bb-color-supporting-text);
   font-size: 0.94rem;
   line-height: 1.85;
 }
 
 :global(:root.dark .user-devices__title-block p),
 :global(:root.dark .user-devices__intro) {
-  color: #a0b6b2;
+  color: var(--bb-color-supporting-text);
 }
 
 :global(:root.dark .user-devices__title-block h1) {
-  color: #edf5f2;
+  color: var(--bb-color-text);
 }
 </style>

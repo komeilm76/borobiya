@@ -34,7 +34,9 @@ export const palettes = {
     success: "#347c61", info: "#4a7c91", warning: "#fb8c00",
     // Small labels also sit on the pale inset, not only on white cards.
     text: "#193536", muted: "#586f6f", onPrimary: "#ffffff", brand: "#0e6666",
-    inset: "#f4f7f6", outline: "#627a7a"
+    inset: "#f4f7f6", outline: "#627a7a",
+    // Settings/supporting copy and status colors are distinct from the base muted/error palette.
+    "supporting-text": "#536d6c", "error-text": "#b3261e", "row-outline": "#629289"
   },
   dark: {
     background: "#111c1d", surface: "#294043", primary: "#71c7be",
@@ -43,7 +45,8 @@ export const palettes = {
     text: "#edf5f2", muted: "#afc1bc", onPrimary: "#111c1d", brand: "#0e6666",
     // An inset row needs a visible boundary on the raised surface without
     // sacrificing 4.5:1 for muted/primary text inside it.
-    inset: "#304749", outline: "#82aaa5"
+    inset: "#304749", outline: "#82aaa5",
+    "supporting-text": "#a0b6b2", "error-text": "#ffb4ab", "row-outline": "#82aaa5"
   }
 } as const;
 

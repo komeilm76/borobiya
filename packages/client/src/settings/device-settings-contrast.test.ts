@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { palettes } from "../styles/tokens";
+import { designTokenStylesheet, palettes } from "../styles/tokens";
 
 // Source-pinned CSS audit. This repository does not mount Vue SFCs in unit tests.
 const panel = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
@@ -23,13 +23,26 @@ function lightColor(source: string, selector: string): string {
   const lightStyles = source.split(":global(:root.dark ")[0]!;
   for (const block of lightStyles.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!block[1]!.split(",").map((part) => part.trim()).includes(selector)) continue;
-    const color = block[2]!.match(/(?:^|;)\s*color:\s*(#[0-9a-f]{6});/i)?.[1];
-    if (color) return color;
+    const token = block[2]!.match(/(?:^|;)\s*color:\s*var\(--bb-color-([a-z-]+)\);/i)?.[1] as keyof typeof palettes.light | undefined;
+    if (token && token in palettes.light) return palettes.light[token];
   }
-  throw new Error(`Missing literal foreground color for ${selector}`);
+  throw new Error(`Missing shared foreground token for ${selector}`);
 }
 
 describe("device settings small text contrast (T4.4.3 partial)", () => {
+  it("sources this page's semantic colors from the global light/dark configuration", () => {
+    const css = designTokenStylesheet();
+    for (const theme of ["light", "dark"] as const) {
+      for (const key of ["supporting-text", "error-text", "row-outline"] as const) {
+        expect(css).toContain(`--bb-color-${key}: ${palettes[theme][key]}`);
+      }
+    }
+    expect(view.split("<style scoped>")[1]).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(panel.split("<style scoped>")[1]).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(panel).toContain("border: 1px solid color-mix(in srgb, var(--bb-color-text) 8%, transparent);");
+    expect(contrast(palettes.light["error-text"], palettes.light.surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("keeps small labels readable against the white cards and light page", () => {
     for (const selector of [
       ".device-priority__kicker", ".device-priority__hint", ".device-priority__meta", ".device-priority__icon"
@@ -45,7 +58,7 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
 
   it("centers a restrained desktop card and separates session rows without changing their controls", () => {
     expect(panel).toMatch(/\.device-priority__card\s*\{[^}]*width: 100%;[^}]*max-width: 52rem;[^}]*align-self: center;/);
-    expect(panel).toMatch(/\.device-priority__session\s*\{[^}]*border: 1px solid rgba\(98, 146, 137, 0\.32\);[^}]*background: var\(--bb-color-inset\);/);
+    expect(panel).toMatch(/\.device-priority__session\s*\{[^}]*border: 1px solid color-mix\(in srgb, var\(--bb-color-row-outline\) 32%, transparent\);[^}]*background: var\(--bb-color-inset\);/);
     expect(panel).toContain(":global(:root.dark .device-priority__session) {");
     expect(panel).toContain("border-color: var(--bb-color-outline);");
     // A longer Persian duration must not make the details' max-content width
@@ -61,8 +74,8 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
       expect(contrast(palettes.dark.muted, background), `muted on ${background}`).toBeGreaterThanOrEqual(4.5);
     }
     expect(contrast(palettes.dark.text, palettes.dark.inset)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast("#ffb4ab", palettes.dark.surface)).toBeGreaterThanOrEqual(4.5);
-    expect(panel).toContain(":global(:root.dark .device-priority__hint--error) { color: #ffb4ab; }");
+    expect(contrast(palettes.dark["error-text"], palettes.dark.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(panel).toContain(":global(:root.dark .device-priority__hint--error) { color: var(--bb-color-error-text); }");
   });
 
   it("preserves dark-theme overrides for the same labels", () => {
@@ -73,7 +86,7 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
     }
     expect(view).toContain(":global(:root.dark .user-devices__title-block p)");
     for (const background of [palettes.dark.surface, palettes.dark.background]) {
-      expect(contrast("#a0b6b2", background)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(palettes.dark["supporting-text"], background)).toBeGreaterThanOrEqual(4.5);
     }
   });
 });
