@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { effectScope, ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
-import { useMissionRoutes } from "./use-mission-routes";
+import { MISSION_GPS_DEADLINE_MS, useMissionRoutes } from "./use-mission-routes";
 
 const mission = "50000000-0000-4000-8000-000000000005";
 const incident = { lat: 35.7, lon: 51.4 };
@@ -190,6 +190,28 @@ describe("active rescuer mission route picker", () => {
       await pending;
       expect(picker.routes.value).toEqual([]);
     } finally { oldRoute.resolve([route]); scope.stop(); }
+  });
+
+  it("unblocks navigation when the GPS bridge never calls back, then retries from a fresh fix", async () => {
+    vi.useFakeTimers();
+    const getPosition = vi.fn().mockImplementationOnce(() => new Promise(() => {})).mockResolvedValueOnce(from);
+    const getRoutes = vi.fn(async () => [route]);
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined,
+      { getTarget: async () => target, getPosition, getRoutes });
+    try {
+      await picker.open();
+      const first = picker.findRoutes();
+      await vi.advanceTimersByTimeAsync(MISSION_GPS_DEADLINE_MS);
+      await first;
+      expect(picker.loading.value).toBe(false);
+      expect(picker.from.value).toBeNull();
+      expect(picker.error.value).toContain("مکان‌یابی");
+      await picker.findRoutes();
+      expect(getPosition).toHaveBeenCalledTimes(2);
+      expect(getRoutes).toHaveBeenCalledOnce();
+      expect(picker.selectedRoute.value).toEqual(route);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { picker.reset(); vi.useRealTimers(); }
   });
 
   it("does not route from an old fix after an explicit GPS refresh is denied", async () => {

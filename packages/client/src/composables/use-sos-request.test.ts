@@ -3,7 +3,7 @@ import { effectScope, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/http";
 import * as sosApi from "@/api/sos";
-import { useSosRequest, type GeolocationProvider } from "./use-sos-request";
+import { SOS_CATALOG_DEADLINE_MS, SOS_GPS_DEADLINE_MS, useSosRequest, type GeolocationProvider } from "./use-sos-request";
 
 const INCIDENT_A = "11111111-1111-4111-8111-111111111111";
 const INCIDENT_B = "33333333-3333-4333-8333-333333333333";
@@ -82,6 +82,25 @@ describe("useSosRequest composable", () => {
     await newer;
     expect(sos.loadingCatalog.value).toBe(false);
     expect(sos.incidentTypeId.value).toBe(INCIDENT_B);
+  });
+
+  it("unblocks a stalled incident catalog so an SOS can retry the category lookup", async () => {
+    vi.useFakeTimers();
+    const read = vi.spyOn(sosApi, "listSosIncidentTypes")
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValueOnce([catalogRow(INCIDENT_A)]);
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token") });
+    try {
+      const pending = sos.loadCatalog();
+      await vi.advanceTimersByTimeAsync(SOS_CATALOG_DEADLINE_MS);
+      await pending;
+      expect(sos.loadingCatalog.value).toBe(false);
+      expect(sos.catalogError.value).toContain("دریافت فهرست");
+      await sos.loadCatalog();
+      expect(read).toHaveBeenCalledTimes(2);
+      expect(sos.incidentTypeId.value).toBe(INCIDENT_A);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { sos.reset(); vi.useRealTimers(); }
   });
 
   it("keeps a selected incident type only while it exists in the refreshed catalog", async () => {
@@ -166,6 +185,27 @@ describe("useSosRequest composable", () => {
       expect(sos.setManualLocation(35.7, 51.4)).toBe(true);
       expect(sos.location.value).toEqual({ lat: 35.7, lon: 51.4, isManual: true });
     }
+  });
+
+  it("ends a silent GPS lookup and ignores its late fix after a retry", async () => {
+    vi.useFakeTimers();
+    const callbacks: Array<Parameters<GeolocationProvider["getCurrentPosition"]>[0]> = [];
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token"),
+      geolocation: () => ({ getCurrentPosition: (success) => { callbacks.push(success); } }) });
+    try {
+      sos.requestGpsLocation();
+      expect(sos.locating.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(SOS_GPS_DEADLINE_MS);
+      expect(sos.locating.value).toBe(false);
+      expect(sos.locationHint.value).toContain("نقشه");
+      sos.requestGpsLocation();
+      callbacks[0]!({ coords: { latitude: 35.7, longitude: 51.4 } });
+      expect(sos.location.value).toBeNull();
+      callbacks[1]!({ coords: { latitude: 35.8, longitude: 51.5 } });
+      expect(sos.locating.value).toBe(false);
+      expect(sos.location.value).toMatchObject({ lat: 35.8, lon: 51.5 });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { sos.reset(); vi.useRealTimers(); }
   });
 
   it("loads incident catalog and GPS fix on open, then submits SOS without photo", async () => {
@@ -707,7 +747,10 @@ describe("useSosRequest composable", () => {
     });
 
     sos.prepareForOpen();
-    await vi.waitFor(() => expect(sos.location.value).not.toBeNull());
+    await vi.waitFor(() => {
+      expect(sos.location.value).not.toBeNull();
+      expect(sos.incidentTypeId.value).toBe(INCIDENT_A);
+    });
     sos.description.value = "نیاز فوری به کمک پزشکی در ساختمان مسکونی";
     expect(sos.canSubmit.value).toBe(true);
 

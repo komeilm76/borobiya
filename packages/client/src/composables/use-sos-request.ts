@@ -15,6 +15,9 @@ import {
   type SosFormDraft
 } from "../sos/sos-form";
 
+export const SOS_GPS_DEADLINE_MS = 12_000;
+export const SOS_CATALOG_DEADLINE_MS = 12_000;
+
 export interface GeolocationProvider {
   getCurrentPosition(
     success: (position: {
@@ -70,6 +73,11 @@ export function useSosRequest(options: UseSosRequestOptions) {
   const photoUploadedUrl = ref<string | null>(null);
   const awaitingPhotoRetry = ref(false);
   let gpsRequestId = 0;
+  let gpsDeadline: ReturnType<typeof setTimeout> | null = null;
+  function clearGpsDeadline(): void {
+    if (gpsDeadline !== null) clearTimeout(gpsDeadline);
+    gpsDeadline = null;
+  }
   let catalogVersion = 0;
   let operationGeneration = 0;
   // Bind consent to the JWT login session, not just the account: logging into the same
@@ -109,8 +117,18 @@ export function useSosRequest(options: UseSosRequestOptions) {
     const version = ++catalogVersion;
     loadingCatalog.value = true;
     catalogError.value = null;
+    const request = new AbortController();
+    let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      deadlineTimer = setTimeout(() => {
+        reject(new Error("Incident catalog timed out."));
+        request.abort();
+      }, SOS_CATALOG_DEADLINE_MS);
+    });
     try {
-      const types = await listSosIncidentTypes();
+      // Abort alone is advisory. A half-open /incident-types read must free
+      // the SOS category retry action even when fetch ignores its signal.
+      const types = await Promise.race([listSosIncidentTypes(request.signal), deadline]);
       if (version !== catalogVersion) return;
       // A previously selected type may have been removed while the sheet was closed.
       // Do not silently switch the emergency to a different category: require a new
@@ -128,6 +146,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
         "دریافت فهرست نوع حوادث انجام نشد؛ دوباره تلاش کنید."
       );
     } finally {
+      if (deadlineTimer !== null) clearTimeout(deadlineTimer);
+      request.abort();
       if (version === catalogVersion) loadingCatalog.value = false;
     }
   }
@@ -135,6 +155,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   function requestGpsLocation(): void {
     if (submitting.value) return;
     const currentGpsRequest = ++gpsRequestId;
+    clearGpsDeadline();
     let provider: GeolocationProvider | null;
     try {
       provider = (options.geolocation ?? defaultGeolocation)();
@@ -151,10 +172,21 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
     locating.value = true;
     locationHint.value = null;
+    // Native bridges and some browsers ignore the Geolocation API's own timeout.
+    // Keep the manual map/coordinate fallback available and reject late fixes.
+    gpsDeadline = setTimeout(() => {
+      if (currentGpsRequest !== gpsRequestId) return;
+      gpsDeadline = null;
+      gpsRequestId++;
+      locating.value = false;
+      locationHint.value =
+        "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
+    }, SOS_GPS_DEADLINE_MS);
     try {
       provider.getCurrentPosition(
         (position) => {
           if (currentGpsRequest !== gpsRequestId) return;
+          clearGpsDeadline();
           locating.value = false;
           const resolved = gpsLocationDraft(position.coords);
           if (!resolved) {
@@ -167,6 +199,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
         },
         () => {
           if (currentGpsRequest !== gpsRequestId) return;
+          clearGpsDeadline();
           locating.value = false;
           locationHint.value =
             "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
@@ -175,6 +208,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
       );
     } catch {
       if (currentGpsRequest !== gpsRequestId) return;
+      clearGpsDeadline();
       locating.value = false;
       locationHint.value =
         "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
@@ -189,6 +223,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
       return false;
     }
     gpsRequestId++;
+    clearGpsDeadline();
     locating.value = false;
     location.value = next;
     latInput.value = String(next.lat);
@@ -201,6 +236,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   function setCoordinateInputs(nextLatInput: string, nextLonInput: string): boolean {
     if (submitting.value) return false;
     gpsRequestId++;
+    clearGpsDeadline();
     locating.value = false;
     latInput.value = nextLatInput;
     lonInput.value = nextLonInput;
@@ -282,6 +318,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
     const payload = buildSosCreatePayload(draft.value);
     const selectedPhoto = photoFile.value;
     gpsRequestId++; // discard a geolocation callback already in flight
+    clearGpsDeadline();
     locating.value = false;
     // Lock before an asynchronous session refresh. Two taps while a refresh is pending
     // must not each create a separate emergency (and consume the 3/minute quota).
@@ -371,6 +408,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   function reset(): void {
     operationGeneration++;
     gpsRequestId++;
+    clearGpsDeadline();
     submitting.value = false;
     locating.value = false;
     severity.value = "high";

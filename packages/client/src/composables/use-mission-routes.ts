@@ -13,6 +13,21 @@ export interface MissionRoutingRuntime {
   getPosition?: () => Promise<{ lat: number; lon: number }>;
 }
 
+export const MISSION_GPS_DEADLINE_MS = 12_000;
+
+/** The browser's geolocation timeout is not guaranteed by every native bridge. */
+async function positionWithDeadline(getPosition: () => Promise<RoutePoint>): Promise<RoutePoint> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error("GEOLOCATION_TIMEOUT")), MISSION_GPS_DEADLINE_MS);
+  });
+  try {
+    return await Promise.race([getPosition(), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
 function browserPosition(): Promise<{ lat: number; lon: number }> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -182,7 +197,7 @@ export function useMissionRoutes(
     selectedIndex.value = 0;
     try {
       if (!from.value || refreshPosition) {
-        const candidate = await (runtime.getPosition ?? browserPosition)();
+        const candidate = await positionWithDeadline(runtime.getPosition ?? browserPosition);
         if (current !== generation || owner !== userId.value || mission !== missionId.value) return;
         from.value = coordinatesSchema.parse(candidate);
       }
