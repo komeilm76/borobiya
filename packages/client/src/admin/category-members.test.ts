@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Category } from "@shared/index";
-import { withoutConfirmedMember } from "./category-members";
+import { withConfirmedMembers, withoutConfirmedMember } from "./category-members";
 
 const CATEGORY: Category = {
   id: "11111111-1111-4111-8111-111111111111", name: "Mountain team", description: null,
@@ -10,6 +10,21 @@ const CATEGORY: Category = {
     { id: "33333333-3333-4333-8333-333333333333", username: "rescue_two" }
   ]
 };
+
+describe("confirmed category member additions", () => {
+  it("shows acknowledged additions locally and does not duplicate existing or repeated IDs", () => {
+    const additions = [
+      CATEGORY.members[0]!,
+      { id: "44444444-4444-4444-8444-444444444444", username: "rescue_three" },
+      { id: "44444444-4444-4444-8444-444444444444", username: "rescue_three" }
+    ];
+    const updated = withConfirmedMembers(CATEGORY, CATEGORY.id, additions);
+    expect(updated.members.map((member) => member.username)).toEqual(["rescue_one", "rescue_two", "rescue_three"]);
+    expect(CATEGORY.members).toHaveLength(2);
+    expect(withConfirmedMembers(updated, CATEGORY.id, additions)).toBe(updated);
+    expect(withConfirmedMembers(CATEGORY, "other", additions)).toBe(CATEGORY);
+  });
+});
 
 describe("confirmed category member removal", () => {
   it("keeps the confirmed deletion visible even if a following list read fails", () => {

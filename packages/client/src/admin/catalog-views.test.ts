@@ -51,7 +51,7 @@ describe("the admin catalog views' load-bearing markup", () => {
     expect(categories).toContain('v-model="memberSearch"');
     expect(categories).toContain('@update:model-value="queueSearch($event)"');
     expect(categories).toContain('useCategoryMemberSearch(async (term) =>');
-    expect(categories).toContain('if (!open) resetSearch()');
+    expect(categories).toContain('if (!open) {\n    resetSearch();\n    selectedIds.value = [];\n    selectedUsernames.value = {};');
     expect(categories).toContain('onUnmounted(() => {');
     expect(categories).toContain('  resetSearch();');
   });

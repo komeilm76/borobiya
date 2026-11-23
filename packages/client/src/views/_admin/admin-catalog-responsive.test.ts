@@ -37,9 +37,9 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain("{{ category.description || \"—\" }}");
     expect(cards).toContain('v-for="id in category.incidentTypeIds"');
     expect(cards).toContain('v-for="member in category.members"');
-    expect(cards).toContain('@click="openMembers(category)"');
+    expect(cards).toContain('@click="openMembers(category, $event)"');
     expect(cards).toContain('@click="openEdit(category, $event)"');
-    expect(categories.match(/@click="openMembers\(category\)"/g)).toHaveLength(2);
+    expect(categories.match(/@click="openMembers\(category, \$event\)"/g)).toHaveLength(2);
     expect(categories.match(/@click="openEdit\(category, \$event\)"/g)).toHaveLength(2);
     expect(cards).toContain('v-if="listState === \'loading\'"');
     expect(cards).not.toContain('listState === \'empty\'');
@@ -68,7 +68,7 @@ describe("admin catalog lists on narrow screens", () => {
 
   it("stacks catalog dialog actions into full-width touch targets on phones", () => {
     for (const source of [incidents, categories]) {
-      expect(source).toContain('class="admin-catalog-dialog-actions"');
+      expect(source).toMatch(/class="admin-catalog-dialog-actions(?: [^"]+)?"/);
       const phone = source.split("@media (max-width: 600px) {")[1]?.split("\n}")[0];
       expect(phone).toContain(".admin-catalog-dialog-actions { flex-direction: column;");
       expect(phone).toContain(".admin-catalog-dialog-actions :deep(.v-spacer) { display: none; }");

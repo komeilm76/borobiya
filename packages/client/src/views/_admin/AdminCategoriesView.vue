@@ -73,7 +73,7 @@
               </div>
             </td>
             <td class="text-start whitespace-nowrap">
-              <v-btn size="small" variant="text" prepend-icon="mdi-account-plus-outline" @click="openMembers(category)">
+              <v-btn size="small" variant="text" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
                 افزودن عضو ({{ category.members.length }})
               </v-btn>
               <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
@@ -112,7 +112,7 @@
             </dd></div>
           </dl>
           <div class="admin-categories-mobile__actions">
-            <v-btn variant="tonal" prepend-icon="mdi-account-plus-outline" @click="openMembers(category)">
+            <v-btn variant="tonal" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
               افزودن عضو ({{ category.members.length }})
             </v-btn>
             <v-btn variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
@@ -234,73 +234,132 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="membersOpen" max-width="640" scrollable persistent>
-      <v-card rounded="xl" :title="`مدیریت اعضا — ${membersFor?.name ?? ''}`">
-        <v-card-text>
-          <div class="mb-4" data-test="current-members">
-            <p class="mb-2 text-sm font-medium">اعضای فعلی ({{ membersFor?.members.length ?? 0 }})</p>
-            <p v-if="!membersFor || membersFor.members.length === 0" class="text-sm opacity-60">
-              هنوز عضوی در این گروه ثبت نشده است.
-            </p>
-            <div v-else class="flex flex-wrap gap-2">
-              <v-chip
-                v-for="member in membersFor.members"
-                :key="member.id"
-                closable
-                variant="tonal"
-                color="primary"
-                :disabled="saving || removingMemberId === member.id"
-                :aria-label="`حذف ${member.username} از ${membersFor.name}`"
-                @click:close="removeMember(member)"
-              >
-                <span dir="ltr">{{ member.username }}</span>
-              </v-chip>
+    <v-dialog v-model="membersOpen" max-width="760" scrollable persistent :fullscreen="isPhone"
+      aria-labelledby="admin-category-members-title" @after-leave="restoreMembersFocus">
+      <v-card class="admin-category-members" rounded="xl" dir="rtl">
+        <header class="admin-category-members__header">
+          <span class="admin-category-members__header-icon" aria-hidden="true"><v-icon icon="mdi-account-multiple-plus-outline" size="25" /></span>
+          <div class="admin-category-members__heading">
+            <span class="admin-category-members__eyebrow">گروه‌های امدادگر / اعضا</span>
+            <h2 id="admin-category-members-title">{{ membersFor?.name ?? 'مدیریت اعضا' }}</h2>
+            <p>اعضای فعلی را بررسی کنید یا حساب‌های تازه به این گروه اضافه کنید.</p>
+          </div>
+          <v-btn class="admin-category-members__close" icon="mdi-close" variant="text" aria-label="بستن مدیریت اعضا"
+            :disabled="saving || removingMemberId !== null" @click="membersOpen = false" />
+        </header>
+
+        <v-card-text class="admin-category-members__body">
+          <section class="admin-category-members__section admin-category-members__section--search" aria-labelledby="admin-category-add-title">
+            <div class="admin-category-members__section-head">
+              <span class="admin-category-members__section-icon" aria-hidden="true"><v-icon icon="mdi-account-search-outline" size="21" /></span>
+              <div>
+                <h3 id="admin-category-add-title">افزودن حساب</h3>
+                <p id="admin-category-search-hint">با نام کاربری جست‌وجو کنید؛ فقط حساب‌های فعالِ خارج از این گروه نمایش داده می‌شوند.</p>
+              </div>
             </div>
-          </div>
-          <v-text-field
-            v-model="memberSearch"
-            label="جست‌وجوی نام کاربری"
-            placeholder="مثلاً rescue_user1"
-            prepend-inner-icon="mdi-magnify"
-            density="comfortable"
-            variant="outlined"
-            rounded="lg"
-            maxlength="30"
-            clearable
-            hide-details
-            :loading="searching"
-            :disabled="saving"
-            data-test="member-search"
-            @update:model-value="queueSearch($event)"
-          />
-          <div class="admin-categories-members mt-3" aria-live="polite">
-            <p v-if="searchError" class="text-sm text-error">{{ searchError }}</p>
-            <p v-else-if="searching" class="text-sm opacity-70">در حال جست‌وجو…</p>
-            <p v-else-if="memberSearch.trim() && candidates.length === 0" class="text-sm opacity-70">
-              حسابی با این نام پیدا نشد.
-            </p>
-            <v-checkbox
-              v-for="candidate in candidates"
-              :key="candidate.id"
-              :model-value="selectedIds.includes(candidate.id)"
-              :label="candidate.username"
-              density="compact"
+            <v-text-field
+              v-model="memberSearch"
+              label="جست‌وجوی نام کاربری"
+              placeholder="مثلاً rescue_user1"
+              prepend-inner-icon="mdi-magnify"
+              density="comfortable"
+              variant="outlined"
+              rounded="lg"
+              maxlength="30"
+              clearable
               hide-details
-              :disabled="saving"
-              class="admin-categories-member"
-              @update:model-value="toggleMember(candidate.id, $event as boolean)"
+              :loading="searching"
+              :disabled="saving || removingMemberId !== null"
+              aria-describedby="admin-category-search-hint"
+              data-test="member-search"
+              @update:model-value="queueSearch($event)"
             />
-          </div>
-          <p class="mt-3 text-sm opacity-80">
-            {{ selectedIds.length === 0 ? "هنوز کسی انتخاب نشده است." : `${selectedIds.length} عضو برای افزودن انتخاب شده است.` }}
-          </p>
-          <v-alert v-if="membersError" type="error" variant="tonal" rounded="lg" class="mt-2" role="alert">{{ membersError }}</v-alert>
+            <div class="admin-categories-members">
+              <div v-if="!memberSearch.trim()" class="admin-category-members__search-state" role="status">
+                <v-icon icon="mdi-magnify" size="22" aria-hidden="true" />
+                <span>برای پیدا کردن حساب، نام کاربری را وارد کنید.</span>
+              </div>
+              <div v-else-if="searching" class="admin-category-members__search-state" role="status">
+                <v-progress-circular indeterminate color="primary" size="22" aria-hidden="true" />
+                <span>در حال جست‌وجو…</span>
+              </div>
+              <v-alert v-else-if="searchError" type="error" variant="tonal" rounded="lg" role="alert">
+                {{ searchError }}
+                <template #append><v-btn size="small" variant="text" @click="queueSearch(memberSearch)">تلاش دوباره</v-btn></template>
+              </v-alert>
+              <div v-else-if="candidates.length === 0" class="admin-category-members__search-state" role="status">
+                <v-icon icon="mdi-account-search-outline" size="22" aria-hidden="true" />
+                <span>حساب فعالِ تازه‌ای با این عبارت پیدا نشد. عبارت دقیق‌تری امتحان کنید.</span>
+              </div>
+              <template v-else>
+                <div class="admin-category-members__results" role="group" aria-label="نتایج جست‌وجوی حساب‌ها">
+                  <v-checkbox
+                    v-for="candidate in candidates"
+                    :key="candidate.id"
+                    :model-value="selectedIds.includes(candidate.id)"
+                    density="comfortable"
+                    hide-details
+                    :disabled="saving || removingMemberId !== null"
+                    class="admin-categories-member"
+                    :class="{ 'admin-categories-member--selected': selectedIds.includes(candidate.id) }"
+                    @update:model-value="toggleMember(candidate.id, $event as boolean)"
+                  >
+                    <template #label>
+                      <span class="admin-category-members__candidate">
+                        <span class="admin-category-members__avatar" aria-hidden="true">{{ candidate.username.slice(0, 1).toUpperCase() }}</span>
+                        <span dir="ltr">{{ candidate.username }}</span>
+                      </span>
+                    </template>
+                  </v-checkbox>
+                </div>
+                <p class="admin-category-members__results-hint">حداکثر ۱۰ نتیجه نمایش داده می‌شود؛ برای موارد بیشتر جست‌وجو را دقیق‌تر کنید.</p>
+              </template>
+            </div>
+          </section>
+
+          <section v-if="selectedIds.length" class="admin-category-members__selection" aria-label="حساب‌های انتخاب‌شده برای افزودن">
+            <div class="admin-category-members__selection-heading">
+              <strong>آمادهٔ افزودن</strong>
+              <span>{{ selectedIds.length.toLocaleString('fa-IR') }} حساب انتخاب‌شده</span>
+            </div>
+            <div class="admin-category-members__selection-chips">
+              <v-chip v-for="id in selectedIds" :key="id" closable color="primary" variant="tonal"
+                :disabled="saving || removingMemberId !== null" :close-label="`حذف ${selectedUsernames[id] ?? 'کاربر'} از انتخاب‌ها`"
+                @click:close="toggleMember(id, false)"><span dir="ltr">{{ selectedUsernames[id] ?? 'کاربر' }}</span></v-chip>
+            </div>
+          </section>
+          <section class="admin-category-members__section admin-category-members__section--current" aria-labelledby="admin-category-current-title" data-test="current-members">
+            <div class="admin-category-members__section-head">
+              <span class="admin-category-members__section-icon" aria-hidden="true"><v-icon icon="mdi-account-check-outline" size="21" /></span>
+              <div>
+                <h3 id="admin-category-current-title">اعضای فعلی</h3>
+                <p>حذف عضو فقط عضویت در همین گروه را برمی‌دارد.</p>
+              </div>
+              <span class="admin-category-members__count">{{ (membersFor?.members.length ?? 0).toLocaleString('fa-IR') }} عضو</span>
+            </div>
+            <div v-if="!membersFor || membersFor.members.length === 0" class="admin-category-members__empty">
+              هنوز عضوی در این گروه ثبت نشده است.
+            </div>
+            <ul v-else class="admin-category-members__current" aria-label="اعضای فعلی گروه">
+              <li v-for="member in membersFor.members" :key="member.id" class="admin-category-members__person">
+                <span class="admin-category-members__avatar" aria-hidden="true">{{ member.username.slice(0, 1).toUpperCase() }}</span>
+                <span class="admin-category-members__username" dir="ltr">{{ member.username }}</span>
+                <v-btn size="small" variant="text" color="error" prepend-icon="mdi-account-minus-outline"
+                  :loading="removingMemberId === member.id" :disabled="saving || removingMemberId !== null"
+                  :aria-label="`حذف ${member.username} از ${membersFor.name}`" @click="removeMember(member)">حذف</v-btn>
+              </li>
+            </ul>
+          </section>
+
+          <v-alert v-if="membersError" class="admin-category-members__error" type="error" variant="tonal" rounded="lg" role="alert">{{ membersError }}</v-alert>
         </v-card-text>
-        <v-card-actions class="admin-catalog-dialog-actions">
+        <v-card-actions class="admin-catalog-dialog-actions admin-category-members__actions">
+          <span class="admin-category-members__action-hint">{{ selectedIds.length ? `${selectedIds.length.toLocaleString('fa-IR')} حساب آمادهٔ افزودن است.` : 'برای افزودن، یک یا چند حساب را انتخاب کنید.' }}</span>
           <v-spacer />
-          <v-btn variant="text" rounded="lg" :disabled="saving" @click="membersOpen = false">بستن</v-btn>
-          <v-btn color="primary" variant="flat" rounded="lg" :loading="saving" :disabled="selectedIds.length === 0" @click="addMembers">
-            افزودن
+          <v-btn variant="text" rounded="lg" :disabled="saving || removingMemberId !== null" @click="membersOpen = false">بستن</v-btn>
+          <v-btn color="primary" variant="flat" rounded="lg" :loading="saving"
+            :disabled="saving || removingMemberId !== null || selectedIds.length === 0" @click="addMembers">
+            {{ selectedIds.length ? `افزودن ${selectedIds.length.toLocaleString('fa-IR')} عضو` : 'افزودن عضو' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -338,7 +397,7 @@ import {
   type CategoryFormDraft
 } from "../../admin/catalog-form";
 import { catalogListPresentation } from "../../admin/catalog-list-presentation";
-import { withoutConfirmedMember } from "../../admin/category-members";
+import { withConfirmedMembers, withoutConfirmedMember } from "../../admin/category-members";
 import { useCategoryMemberSearch } from "../../admin/use-category-member-search";
 import { useAuthStore } from "../../stores/auth";
 
@@ -375,6 +434,12 @@ function clearFormFeedback(field: "name" | "description" | "incidentTypeIds"): v
 const membersOpen = ref(false);
 const membersFor = ref<Category | null>(null);
 const selectedIds = ref<string[]>([]);
+const selectedUsernames = ref<Record<string, string>>({});
+let membersTrigger: HTMLElement | null = null;
+function restoreMembersFocus(): void {
+  if (membersTrigger?.isConnected) membersTrigger.focus({ preventScroll: true });
+  membersTrigger = null;
+}
 const {
   memberSearch, candidates, searching, searchError, queueSearch, reset: resetSearch
 } = useCategoryMemberSearch(async (term) => {
@@ -522,10 +587,12 @@ async function submit(): Promise<void> {
   }
 }
 
-function openMembers(category: Category): void {
+function openMembers(category: Category, event: MouseEvent): void {
+  membersTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   resetSearch();
   membersFor.value = category;
   selectedIds.value = [];
+  selectedUsernames.value = {};
   membersError.value = "";
   membersOpen.value = true;
 }
@@ -533,19 +600,33 @@ function openMembers(category: Category): void {
 // The picker is an admin username search, not a raw-UUID form. Closing or switching categories
 // invalidates replies that might otherwise offer candidates for an old dialog context.
 watch(membersOpen, (open) => {
-  if (!open) resetSearch();
+  if (!open) {
+    resetSearch();
+    selectedIds.value = [];
+    selectedUsernames.value = {};
+  }
 }, { flush: "sync" });
 
 function toggleMember(id: string, checked: boolean): void {
   const next = new Set(selectedIds.value);
-  if (checked) next.add(id);
-  else next.delete(id);
+  if (checked) {
+    const candidate = candidates.value.find((person) => person.id === id);
+    if (!candidate) return;
+    next.add(id);
+    selectedUsernames.value = { ...selectedUsernames.value, [id]: candidate.username };
+  } else {
+    next.delete(id);
+    const remaining = { ...selectedUsernames.value };
+    delete remaining[id];
+    selectedUsernames.value = remaining;
+  }
   selectedIds.value = [...next];
+  membersError.value = "";
 }
 
 async function addMembers(): Promise<void> {
   const category = membersFor.value;
-  if (!category || saving.value || !hasSelection.value) return;
+  if (!category || saving.value || removingMemberId.value !== null || !hasSelection.value) return;
 
   saving.value = true;
   membersError.value = "";
@@ -555,9 +636,19 @@ async function addMembers(): Promise<void> {
       membersError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
       return;
     }
+    const confirmed = selectedIds.value.flatMap((id) => {
+      const username = selectedUsernames.value[id];
+      return username ? [{ id, username }] : [];
+    });
     await assignCategoryUsers(category.id, selectedIds.value, accessToken);
     const addedCount = selectedIds.value.length;
+    // The write committed: keep its result visible even if the subsequent list refresh fails.
+    categories.value = categories.value.map((row) => withConfirmedMembers(row, category.id, confirmed));
+    if (membersFor.value?.id === category.id) {
+      membersFor.value = withConfirmedMembers(membersFor.value, category.id, confirmed);
+    }
     selectedIds.value = [];
+    selectedUsernames.value = {};
     await load();
     membersOpen.value = false;
     successMessage.value = `${addedCount} عضو به ${category.name} اضافه شد.`;
@@ -676,14 +767,91 @@ onUnmounted(() => {
 }
 @media (prefers-reduced-motion: reduce) { .admin-category-form__option { transition: none; } }
 
+.admin-category-members { color: var(--bb-color-text); background: rgb(var(--v-theme-surface)); font-family: var(--bb-font-family); }
+.admin-category-members__header {
+  display: flex; align-items: center; gap: 1rem; flex: none;
+  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--bb-color-outline);
+  background: linear-gradient(110deg, rgba(var(--v-theme-primary), .1), rgba(var(--v-theme-primary), .025) 75%);
+}
+.admin-category-members__header-icon { display: grid; flex: none; place-items: center; width: 52px; height: 52px;
+  border-radius: 1rem; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
+.admin-category-members__heading { min-width: 0; flex: 1; }
+.admin-category-members__eyebrow { color: var(--bb-color-primary); font-size: .82rem; font-weight: 750; }
+.admin-category-members__heading h2 { margin: .15rem 0 0; font-size: 1.25rem; font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
+.admin-category-members__heading p { margin: .25rem 0 0; color: var(--bb-color-muted); font-size: .85rem; line-height: 1.65; }
+.admin-category-members__close { flex: none; align-self: flex-start; }
+.admin-category-members__close.v-btn { width: 44px; height: 44px; }
+.admin-category-members__body {
+  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  gap: .85rem; align-content: start; padding: 1.25rem 1.5rem 1.5rem;
+}
+.admin-category-members__section { min-width: 0; padding: 1.15rem; border: 1px solid var(--bb-color-outline);
+  border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); }
+.admin-category-members__section--search { grid-column: 1; grid-row: 1; }
+.admin-category-members__section--current { grid-column: 2; grid-row: 1; }
+.admin-category-members__section-head { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-bottom: .9rem; }
+.admin-category-members__section-head > div { min-width: 0; flex: 1 1 9rem; }
+.admin-category-members__section-icon { display: grid; flex: none; place-items: center; width: 38px; height: 38px;
+  border-radius: .8rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .1); }
+.admin-category-members__section-head h3 { margin: 0; font-size: 1rem; font-weight: 800; }
+.admin-category-members__section-head p { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .83rem; line-height: 1.65; }
+.admin-category-members__count { padding: .3rem .65rem; border-radius: 999px; color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), .09); font-size: .82rem; font-weight: 750; }
+.admin-categories-members { min-width: 0; margin-top: .8rem; }
+.admin-category-members__search-state, .admin-category-members__empty { display: flex; align-items: flex-start; gap: .55rem;
+  padding: 1rem; border: 1px dashed var(--bb-color-outline); border-radius: .8rem;
+  background: var(--bb-color-inset); color: var(--bb-color-muted); font-size: .85rem; line-height: 1.7; }
+.admin-category-members__search-state :deep(.v-icon), .admin-category-members__search-state :deep(.v-progress-circular) { flex: none; margin-top: .1rem; }
+.admin-category-members__current { display: grid; gap: .45rem; max-height: 12rem; margin: 0; padding: 0 .1rem;
+  overflow-y: auto; list-style: none; overscroll-behavior: contain; }
+.admin-category-members__person { display: flex; align-items: center; gap: .5rem; min-width: 0; min-height: 55px;
+  padding: .35rem .5rem; border: 1px solid var(--bb-color-outline); border-radius: .8rem; background: var(--bb-color-inset); }
+.admin-category-members__avatar { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
+  border-radius: .7rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .12);
+  font-size: .9rem; font-weight: 800; }
+.admin-category-members__username { min-width: 0; flex: 1; color: var(--bb-color-text); font-size: .85rem;
+  font-weight: 750; overflow-wrap: anywhere; }
+.admin-category-members__person :deep(.v-btn) { min-width: 44px; min-height: 44px; flex: none; }
+.admin-category-members__results { display: grid; gap: .45rem; max-height: 17rem; overflow-y: auto;
+  padding: .1rem; overscroll-behavior: contain; }
+.admin-categories-member { min-width: 0; border: 1px solid var(--bb-color-outline); border-radius: .8rem;
+  background: var(--bb-color-inset); transition: border-color .15s ease, background .15s ease; }
+.admin-categories-member--selected { border-color: rgba(var(--v-theme-primary), .55);
+  background: rgba(var(--v-theme-primary), .1); }
+.admin-categories-member:hover:not(.v-input--disabled) { border-color: rgb(var(--v-theme-primary)); }
+.admin-categories-member :deep(.v-selection-control) { min-height: 56px; padding: .25rem .5rem; }
+.admin-categories-member :deep(.v-label) { min-width: 0; flex: 1; opacity: 1; }
+.admin-categories-member :deep(.v-selection-control--focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px; border-radius: .55rem; }
+.admin-category-members__candidate { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+.admin-category-members__candidate > span:last-child { min-width: 0; color: var(--bb-color-text);
+  font-size: .85rem; font-weight: 700; overflow-wrap: anywhere; }
+.admin-category-members__results-hint { margin: .65rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
+.admin-category-members__selection { grid-column: 1 / -1; min-width: 0; padding: 1rem 1.15rem;
+  border: 1px solid rgba(var(--v-theme-primary), .3); border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-primary), .07); }
+.admin-category-members__selection-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: .4rem; color: var(--bb-color-primary); font-size: .84rem; }
+.admin-category-members__selection-heading strong { font-weight: 800; }
+.admin-category-members__selection-chips { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .7rem; }
+.admin-category-members__selection-chips :deep(.v-chip) { min-height: 44px; max-width: 100%; }
+.admin-category-members__selection-chips :deep(.v-chip__content) { white-space: normal; overflow-wrap: anywhere; }
+.admin-category-members__error { grid-column: 1 / -1; }
+.admin-category-members__actions { flex: none; gap: .4rem; padding: .8rem 1.5rem; border-top: 1px solid var(--bb-color-outline); }
+.admin-category-members__action-hint { max-width: 15rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.5; }
+.admin-category-members__actions :deep(.v-btn) { min-height: 44px; margin: 0; }
+@media (forced-colors: active) {
+  .admin-category-members__header, .admin-category-members__section, .admin-category-members__person,
+  .admin-category-members__selection, .admin-categories-member, .admin-category-members__empty,
+  .admin-category-members__search-state { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .admin-categories-member--selected { border-width: 2px; }
+  .admin-categories-member :deep(.v-selection-control--focus-visible) { outline-color: Highlight; }
+}
+@media (prefers-reduced-motion: reduce) { .admin-categories-member { transition: none; } }
+
 .admin-categories-description {
   max-width: 18rem;
   overflow-wrap: anywhere;
-}
-
-.admin-categories-members {
-  max-height: 15rem;
-  overflow-y: auto;
 }
 
 .admin-categories-mobile { display: none; margin: 0; padding: 0; list-style: none; }
@@ -705,6 +873,16 @@ onUnmounted(() => {
 }
 
 @media (max-width: 600px) {
+  .admin-category-members { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
+  .admin-category-members__header { padding: calc(.75rem + env(safe-area-inset-top, 0px)) 1rem .75rem; }
+  .admin-category-members__header-icon { width: 44px; height: 44px; }
+  .admin-category-members__heading h2 { font-size: 1.1rem; }
+  .admin-category-members__body { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
+  .admin-category-members__section--search, .admin-category-members__section--current { grid-column: 1; grid-row: auto; }
+  .admin-category-members__section { padding: 1rem; }
+  .admin-category-members__results { max-height: none; }
+  .admin-category-members__actions { padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+  .admin-category-members__action-hint { max-width: none; text-align: center; }
   .admin-category-form { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
   .admin-category-form__header { padding: calc(.75rem + env(safe-area-inset-top, 0px)) 1rem .75rem; }
   .admin-category-form__header-icon { width: 44px; height: 44px; }
