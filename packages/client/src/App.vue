@@ -184,7 +184,11 @@
         </div>
       </header>
       <RouterView v-slot="{ Component, route }">
-        <Transition mode="out-in" name="page-fade">
+        <div v-if="!Component" class="app-route-pending" role="status" aria-live="polite">
+          <strong>در حال اتصال به بوروبیا…</strong>
+          <span>در شبکهٔ کند ممکن است این مرحله چند لحظه طول بکشد.</span>
+        </div>
+        <Transition v-else mode="out-in" name="page-fade">
           <!-- Map query changes must not tear down a live trip, dispatch selection or MapLibre. -->
           <component :is="Component" :key="route.name === 'user-map' || route.name === 'admin-dispatch' ? route.path : route.fullPath" />
         </Transition>
@@ -268,14 +272,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
-import MapSidebar from "./components/shell/MapSidebar.vue";
 import NetworkStatusIcon from "./components/shell/NetworkStatusIcon.vue";
-import MapProposalSidebar from "./components/shell/MapProposalSidebar.vue";
-import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
+// Do not make the public/login entry download the map's navigation, offer inbox,
+// or SOS form. They load in parallel with the map route (or when auth resolves).
+const MapSidebar = defineAsyncComponent(() => import("./components/shell/MapSidebar.vue"));
+const MapProposalSidebar = defineAsyncComponent(() => import("./components/shell/MapProposalSidebar.vue"));
+const SosRequestSheet = defineAsyncComponent(() => import("./components/sos/SosRequestSheet.vue"));
 import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
 import { accountSessionKey } from "./composables/device-identity";
 import { pinia } from "./stores";
@@ -313,7 +319,9 @@ watch(() => [missionShare.refreshing, missionShare.mission?.id, missionShare.sta
   }, { flush: "post" });
 const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
-  () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
+  // A bearer can precede its verified profile on a slow connection. Never
+  // expose SOS or location-sharing actions on that interim guest screen.
+  () => auth.isAuthenticated && !!auth.user && !auth.mustCompleteSecurityQuestions
 );
 // General Broadcast is a separate manual opt-in; missions and navigation never turn it on.
 // A trip started in another login must not silently inherit that session's GPS
@@ -421,6 +429,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.app-route-pending { display: grid; align-content: center; gap: .35rem;
+  min-height: min(65vh, 32rem); padding: 2rem; text-align: center;
+  color: var(--bb-color-text); }
+.app-route-pending strong { font-size: 1rem; }
+.app-route-pending span { font-size: .875rem; color: var(--bb-color-muted); }
 /* Same 48px rail and live-broadcast states as /_user/map, immediately above SOS. */
 .app-general-share {
   position: fixed; z-index: 951;

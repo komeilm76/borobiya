@@ -135,9 +135,15 @@ export function createAppRouter(
   // A guard runs only when navigation occurs. A session can also arrive while a guest
   // view is already open (e.g. a late cookie refresh); don't leave that view visible.
   watch(
-    () => [auth.isAuthenticated, auth.mustCompleteSecurityQuestions] as const,
-    ([authenticated, onboarding]) => {
-      if (!authenticated) return;
+    // Include the route: a fast refresh may finish before the first guest
+    // navigation commits, so watching auth alone could leave login visible.
+    () => [auth.isAuthenticated, auth.mustCompleteSecurityQuestions, auth.user?.role,
+      router.currentRoute.value.fullPath] as const,
+    ([authenticated, onboarding, role]) => {
+      // A bearer can arrive before the /me profile on slow connections. Wait
+      // for a verified role before leaving the guest screen; a later profile
+      // recovery must trigger this watcher even if the bearer did not change.
+      if (!authenticated || !role) return;
       const current = router.currentRoute.value;
       if (onboarding && current.path !== "/_user/complete-security-questions") {
         void router.replace("/_user/complete-security-questions");

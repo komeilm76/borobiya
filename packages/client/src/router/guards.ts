@@ -59,12 +59,14 @@ export function resolveAuthNavigation(
     return ONBOARDING_PATH;
   }
 
-  if (isGuestOnlyPath(to.path) && auth.isAuthenticated) {
+  if (isGuestOnlyPath(to.path) && auth.isAuthenticated && auth.user) {
     return resolvePostLoginDestination(to.query.redirect, auth);
   }
 
   if (!isProtectedPath(to.path)) return true;
-  if (!auth.isAuthenticated) {
+  // A bearer without a verified or same-session cached profile cannot confer a
+  // role. This can happen when /me times out during cold restoration.
+  if (!auth.isAuthenticated || !auth.user) {
     return { path: LOGIN_PATH, query: { redirect: to.fullPath } };
   }
   if (auth.mustCompleteSecurityQuestions && to.path !== ONBOARDING_PATH) {
@@ -81,8 +83,14 @@ export function resolveAuthNavigation(
 
 export function createAuthGuard(auth: AuthGuardState) {
   return async (to: RouteLocationNormalized): Promise<RouteLocationRaw | true> => {
-    if (isGuestOnlyPath(to.path) || isProtectedPath(to.path)) {
+    if (isProtectedPath(to.path) || (isGuestOnlyPath(to.path) && auth.isAuthenticated)) {
+      // A protected route must never render until its session and role are verified.
       await auth.ensureSession();
+    } else if (isGuestOnlyPath(to.path)) {
+      // The login/register form is safe to render while a slow cookie refresh is
+      // pending. App.vue also starts this same coalesced refresh on mount; the
+      // router's auth watcher redirects if a real session eventually arrives.
+      void auth.ensureSession().catch(() => undefined);
     }
     return resolveAuthNavigation(to, auth);
   };

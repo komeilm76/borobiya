@@ -3,7 +3,7 @@ import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { apiRoutes } from "@shared/api";
 import { requestJson } from "../api/http";
-import { useAuthStore } from "./auth";
+import { SESSION_RESTORE_BUDGET_MS, useAuthStore } from "./auth";
 import { useBroadcastStore } from "./broadcast";
 
 const user = {
@@ -48,6 +48,45 @@ beforeEach(() => {
 });
 
 describe("client auth store", () => {
+  it("bounds a stalled first cookie refresh instead of leaving a protected route blank", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      const restoring = auth.ensureSession();
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_BUDGET_MS);
+      await restoring;
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect((fetchMock.mock.calls[0]?.[1] as RequestInit).signal?.aborted).toBe(true);
+      expect(auth.initialized).toBe(true);
+      expect(auth.isAuthenticated).toBe(false);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("uses the same startup deadline for a stalled profile read after cookie refresh", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ accessToken }))
+      .mockImplementationOnce((_url: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+        }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      const restoring = auth.ensureSession();
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_BUDGET_MS);
+      await restoring;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect((fetchMock.mock.calls[1]?.[1] as RequestInit).signal?.aborted).toBe(true);
+      expect(auth.initialized).toBe(true);
+      expect(auth.user).toBeNull(); // no unverified admin role on a protected route
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
   it("stores the access token and user returned by login", async () => {
     const fetchMock = fakeFetch(jsonResponse({ accessToken, user }));
     vi.stubGlobal("fetch", fetchMock);

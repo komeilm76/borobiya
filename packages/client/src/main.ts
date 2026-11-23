@@ -5,16 +5,10 @@ import { pinia } from "./stores";
 import { useThemeStore } from "./stores/theme";
 import { vuetify } from "./plugins/vuetify";
 import { installDesignTokenStyles } from "./styles/tokens";
-import { registerMapCacheWorker } from "./services/map-cache";
 import "@mdi/font/css/materialdesignicons.css";
-// Bundle the OFL-licensed Persian font locally; CSS includes WOFF2 and WOFF
-// fallback per weight/subset, so iOS Safari needs no OS font or external CDN.
-import "@fontsource/vazirmatn/400.css";
-import "@fontsource/vazirmatn/500.css";
-import "@fontsource/vazirmatn/600.css";
-import "@fontsource/vazirmatn/700.css";
-import "@fontsource/vazirmatn/800.css";
-import "@fontsource/vazirmatn/900.css";
+// One self-hosted variable WOFF2 per script covers every UI weight (100–900),
+// instead of downloading separate Persian/Latin files for each weight.
+import "@fontsource-variable/vazirmatn/wght.css";
 import "./styles/tailwind.css";
 import "./styles/auth.css";
 import "./styles/public.css";
@@ -27,7 +21,7 @@ watch(
   { immediate: true, flush: "sync" }
 );
 
-void registerMapCacheWorker();
-
+// MapCanvas registers the tile cache only when a map is actually opened;
+// public and auth screens need no competing service-worker request.
 const router = createAppRouter();
 createApp(App).use(pinia).use(router).use(vuetify).mount("#app");

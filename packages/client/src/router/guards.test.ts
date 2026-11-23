@@ -34,7 +34,7 @@ describe("client auth navigation guard", () => {
   });
 
   it("forces incomplete accounts to onboarding from user, admin, public, and guest routes", () => {
-    const auth = makeAuth({ isAuthenticated: true, mustCompleteSecurityQuestions: true });
+    const auth = makeAuth({ isAuthenticated: true, user: ordinaryUser, mustCompleteSecurityQuestions: true });
 
     expect(resolveAuthNavigation(location("/_user/dashboard"), auth)).toBe("/_user/complete-security-questions");
     expect(resolveAuthNavigation(location("/_admin/dashboard"), auth)).toBe("/_user/complete-security-questions");
@@ -64,6 +64,17 @@ describe("client auth navigation guard", () => {
     expect(resolveAuthNavigation(location("/authentic"), auth)).toBe(true);
   });
 
+  it("does not grant access from a bearer whose profile has not finished loading", () => {
+    const unresolved = makeAuth({ isAuthenticated: true, user: null });
+    expect(resolveAuthNavigation(location("/_auth/login"), unresolved)).toBe(true);
+    expect(resolveAuthNavigation(location("/_admin/users"), unresolved)).toEqual({
+      path: "/_auth/login", query: { redirect: "/_admin/users" }
+    });
+    expect(resolveAuthNavigation(location("/_user/map"), unresolved)).toEqual({
+      path: "/_auth/login", query: { redirect: "/_user/map" }
+    });
+  });
+
   it("requires an admin role for admin pages", () => {
     expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: ordinaryUser })))
       .toBe("/_user/map");
@@ -90,12 +101,22 @@ describe("client auth navigation guard", () => {
     expect(resolvePostLoginDestination(["/_user/map", "//attacker.example"], auth)).toBe("/_admin/users");
   });
 
-  it("restores auth state before navigating to a guest-only or protected page", async () => {
-    const auth = makeAuth();
+  it("does not block guest pages on a slow refresh, but still verifies protected pages", async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    const auth = makeAuth({ ensureSession: vi.fn(() => pending) });
     const guard = createAuthGuard(auth);
 
-    await guard({ path: "/_auth/login" } as RouteLocationNormalized);
+    await expect(guard({ path: "/_auth/login" } as RouteLocationNormalized)).resolves.toBe(true);
     expect(auth.ensureSession).toHaveBeenCalledOnce();
+
+    const protectedPage = guard(location("/_user/map") as RouteLocationNormalized);
+    let settled = false;
+    void protectedPage.then(() => { settled = true; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    finish();
+    await expect(protectedPage).resolves.toEqual({ path: "/_auth/login", query: { redirect: "/_user/map" } });
 
     vi.mocked(auth.ensureSession).mockClear();
     await guard({ path: "/_public/landing" } as RouteLocationNormalized);

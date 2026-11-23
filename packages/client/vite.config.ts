@@ -17,6 +17,22 @@ function stripPrefix(prefix: string) {
   return (requestPath: string) => requestPath.slice(prefix.length) || "/";
 }
 
+// A synchronous external theme-init.js blocks the HTML parser before the
+// first visible fallback. Inline its tiny, trusted local source at build and
+// dev time so a slow extra request cannot delay the very first paint.
+function inlineThemeBootstrap(): Plugin {
+  return {
+    name: "borobiya-inline-theme-bootstrap",
+    transformIndexHtml(html) {
+      const tag = '<script src="/theme-init.js"></script>';
+      if (!html.includes(tag)) throw new Error("Missing pre-paint theme bootstrap in index.html");
+      const script = readFileSync(resolve(packageRoot, "public/theme-init.js"), "utf8");
+      if (script.toLowerCase().includes("</script")) throw new Error("Theme bootstrap contains a script terminator");
+      return html.replace(tag, `<script>${script}</script>`);
+    }
+  };
+}
+
 // MapLibre GL JS v6 locates its worker as a sibling of its (pre)bundled chunk,
 // where Vite never emits it ("Worker failed to load"). Serve the package's
 // self-contained worker file verbatim at a stable path in dev and build;
@@ -83,7 +99,7 @@ export default defineConfig(async ({ command, mode, isPreview }) => {
   return {
     root: packageRoot,
     envDir: repositoryRoot,
-    plugins: [vue(), vuetify({ autoImport: true }), tailwindcss(), maplibreWorkerPlugin(), devtools],
+    plugins: [inlineThemeBootstrap(), vue(), vuetify({ autoImport: true }), tailwindcss(), maplibreWorkerPlugin(), devtools],
     resolve: {
       alias: {
         "@": resolve(packageRoot, "src"),

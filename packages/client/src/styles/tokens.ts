@@ -19,7 +19,7 @@ export const spacing = {
 export const radii = { card: 24, nested: 16 } as const;
 
 export const typography = {
-  fontFamily: '"Vazirmatn", "Segoe UI", Tahoma, sans-serif',
+  fontFamily: '"Vazirmatn Variable", "Segoe UI", Tahoma, sans-serif',
   sizes: { caption: "0.75rem", body: "1rem", title: "1.25rem", heading: "2rem" },
   weights: { regular: 400, medium: 500, semibold: 600, bold: 700, heavy: 800 },
   lineHeights: { body: 1.7, heading: 1.25 }

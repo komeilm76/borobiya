@@ -28,7 +28,7 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
   it("mounts the prominent red SOS button and bottom sheet globally in App.vue", () => {
     expect(appSource).toContain("<SosTriggerButton");
     expect(appSource).toContain("<SosRequestSheet");
-    expect(appSource).toContain("auth.isAuthenticated && !auth.mustCompleteSecurityQuestions");
+    expect(appSource).toContain("auth.isAuthenticated && !!auth.user && !auth.mustCompleteSecurityQuestions");
     expect(triggerSource).toContain('data-test="sos-trigger"');
     expect(triggerSource).toContain("prefers-reduced-motion: reduce");
   });

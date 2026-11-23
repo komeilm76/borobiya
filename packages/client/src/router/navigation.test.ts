@@ -81,7 +81,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/complete-security-questions"));
   });
 
-  it("restores a real cookie session before resolving a direct auth URL", async () => {
+  it("restores a real cookie session after displaying a direct auth URL", async () => {
     const profile = {
       id: "00000000-0000-4000-8000-000000000099",
       username: "rescue_user1",
@@ -98,7 +98,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     const auth = useAuthStore(createPinia());
     const router = setup(auth);
     await router.push("/_auth/forgot-password");
-    expect(router.currentRoute.value.path).toBe("/_user/map");
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/map"));
     expect(auth.isAuthenticated).toBe(true);
     expect(auth.user?.role).toBe("user");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -129,19 +129,18 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it("waits for cookie restoration before allowing an auth view to render", async () => {
+  it("renders the login form immediately while cookie restoration is slow, then redirects when verified", async () => {
     let restore!: () => void;
     const pending = new Promise<void>((resolve) => { restore = resolve; });
-    const auth = authState({ ensureSession: vi.fn(() => pending) });
+    const auth = reactive(authState({ ensureSession: vi.fn(() => pending) }));
     const router = setup(auth);
-    const navigation = router.push("/_auth/login");
-    expect(router.currentRoute.value.name).not.toBe("auth-login");
-    auth.isAuthenticated = true;
-    auth.user = user;
-    restore();
-    await navigation;
-    expect(router.currentRoute.value.path).toBe("/_user/map");
+    await router.push("/_auth/login");
+    expect(router.currentRoute.value.name).toBe("auth-login");
     expect(auth.ensureSession).toHaveBeenCalled();
+    auth.user = user;
+    auth.isAuthenticated = true;
+    restore();
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/map"));
   });
 
   it("preserves internal return paths for guests and uses them on subsequent login", async () => {

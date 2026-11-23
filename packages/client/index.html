@@ -8,9 +8,19 @@
     <meta name="description" content="بوروبیا؛ شبکهٔ امداد و همراهی جامعه‌محور" />
     <script src="/theme-init.js"></script>
     <title>بوروبیا | شبکهٔ امداد و همراهی</title>
+    <style>
+      html, body { margin: 0; }
+      #startup-status { min-height: 100vh; display: grid; place-content: center; gap: .5rem;
+        padding: 1.5rem; text-align: center; font: 16px/1.7 Tahoma, sans-serif;
+        background: #f4f7f6; color: #193536; }
+      #startup-status strong { font-size: 1.15rem; }
+      html[data-theme="dark"] #startup-status { background: #111c1d; color: #edf5f2; }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app"><div id="startup-status" role="status" aria-live="polite">
+      <strong>بوروبیا</strong><span>در حال آماده‌سازی برنامه…</span>
+    </div></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
