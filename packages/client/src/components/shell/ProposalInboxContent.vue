@@ -255,6 +255,7 @@ import { attachOfferRouteScreen } from "@/map/offer-route-screen";
 import { offerCameraPadding } from "@/map/offer-camera-padding";
 import { getMissionRouteChoices, type RouteChoice, type RoutePoint } from "@/api/mission-routing";
 import { reversePlace } from "@/api/geocoding";
+import { useOfferDistancePosition } from "@/composables/use-offer-distance-position";
 import { missionMapCamera } from "@/sos/mission-map";
 import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
@@ -471,11 +472,8 @@ const declineReason = ref("");
 const photoSrc = ref<string | null>(null);
 const photoError = ref<string | null>(null);
 const photoLoading = ref(false);
-const myPosition = ref<{ lat: number; lon: number } | null>(null);
-const locationError = ref<string | null>(null);
-const locating = ref(false);
+const { myPosition, locationError, locating, locate: locateMe, reset: resetLocation } = useOfferDistancePosition();
 let photoGeneration = 0;
-let locationGeneration = 0;
 
 function severity(item: ProposalInboxItem) {
   return proposalSeverity[item.details?.sosRequest.severity ?? "medium"];
@@ -495,25 +493,6 @@ async function loadPhoto(): Promise<void> {
   } finally {
     if (generation === photoGeneration) photoLoading.value = false;
   }
-}
-function locateMe(): void {
-  if (!navigator.geolocation) { locationError.value = "مکان‌یابی در این مرورگر در دسترس نیست."; return; }
-  locating.value = true;
-  locationError.value = null;
-  const generation = ++locationGeneration;
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      if (generation !== locationGeneration) return;
-      myPosition.value = { lat: position.coords.latitude, lon: position.coords.longitude };
-      locating.value = false;
-    },
-    () => {
-      if (generation !== locationGeneration) return;
-      locationError.value = "دسترسی به موقعیت ممکن نشد؛ همچنان می‌توانید نشانی روی نقشه را ببینید.";
-      locating.value = false;
-    },
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 }
-  );
 }
 async function submitDecision(): Promise<void> {
   const id = selected.value?.id;
@@ -548,6 +527,7 @@ watch(() => selected.value?.id, (id) => {
     selectedId.value = null;
     void closeMapDetail();
   }
+  resetLocation();
   photoGeneration++;
   photoSrc.value = null;
   photoError.value = null;
@@ -557,13 +537,11 @@ watch(() => selected.value?.id, (id) => {
 });
 watch(() => auth.user?.id, () => {
   detailOpen.value = false;
-  myPosition.value = null;
-  locating.value = false;
-  locationGeneration++;
+  resetLocation();
   photoGeneration++;
   photoSrc.value = null;
 });
-onBeforeUnmount(() => { photoGeneration++; locationGeneration++; photoSrc.value = null; });
+onBeforeUnmount(() => { photoGeneration++; photoSrc.value = null; });
 </script>
 
 <style scoped>

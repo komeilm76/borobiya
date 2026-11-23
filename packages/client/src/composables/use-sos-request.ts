@@ -186,6 +186,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
       provider.getCurrentPosition(
         (position) => {
           if (currentGpsRequest !== gpsRequestId) return;
+          gpsRequestId++; // A one-shot fix must never be overwritten by a duplicate bridge callback.
           clearGpsDeadline();
           locating.value = false;
           const resolved = gpsLocationDraft(position.coords);
@@ -199,6 +200,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
         },
         () => {
           if (currentGpsRequest !== gpsRequestId) return;
+          gpsRequestId++;
           clearGpsDeadline();
           locating.value = false;
           locationHint.value =
@@ -208,6 +210,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
       );
     } catch {
       if (currentGpsRequest !== gpsRequestId) return;
+      gpsRequestId++;
       clearGpsDeadline();
       locating.value = false;
       locationHint.value =

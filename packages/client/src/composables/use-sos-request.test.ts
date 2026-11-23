@@ -208,6 +208,19 @@ describe("useSosRequest composable", () => {
     } finally { sos.reset(); vi.useRealTimers(); }
   });
 
+  it("accepts only the first GPS fix when a native bridge invokes its callback twice", () => {
+    let callback!: Parameters<GeolocationProvider["getCurrentPosition"]>[0];
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token"),
+      geolocation: () => ({ getCurrentPosition: (success) => { callback = success; } }) });
+    try {
+      sos.requestGpsLocation();
+      callback({ coords: { latitude: 35.7, longitude: 51.4 } });
+      expect(sos.location.value).toMatchObject({ lat: 35.7, lon: 51.4 });
+      callback({ coords: { latitude: 35.8, longitude: 51.5 } });
+      expect(sos.location.value).toMatchObject({ lat: 35.7, lon: 51.4 });
+    } finally { sos.reset(); }
+  });
+
   it("loads incident catalog and GPS fix on open, then submits SOS without photo", async () => {
     vi.spyOn(sosApi, "listSosIncidentTypes").mockResolvedValue([
       {
