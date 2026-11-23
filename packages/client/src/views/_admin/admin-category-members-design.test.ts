@@ -9,6 +9,8 @@ const style = parse(source).descriptor.styles[0]!.content;
 
 describe("category member management dialog", () => {
   it("prioritizes finding new accounts and distinguishes search states", () => {
+    expect(dialog).toContain('v-model="membersOpen" max-width="800"');
+    expect(style).toContain('grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr)');
     expect(dialog).toContain('aria-labelledby="admin-category-members-title"');
     expect(dialog).toContain(':fullscreen="isPhone"');
     expect(dialog.indexOf('id="admin-category-add-title"')).toBeLessThan(dialog.indexOf('id="admin-category-current-title"'));

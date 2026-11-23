@@ -28,15 +28,23 @@ describe("admin catalog lists on narrow screens", () => {
     expect(narrow).toContain(".admin-incidents-mobile { display: grid;");
   });
 
-  it("preserves category assignments and both actions in a single-column mobile list", () => {
+  it("keeps category actions reachable without rendering every member in either list", () => {
     expect(categories).toContain('<v-table class="admin-categories-table"');
+    const table = categories.split('<v-table class="admin-categories-table"')[1]?.split('</v-table>')[0];
+    expect(table).toContain('<th class="admin-categories-actions-heading">عملیات</th>');
+    expect(table?.match(/<th(?:\s|>)/g)).toHaveLength(4);
+    expect(table?.match(/colspan="4"/g)).toHaveLength(3);
+    expect(table).not.toContain('v-for="member in category.members"');
+    expect(table).toContain('category.members.length.toLocaleString(\'fa-IR\')');
+    expect(table).toContain('class="admin-categories-actions__buttons"');
     expect(categories).toContain('<ul v-if="categories.length || listState === \'loading\'" class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading" role="list">');
     const cards = categories.split('<ul v-if="categories.length || listState === \'loading\'" class="admin-categories-mobile"')[1]?.split("</ul>")[0];
     expect(cards).toContain('v-for="category in categories"');
     expect(cards).toContain("{{ category.name }}");
     expect(cards).toContain("{{ category.description || \"—\" }}");
     expect(cards).toContain('v-for="id in category.incidentTypeIds"');
-    expect(cards).toContain('v-for="member in category.members"');
+    expect(cards).not.toContain('v-for="member in category.members"');
+    expect(cards).toContain('category.members.length.toLocaleString(\'fa-IR\')');
     expect(cards).toContain('@click="openMembers(category, $event)"');
     expect(cards).toContain('@click="openEdit(category, $event)"');
     expect(categories.match(/@click="openMembers\(category, \$event\)"/g)).toHaveLength(2);

@@ -77,7 +77,7 @@ describe("the admin catalog views' load-bearing markup", () => {
   it("distinguishes first-load skeletons, failed reads, empty success and stale rows during refresh", () => {
     for (const [source, rows, colspan] of [
       [incidents, "types", "6"],
-      [categories, "categories", "5"]
+      [categories, "categories", "4"]
     ]) {
       expect(source).toContain(`catalogListPresentation(loading.value, ${rows}.value.length, listError.value)`);
       expect(source).toContain("const loading = ref(true)"); // no empty-state flash before onMounted

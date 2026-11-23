@@ -37,13 +37,12 @@
             <th>نام</th>
             <th>توضیح</th>
             <th>نوع رویدادها</th>
-            <th>اعضا</th>
-            <th aria-label="عملیات"></th>
+            <th class="admin-categories-actions-heading">عملیات</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="listState === 'loading'">
-            <td colspan="5">
+            <td colspan="4">
               <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" aria-hidden="true" />
             </td>
           </tr>
@@ -58,35 +57,23 @@
                 <span v-if="category.incidentTypeIds.length === 0" class="opacity-50">هیچ‌کدام</span>
               </div>
             </td>
-            <td>
-              <div class="flex flex-wrap items-center gap-1">
-                <v-chip
-                  v-for="member in category.members"
-                  :key="member.id"
-                  size="small"
-                  variant="tonal"
-                  color="primary"
-                >
-                  <span dir="ltr">{{ member.username }}</span>
-                </v-chip>
-                <span v-if="category.members.length === 0" class="opacity-50">بدون عضو</span>
+            <td class="admin-categories-actions">
+              <div class="admin-categories-actions__buttons">
+                <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
+                  افزودن عضو ({{ category.members.length.toLocaleString('fa-IR') }})
+                </v-btn>
+                <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
               </div>
-            </td>
-            <td class="text-start whitespace-nowrap">
-              <v-btn size="small" variant="text" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
-                افزودن عضو ({{ category.members.length }})
-              </v-btn>
-              <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
             </td>
           </tr>
           <tr v-if="listState === 'error'">
-            <td colspan="5" class="py-6 text-center">
+            <td colspan="4" class="py-6 text-center">
               دریافت گروه‌ها انجام نشد.
               <v-btn size="small" variant="text" color="primary" @click="load">تلاش دوباره</v-btn>
             </td>
           </tr>
           <tr v-if="listState === 'empty'">
-            <td colspan="5" class="py-6 text-center opacity-60">هنوز گروهی ساخته نشده است.</td>
+            <td colspan="4" class="py-6 text-center opacity-60">هنوز گروهی ساخته نشده است.</td>
           </tr>
         </tbody>
       </v-table>
@@ -104,16 +91,10 @@
               </v-chip>
               <span v-if="category.incidentTypeIds.length === 0">هیچ‌کدام</span>
             </dd></div>
-            <div><dt>اعضا</dt><dd class="admin-categories-mobile__chips">
-              <v-chip v-for="member in category.members" :key="member.id" size="small" variant="tonal" color="primary">
-                <span dir="ltr">{{ member.username }}</span>
-              </v-chip>
-              <span v-if="category.members.length === 0">بدون عضو</span>
-            </dd></div>
           </dl>
           <div class="admin-categories-mobile__actions">
             <v-btn variant="tonal" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
-              افزودن عضو ({{ category.members.length }})
+              افزودن عضو ({{ category.members.length.toLocaleString('fa-IR') }})
             </v-btn>
             <v-btn variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
           </div>
@@ -234,7 +215,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="membersOpen" max-width="760" scrollable persistent :fullscreen="isPhone"
+    <v-dialog v-model="membersOpen" max-width="800" scrollable persistent :fullscreen="isPhone"
       aria-labelledby="admin-category-members-title" @after-leave="restoreMembersFocus">
       <v-card class="admin-category-members" rounded="xl" dir="rtl">
         <header class="admin-category-members__header">
@@ -781,7 +762,7 @@ onUnmounted(() => {
 .admin-category-members__close { flex: none; align-self: flex-start; }
 .admin-category-members__close.v-btn { width: 44px; height: 44px; }
 .admin-category-members__body {
-  display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
+  display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr);
   gap: .6rem; align-content: start; align-items: start; padding: .85rem 1.1rem;
 }
 .admin-category-members__section { min-width: 0; padding: .8rem; border: 1px solid var(--bb-color-outline);
@@ -854,10 +835,12 @@ onUnmounted(() => {
 }
 @media (prefers-reduced-motion: reduce) { .admin-categories-member { transition: none; } }
 
-.admin-categories-description {
-  max-width: 18rem;
-  overflow-wrap: anywhere;
-}
+.admin-categories-table td { vertical-align: middle; }
+.admin-categories-table .admin-categories-row > td:first-child { overflow-wrap: anywhere; }
+.admin-categories-description { max-width: 18rem; overflow-wrap: anywhere; }
+.admin-categories-actions-heading, .admin-categories-actions { width: 15rem; }
+.admin-categories-actions__buttons { display: flex; flex-wrap: wrap; gap: .25rem; }
+.admin-categories-actions__buttons :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; }
 
 .admin-categories-mobile { display: none; margin: 0; padding: 0; list-style: none; }
 .admin-categories-mobile__card { min-width: 0; padding: 1rem; border-block-start: 1px solid rgba(var(--v-theme-on-surface), .12); overflow-wrap: anywhere; }
