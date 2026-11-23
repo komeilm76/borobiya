@@ -1,10 +1,11 @@
-import { computed, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import { sosProposalReceivedEventSchema, type ProposalInboxItem } from "@shared/index";
 import { acceptProposal, declineProposal, listPendingProposals } from "@/api/proposals";
 import { ApiError } from "@/api/http";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { SOS_PROPOSAL_RECEIVED_EVENT } from "@/services/socket-events";
+import { accountSessionKey } from "@/composables/device-identity";
 import type { RealtimeClient } from "@/services/socket";
 import { useAuthStore } from "./auth";
 
@@ -35,6 +36,9 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   const failed = ref(false);
   const identity = computed(() => auth.isAuthenticated && auth.user?.role === "user" &&
     !auth.mustCompleteSecurityQuestions ? auth.user.id : null);
+  // A new login for the same rescuer is a different consent boundary. Keep
+  // routine bearer rotations for the same JWT session in the current inbox.
+  const loginKey = computed(() => accountSessionKey(identity.value, auth.accessToken));
 
   let generation = 0;
   let sessionGeneration = 0;
@@ -44,18 +48,20 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   let interval: ReturnType<typeof setInterval> | null = null;
   let client: RealtimeClient | null = null;
   let opening: object | null = null;
+  let disposed = false;
 
   async function refresh(): Promise<void> {
     const userId = identity.value;
     const token = auth.accessToken;
-    if (!userId || !token || acceptedMissionId.value) return;
+    const login = loginKey.value;
+    if (!userId || !token || !login || acceptedMissionId.value) return;
     const gen = ++generation;
     loading.value = true;
     try {
       const read = runtime.list ?? listPendingProposals;
       let requestedPage = page.value;
       let result = await read(token, requestedPage);
-      if (gen !== generation || identity.value !== userId) return;
+      if (gen !== generation || identity.value !== userId || loginKey.value !== login) return;
       // Declining/expiring the sole offer on the last page can leave a valid
       // total but an empty out-of-range page. Rewind before claiming the inbox
       // has no pending offers; bound retries if the total keeps changing.
@@ -66,7 +72,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
         if (result.totalPages === 0) break;
         if (redirects >= 2) throw new Error("Proposal pages changed during refresh");
         result = await read(token, requestedPage);
-        if (gen !== generation || identity.value !== userId) return;
+        if (gen !== generation || identity.value !== userId || loginKey.value !== login) return;
       }
       proposals.value = result.items;
       loadedPage = requestedPage;
@@ -74,7 +80,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
       totalPages.value = result.totalPages;
       failed.value = false;
     } catch {
-      if (gen === generation && identity.value === userId) {
+      if (gen === generation && identity.value === userId && loginKey.value === login) {
         failed.value = true;
         // Do not label retained page-one rows as page two after a failed page
         // change. Rewind failures that cleared the rows retain their honest
@@ -105,18 +111,20 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   async function decide(id: string, action: "accept" | "decline", reason?: string): Promise<boolean> {
     // Lock before the first await; a double-click cannot create two concurrent writes.
     const userId = identity.value;
-    if (decidingId.value || acceptedMissionId.value || !userId || !proposals.value.some((item) => item.id === id)) return false;
+    const login = loginKey.value;
+    if (decidingId.value || acceptedMissionId.value || !userId || !login ||
+        !proposals.value.some((item) => item.id === id)) return false;
     decidingId.value = id;
     decisionError.value = null;
     const session = sessionGeneration;
     try {
       await auth.ensureSession();
-      if (identity.value !== userId || session !== sessionGeneration || !auth.accessToken) return false;
+      if (identity.value !== userId || loginKey.value !== login || session !== sessionGeneration || !auth.accessToken) return false;
       if (action === "accept") {
         const missionId = await (runtime.accept ?? acceptProposal)(auth.accessToken, id);
         // The server may have committed, but the former account's reply is not a success for the
         // current view. Do not clear its dialog or alter its inbox after a session transition.
-        if (identity.value !== userId || session !== sessionGeneration) return false;
+        if (identity.value !== userId || loginKey.value !== login || session !== sessionGeneration) return false;
         generation++; // invalidate any pre-accept inbox read
         loading.value = false;
         acceptedMissionId.value = missionId;
@@ -127,14 +135,14 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
         failed.value = false; // The server confirmed this mission and closed other pending offers.
       } else {
         await (runtime.decline ?? declineProposal)(auth.accessToken, id, reason);
-        if (identity.value !== userId || session !== sessionGeneration) return false;
+        if (identity.value !== userId || loginKey.value !== login || session !== sessionGeneration) return false;
         proposals.value = proposals.value.filter((item) => item.id !== id);
         total.value = Math.max(0, total.value - 1);
       }
       void refresh();
       return true;
     } catch (error) {
-      if (identity.value === userId && session === sessionGeneration) {
+      if (identity.value === userId && loginKey.value === login && session === sessionGeneration) {
         decisionError.value = error instanceof ApiError && [404, 409].includes(error.status)
           ? "این پیشنهاد دیگر در دسترس نیست. فهرست تازه می‌شود."
           : friendlyErrorMessage(error, "پاسخ ثبت نشد؛ دوباره تلاش کنید.");
@@ -168,7 +176,8 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   }
 
   async function attachRealtime(userId: string): Promise<void> {
-    if (client || opening || identity.value !== userId || !auth.accessToken) return;
+    const login = loginKey.value;
+    if (client || opening || identity.value !== userId || !auth.accessToken || !login) return;
     const attempt = {};
     opening = attempt;
     const gen = sessionGeneration;
@@ -178,7 +187,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
         return createRealtimeClient(token);
       });
       const connected = await opener(auth.accessToken);
-      if (identity.value !== userId || gen !== sessionGeneration || !auth.accessToken) {
+      if (identity.value !== userId || loginKey.value !== login || gen !== sessionGeneration || !auth.accessToken) {
         connected.close();
         return;
       }
@@ -199,6 +208,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   }
 
   function start(userId: string): void {
+    if (disposed) return;
     void refresh();
     void attachRealtime(userId);
     interval = setInterval(() => {
@@ -209,10 +219,15 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     interval.unref?.();
   }
 
-  watch(identity, (next) => {
+  watch(loginKey, (next) => {
+    // Revoke the former inbox synchronously, but coalesce a same-tick profile +
+    // bearer replacement before opening a socket or reading with mixed identities.
     stop();
-    if (next) void start(next);
-  }, { immediate: true });
+    const current = sessionGeneration;
+    if (next) queueMicrotask(() => {
+      if (!disposed && current === sessionGeneration && loginKey.value === next && identity.value) start(identity.value);
+    });
+  }, { immediate: true, flush: "sync" });
   watch(() => auth.accessToken, (token) => {
     if (token && client) {
       client.updateToken(token);
@@ -221,6 +236,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
       if (!client.socket.connected) client.connect();
     }
   });
+  onScopeDispose(() => { disposed = true; stop(); });
 
   return { proposals, total, page, totalPages, loading, failed, decidingId, decisionError, acceptedMissionId, acceptedOffer, refresh, setPage, releaseAcceptedMission, decide, stop };
 });

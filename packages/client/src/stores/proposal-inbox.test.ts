@@ -414,6 +414,82 @@ describe("proposal inbox", () => {
     expect(list).toHaveBeenLastCalledWith("rescuer-token", 1);
   });
 
+  it("does not reopen a socket after the inbox store is disposed before startup", async () => {
+    const openSocket = vi.fn(async () => ({ socket: new EventEmitter() as never,
+      connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() }));
+    const list = vi.fn(async () => page([proposal]));
+    configureProposalInboxForTests({ list, openSocket });
+    const auth = useAuthStore();
+    const inbox = useProposalInboxStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    inbox.$dispose();
+    await nextTick();
+    expect(openSocket).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it("keeps an accepted mission and its socket through a same-session bearer renewal", async () => {
+    const jwt = (nonce: number) => `header.${btoa(JSON.stringify({ sub: rescuerId, sessionId: "login-a", nonce }))}.sig`;
+    const close = vi.fn();
+    const updateToken = vi.fn();
+    configureProposalInboxForTests({ list: async () => page([proposal]),
+      accept: async () => "77777777-7777-4777-8777-777777777777",
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken, close }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = jwt(1);
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([proposal]));
+    await vi.waitFor(() => expect(updateToken).toHaveBeenCalledWith(jwt(1)));
+    expect(await inbox.decide(proposal.id, "accept")).toBe(true);
+    auth.accessToken = jwt(2);
+    await nextTick();
+    expect(inbox.acceptedMissionId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(close).not.toHaveBeenCalled();
+    expect(updateToken).toHaveBeenCalledWith(jwt(2));
+  });
+
+  it("does not accept a prior login's late mission reply for the same rescuer", async () => {
+    const jwt = (sessionId: string, nonce = 0) =>
+      `header.${btoa(JSON.stringify({ sub: rescuerId, sessionId, nonce }))}.sig`;
+    let finish!: (id: string) => void;
+    const accept = vi.fn(() => new Promise<string>((resolve) => { finish = resolve; }));
+    const close = vi.fn();
+    configureProposalInboxForTests({ list: async () => page([proposal]), accept,
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = jwt("login-a");
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([proposal]));
+    const decision = inbox.decide(proposal.id, "accept");
+    await vi.waitFor(() => expect(accept).toHaveBeenCalledOnce());
+    auth.accessToken = jwt("login-b"); // Same profile, different login session.
+    expect(inbox.decidingId).toBeNull();
+    expect(inbox.acceptedMissionId).toBeNull();
+    finish("77777777-7777-4777-8777-777777777777");
+    expect(await decision).toBe(false);
+    expect(inbox.acceptedMissionId).toBeNull();
+  });
+
+  it("does not send an old offer decision using a newly restored login", async () => {
+    const jwt = (sessionId: string) => `header.${btoa(JSON.stringify({ sub: rescuerId, sessionId }))}.sig`;
+    const accept = vi.fn(async () => "77777777-7777-4777-8777-777777777777");
+    configureProposalInboxForTests({ list: async () => page([proposal]), accept,
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = jwt("login-a");
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([proposal]));
+    vi.spyOn(auth, "ensureSession").mockImplementation(async () => { auth.accessToken = jwt("login-b"); });
+    expect(await inbox.decide(proposal.id, "accept")).toBe(false);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
   it("does not let a late decision response restore another account's inbox", async () => {
     let resolve!: (id: string) => void;
     const waiting = new Promise<string>((done) => { resolve = done; });
