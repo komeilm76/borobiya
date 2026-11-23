@@ -60,6 +60,10 @@ describe("compact, consistent admin SOS notifications", () => {
     expect(css).toContain('.dispatch-replacement__location summary { min-height: 44px; }');
     expect(css).not.toContain('@keyframes replacement-arrival');
     expect(dispatch).toContain('void adminSos.redispatchNearest(requestId);');
+    const feedback = markup.slice(markup.indexOf('id="dispatch-notice-03"'), markup.indexOf('</v-alert>', markup.indexOf('id="dispatch-notice-03"')));
+    expect(feedback).toContain('closable');
+    expect(feedback).toContain("adminSos.quickDispatchFeedback.type === 'error' ? 'alert' : 'status'");
+    expect(feedback).toContain('@click:close="adminSos.quickDispatchFeedback = null"');
   });
 
   it("keeps a concise fallback in the selected SOS panel after the toast is dismissed", () => {

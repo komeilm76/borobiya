@@ -382,13 +382,54 @@ describe("useAdminSosStore (T3.2.5)", () => {
     const store = useAdminSosStore();
     await vi.waitFor(() => expect(store.requests.some((item) => item.id === row.id)).toBe(true));
     store.selectRequest(row.id);
+    await nextTick();
+    store.dispatchFeedback = { type: "error", message: "نتیجهٔ قبلی ارسال دستی" };
     expect(await store.redispatchNearest(row.id)).toBe(true); // works after reload without a socket alert
+    expect(store.dispatchFeedback).toBeNull(); // a stale manual error cannot linger beside the new result
     expect(listRequestMissions).toHaveBeenCalledWith("admin-jwt", row.id, true);
     expect(getNearestResponders).toHaveBeenCalledWith(row.id, "admin-jwt", undefined, true);
     expect(dispatchResponders).toHaveBeenCalledWith(row.id, [newId, another], "admin-jwt");
     expect(store.selectedRequest?.status).toBe("dispatched");
     expect(store.quickDispatchFeedback?.type).toBe("success");
     expect(await store.redispatchNearest(row.id)).toBe(false); // no repeat after success
+  });
+
+  it("does not show replacement feedback for a different SOS after selection changes", async () => {
+    const first = makeSosRecord({ status: "cancelled_by_rescuer" });
+    const second = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "pending" });
+    const rescuerId = "44444444-4444-4444-8444-444444444441";
+    let finishDispatch!: (value: { proposals: never[] }) => void;
+    const pendingDispatch = new Promise<{ proposals: never[] }>((resolve) => { finishDispatch = resolve; });
+    const dispatchResponders = vi.fn(() => pendingDispatch);
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [first, second], total: 2 }),
+      getRequest: async () => first,
+      listRequestMissions: async () => [],
+      getNearestResponders: async () => ({ responders: [{ userId: rescuerId, username: "rescuer",
+        categoryName: "rescue", distance: 100, avgRating: null, lastActiveAt: first.createdAt }] }),
+      dispatchResponders
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.requests).toHaveLength(2));
+    store.selectRequest(first.id);
+    const running = store.redispatchNearest(first.id);
+    await vi.waitFor(() => expect(dispatchResponders).toHaveBeenCalledOnce());
+    store.selectRequest(second.id);
+    await nextTick();
+    finishDispatch({ proposals: [] });
+    expect(await running).toBe(true);
+    expect(store.requests.find((row) => row.id === first.id)?.status).toBe("dispatched");
+    expect(store.selectedId).toBe(second.id);
+    expect(store.quickDispatchFeedback).toBeNull();
+
+    store.quickDispatchFeedback = { type: "error", message: "خطای مربوط به درخواست پیشین" };
+    store.selectRequest(first.id);
+    await nextTick();
+    expect(store.quickDispatchFeedback).toBeNull();
   });
 
   it("rechecks replacement status and refuses stale SOS, empty candidates, and late logout responses", async () => {
@@ -966,8 +1007,10 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.selectedResponderIds).toEqual([nearestA.userId]);
     expect(store.canDispatchSelected).toBe(true);
 
+    store.quickDispatchFeedback = { type: "error", message: "نتیجهٔ قبلی اعزام جایگزین" };
     const ok = await store.dispatchSelectedResponders();
     expect(ok).toBe(true);
+    expect(store.quickDispatchFeedback).toBeNull(); // a previous quick error must not survive manual success
     expect(dispatchResponders).toHaveBeenCalledWith(reqRow.id, [nearestA.userId], "admin-jwt-dispatch");
     expect(store.selectedRequest?.status).toBe("dispatched");
     expect(store.dispatchedCount).toBe(1);

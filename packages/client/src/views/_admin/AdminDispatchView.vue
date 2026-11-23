@@ -103,7 +103,9 @@
     </v-alert>
 
     <v-alert id="dispatch-notice-03" v-if="adminSos.quickDispatchFeedback" :type="adminSos.quickDispatchFeedback.type"
-      variant="tonal" rounded="lg" role="status" class="mb-4">
+      variant="tonal" rounded="lg" closable
+      :role="adminSos.quickDispatchFeedback.type === 'error' ? 'alert' : 'status'" class="mb-4"
+      @click:close="adminSos.quickDispatchFeedback = null">
       {{ adminSos.quickDispatchFeedback.message }}
     </v-alert>
     <section id="dispatch-notice-04" v-if="adminSos.urgentReplacement"

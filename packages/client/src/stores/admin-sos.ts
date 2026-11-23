@@ -338,6 +338,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     const gen = ++dispatchGeneration;
     dispatchSubmitting.value = true;
     dispatchFeedback.value = null;
+    quickDispatchFeedback.value = null;
 
     const dispatchFn = activeOverrides.dispatchResponders ?? dispatchSosResponders;
     try {
@@ -414,10 +415,13 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     const gen = ++dispatchGeneration;
     dispatchSubmitting.value = true;
     quickDispatchFeedback.value = null;
+    dispatchFeedback.value = null;
     const current = () => gen === dispatchGeneration && session === sessionGeneration && isAdminSession.value &&
       (replacementByRequest.value[requestId]?.missionId ?? null) === alertMissionId;
     const fail = (message: string) => {
-      if (current()) quickDispatchFeedback.value = { type: "error", message };
+      // Complete the request for its original SOS, but never show its feedback
+      // in the context of another SOS selected while the network call ran.
+      if (current() && selectedId.value === requestId) quickDispatchFeedback.value = { type: "error", message };
       return false;
     };
     try {
@@ -452,8 +456,10 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       requests.value = upsertSosAlert(requests.value, { ...record, status: "dispatched" }).items;
       invalidateListAfterConfirmedDispatch();
       resolveReplacement(requestId);
-      quickDispatchFeedback.value = { type: "success",
-        message: `پیشنهاد جایگزین برای ${sent.proposals.length} امدادگر جدید ارسال شد.` };
+      if (selectedId.value === requestId) {
+        quickDispatchFeedback.value = { type: "success",
+          message: `پیشنهاد جایگزین برای ${sent.proposals.length} امدادگر جدید ارسال شد.` };
+      }
       return true;
     } catch (err) {
       return fail(friendlyErrorMessage(err, "اعزام جایگزین انجام نشد؛ دوباره تلاش کنید."));
@@ -708,6 +714,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     responderSearch.value = "";
     clearResponderSelection();
     dispatchFeedback.value = null;
+    quickDispatchFeedback.value = null;
     void loadNearestResponders(nextId);
   });
 
