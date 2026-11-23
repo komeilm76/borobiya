@@ -626,6 +626,76 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.errorMessage).toBeNull();
   });
 
+  it("still retries a 401 list read after a normal same-session JWT renewal", async () => {
+    const jwt = (nonce: number) => `header.${btoa(JSON.stringify({ sub: "admin-1", sessionId: "session-a", nonce }))}.sig`;
+    const first = jwt(1), second = jwt(2);
+    const row = makeSosRecord();
+    const listRequests = vi.fn(async (token: string) => {
+      if (token === first) throw new ApiError(401, "INVALID_ACCESS_TOKEN", "Expired");
+      return { items: [row], total: 1 };
+    });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = first;
+    auth.user = { id: "admin-1", username: "first_admin", role: "admin", mustCompleteSecurityQuestions: false };
+    vi.spyOn(auth, "refreshSession").mockImplementation(async () => { auth.accessToken = second; return true; });
+    const store = useAdminSosStore();
+    await store.refreshRequests();
+    expect(store.requests).toEqual([row]);
+    expect(listRequests.mock.calls.some(([token]) => token === second)).toBe(true);
+  });
+
+  it("never retries an old admin's dispatch as a different account after a 401 refresh", async () => {
+    const request = makeSosRecord();
+    const dispatchResponders = vi.fn(async (_requestId: string, _ids: string[], token: string) => {
+      if (token === "admin-one-token") throw new ApiError(401, "INVALID_ACCESS_TOKEN", "Expired");
+      return { proposals: [] };
+    });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }),
+      getNearestResponders: async () => ({ responders: [] }), dispatchResponders });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-one-token";
+    auth.user = { id: "admin-1", username: "first_admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.requests).toEqual([request]));
+    store.selectRequest(request.id);
+    store.selectedResponderIds = ["44444444-4444-4444-8444-444444444441"];
+    vi.spyOn(auth, "refreshSession").mockImplementation(async () => {
+      auth.accessToken = "admin-two-token";
+      auth.user = { id: "admin-2", username: "second_admin", role: "admin", mustCompleteSecurityQuestions: false };
+      return true;
+    });
+
+    expect(await store.dispatchSelectedResponders()).toBe(false);
+    expect(dispatchResponders).toHaveBeenCalledTimes(1);
+    expect(dispatchResponders).toHaveBeenCalledWith(request.id, ["44444444-4444-4444-8444-444444444441"], "admin-one-token");
+  });
+
+  it("never retries an old admin's dispatch in a new login for the same account", async () => {
+    const jwt = (sessionId: string) => `header.${btoa(JSON.stringify({ sub: "admin-1", sessionId }))}.sig`;
+    const first = jwt("login-one"), second = jwt("login-two");
+    const request = makeSosRecord();
+    const dispatchResponders = vi.fn(async (_requestId: string, _ids: string[], token: string) => {
+      if (token === first) throw new ApiError(401, "INVALID_ACCESS_TOKEN", "Expired");
+      return { proposals: [] };
+    });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }),
+      getNearestResponders: async () => ({ responders: [] }), dispatchResponders });
+    const auth = useAuthStore();
+    auth.accessToken = first;
+    auth.user = { id: "admin-1", username: "first_admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.requests).toEqual([request]));
+    store.selectRequest(request.id);
+    store.selectedResponderIds = ["44444444-4444-4444-8444-444444444441"];
+    vi.spyOn(auth, "refreshSession").mockImplementation(async () => { auth.accessToken = second; return true; });
+
+    expect(await store.dispatchSelectedResponders()).toBe(false);
+    expect(dispatchResponders).toHaveBeenCalledTimes(1);
+  });
+
   it("refreshes session and reconnects socket when handshake fails with data.code INVALID_ACCESS_TOKEN", async () => {
     const updateToken = vi.fn();
     configureAdminSosRuntimeForTests({

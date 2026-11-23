@@ -25,12 +25,13 @@ import {
   listLocationHistoryShares
 } from "@/api/location";
 
-function makeJwt(deviceId: string, expSecondsFromNow = 900): string {
+function makeJwt(deviceId: string, expSecondsFromNow = 900,
+  sub = "11111111-1111-4111-8111-111111111111", role: "user" | "admin" = "user"): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(
     JSON.stringify({
-      sub: "11111111-1111-4111-8111-111111111111",
-      role: "user",
+      sub,
+      role,
       sessionId: "22222222-2222-4222-8222-222222222222",
       deviceId,
       exp: Math.floor(Date.now() / 1000) + expSecondsFromNow
@@ -334,7 +335,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
   it("useAdminSosStore hydrates cancelled_by_rescuer + dispatched counts accurately on initial load and prefers visible requests", async () => {
     setActivePinia(createPinia());
     const auth = useAuthStore();
-    auth.accessToken = makeJwt("admin-dev-initial");
+    auth.accessToken = makeJwt("admin-dev-initial", 900, "44444444-4444-4444-8444-444444444444", "admin");
     auth.user = {
       id: "44444444-4444-4444-8444-444444444444",
       username: "dispatch_ops",
@@ -451,7 +452,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     // Admin accounts with mustCompleteSecurityQuestions = true are NOT locked out of admin views:
     setActivePinia(createPinia());
     const auth = useAuthStore();
-    auth.accessToken = makeJwt("admin-dev-onboarding-exempt");
+    auth.accessToken = makeJwt("admin-dev-onboarding-exempt", 900, "99999999-9999-4999-8999-999999999999", "admin");
     auth.user = {
       id: "99999999-9999-4999-8999-999999999999",
       username: "admin_with_flag",

@@ -17,6 +17,7 @@ import {
 } from "@/api/admin-sos";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
+import { accountSessionKey } from "@/composables/device-identity";
 import {
   isDispatchableSosStatus,
   parseAdminRescuerCancellationPayload,
@@ -167,15 +168,26 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
 
   async function withAdminAuthRetry<T>(run: (token: string) => Promise<T>): Promise<T | null> {
     const token = auth.accessToken;
-    if (!token) return null;
+    const owner = auth.user?.id ?? null;
+    const session = accountSessionKey(owner, token);
+    if (!token || !session || !isAdminSession.value) return null;
+    const generation = sessionGeneration;
+    const current = () => generation === sessionGeneration && isAdminSession.value &&
+      auth.user?.id === owner && accountSessionKey(owner, auth.accessToken) === session;
 
     try {
-      return await run(token);
+      const result = await run(token);
+      return current() ? result : null;
     } catch (err) {
+      if (!current()) return null;
       if (err instanceof ApiError && err.status === 401) {
         const refreshed = await auth.refreshSession();
+        // A cookie refresh can discover a different admin (or a new login for
+        // this same admin). Never replay a pending dispatch using that identity.
+        if (!current()) return null;
         if (refreshed && auth.accessToken) {
-          return await run(auth.accessToken);
+          const result = await run(auth.accessToken);
+          return current() ? result : null;
         }
       }
       throw err;
