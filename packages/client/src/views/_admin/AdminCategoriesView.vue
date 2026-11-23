@@ -295,16 +295,16 @@
                 <p v-if="candidates.length === 10" class="admin-category-members__results-hint">۱۰ نتیجهٔ نخست؛ جست‌وجو را دقیق‌تر کنید.</p>
               </template>
             </div>
-          </section>
-
-          <section v-if="selectedIds.length" class="admin-category-members__selection" aria-label="حساب‌های انتخاب‌شده برای افزودن">
-            <strong class="admin-category-members__selection-heading">انتخاب‌شده ({{ selectedIds.length.toLocaleString('fa-IR') }})</strong>
-            <div class="admin-category-members__selection-chips">
-              <v-chip v-for="id in selectedIds" :key="id" closable color="primary" variant="tonal"
-                :disabled="saving || removingMemberId !== null" :close-label="`حذف ${selectedUsernames[id] ?? 'کاربر'} از انتخاب‌ها`"
-                @click:close="toggleMember(id, false)"><span dir="ltr">{{ selectedUsernames[id] ?? 'کاربر' }}</span></v-chip>
+            <div v-if="selectedIds.length" class="admin-category-members__selection" role="group" aria-label="حساب‌های انتخاب‌شده برای افزودن">
+              <strong class="admin-category-members__selection-heading">انتخاب‌شده ({{ selectedIds.length.toLocaleString('fa-IR') }})</strong>
+              <div class="admin-category-members__selection-chips">
+                <v-chip v-for="id in selectedIds" :key="id" closable color="primary" variant="tonal"
+                  :disabled="saving || removingMemberId !== null" :close-label="`حذف ${selectedUsernames[id] ?? 'کاربر'} از انتخاب‌ها`"
+                  @click:close="toggleMember(id, false)"><span dir="ltr">{{ selectedUsernames[id] ?? 'کاربر' }}</span></v-chip>
+              </div>
             </div>
           </section>
+
           <section class="admin-category-members__section admin-category-members__section--current" aria-labelledby="admin-category-current-title" data-test="current-members">
             <button class="admin-category-members__disclosure" type="button" :aria-expanded="currentMembersExpanded"
               aria-controls="admin-category-current-list" @click="currentMembersExpanded = !currentMembersExpanded">
@@ -766,12 +766,14 @@ onUnmounted(() => {
 .admin-category-members__close.v-btn { width: 44px; height: 44px; }
 .admin-category-members__body {
   display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr);
-  gap: .6rem; align-content: start; align-items: start; padding: .85rem 1.1rem;
+  gap: .75rem; align-content: start; align-items: start; padding: .85rem 1.1rem;
+  background: var(--bb-color-inset);
 }
-.admin-category-members__section { min-width: 0; padding: .8rem; border: 0; background: transparent; }
-.admin-category-members__section--search { grid-column: 1; grid-row: 1; }
+.admin-category-members__section { min-width: 0; padding: .85rem; border: 0; border-radius: var(--bb-radius-nested, 16px); }
+.admin-category-members__section--search { grid-column: 1; grid-row: 1;
+  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-item); }
 .admin-category-members__section--current { grid-column: 2; grid-row: 1;
-  border-radius: .85rem; background: var(--bb-color-inset); }
+  background: rgba(var(--v-theme-primary), .09); }
 .admin-category-members__section-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
 .admin-category-members__section-head > div { min-width: 0; flex: 1 1 9rem; }
 .admin-category-members__section-icon { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
@@ -813,9 +815,9 @@ onUnmounted(() => {
 .admin-category-members__candidate > span:last-child { min-width: 0; color: var(--bb-color-text);
   font-size: .85rem; font-weight: 700; overflow-wrap: anywhere; }
 .admin-category-members__results-hint { margin: .4rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
-.admin-category-members__selection { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .7rem;
-  min-width: 0; padding: .45rem .7rem;
-  border-radius: .85rem; background: rgba(var(--v-theme-primary), .08); }
+.admin-category-members__selection { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .7rem;
+  min-width: 0; margin-top: .7rem; padding: .45rem .7rem;
+  border-radius: .75rem; background: rgba(var(--v-theme-primary), .1); }
 .admin-category-members__selection-heading { flex: none; color: var(--bb-color-primary); font-size: .84rem; font-weight: 800; }
 .admin-category-members__selection-chips { display: flex; flex: 1 1 14rem; flex-wrap: wrap; gap: .35rem; min-width: 0;
   max-width: 100%; max-height: 7rem; overflow-y: auto; }
@@ -826,7 +828,7 @@ onUnmounted(() => {
 .admin-category-members__disclosure { display: flex; align-items: center; gap: .45rem; width: 100%; min-height: 44px;
   padding: 0; border: 0; background: transparent; color: var(--bb-color-text); font-size: .9rem; font-weight: 800;
   text-align: start; cursor: pointer; }
-.admin-category-members__disclosure .admin-category-members__count { margin-inline-start: auto; }
+.admin-category-members__disclosure .admin-category-members__count { margin-inline-start: auto; background: rgb(var(--v-theme-surface)); }
 .admin-category-members__disclosure:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; border-radius: .4rem; }
 .admin-category-members__current-content { margin-top: .45rem; }
 .admin-category-members__remove-hint { margin: 0 0 .45rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.5; }
@@ -835,6 +837,7 @@ onUnmounted(() => {
   .admin-category-members__header, .admin-category-members__section, .admin-category-members__person,
   .admin-category-members__selection, .admin-categories-member, .admin-category-members__empty,
   .admin-category-members__search-state { background: Canvas; color: CanvasText; }
+  .admin-category-members__section { outline: 1px solid CanvasText; }
   .admin-category-members__person + .admin-category-members__person { border-color: CanvasText; }
   .admin-categories-member--selected { outline: 2px solid Highlight; outline-offset: -2px; }
   .admin-category-members__disclosure:focus-visible,

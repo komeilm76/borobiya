@@ -28,6 +28,8 @@ describe("category member management dialog", () => {
 
   it("keeps chosen names available across searches and clears them only when removed, closed or added", () => {
     expect(dialog).toContain('v-if="selectedIds.length"');
+    expect(dialog).toContain('class="admin-category-members__selection" role="group" aria-label="حساب‌های انتخاب‌شده برای افزودن"');
+    expect(dialog.indexOf('class="admin-category-members__selection"')).toBeLessThan(dialog.indexOf('data-test="current-members"'));
     expect(dialog).toContain('v-for="id in selectedIds"');
     expect(dialog).toContain("selectedUsernames[id] ?? 'کاربر'");
     expect(dialog).toContain('@click:close="toggleMember(id, false)"');
@@ -70,19 +72,22 @@ describe("category member management dialog", () => {
     expect(dialog).not.toContain('admin-category-members__action-hint');
   });
 
-  it("uses quiet section fills and flat member rows instead of nested outlines", () => {
-    expect(style).toContain('.admin-category-members__section { min-width: 0; padding: .8rem; border: 0; background: transparent; }');
-    expect(style).toContain('border-radius: .85rem; background: var(--bb-color-inset); }');
+  it("gives search a raised work surface, a tonal member rail, and selections beside search", () => {
+    expect(style).toContain('background: var(--bb-color-inset);\n}');
+    expect(style).toContain('.admin-category-members__section { min-width: 0; padding: .85rem; border: 0;');
+    expect(style).toContain('background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-item);');
+    expect(style).toContain('background: rgba(var(--v-theme-primary), .09);');
+    expect(style).toContain('.admin-category-members__selection { display: flex;');
+    expect(style).not.toContain('.admin-category-members__selection { grid-column: 1 / -1;');
     expect(style).toContain('.admin-category-members__person + .admin-category-members__person { border-top:');
     expect(style).toContain('.admin-categories-member--selected { background: rgba(var(--v-theme-primary), .1);');
     expect(style).toContain('.admin-categories-member--selected { outline: 2px solid Highlight;');
-    expect(style).not.toContain('.admin-category-members__person { display: flex; align-items: center; gap: .4rem; min-width: 0; min-height: 48px;\n  padding: .1rem .35rem; border: 1px');
   });
 
   it("keeps touch targets, focus, theme and phone layout intact", () => {
     expect(style).toContain('.admin-category-members__person :deep(.v-btn) { min-width: 44px; min-height: 44px;');
     expect(style).toContain('.admin-categories-member :deep(.v-selection-control--focus-visible)');
-    expect(style).toContain('.admin-category-members__section--search { grid-column: 1; grid-row: 1; }');
+    expect(style).toContain('.admin-category-members__section--search { grid-column: 1; grid-row: 1;');
     expect(style).toContain('.admin-category-members__section--current { grid-column: 2; grid-row: 1;');
     expect(style).toContain('.admin-category-members__section--search, .admin-category-members__section--current { grid-column: 1; grid-row: auto; }');
     expect(style).toContain('background: var(--bb-color-inset)');
