@@ -523,8 +523,10 @@ a {
 }
 
 /* Fullscreen map workspaces own the viewport. The menu launcher and drawer
- * replace (rather than overlay) the shared app bar. */
-.app-shell--map { min-height: 100dvh; }
+ * replace (rather than overlay) the shared app bar. Match the legend's
+ * rounded-square action shape without changing buttons on other pages. */
+.app-shell--map { min-height: 100dvh; --bb-map-action-radius: 1rem; }
+.app-shell--map :is(.sos-fab.sos-fab) { border-radius: var(--bb-map-action-radius); }
 .app-shell--map .app-main {
   min-height: 100dvh;
   padding-top: 0 !important;

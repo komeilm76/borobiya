@@ -41,7 +41,7 @@ describe("map sharing quick action", () => {
     const base = styleBlock(view, '.user-map-view__recenter, .user-map-view__share');
     expect(base).toContain('width: 48px;');
     expect(base).toContain('height: 48px;');
-    expect(base).toContain('border-radius: 50%;');
+    expect(base).toContain('border-radius: var(--bb-map-action-radius, 1rem);');
     expect(view).toContain('v-show="!(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
     const phone = view.split('@media (max-width: 599px) {')[1]!;
     const normalRail = phone.slice(phone.indexOf('/* Search/Location are the lower row;'));

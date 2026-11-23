@@ -36,7 +36,7 @@ onBeforeUnmount(monitor.stop);
 .network-status-icon__button {
   width: 48px; height: 48px; min-width: 48px; padding: 0;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
-  border-radius: 1rem;
+  border-radius: var(--bb-map-action-radius, 1rem);
   color: rgb(var(--v-theme-on-surface));
   background: rgba(var(--v-theme-surface), 0.97) !important;
   box-shadow: var(--bb-shadow-overlay) !important;

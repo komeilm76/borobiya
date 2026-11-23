@@ -440,7 +440,8 @@ onMounted(async () => {
   inset-inline-start: 1.25rem;
   inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
   width: 48px; height: 48px; min-width: 48px;
-  border: 1px solid rgba(var(--v-theme-on-surface), .15); border-radius: 50%;
+  border: 1px solid rgba(var(--v-theme-on-surface), .15);
+  border-radius: var(--bb-map-action-radius, 50%);
   box-shadow: var(--bb-shadow-overlay);
 }
 .app-general-share--idle { border-color: var(--bb-color-outline); }

@@ -357,7 +357,7 @@ defineExpose({ map, setStyle: updateStyle });
   width: 48px;
   height: 48px;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--bb-map-action-radius, 50%);
   background: rgb(var(--v-theme-primary));
   box-shadow: var(--bb-shadow-overlay);
 }
@@ -365,7 +365,7 @@ defineExpose({ map, setStyle: updateStyle });
   width: 48px;
   height: 48px;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
-  border-radius: 50%;
+  border-radius: var(--bb-map-action-radius, 50%);
 }
 /* MapLibre's stock #333/#ccc arrows disappear on the themed primary surface.
  * Keep its real rotating icon element and pointer/keyboard behavior, but paint

@@ -37,7 +37,7 @@ describe("map-only compass action", () => {
     expect(view).toContain(':show-zoom="false" compass-action');
     const group = canvasStyles.slice(canvasStyles.indexOf(".map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group:not(:empty)) {"));
     expect(group).toContain("border: 0;");
-    expect(group).toContain("border-radius: 50%;");
+    expect(group).toContain("border-radius: var(--bb-map-action-radius, 50%);");
     expect(group).toContain("box-shadow: var(--bb-shadow-overlay);");
     const button = canvasStyles.slice(canvasStyles.indexOf(".map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass) {"));
     expect(button).toContain("width: 48px;");

@@ -1603,14 +1603,16 @@ onBeforeUnmount(() => {
   left: calc(1rem + env(safe-area-inset-left, 0px));
   bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
   width: 48px; min-width: 48px; height: 48px;
-  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: 50%;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-map-action-radius, 50%);
   box-shadow: var(--bb-shadow-overlay); }
 .mission-desk__legend-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__info-action { position: absolute; z-index: 10;
   left: calc(1rem + env(safe-area-inset-left, 0px));
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   width: 48px; min-width: 48px; height: 48px;
-  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: 50%;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-map-action-radius, 50%);
   box-shadow: var(--bb-shadow-overlay); }
 .mission-desk__info-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-desk__map-focus {
@@ -1621,7 +1623,8 @@ onBeforeUnmount(() => {
 
 .mission-desk__map-focus :deep(.v-btn) {
   width: 48px; min-width: 48px; height: 48px;
-  border: 1px solid var(--bb-color-outline); border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
+  border: 1px solid var(--bb-color-outline);
+  border-radius: var(--bb-map-action-radius, 50%); box-shadow: var(--bb-shadow-overlay);
 }
 .mission-desk__map-focus :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 @media (min-width: 600px) {

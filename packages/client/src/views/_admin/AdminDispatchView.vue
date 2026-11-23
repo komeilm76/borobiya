@@ -2231,6 +2231,7 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 5; right: 1.125rem;
   bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   width: 44px; height: 44px; min-width: 44px; min-height: 44px;
+  border-radius: var(--bb-map-action-radius, 1rem);
   box-shadow: var(--bb-shadow-overlay);
 }
 .admin-dispatch__legend-toggle:focus-visible {
@@ -2356,8 +2357,8 @@ onBeforeUnmount(() => {
 .dispatch-mission-timeline[open] summary { margin-bottom: .5rem; }
 .admin-dispatch__followup-toggle[aria-expanded="true"] { margin-bottom: .75rem; }
 
-.dispatch-map-choices { position: absolute; z-index: 5; bottom: 12px; inset-inline-end: 12px;
-  width: min(17rem, calc(100% - 1.5rem)); max-height: min(15rem, 50%);
+.dispatch-map-choices { position: absolute; z-index: 5; bottom: 12px;
+  width: min(17rem, calc(100% - 44px - 2.75rem)); max-height: min(15rem, 50%);
   display: flex; flex-direction: column; padding: .35rem;
   border: 1px solid var(--bb-color-outline); border-radius: 16px;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
@@ -2898,8 +2899,9 @@ onBeforeUnmount(() => {
   box-shadow: var(--bb-shadow-overlay);
 }
 .admin-dispatch__map-and-actions .dispatch-map-choices {
-  /* A temporary hit chooser must sit above the pinned incident panel. */
-  position: absolute; z-index: 15; right: .75rem;
+  /* Keep the whole chooser beside the 44px SOS/Broadcast/legend rail, not
+     underneath its buttons. The width shrinks with narrow map viewports. */
+  position: absolute; z-index: 15; right: calc(44px + 2rem);
   left: auto; bottom: 5rem; max-height: min(30dvh, 15rem);
 }
 :global(.dispatch-place-marker) {
@@ -2965,7 +2967,7 @@ onBeforeUnmount(() => {
   }
   .admin-dispatch__map-and-actions .dispatch-map-key li { flex: none; }
   .admin-dispatch__map-and-actions .dispatch-map-choices {
-    right: .75rem; bottom: 4.5rem;
+    bottom: 4.5rem;
   }
   .admin-dispatch__queue .dispatch-request-list, .admin-dispatch__responders .responder-list {
     max-height: 10rem;

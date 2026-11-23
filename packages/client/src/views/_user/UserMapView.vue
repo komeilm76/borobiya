@@ -2769,7 +2769,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   height: 48px;
   min-width: 48px;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
-  border-radius: 50%;
+  border-radius: var(--bb-map-action-radius, 1rem);
   box-shadow: var(--bb-shadow-overlay);
 }
 .user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem); }
@@ -3106,7 +3106,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     position: fixed; z-index: 8;
     inset-inline-start: calc(4.25rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px));
-    width: 48px; min-width: 48px; height: 48px; border-radius: 50%;
+    width: 48px; min-width: 48px; height: 48px;
+    border-radius: var(--bb-map-action-radius, 1rem);
     box-shadow: var(--bb-shadow-overlay);
   }
   .user-map-view__search-action:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }

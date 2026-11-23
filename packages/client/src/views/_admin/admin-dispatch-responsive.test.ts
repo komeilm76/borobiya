@@ -93,7 +93,9 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('max-width: calc(100% - 28.5rem);');
     expect(css).not.toContain('max-width: calc(100% - var(--dispatch-sidebar-width) - 26rem);');
     expect(css).toContain('.admin-dispatch__map-and-actions .dispatch-map-choices {');
-    expect(css).toContain('position: absolute; z-index: 15; right: .75rem;');
+    expect(css).toContain('position: absolute; z-index: 15; right: calc(44px + 2rem);');
+    expect(css).toContain('width: min(17rem, calc(100% - 44px - 2.75rem));');
+    expect(css).not.toContain('right: .75rem; bottom: 4.5rem;'); // Phone must not undo the rail clearance.
     expect(css).toContain('flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;');
     expect(source).toContain('offset: dispatchFocusOffset()');
     expect(template).toContain(':id="`dispatch-sos-${item.id}`"');
