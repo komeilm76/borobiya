@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { palettes } from "./tokens";
+import { designTokenStylesheet, palettes, shellColors } from "./tokens";
 
 // Source-level regression: no mounting Vue components (docs/TASKS.md).
 const css = readFileSync(new URL("./tailwind.css", import.meta.url), "utf8");
@@ -31,15 +31,18 @@ describe("network error cards", () => {
 
   it("uses opaque light and dark surfaces with readable body text and error icon", () => {
     const selector = ":is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error";
-    expect(css).toContain(`${selector} {\n  color: var(--bb-color-text) !important;\n  background: #fff0ee;`);
-    expect(css).toContain(`:root.dark ${selector} {\n  background: #422f35;`);
+    expect(css).toContain(`${selector} {\n  color: var(--bb-color-text) !important;\n  background: var(--bb-shell-alertFill);`);
+    expect(css).toContain(`:root.dark ${selector} {\n  background: var(--bb-shell-alertFill);`);
+    for (const mode of ["light", "dark"] as const) {
+      expect(designTokenStylesheet()).toContain(`--bb-shell-alertFill: ${shellColors[mode].alertFill}`);
+    }
     expect(css).toContain(`${selector} .v-alert__underlay {\n  display: none;`);
     expect(css).toContain(`${selector} .v-alert__prepend {\n  color: rgb(var(--v-theme-error));`);
     expect(css).toContain("border-inline-start-width: 4px;");
     expect(css).toContain("overflow-wrap: anywhere;");
-    for (const [theme, surface] of [[palettes.light, "#fff0ee"], [palettes.dark, "#422f35"]] as const) {
-      expect(contrast(theme.text, surface)).toBeGreaterThanOrEqual(7);
-      expect(contrast(theme.error, surface)).toBeGreaterThanOrEqual(4.5);
+    for (const mode of ["light", "dark"] as const) {
+      expect(contrast(palettes[mode].text, shellColors[mode].alertFill)).toBeGreaterThanOrEqual(7);
+      expect(contrast(palettes[mode].error, shellColors[mode].alertFill)).toBeGreaterThanOrEqual(4.5);
     }
     expect(css).toContain("color: CanvasText !important;\n    background: Canvas;\n    border-color: CanvasText;");
   });

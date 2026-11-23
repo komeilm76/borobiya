@@ -462,12 +462,12 @@ onMounted(async () => {
 :global(.admin-sos-toast__message) { display: flex; align-items: center; gap: .5rem; min-width: 0; }
 :global(.admin-sos-toast__message > .v-icon) { flex: none; color: rgb(var(--v-theme-error)); }
 :global(.admin-sos-toast__message > span) { display: grid; min-width: 0; gap: .1rem; }
-:global(.admin-sos-toast__message strong) { font-size: .85rem; line-height: 1.3; }
-:global(.admin-sos-toast__message small) { color: var(--bb-color-muted); font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere; }
+:global(.admin-sos-toast__message strong) { font-size: var(--bb-shell-font-toastTitle); line-height: 1.3; }
+:global(.admin-sos-toast__message small) { color: var(--bb-color-muted); font-size: var(--bb-shell-font-toastSmall); line-height: 1.35; overflow-wrap: anywhere; }
 :global(.admin-sos-toast__wrapper .v-snackbar__actions) { gap: .15rem; margin: 0; padding: .35rem .4rem; }
 :global(.admin-sos-toast__wrapper .v-snackbar__actions .v-btn) {
-  min-width: 38px; min-height: 38px; height: 38px; border-radius: .7rem;
-  font-family: var(--bb-font-family); font-size: .8rem; letter-spacing: normal;
+  min-width: 38px; min-height: 38px; height: 38px; border-radius: var(--bb-shell-radius-toastAction);
+  font-family: var(--bb-font-family); font-size: var(--bb-shell-font-toastSmall); letter-spacing: normal;
 }
 :global(.admin-sos-toast__wrapper .v-snackbar__actions .v-btn:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;

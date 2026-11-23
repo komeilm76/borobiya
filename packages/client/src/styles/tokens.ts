@@ -70,6 +70,76 @@ export const shadows = {
   }
 } as const;
 
+// Shared application chrome and the legacy workspace welcome surface. Keep
+// route-specific map geometry and touch-target dimensions in their owners.
+// These names describe roles rather than individual CSS declarations so editing
+// either theme here updates topbar, footer, welcome state and alert treatments.
+export const shellColors = {
+  light: {
+    topbarEdge: "rgba(26, 67, 68, 0.08)", topbarFill: "rgba(255, 255, 255, 0.9)",
+    navInk: "#527071", brandInk: "#ffffff", brandShadow: "0 7px 18px rgba(14, 102, 102, 0.2)",
+    brandTagline: "var(--bb-color-muted)", alertFill: "#fff0ee",
+    mainBackdrop: "radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.12), transparent 30%), radial-gradient(ellipse at 92% 72%, rgba(14, 102, 102, 0.08), transparent 34%), var(--bb-color-background)",
+    eyebrowInk: "#537879", eyebrowSeparator: "#bdc9c7", heroInk: "#173b3c",
+    statusDot: "#35a176", statusHalo: "0 0 0 4px rgba(53, 161, 118, 0.12)",
+    welcomeEdge: "rgba(34, 75, 75, 0.08)",
+    welcomeBackdrop: "radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.14), transparent 37%), rgba(255, 255, 255, 0.94)",
+    symbolEdge: "rgba(14, 102, 102, 0.1)", symbolInk: "#0e6666",
+    symbolFill: "linear-gradient(145deg, #e8f4f0, #f8fbf9 70%)",
+    orbitEdge: "rgba(14, 102, 102, 0.12)", orbitAccent: "rgba(233, 179, 90, 0.16)",
+    sparkEdge: "#ffffff", sparkFill: "#e9b35a", sparkShadow: "0 3px 10px rgba(141, 99, 28, 0.2)",
+    statusEdge: "rgba(53, 161, 118, 0.12)", statusInk: "#39765f", statusFill: "#eff8f3",
+    welcomeInk: "#1a3b3c", welcomeCopy: "var(--bb-color-muted)",
+    noteEdge: "rgba(34, 75, 75, 0.08)", noteFill: "rgba(255, 255, 255, 0.64)",
+    noteIconInk: "#9a6a19", noteIconFill: "#fff3d9", noteHeading: "#365b5c",
+    noteCopy: "var(--bb-color-muted)", footerEdge: "rgba(26, 67, 68, 0.07)",
+    footerInk: "var(--bb-color-muted)", footerFill: "rgba(255, 255, 255, 0.76)"
+  },
+  dark: {
+    topbarEdge: "var(--bb-color-outline)", topbarFill: "rgba(var(--v-theme-surface), 0.96)",
+    navInk: "#b6cbc5", brandInk: "#ffffff", brandShadow: "0 7px 18px rgba(14, 102, 102, 0.2)",
+    brandTagline: "#9cb1ac", alertFill: "#422f35",
+    mainBackdrop: "radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.07), transparent 30%), radial-gradient(ellipse at 92% 72%, rgba(113, 199, 190, 0.08), transparent 34%), var(--bb-color-background)",
+    eyebrowInk: "#9fc4bc", eyebrowSeparator: "#526968", heroInk: "#e5f0ec",
+    statusDot: "#35a176", statusHalo: "0 0 0 4px rgba(53, 161, 118, 0.12)",
+    welcomeEdge: "var(--bb-color-outline)",
+    welcomeBackdrop: "radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.08), transparent 37%), rgba(var(--v-theme-surface), 0.96)",
+    symbolEdge: "rgba(133, 202, 191, 0.18)", symbolInk: "#8bd2c8",
+    symbolFill: "linear-gradient(145deg, #203b39, var(--bb-color-surface) 70%)",
+    orbitEdge: "rgba(139, 210, 200, 0.18)", orbitAccent: "rgba(233, 179, 90, 0.24)",
+    sparkEdge: "#203b39", sparkFill: "#e9b35a", sparkShadow: "0 3px 10px rgba(141, 99, 28, 0.2)",
+    statusEdge: "rgba(107, 190, 147, 0.2)", statusInk: "#a6dfbd", statusFill: "#1c352b",
+    welcomeInk: "#e1eeea", welcomeCopy: "#a9bcb7",
+    noteEdge: "var(--bb-color-outline)", noteFill: "rgba(var(--v-theme-surface), 0.78)",
+    noteIconInk: "#e6bd72", noteIconFill: "#3a321f", noteHeading: "#d8e7e2",
+    noteCopy: "#a7bab5", footerEdge: "rgba(190, 221, 213, 0.1)",
+    footerInk: "#9aafaa", footerFill: "rgba(var(--v-theme-surface), 0.82)"
+  }
+} as const;
+
+export const shellTypography = {
+  brandName: "1.1rem", supporting: "0.82rem", eyebrow: "0.83rem",
+  heroTitle: "clamp(1.65rem, 2.5vw, 2.15rem)", heroTitlePhone: "clamp(1.65rem, 5vw, 2rem)",
+  heroCopy: "clamp(1rem, 1.5vw, 1.12rem)", welcomeTitle: "1.22rem",
+  welcomeCopy: "0.9rem", noteHeading: "0.84rem", alert: "0.9rem",
+  profileName: "1.08rem", profileRole: "0.8rem", profileGuest: "0.95rem",
+  profileTheme: "0.85rem", profilePortrait: "1.2rem", toastTitle: "0.85rem",
+  toastSmall: "0.8rem"
+} as const;
+
+// Presentational spacing/blur shared by the non-map application shell.
+// Keep viewport cutoffs, measured map clearances and 44/48px targets local.
+export const shellLayout = {
+  topbarBlur: "16px", heroGap: "clamp(2rem, 6vw, 5.5rem)",
+  heroGapPhone: "1.5rem", heroPadding: "1.5rem 2.5rem",
+  heroPaddingPhone: "1.1rem 1.5rem", welcomePadding: "clamp(1.5rem, 4vw, 2.5rem)",
+  notePadding: "1rem 1.2rem",
+  footerPadding: "0.75rem clamp(var(--bb-space-two, 1rem), 4vw, var(--bb-space-six, 3rem))"
+} as const;
+
+export const shellRadii = { brand: 15, symbol: 34, pill: 999, noteIcon: 12, focus: 2,
+  profileChip: 10.4, profileTheme: 12, toastAction: 11.2 } as const;
+
 export type DesignTheme = keyof typeof palettes;
 
 /** Vuetify and plain CSS derive from one palette; no second palette to drift. */
@@ -83,6 +153,9 @@ export function designTokenStylesheet(): string {
     `--bb-grid-unit: ${gridUnit}px`,
     ...Object.entries(spacing).map(([key, value]) => `--bb-space-${key}: ${value}px`),
     ...Object.entries(radii).map(([key, value]) => `--bb-radius-${key}: ${value}px`),
+    ...Object.entries(shellRadii).map(([key, value]) => `--bb-shell-radius-${key}: ${value}px`),
+    ...Object.entries(shellTypography).map(([key, value]) => `--bb-shell-font-${key}: ${value}`),
+    ...Object.entries(shellLayout).map(([key, value]) => `--bb-shell-layout-${key}: ${value}`),
     `--bb-font-family: ${typography.fontFamily}`,
     ...Object.entries(typography.sizes).map(([key, value]) => `--bb-font-${key}: ${value}`),
     ...Object.entries(typography.weights).map(([key, value]) => `--bb-weight-${key}: ${value}`),
@@ -90,6 +163,7 @@ export function designTokenStylesheet(): string {
   ];
   const colors = (theme: DesignTheme) => [
     ...Object.entries(palettes[theme]).map(([key, value]) => `--bb-color-${key}: ${value}`),
+    ...Object.entries(shellColors[theme]).map(([key, value]) => `--bb-shell-${key}: ${value}`),
     `--bb-shadow-surface: ${shadows[theme].surface}`,
     `--bb-shadow-overlay: ${shadows[theme].overlay}`,
     `--bb-shadow-hero: ${shadows[theme].hero}`,

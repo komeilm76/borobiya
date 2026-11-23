@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { shellTypography } from "./tokens";
 
 const src = fileURLToPath(new URL("../", import.meta.url));
 const read = (path: string) => readFileSync(join(src, path), "utf8");
@@ -10,8 +11,10 @@ const workspace = read("styles/tailwind.css");
 // Style/source checks only. Do not mount .vue components (docs/TASKS.md).
 describe("user/admin workspace typography", () => {
   it("caps real page headlines and keeps the shared placeholder in the same scale", () => {
-    expect(workspace).toContain("font-size: clamp(1.65rem, 2.5vw, 2.15rem)");
-    expect(workspace).toContain("font-size: clamp(1.65rem, 5vw, 2rem)");
+    expect(shellTypography.heroTitle).toBe("clamp(1.65rem, 2.5vw, 2.15rem)");
+    expect(shellTypography.heroTitlePhone).toBe("clamp(1.65rem, 5vw, 2rem)");
+    expect(workspace).toContain("font-size: var(--bb-shell-font-heroTitle);");
+    expect(workspace).toContain("font-size: var(--bb-shell-font-heroTitlePhone);");
     expect(workspace).not.toContain("max-width: 12ch");
     expect(workspace).not.toContain("letter-spacing: -0.045em");
     expect(read("views/_user/UserMissionView.vue")).toContain("clamp(1.65rem, 2.5vw, 2.2rem)");

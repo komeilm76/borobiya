@@ -15,7 +15,7 @@ function rule(source: string, selector: string): string {
 describe("floating map action shape", () => {
   it("uses the legend's rounded-square shape for user, mission and dispatch controls", () => {
     const shell = read("../styles/tailwind.css");
-    expect(rule(shell, ".app-shell--map")).toContain("--bb-map-action-radius: 1rem;");
+    expect(rule(shell, ".app-shell--map")).toContain("--bb-map-action-radius: var(--bb-radius-nested);");
     expect(rule(shell, ".app-shell--map :is(.sos-fab.sos-fab)")).toContain(`${radius});`);
     expect(rule(css("../App.vue"), ".app-general-share")).toContain(radius);
 

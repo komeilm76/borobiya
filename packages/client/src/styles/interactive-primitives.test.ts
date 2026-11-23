@@ -69,9 +69,14 @@ describe("cards, actions and fields across the app", () => {
 
   it("keeps small shell and auth copy legible on light surfaces without erasing dark overrides", () => {
     expect(contrast(palettes.light.muted, palettes.light.inset)).toBeGreaterThanOrEqual(4.5);
-    for (const selector of [".brand-tagline", ".hero-copy", ".welcome-copy", ".note-copy", ".note-version", ".app-footer"]) {
+    const shellForegrounds = {
+      ".brand-tagline": "brandTagline", ".hero-copy": null, ".welcome-copy": "welcomeCopy",
+      ".note-copy": "noteCopy", ".note-version": "noteCopy", ".app-footer": "footerInk"
+    } as const;
+    for (const [selector, role] of Object.entries(shellForegrounds)) {
+      const token = role ? `var(--bb-shell-${role})` : "var(--bb-color-muted)";
       expect(css.split(`${selector} {`).slice(1).some((block) =>
-        block.split("}")[0]!.includes("color: var(--bb-color-muted);")), selector).toBe(true);
+        block.split("}")[0]!.includes(`color: ${token};`)), selector).toBe(true);
     }
     for (const selector of [".auth-trust-row small", ".auth-divider", ".auth-switch-copy", ".auth-privacy-note",
       ".auth-form-intro", ".auth-success-state > p:not(.auth-eyebrow)"]) {

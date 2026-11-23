@@ -78,7 +78,8 @@ package or backend styles are included in this client visual audit.
 ## Batch status
 
 - **Batch 1 implementation:** Account/device settings colors now use theme-aware semantic tokens for supporting copy, error text, headings and row/card borders. The original light/dark computed colors were preserved in fixture-backed captures at 390/645/1007px; tests and build passed. See `review-artifacts/style-token-migration/batch-1/README.md` for evidence and limitations. A genuine signed-in after comparison and the user's go-ahead remain pending before Batch 2.
-- **Remaining scope:** The counts above are the baseline inventory, not a claim that all files have been migrated. Batch 1 changes one page, its settings component, and shared token definitions. The remaining batches below cover the rest of the app.
+- **Batch 2 implementation:** Shared chrome, placeholder/welcome surfaces and the global error alert now use light/dark `shellColors` and shared shell typography/layout/radii in `tokens.ts`; the account-profile menu and toast actions use the same type/radius configuration. The color-pinned baseline and new render of `/_user/settings` were pixel-identical in fixture-backed Chromium at 390/645/1007px (light and dark). See `review-artifacts/style-token-migration/batch-2/README.md`. Wait for approval before Batch 3.
+- **Remaining scope:** The counts above are the baseline inventory, not a claim that all files have been migrated. Batches 1–2 cover the device view and selected shared shell styles. Auth/public/sharing pages, mission/SOS/admin and map-heavy UI remain, along with deliberate follow-up for isolated shell spacing/type/effects that were not promoted to shared tokens. The user selected all *visual-design* values as the end goal; this is not yet complete.
 
 ## Prioritized migration batches
 

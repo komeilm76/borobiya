@@ -37,9 +37,9 @@ a {
 }
 
 .app-topbar {
-  border-bottom: 1px solid rgba(26, 67, 68, 0.08) !important;
-  background: rgba(255, 255, 255, 0.9) !important;
-  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--bb-shell-topbarEdge) !important;
+  background: var(--bb-shell-topbarFill) !important;
+  backdrop-filter: blur(var(--bb-shell-layout-topbarBlur));
 }
 
 .v-toolbar__content {
@@ -58,10 +58,10 @@ a {
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 15px;
-  color: #fff;
+  border-radius: var(--bb-shell-radius-brand);
+  color: var(--bb-shell-brandInk);
   background: var(--bb-color-brand, #0e6666);
-  box-shadow: 0 7px 18px rgba(14, 102, 102, 0.2);
+  box-shadow: var(--bb-shell-brandShadow);
 }
 
 .brand-copy {
@@ -70,15 +70,15 @@ a {
 }
 
 .brand-name {
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-size: var(--bb-shell-font-brandName);
+  font-weight: var(--bb-weight-heavy);
   line-height: 1.15;
 }
 
 .brand-tagline {
-  color: var(--bb-color-muted);
-  font-size: 0.82rem;
-  font-weight: 500;
+  color: var(--bb-shell-brandTagline);
+  font-size: var(--bb-shell-font-supporting);
+  font-weight: var(--bb-weight-medium);
 }
 
 .top-nav {
@@ -91,8 +91,8 @@ a {
 .top-nav__sections { max-height: min(70dvh, 30rem); overflow-y: auto; overscroll-behavior: contain; }
 
 .nav-button {
-  color: #527071 !important;
-  font-weight: 600;
+  color: var(--bb-shell-navInk) !important;
+  font-weight: var(--bb-weight-semibold);
 }
 
 .login-button {
@@ -159,10 +159,10 @@ a {
    alerts an opaque surface, readable body ink and a distinct semantic edge. */
 :is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error {
   color: var(--bb-color-text) !important;
-  background: #fff0ee;
+  background: var(--bb-shell-alertFill);
   border: 1px solid rgb(var(--v-theme-error));
   border-inline-start-width: 4px;
-  font-size: 0.9rem;
+  font-size: var(--bb-shell-font-alert);
   line-height: 1.7;
   overflow-wrap: anywhere;
 }
@@ -173,7 +173,7 @@ a {
   color: rgb(var(--v-theme-error));
 }
 :root.dark :is(.app-shell, .v-overlay-container) .v-alert.v-alert--variant-tonal.text-error {
-  background: #422f35;
+  background: var(--bb-shell-alertFill);
 }
 @media (forced-colors: active) {
   :is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not(.v-field--focused):not(.v-field--error):not(.v-field--disabled) .v-field__outline {
@@ -191,10 +191,7 @@ a {
 
 .app-main {
   min-height: calc(100vh - 120px);
-  background:
-    radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.12), transparent 30%),
-    radial-gradient(ellipse at 92% 72%, rgba(14, 102, 102, 0.08), transparent 34%),
-    var(--bb-color-background, #f4f7f6);
+  background: var(--bb-shell-mainBackdrop);
 }
 
 /* Opt in only top-level surfaces. Vuetify elevation-0 is !important; don't flatten dialogs or rows. */
@@ -234,8 +231,8 @@ a {
   display: grid;
   grid-template-columns: minmax(0, 1.12fr) minmax(300px, 0.88fr);
   align-items: center;
-  gap: clamp(2rem, 6vw, 5.5rem);
-  padding-block: 1.5rem 2.5rem;
+  gap: var(--bb-shell-layout-heroGap);
+  padding-block: var(--bb-shell-layout-heroPadding);
 }
 
 .hero-copy-block {
@@ -246,9 +243,9 @@ a {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  color: #537879;
-  font-size: 0.83rem;
-  font-weight: 700;
+  color: var(--bb-shell-eyebrowInk);
+  font-size: var(--bb-shell-font-eyebrow);
+  font-weight: var(--bb-weight-bold);
   letter-spacing: 0.01em;
 }
 
@@ -258,20 +255,20 @@ a {
   height: 8px;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: #35a176;
-  box-shadow: 0 0 0 4px rgba(53, 161, 118, 0.12);
+  background: var(--bb-shell-statusDot);
+  box-shadow: var(--bb-shell-statusHalo);
 }
 
 .eyebrow-separator {
-  color: #bdc9c7;
+  color: var(--bb-shell-eyebrowSeparator);
 }
 
 .hero-title {
   max-width: 100%;
   margin: 1.25rem 0 0.85rem;
-  color: #173b3c;
-  font-size: clamp(1.65rem, 2.5vw, 2.15rem);
-  font-weight: 800;
+  color: var(--bb-shell-heroInk);
+  font-size: var(--bb-shell-font-heroTitle);
+  font-weight: var(--bb-weight-heavy);
   line-height: 1.45;
 }
 
@@ -279,7 +276,7 @@ a {
   max-width: 42rem;
   margin: 0;
   color: var(--bb-color-muted);
-  font-size: clamp(1rem, 1.5vw, 1.12rem);
+  font-size: var(--bb-shell-font-heroCopy);
   line-height: 2;
 }
 
@@ -292,15 +289,13 @@ a {
 
 .welcome-card {
   overflow: hidden;
-  border: 1px solid rgba(34, 75, 75, 0.08);
-  background:
-    radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.14), transparent 37%),
-    rgba(255, 255, 255, 0.94) !important;
+  border: 1px solid var(--bb-shell-welcomeEdge);
+  background: var(--bb-shell-welcomeBackdrop) !important;
   box-shadow: var(--bb-shadow-feature) !important;
 }
 
 .welcome-card-content {
-  padding: clamp(1.5rem, 4vw, 2.5rem) !important;
+  padding: var(--bb-shell-layout-welcomePadding) !important;
   text-align: center;
 }
 
@@ -311,10 +306,10 @@ a {
   height: 112px;
   margin: 0 auto 1.4rem;
   place-items: center;
-  border: 1px solid rgba(14, 102, 102, 0.1);
-  border-radius: 34px;
-  color: #0e6666;
-  background: linear-gradient(145deg, #e8f4f0, #f8fbf9 70%);
+  border: 1px solid var(--bb-shell-symbolEdge);
+  border-radius: var(--bb-shell-radius-symbol);
+  color: var(--bb-shell-symbolInk);
+  background: var(--bb-shell-symbolFill);
   transform: rotate(-4deg);
 }
 
@@ -324,7 +319,7 @@ a {
 
 .symbol-orbit {
   position: absolute;
-  border: 1px solid rgba(14, 102, 102, 0.12);
+  border: 1px solid var(--bb-shell-orbitEdge);
   border-radius: 50%;
 }
 
@@ -334,7 +329,7 @@ a {
 
 .orbit-two {
   inset: -22px;
-  border-color: rgba(233, 179, 90, 0.16);
+  border-color: var(--bb-shell-orbitAccent);
 }
 
 .symbol-spark {
@@ -343,10 +338,10 @@ a {
   inset-inline-start: 7px;
   width: 12px;
   height: 12px;
-  border: 3px solid #fff;
+  border: 3px solid var(--bb-shell-sparkEdge);
   border-radius: 50%;
-  background: #e9b35a;
-  box-shadow: 0 3px 10px rgba(141, 99, 28, 0.2);
+  background: var(--bb-shell-sparkFill);
+  box-shadow: var(--bb-shell-sparkShadow);
 }
 
 .status-label {
@@ -354,12 +349,12 @@ a {
   align-items: center;
   gap: 0.6rem;
   padding: 0.45rem 0.8rem;
-  border: 1px solid rgba(53, 161, 118, 0.12);
-  border-radius: 999px;
-  color: #39765f;
-  background: #eff8f3;
-  font-size: 0.82rem;
-  font-weight: 700;
+  border: 1px solid var(--bb-shell-statusEdge);
+  border-radius: var(--bb-shell-radius-pill);
+  color: var(--bb-shell-statusInk);
+  background: var(--bb-shell-statusFill);
+  font-size: var(--bb-shell-font-supporting);
+  font-weight: var(--bb-weight-bold);
 }
 
 .status-label .status-dot {
@@ -370,16 +365,16 @@ a {
 
 .welcome-title {
   margin: 1.1rem 0 0.6rem;
-  color: #1a3b3c;
-  font-size: 1.22rem;
-  font-weight: 800;
+  color: var(--bb-shell-welcomeInk);
+  font-size: var(--bb-shell-font-welcomeTitle);
+  font-weight: var(--bb-weight-heavy);
   line-height: 1.6;
 }
 
 .welcome-copy {
   margin: 0 auto 1.4rem;
-  color: var(--bb-color-muted);
-  font-size: 0.9rem;
+  color: var(--bb-shell-welcomeCopy);
+  font-size: var(--bb-shell-font-welcomeCopy);
   line-height: 1.9;
 }
 
@@ -388,10 +383,10 @@ a {
   align-items: center;
   gap: 0.85rem;
   margin-block: 1rem 2rem;
-  padding: 1rem 1.2rem;
-  border: 1px solid rgba(34, 75, 75, 0.08);
+  padding: var(--bb-shell-layout-notePadding);
+  border: 1px solid var(--bb-shell-noteEdge);
   border-radius: var(--bb-radius-nested, 16px);
-  background: rgba(255, 255, 255, 0.64);
+  background: var(--bb-shell-noteFill);
 }
 
 .note-icon {
@@ -400,9 +395,9 @@ a {
   height: 38px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 12px;
-  color: #9a6a19;
-  background: #fff3d9;
+  border-radius: var(--bb-shell-radius-noteIcon);
+  color: var(--bb-shell-noteIconInk);
+  background: var(--bb-shell-noteIconFill);
 }
 
 .skeleton-note strong,
@@ -411,22 +406,22 @@ a {
 }
 
 .skeleton-note strong {
-  color: #365b5c;
-  font-size: 0.84rem;
-  font-weight: 800;
+  color: var(--bb-shell-noteHeading);
+  font-size: var(--bb-shell-font-noteHeading);
+  font-weight: var(--bb-weight-heavy);
 }
 
 .note-copy {
   margin-top: 0.2rem;
-  color: var(--bb-color-muted);
-  font-size: 0.82rem;
+  color: var(--bb-shell-noteCopy);
+  font-size: var(--bb-shell-font-supporting);
 }
 
 .note-version {
   margin-inline-start: auto;
-  color: var(--bb-color-muted);
+  color: var(--bb-shell-noteCopy);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.82rem;
+  font-size: var(--bb-shell-font-supporting);
 }
 
 .app-footer {
@@ -435,11 +430,11 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: var(--bb-space-two, 16px);
-  padding: 0.75rem clamp(var(--bb-space-two, 1rem), 4vw, var(--bb-space-six, 3rem));
-  border-top: 1px solid rgba(26, 67, 68, 0.07);
-  color: var(--bb-color-muted);
-  background: rgba(255, 255, 255, 0.76);
-  font-size: 0.82rem;
+  padding: var(--bb-shell-layout-footerPadding);
+  border-top: 1px solid var(--bb-shell-footerEdge);
+  color: var(--bb-shell-footerInk);
+  background: var(--bb-shell-footerFill);
+  font-size: var(--bb-shell-font-supporting);
 }
 
 .osm-attribution {
@@ -456,7 +451,7 @@ a {
 }
 
 .osm-attribution:focus-visible {
-  border-radius: 2px;
+  border-radius: var(--bb-shell-radius-focus);
   outline: 2px solid currentColor;
   outline-offset: 3px;
 }
@@ -482,8 +477,8 @@ a {
 @media (max-width: 760px) {
   .hero-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 1.5rem;
-    padding-block: 1.1rem 1.5rem;
+    gap: var(--bb-shell-layout-heroGapPhone);
+    padding-block: var(--bb-shell-layout-heroPaddingPhone);
   }
 
   .hero-copy-block {
@@ -492,7 +487,7 @@ a {
 
   .hero-title {
     max-width: 100%;
-    font-size: clamp(1.65rem, 5vw, 2rem);
+    font-size: var(--bb-shell-font-heroTitlePhone);
   }
 
   .welcome-card {
@@ -531,7 +526,7 @@ a {
 /* Fullscreen map workspaces own the viewport. The menu launcher and drawer
  * replace (rather than overlay) the shared app bar. Match the legend's
  * rounded-square action shape without changing buttons on other pages. */
-.app-shell--map { min-height: 100dvh; --bb-map-action-radius: 1rem; }
+.app-shell--map { min-height: 100dvh; --bb-map-action-radius: var(--bb-radius-nested); }
 .app-shell--map :is(.sos-fab.sos-fab) { border-radius: var(--bb-map-action-radius); }
 .app-shell--map .app-main {
   min-height: 100dvh;
@@ -666,8 +661,8 @@ a {
 }
 
 :root.dark .app-topbar {
-  border-bottom-color: var(--bb-color-outline) !important;
-  background: rgba(var(--v-theme-surface), 0.96) !important;
+  border-bottom-color: var(--bb-shell-topbarEdge) !important;
+  background: var(--bb-shell-topbarFill) !important;
 }
 
 :root.dark .brand-link {
@@ -675,92 +670,87 @@ a {
 }
 
 :root.dark .brand-tagline {
-  color: #9cb1ac;
+  color: var(--bb-shell-brandTagline);
 }
 
 :root.dark .nav-button {
-  color: #b6cbc5 !important;
+  color: var(--bb-shell-navInk) !important;
 }
 
 :root.dark .app-main {
-  color: #edf5f2;
-  background:
-    radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.07), transparent 30%),
-    radial-gradient(ellipse at 92% 72%, rgba(113, 199, 190, 0.08), transparent 34%),
-    var(--bb-color-background, #111c1d);
+  color: var(--bb-color-text);
+  background: var(--bb-shell-mainBackdrop);
 }
 
 :root.dark .eyebrow {
-  color: #9fc4bc;
+  color: var(--bb-shell-eyebrowInk);
 }
 
 :root.dark .eyebrow-separator {
-  color: #526968;
+  color: var(--bb-shell-eyebrowSeparator);
 }
 
 :root.dark .hero-title {
-  color: #e5f0ec;
+  color: var(--bb-shell-heroInk);
 }
 
 :root.dark .hero-copy {
-  color: #afc1bc;
+  color: var(--bb-color-muted);
 }
 
 :root.dark .welcome-card {
-  border-color: var(--bb-color-outline);
-  background:
-    radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.08), transparent 37%),
-    rgba(var(--v-theme-surface), 0.96) !important;
+  border-color: var(--bb-shell-welcomeEdge);
+  background: var(--bb-shell-welcomeBackdrop) !important;
 }
 
 :root.dark .welcome-symbol {
-  border-color: rgba(133, 202, 191, 0.18);
-  color: #8bd2c8;
-  background: linear-gradient(145deg, #203b39, var(--bb-color-surface) 70%);
+  border-color: var(--bb-shell-symbolEdge);
+  color: var(--bb-shell-symbolInk);
+  background: var(--bb-shell-symbolFill);
 }
 
 :root.dark .symbol-orbit {
-  border-color: rgba(139, 210, 200, 0.18);
+  border-color: var(--bb-shell-orbitEdge);
 }
 
 :root.dark .orbit-two {
-  border-color: rgba(233, 179, 90, 0.24);
+  border-color: var(--bb-shell-orbitAccent);
 }
 
 :root.dark .symbol-spark {
-  border-color: #203b39;
+  border-color: var(--bb-shell-sparkEdge);
 }
 
 :root.dark .status-label {
-  border-color: rgba(107, 190, 147, 0.2);
-  color: #a6dfbd;
-  background: #1c352b;
+  border-color: var(--bb-shell-statusEdge);
+  color: var(--bb-shell-statusInk);
+  background: var(--bb-shell-statusFill);
 }
 
 :root.dark .welcome-title {
-  color: #e1eeea;
+  color: var(--bb-shell-welcomeInk);
 }
 
 :root.dark .welcome-copy {
-  color: #a9bcb7;
+  color: var(--bb-shell-welcomeCopy);
 }
 
 :root.dark .skeleton-note {
-  border-color: var(--bb-color-outline);
-  background: rgba(var(--v-theme-surface), 0.78);
+  border-color: var(--bb-shell-noteEdge);
+  background: var(--bb-shell-noteFill);
 }
 
 :root.dark .note-icon {
-  color: #e6bd72;
-  background: #3a321f;
+  color: var(--bb-shell-noteIconInk);
+  background: var(--bb-shell-noteIconFill);
 }
 
 :root.dark .skeleton-note strong {
-  color: #d8e7e2;
+  color: var(--bb-shell-noteHeading);
 }
 
 :root.dark .note-copy {
-  color: #a7bab5;
+  color: var(--bb-shell-noteCopy);
 }
 
 :root.dark .note-version {
@@ -772,7 +762,7 @@ a {
 }
 
 :root.dark .app-footer {
-  border-top-color: rgba(190, 221, 213, 0.1);
-  color: #9aafaa;
-  background: rgba(var(--v-theme-surface), 0.82);
+  border-top-color: var(--bb-shell-footerEdge);
+  color: var(--bb-shell-footerInk);
+  background: var(--bb-shell-footerFill);
 }
