@@ -56,6 +56,15 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
     expect(panel).toContain('v-if="!row.isCurrent"');
   });
 
+  it("keeps dark session labels and error feedback readable on their inset and card surfaces", () => {
+    for (const background of [palettes.dark.surface, palettes.dark.inset]) {
+      expect(contrast(palettes.dark.muted, background), `muted on ${background}`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(palettes.dark.text, palettes.dark.inset)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("#ffb4ab", palettes.dark.surface)).toBeGreaterThanOrEqual(4.5);
+    expect(panel).toContain(":global(:root.dark .device-priority__hint--error) { color: #ffb4ab; }");
+  });
+
   it("preserves dark-theme overrides for the same labels", () => {
     for (const selector of [
       ".device-priority__kicker", ".device-priority__hint", ".device-priority__meta", ".device-priority__icon"
