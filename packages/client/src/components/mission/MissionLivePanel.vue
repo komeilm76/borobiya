@@ -367,9 +367,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .live-panel { margin-block: 22px; container-type: inline-size; border: 1px solid var(--bb-rescue-livePanelEdge); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: var(--bb-shadow-surface); }
 .live-panel__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
-.live-panel__heading h3 { font-size: 1.15rem; margin: 6px 0 2px; }
-.live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }
-.live-panel__eyebrow { font-size: 0.82rem; color: rgb(var(--v-theme-primary)); font-weight: 750; }
+.live-panel__heading h3 { font-size: var(--bb-rescue-font-section); margin: 6px 0 2px; }
+.live-panel__heading p,.live-panel__note { font-size: var(--bb-rescue-font-tiny); opacity: .75; line-height: var(--bb-rescue-leading-timeline); }
+.live-panel__eyebrow { font-size: var(--bb-rescue-font-caption); color: rgb(var(--v-theme-primary)); font-weight: var(--bb-rescue-weight-emphasized); }
 .live-panel__grid { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(230px,.6fr); gap: 18px; }
 .live-panel__map-area { min-width: 0; }
 .live-panel__map { position: relative; min-height: 20rem; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; }
@@ -381,7 +381,7 @@ onBeforeUnmount(() => {
   background: var(--bb-rescue-membersFill); box-shadow: var(--bb-shadow-overlay); }
 .live-panel__room-heading { display: flex; align-items: center; gap: .5rem; flex: none;
   padding-bottom: .25rem; border-bottom: 1px solid var(--bb-color-outline); }
-.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem; font-weight: 800; }
+.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: var(--bb-rescue-font-regular); font-weight: var(--bb-rescue-weight-strong); }
 .live-panel__room-heading :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 .live-panel__member-list { list-style: none; margin: 0; padding: 0; min-height: 0; max-height: min(13rem, 35dvh);
   overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
@@ -395,7 +395,7 @@ onBeforeUnmount(() => {
 .live-panel__member:disabled { cursor: default; opacity: .72; }
 .live-panel__member-copy { display: grid; gap: 1px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .live-panel__member strong { font-size: .875rem; line-height: 1.4; }
-.live-panel__member small { font-size: .82rem; line-height: 1.4; color: var(--bb-color-muted); }
+.live-panel__member small { font-size: var(--bb-rescue-font-caption); line-height: 1.4; color: var(--bb-color-muted); }
 .live-panel__avatar { position: relative; display: grid; place-items: center; flex: none; width: 36px; height: 36px;
   border-radius: 50%; background: var(--bb-rescue-avatarDefaultFill); color: rgb(var(--v-theme-primary)); }
 .live-panel__avatar.requester { background: var(--bb-rescue-avatarRequesterFill); color: var(--bb-rescue-avatarRequesterInk); }
@@ -406,8 +406,8 @@ onBeforeUnmount(() => {
 .live-panel__avatar i.live-panel__avatar-status--fresh { background: rgb(var(--v-theme-success)); }
 .live-panel__member > .v-icon { flex: none; color: rgb(var(--v-theme-primary)); }
 .live-panel__privacy { margin-top: .65rem; padding: .65rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-nested, 16px); }
-.live-panel__privacy summary { min-height: 44px; display: flex; align-items: center; font-weight: 700; cursor: pointer; }
-.live-panel__privacy p { font-size: .8rem; line-height: 1.6; }
+.live-panel__privacy summary { min-height: 44px; display: flex; align-items: center; font-weight: var(--bb-rescue-weight-medium); cursor: pointer; }
+.live-panel__privacy p { font-size: var(--bb-rescue-font-tiny); line-height: 1.6; }
 .live-panel__room-alert { position: absolute; z-index: 7; inset: calc(.5rem + env(safe-area-inset-top, 0px)) 1rem auto; max-width: 25rem; pointer-events: auto; }
 @container (min-width: 721px) { .live-panel--routing .live-panel__map { position: sticky; top: 16px; z-index: 1; } }
 @container (max-width: 720px) { .live-panel__grid { grid-template-columns: minmax(0,1fr); } }

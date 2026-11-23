@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+import { rescueType } from "@/styles/tokens";
 
 // Source/compiled contracts only; docs/TASKS.md prohibits mounting Vue SFCs in unit tests.
 const sources = {
@@ -46,8 +47,10 @@ describe("Mission tab uses Travel's map-card hierarchy", () => {
   it("gives stage actions and the map key the same readable type and single-surface separation", () => {
     expect(styles.trip).toContain('.point-route__actions { position: sticky; bottom: 0;');
     expect(rule(styles.progress, '.mission-desk__next-step')).toContain('border-top: 1px solid var(--bb-color-outline);');
-    expect(styles.progress).toContain('.mission-desk__phase-heading strong { font-size: 1rem;');
-    expect(styles.progress).toContain('color: var(--bb-color-muted); font-size: .82rem;');
+    expect(styles.progress).toContain('.mission-desk__phase-heading strong { font-size: var(--bb-rescue-font-regular);');
+    expect(styles.progress).toContain('color: var(--bb-color-muted); font-size: var(--bb-rescue-font-caption);');
+    expect(rescueType.sizes.regular).toBe('1rem');
+    expect(rescueType.sizes.caption).toBe('0.82rem');
     expect(styles.mission).toContain('.mission-desk__map-cards :deep(.mission-map-cards) {\n  border: 0; border-radius: 0; background: transparent; box-shadow: none;');
     expect(styles.mission).toContain('.mission-desk__map-legend h2 { margin: 0 0 .25rem; font-size: 1rem;');
     expect(styles.mission).toContain('.mission-desk__map-legend :deep(.bb-point-key) { display: flex; flex-wrap: wrap;');
@@ -72,7 +75,7 @@ describe("Mission tab uses Travel's map-card hierarchy", () => {
   });
 
   it("retains compact team scrolling and makes idle offers one light/dark-safe map surface", () => {
-    expect(styles.members).toContain('.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: 1rem;');
+    expect(styles.members).toContain('.live-panel__room-heading h2 { flex: 1; min-width: 0; margin: 0; font-size: var(--bb-rescue-font-regular);');
     expect(styles.members).toContain('.live-panel__member-list { list-style: none;');
     expect(styles.members).toContain('overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable;');
     expect(sources.members).toContain('@click="focusMember(member.role)"');

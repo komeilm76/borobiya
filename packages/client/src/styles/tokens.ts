@@ -702,6 +702,23 @@ export const rescueColors = {
   }
 } as const;
 
+// Legible rescue-flow type roles. Responsive history titles are separate because
+// the two page headings have different optical caps; stage/touch geometry stays
+// local to each component. Numeric values preserve the pre-migration rendering.
+export const rescueType = {
+  sizes: {
+    tiny: "0.8rem", caption: "0.82rem", supporting: "0.85rem",
+    body: "0.9rem", regular: "1rem", sosTitle: "1.1rem",
+    section: "1.15rem", requesterHero: "clamp(1.55rem,2.5vw,2.2rem)",
+    rescuerHero: "clamp(1.55rem,2.5vw,2.15rem)",
+    caseTitle: "clamp(1.15rem,2vw,1.45rem)",
+    savedStars: "1.65rem", choiceStars: "2rem"
+  },
+  weights: { medium: 700, emphasized: 750, strong: 800, display: 850 },
+  leading: { heroTitle: 1.25, caption: 1.35, notice: 1.55, timeline: 1.7, description: 1.8, heroCopy: 1.9 },
+  tracking: { historyStars: "2px", ratingStars: "3px" }
+} as const;
+
 export const audienceContentType = {
   sizes: {
     tiny: "0.8rem", caption: "0.82rem", supporting: "0.84rem",
@@ -756,6 +773,10 @@ export function designTokenStylesheet(): string {
     ...Object.entries(audienceContentType.sizes).map(([key, value]) => `--bb-content-font-${key}: ${value}`),
     ...Object.entries(audienceContentType.weights).map(([key, value]) => `--bb-content-weight-${key}: ${value}`),
     ...Object.entries(audienceContentType.leading).map(([key, value]) => `--bb-content-leading-${key}: ${value}`),
+    ...Object.entries(rescueType.sizes).map(([key, value]) => `--bb-rescue-font-${key}: ${value}`),
+    ...Object.entries(rescueType.weights).map(([key, value]) => `--bb-rescue-weight-${key}: ${value}`),
+    ...Object.entries(rescueType.leading).map(([key, value]) => `--bb-rescue-leading-${key}: ${value}`),
+    ...Object.entries(rescueType.tracking).map(([key, value]) => `--bb-rescue-tracking-${key}: ${value}`),
     ...Object.entries(sharingTypography).map(([key, value]) => `--bb-sharing-font-${key}: ${value}`),
     ...Object.entries(shellTypography).map(([key, value]) => `--bb-shell-font-${key}: ${value}`),
     ...Object.entries(shellLayout).map(([key, value]) => `--bb-shell-layout-${key}: ${value}`),

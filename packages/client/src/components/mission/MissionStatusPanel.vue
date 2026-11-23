@@ -21,6 +21,6 @@ const emit = defineEmits<{ close: [] }>();
 .mission-desk__card-header { display: flex; flex: none; align-items: center; justify-content: space-between; gap: .5rem;
   margin: -.75rem -.75rem .35rem; padding: .25rem .75rem;
   border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); background: rgb(var(--v-theme-surface)); }
-.mission-desk__card-header h2 { margin: 0; font-size: 1rem; line-height: 1.5; font-weight: 800; }
+.mission-desk__card-header h2 { margin: 0; font-size: var(--bb-rescue-font-regular); line-height: 1.5; font-weight: var(--bb-rescue-weight-strong); }
 .mission-desk__card-header :deep(.v-btn) { flex: none; width: 44px; min-width: 44px; height: 44px; }
 </style>

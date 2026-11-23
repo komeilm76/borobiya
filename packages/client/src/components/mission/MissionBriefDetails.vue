@@ -212,13 +212,13 @@ onBeforeUnmount(clear);
 <style scoped>
 .mission-brief { flex: 0 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
 .mission-brief__body { display: grid; gap: .3rem; min-width: 0; font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
-.mission-brief__body span { color: var(--bb-color-muted); font-size: .82rem; font-weight: 700; }
-.mission-brief__body strong { font-weight: 750; }
+.mission-brief__body span { color: var(--bb-color-muted); font-size: var(--bb-rescue-font-caption); font-weight: var(--bb-rescue-weight-medium); }
+.mission-brief__body strong { font-weight: var(--bb-rescue-weight-emphasized); }
 .mission-brief__notice { margin: .35rem 0; }
 .mission-brief__overview { display: grid; gap: .45rem; }
 .mission-brief__identity { display: flex; align-items: center; gap: .6rem; min-width: 0; }
 .mission-brief__identity > div { display: grid; gap: 1px; min-width: 0; }
-.mission-brief__identity strong { font-size: 1rem; overflow-wrap: anywhere; }
+.mission-brief__identity strong { font-size: var(--bb-rescue-font-regular); overflow-wrap: anywhere; }
 .mission-brief__incident-icon { display: grid; place-items: center; flex: none; width: 36px; height: 36px;
   border-radius: 12px; background: rgba(var(--v-theme-error), .12); color: rgb(var(--v-theme-error)) !important; }
 /* Like Travel's A-to-B rail, the incident address is part of the surface,
@@ -258,7 +258,7 @@ onBeforeUnmount(clear);
   color: rgb(var(--v-theme-on-surface)); }
 .mission-brief__details { min-width: 0; border-top: 1px solid var(--bb-color-outline); }
 .mission-brief__details summary { display: flex; align-items: center; gap: .3rem; cursor: pointer; min-height: 44px;
-  color: rgb(var(--v-theme-primary)); font-weight: 800; }
+  color: rgb(var(--v-theme-primary)); font-weight: var(--bb-rescue-weight-strong); }
 .mission-brief__details summary :deep(.v-icon) { margin-inline-start: auto; transition: transform .2s; }
 .mission-brief__details[open] summary :deep(.v-icon) { transform: rotate(180deg); }
 .mission-brief__details summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
@@ -269,7 +269,7 @@ onBeforeUnmount(clear);
   display: flex; flex-direction: column; overflow: hidden; color: rgb(var(--v-theme-on-surface)); }
 .mission-brief__viewer-header { display: flex; align-items: center; justify-content: space-between; flex: none;
   min-height: 52px; padding: .25rem .75rem; border-bottom: 1px solid var(--bb-color-outline); }
-.mission-brief__viewer-header h2 { margin: 0; font-size: 1rem; }
+.mission-brief__viewer-header h2 { margin: 0; font-size: var(--bb-rescue-font-regular); }
 .mission-brief__viewer-header :deep(.v-btn) { width: 44px; min-width: 44px; height: 44px; }
 .mission-brief__viewer-content { display: grid; place-items: center; min-height: 0; overflow: auto;
   padding: .65rem; background: var(--bb-color-inset); }

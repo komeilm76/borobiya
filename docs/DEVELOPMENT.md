@@ -303,9 +303,12 @@ roles. `audienceContentWidths`, `audienceIconSizes` and
 `audienceContentOptics` configure reading measures, decorative symbol sizes
 and underline/diagram detail. `rescueColors.light/dark` emits `--bb-rescue-*`
 for the two user history pages and SOS/mission presentation paint (hero/row,
-emergency states, member identities, timeline and rating). This is a bounded
-paint pass, not a complete migration of the map-first mission workspace or
-remaining visual values; see the Batch 4a review in the migration plan. The
+emergency states, member identities, timeline and rating). `rescueType` emits
+`--bb-rescue-font-*`, `--bb-rescue-weight-*`, `--bb-rescue-leading-*` and
+`--bb-rescue-tracking-*` for selected history/SOS and mission-panel text.
+These are bounded paint/type passes, not a complete migration of the map-first
+mission workspace or remaining visual values; see the Batch 4a–4b reviews in
+the migration plan. The
 32px hero radius is `radii.hero`; the guest badge corners use
 `audienceDetailRadii`. Functional touch targets,
 responsive breakpoints, zero/auto resets, scroll constraints and compositional

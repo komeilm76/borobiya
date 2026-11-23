@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { shellTypography } from "./tokens";
+import { rescueType, shellTypography } from "./tokens";
 
 const src = fileURLToPath(new URL("../", import.meta.url));
 const read = (path: string) => readFileSync(join(src, path), "utf8");
@@ -18,8 +18,10 @@ describe("user/admin workspace typography", () => {
     expect(workspace).not.toContain("max-width: 12ch");
     expect(workspace).not.toContain("letter-spacing: -0.045em");
     expect(read("views/_user/UserMissionView.vue")).toContain("clamp(1.65rem, 2.5vw, 2.2rem)");
-    expect(read("views/_user/UserRescuerHistoryView.vue")).toContain("clamp(1.55rem,2.5vw,2.15rem)");
-    expect(read("views/_user/UserSosHistoryView.vue")).toContain("clamp(1.55rem,2.5vw,2.2rem)");
+    expect(read("views/_user/UserRescuerHistoryView.vue")).toContain("font-size: var(--bb-rescue-font-rescuerHero)");
+    expect(read("views/_user/UserSosHistoryView.vue")).toContain("font-size: var(--bb-rescue-font-requesterHero)");
+    expect(rescueType.sizes.rescuerHero).toBe("clamp(1.55rem,2.5vw,2.15rem)");
+    expect(rescueType.sizes.requesterHero).toBe("clamp(1.55rem,2.5vw,2.2rem)");
     const users = read("views/_admin/AdminUsersView.vue");
     expect(users).toContain("clamp(1.5rem, 2.3vw, 1.95rem)");
     expect(users).not.toContain("letter-spacing: -0.035em");

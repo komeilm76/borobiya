@@ -83,7 +83,7 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
 .mission-desk__next-step { display: grid; gap: .35rem; min-width: 0;
   padding-top: .45rem; border-top: 1px solid var(--bb-color-outline); }
-.mission-desk__next-step > span { color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
+.mission-desk__next-step > span { color: rgb(var(--v-theme-primary)); font-size: var(--bb-rescue-font-caption); font-weight: var(--bb-rescue-weight-strong); }
 .mission-desk__next-step :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
 .mission-desk__next-step :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-map-cards__notice { margin: 0; font-size: .875rem; line-height: 1.5; color: rgb(var(--v-theme-on-surface)); }
@@ -93,8 +93,8 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
 .mission-desk__phase-summary { min-width: 0; }
 .mission-desk__phase-heading { display: flex; align-items: center; gap: .3rem; }
 .mission-desk__phase-copy { display: grid; flex: 1 1 auto; min-width: 0; gap: 1px; }
-.mission-desk__phase-heading strong { font-size: 1rem; line-height: 1.35; }
-.mission-desk__phase-heading span { color: var(--bb-color-muted); font-size: .82rem; font-weight: 700; overflow-wrap: anywhere; }
+.mission-desk__phase-heading strong { font-size: var(--bb-rescue-font-regular); line-height: var(--bb-rescue-leading-caption); }
+.mission-desk__phase-heading span { color: var(--bb-color-muted); font-size: var(--bb-rescue-font-caption); font-weight: var(--bb-rescue-weight-medium); overflow-wrap: anywhere; }
 /* At phone widths keep stage/status legible instead of squeezing it between
    four touch targets; team and route stay adjacent on the second row. */
 @media (max-width: 420px) {
@@ -109,13 +109,13 @@ watch(() => props.desk.activeMission.value?.id, () => { expanded.value = false; 
   align-items: center; gap: .35rem; min-width: 0; min-height: 29px; padding: 2px 4px;
   border-radius: 9px; color: var(--bb-color-muted); font-size: .875rem; line-height: 1.4; }
 .mission-desk__phase-marker { display: grid; width: 21px; height: 21px; place-items: center;
-  border-radius: 50%; color: var(--bb-color-muted); background: var(--bb-color-inset); font-size: .8rem; font-weight: 800; }
-.mission-desk__phase-step--passed { color: rgb(var(--v-theme-primary)); font-weight: 700; }
+  border-radius: 50%; color: var(--bb-color-muted); background: var(--bb-color-inset); font-size: var(--bb-rescue-font-tiny); font-weight: var(--bb-rescue-weight-strong); }
+.mission-desk__phase-step--passed { color: rgb(var(--v-theme-primary)); font-weight: var(--bb-rescue-weight-medium); }
 .mission-desk__phase-step--passed .mission-desk__phase-marker { color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
-.mission-desk__phase-step--current { color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); font-weight: 800; }
+.mission-desk__phase-step--current { color: rgb(var(--v-theme-on-surface)); background: var(--bb-color-inset); font-weight: var(--bb-rescue-weight-strong); }
 .mission-desk__phase-step--current .mission-desk__phase-marker { color: rgb(var(--v-theme-primary)); box-shadow: inset 0 0 0 2px rgb(var(--v-theme-primary)); }
 .mission-desk__phase-label { min-width: 0; overflow-wrap: anywhere; }
-.mission-desk__phase-now { color: rgb(var(--v-theme-primary)); font-size: .8rem; font-weight: 800; }
+.mission-desk__phase-now { color: rgb(var(--v-theme-primary)); font-size: var(--bb-rescue-font-tiny); font-weight: var(--bb-rescue-weight-strong); }
 .mission-map-cards__more { flex: none; min-width: 44px; min-height: 44px; }
 @media (max-width: 599px) and (max-height: 560px) {
   /* Keep the manual, server-guarded action in reach while the single card

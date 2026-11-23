@@ -164,13 +164,13 @@ watch(trace, () => draw());
 
 <style scoped>
 .mission-trace { margin: 1rem 0; padding: 1rem; border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); }
-.mission-trace summary { min-height: 44px; cursor: pointer; font-weight: 700; color: rgb(var(--v-theme-primary)); }
+.mission-trace summary { min-height: 44px; cursor: pointer; font-weight: var(--bb-rescue-weight-medium); color: rgb(var(--v-theme-primary)); }
 .mission-trace summary:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .mission-trace__body { display: grid; gap: .8rem; }
-.mission-trace__body p { margin: 0; line-height: 1.7; font-size: .85rem; }
+.mission-trace__body p { margin: 0; line-height: var(--bb-rescue-leading-timeline); font-size: var(--bb-rescue-font-supporting); }
 .mission-trace__map { width: 100%; height: min(52dvh, 380px); min-height: 250px; overflow: hidden; border-radius: var(--bb-radius-nested, 16px); }
 .mission-trace__map :deep(.map-canvas) { height: 100%; min-height: 0; }
-.mission-trace__legend { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; font-size: .85rem; }
+.mission-trace__legend { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; font-size: var(--bb-rescue-font-supporting); }
 .mission-trace__legend li { display: flex; align-items: center; flex-wrap: wrap; gap: .3rem; }
 .mission-trace__dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .mission-trace__dot.requester { background: var(--bb-rescue-avatarRequesterInk); }.mission-trace__dot.rescuer { background: var(--bb-rescue-avatarRescuerInk); }.mission-trace__dot.admin { background: var(--bb-rescue-avatarAdminInk); }

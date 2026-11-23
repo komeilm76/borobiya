@@ -597,15 +597,15 @@ onBeforeUnmount(() => {
 
 .sos-sheet__title {
   margin: 0;
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-size: var(--bb-rescue-font-sosTitle);
+  font-weight: var(--bb-rescue-weight-strong);
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 .sos-sheet__subtitle {
   margin: 0.1rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--bb-rescue-font-tiny);
   white-space: normal;
   overflow-wrap: anywhere;
   opacity: 0.74;
@@ -617,14 +617,14 @@ onBeforeUnmount(() => {
 }
 
 .sos-sheet__readiness, .sos-sheet__ready { margin: 0 0 1rem; padding: .7rem .85rem; border-radius: 12px;
-  font-size: .86rem; line-height: 1.55; }
+  font-size: .86rem; line-height: var(--bb-rescue-leading-notice); }
 .sos-sheet__readiness { border: 1px solid var(--bb-rescue-sosReadinessEdge);
   background: var(--bb-rescue-sosReadinessFill); color: rgb(var(--v-theme-on-surface)); }
 .sos-sheet__readiness ul { margin: .3rem 0; padding-inline-start: 1.2rem; }
-.sos-sheet__readiness small { font-size: .82rem; }
+.sos-sheet__readiness small { font-size: var(--bb-rescue-font-caption); }
 .sos-sheet__ready { border: 1px solid var(--bb-rescue-sosReadyEdge);
   background: var(--bb-rescue-sosReadyFill); color: rgb(var(--v-theme-on-surface)); }
-.sos-sheet__help { margin: .3rem 0 0; font-size: .85rem; line-height: 1.55; }
+.sos-sheet__help { margin: .3rem 0 0; font-size: var(--bb-rescue-font-supporting); line-height: var(--bb-rescue-leading-notice); }
 .sos-sheet__section + .sos-sheet__section {
   margin-top: 1.15rem;
 }
@@ -633,7 +633,7 @@ onBeforeUnmount(() => {
   display: block;
   margin-bottom: 0.45rem;
   font-size: 0.84rem;
-  font-weight: 800;
+  font-weight: var(--bb-rescue-weight-strong);
 }
 
 .sos-sheet__severity-fieldset {
@@ -683,14 +683,14 @@ onBeforeUnmount(() => {
 }
 
 .sos-severity-title {
-  font-size: 0.9rem;
-  font-weight: 800;
+  font-size: var(--bb-rescue-font-body);
+  font-weight: var(--bb-rescue-weight-strong);
 }
 
 .sos-severity-hint {
-  font-size: 0.82rem;
+  font-size: var(--bb-rescue-font-caption);
   opacity: 0.75;
-  line-height: 1.35;
+  line-height: var(--bb-rescue-leading-caption);
 }
 
 .sos-sheet__map-wrap {
