@@ -13,8 +13,8 @@ withDefaults(defineProps<{ profile: UserSearchResult; showUsername?: boolean }>(
 </script>
 
 <style scoped>
-.public-profile-facts { display: grid; gap: 0.3rem; margin: 0; font-size: 0.83rem; }
-.public-profile-facts > div { display: flex; justify-content: space-between; gap: 0.75rem; align-items: baseline; }
-.public-profile-facts dt { opacity: 0.72; flex: 0 0 auto; }
+.public-profile-facts { display: grid; gap: var(--bb-rhythm-r030); margin: 0; font-size: var(--bb-sharing-font-facts); }
+.public-profile-facts > div { display: flex; justify-content: space-between; gap: var(--bb-rhythm-r075); align-items: baseline; }
+.public-profile-facts dt { opacity: var(--bb-finish-profileFactCaptionOpacity); flex: 0 0 auto; }
 .public-profile-facts dd { margin: 0; text-align: end; overflow-wrap: anywhere; min-width: 0; }
 </style>

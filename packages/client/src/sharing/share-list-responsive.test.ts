@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { audienceRhythm } from "../styles/tokens";
 
 // The repo intentionally tests SFC markup rather than mounting Vue components in unit tests.
 const source = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
@@ -17,7 +18,8 @@ describe("share revocation confirmation on short and narrow viewports (T4.4.1 pa
     expect(source).toMatch(/\.share-lists__confirm \{[^}]*overflow-wrap: anywhere;/);
     const phone = source.split('@media (max-width: 599px) {')[1];
     expect(phone).toBeDefined();
-    expect(phone).toContain('.share-lists__confirm-actions { flex-direction: column; align-items: stretch; gap: 0.5rem; }');
+    expect(phone).toContain('.share-lists__confirm-actions { flex-direction: column; align-items: stretch; gap: var(--bb-rhythm-r050); }');
+    expect(audienceRhythm.r050).toBe("0.5rem");
     expect(phone).toContain('.share-lists__confirm-actions :deep(.v-spacer) { display: none; }');
     expect(phone).toContain('.share-lists__confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }');
     expect(phone).toContain('.share-lists__confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');

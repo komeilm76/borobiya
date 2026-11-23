@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { audienceContentWidths } from "../styles/tokens";
 
 // This repository does not mount Vue SFCs in unit tests; pin the compact result contract instead.
 const dialog = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
@@ -17,7 +18,8 @@ describe("compact recipient search", () => {
     expect(dialog).toContain(':disabled="isSelf(candidate) || (recipientsFull && !isSelected(candidate))"');
     expect(dialog).toContain(':aria-pressed="isSelected(candidate)"');
     expect(dialog).toContain('min-width: 44px; min-height: 44px;');
-    expect(dialog).toContain('max-width: 45rem;'); // Keep fullscreen desktop content readable.
+    expect(dialog).toContain('max-width: var(--bb-content-width-sharingDialog);'); // Keep fullscreen desktop content readable.
+    expect(audienceContentWidths.sharingDialog).toBe("45rem");
     expect(dialog).not.toContain('<PublicProfileFacts :profile="candidate"');
     expect(dialog).not.toContain('class="share-dialog__result-distance"');
   });

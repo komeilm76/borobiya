@@ -7,7 +7,7 @@ import {
 
 const auth = readFileSync(new URL("./auth.css", import.meta.url), "utf8");
 const publicCss = readFileSync(new URL("./public.css", import.meta.url), "utf8");
-const sharing = ["ShareDialog.vue", "ShareLists.vue"].map((file) =>
+const sharing = ["ShareDialog.vue", "ShareLists.vue", "LiveBroadcastBar.vue", "HistoryDateTimeField.vue", "PublicProfileFacts.vue"].map((file) =>
   readFileSync(new URL(`../components/sharing/${file}`, import.meta.url), "utf8")).join("\n");
 const consumers = auth + publicCss + sharing;
 

@@ -295,12 +295,17 @@ as `--bb-detail-*`); repeated sharing-dialog/list text sizes use
 `sharingTypography` (`--bb-sharing-font-*`). The decorative auth/public and
 sharing surface effects are `audienceFinishes.light/dark` (`--bb-finish-*`),
 while `audienceContentType`, `audienceContentLayout`, `audienceContentRadii` and
-`audienceContentMotion` configure their reusable text hierarchy, primary
-insets, responsive panel corners and hover timing. The 32px hero radius is
-`radii.hero`; the step/not-found and other guest badge corners use
-`audienceDetailRadii`. Functional touch targets, responsive breakpoints and
-map coordinates remain local. Some isolated component-local optical spacing
-and presentation values have not yet been migrated;
+`audienceContentMotion` configure text hierarchy, primary insets, responsive
+panel corners and hover timing. `audienceRhythm` holds repeated rem-based
+spacing steps (`r065` = 0.65rem; `n040` = -0.4rem) without replacing rem with
+fixed px; isolated guest optical offsets have named `audienceContentLayout`
+roles. `audienceContentWidths`, `audienceIconSizes` and
+`audienceContentOptics` configure reading measures, decorative symbol sizes
+and underline/diagram detail. The 32px hero radius is `radii.hero`; the
+guest badge corners use `audienceDetailRadii`. Functional touch targets,
+responsive breakpoints, zero/auto resets, scroll constraints and compositional
+map/diagram coordinates remain local. Other client pages still have
+component-local presentation values;
 this configuration is the source of truth for token-backed styles, **not** a claim
 that every existing CSS declaration is centralized. Track the staged all-page
 migration in [CLIENT_STYLE_TOKEN_MIGRATION.md](CLIENT_STYLE_TOKEN_MIGRATION.md).

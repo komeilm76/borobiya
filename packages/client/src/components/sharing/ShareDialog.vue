@@ -701,7 +701,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 45rem;
+  max-width: var(--bb-content-width-sharingDialog);
   margin-inline: auto;
   color: var(--bb-color-text);
   font-weight: var(--bb-weight-heavy);
@@ -709,24 +709,24 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 
 .share-dialog__body {
   width: 100%;
-  max-width: 45rem;
+  max-width: var(--bb-content-width-sharingDialog);
   margin-inline: auto;
   padding-inline: var(--bb-content-layout-sharingDialogInset);
 }
 
 .share-dialog__lead {
-  margin: 0 0 1rem;
+  margin: 0 0 var(--bb-rhythm-r100);
   color: var(--bb-color-text);
   font-size: var(--bb-sharing-font-lead);
   line-height: var(--bb-content-leading-supporting);
 }
 
 .share-dialog__field + .share-dialog__field {
-  margin-top: 1.25rem;
+  margin-top: var(--bb-rhythm-r125);
 }
 
 .share-dialog__label {
-  margin: 0 0 0.4rem;
+  margin: 0 0 var(--bb-rhythm-r040);
   color: var(--bb-color-muted);
   font-size: var(--bb-sharing-font-caption);
   font-weight: var(--bb-weight-heavy);
@@ -736,14 +736,14 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem 0.75rem;
-  margin-top: 0.75rem;
+  gap: var(--bb-rhythm-r050) var(--bb-rhythm-r075);
+  margin-top: var(--bb-rhythm-r075);
 }
 
 .share-dialog__online-filter .share-dialog__label { margin: 0; }
 
 .share-dialog__hint {
-  margin: 0.5rem 0 0;
+  margin: var(--bb-rhythm-r050) 0 0;
   color: var(--bb-color-muted);
   font-size: var(--bb-sharing-font-caption);
   line-height: var(--bb-content-leading-caption);
@@ -761,7 +761,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__results {
   list-style: none;
   padding: 0;
-  margin: 0.6rem 0 0;
+  margin: var(--bb-rhythm-r060) 0 0;
   border: 1px solid var(--bb-finish-shareResultsEdge);
   border-radius: var(--bb-radius-nested, 16px);
   /* The scrollable dialog body is the only vertical scroller. A second 17rem
@@ -772,7 +772,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__result {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: var(--bb-rhythm-r065);
   min-width: 0;
   min-height: 66px;
   padding: var(--bb-content-layout-sharingResultInset);
@@ -786,51 +786,51 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   line-height: var(--bb-content-leading-row); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .share-dialog__result-meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.6rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--bb-rhythm-r010) var(--bb-rhythm-r060);
   color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: var(--bb-content-leading-meta);
 }
-.share-dialog__result-rating { display: inline-flex; align-items: center; gap: 0.1rem; }
+.share-dialog__result-rating { display: inline-flex; align-items: center; gap: var(--bb-rhythm-r010); }
 .share-dialog__result-rating :deep(.v-icon) { color: var(--bb-audience-shareRating); }
-.share-dialog__result-presence { display: inline-flex; align-items: center; gap: 0.25rem; }
-.share-dialog__result-dot { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: var(--bb-audience-shareDotIdle); }
+.share-dialog__result-presence { display: inline-flex; align-items: center; gap: var(--bb-rhythm-r025); }
+.share-dialog__result-dot { width: var(--bb-content-icon-presenceDot); height: var(--bb-content-icon-presenceDot); border-radius: 50%; background: var(--bb-audience-shareDotIdle); }
 .share-dialog__result-presence--online .share-dialog__result-dot { background: var(--bb-audience-shareDotOnline); }
 .share-dialog__result-action { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
 .share-dialog__result-action:focus-visible { outline: 2px solid var(--bb-color-primary); outline-offset: 2px; }
 
 .share-dialog__selected {
-  margin-top: 1rem;
+  margin-top: var(--bb-rhythm-r100);
 }
 
 .share-dialog__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
+  gap: var(--bb-rhythm-r040);
 }
 
 .share-dialog__duration {
-  margin-top: 0.85rem;
+  margin-top: var(--bb-rhythm-r085);
 }
 
 .share-dialog__history-fields {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: 0.65rem;
-  margin-top: 0.75rem;
+  gap: var(--bb-rhythm-r065);
+  margin-top: var(--bb-rhythm-r075);
 }
 
-.share-dialog__duration-value { margin: 0.7rem 0 0; color: var(--bb-color-text); font-weight: var(--bb-weight-bold); font-size: var(--bb-sharing-font-label); }
-.share-dialog__slider-limits { display: flex; justify-content: space-between; gap: 0.5rem; font-size: var(--bb-sharing-font-caption); color: var(--bb-color-muted); }
+.share-dialog__duration-value { margin: var(--bb-rhythm-r070) 0 0; color: var(--bb-color-text); font-weight: var(--bb-weight-bold); font-size: var(--bb-sharing-font-label); }
+.share-dialog__slider-limits { display: flex; justify-content: space-between; gap: var(--bb-rhythm-r050); font-size: var(--bb-sharing-font-caption); color: var(--bb-color-muted); }
 
 .share-dialog__presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.4rem;
+  gap: var(--bb-rhythm-r030);
+  margin-top: var(--bb-rhythm-r040);
 }
 
 .share-dialog__chip {
   min-height: 2.5rem;
-  padding: 0.25rem 0.6rem;
+  padding: var(--bb-rhythm-r025) var(--bb-rhythm-r060);
   border: 1px solid var(--bb-finish-shareChipEdge);
   border-radius: var(--bb-shell-radius-pill);
   background: var(--bb-finish-shareChipFill);
@@ -859,9 +859,9 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 
 .share-dialog__actions {
   width: 100%;
-  max-width: 45rem;
+  max-width: var(--bb-content-width-sharingDialog);
   margin-inline: auto;
-  padding: 0.75rem var(--bb-content-layout-sharingDialogInset) 1rem;
+  padding: var(--bb-rhythm-r075) var(--bb-content-layout-sharingDialogInset) var(--bb-rhythm-r100);
 }
 
 /* Only the device choices scroll; the confirmation controls remain reachable. */

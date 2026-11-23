@@ -33,7 +33,7 @@ describe("guest and account page typography", () => {
     expect(auth).toContain("font-size: var(--bb-content-font-heroPhone)");
     expect(auth).toContain(".auth-card-heading h2,\n.auth-success-state h2");
     expect(auth).toContain("font-size: var(--bb-content-font-formHeading);");
-    expect(auth).toContain(".auth-form .v-input__details {\n  padding-inline: 0.8rem;\n  font-size: var(--bb-content-font-caption);");
+    expect(auth).toContain(".auth-form .v-input__details {\n  padding-inline: var(--bb-rhythm-r080);\n  font-size: var(--bb-content-font-caption);");
     for (const view of ["LoginView.vue", "RegisterView.vue", "ForgotPasswordView.vue", "../_user/CompleteSecurityQuestionsView.vue"]) {
       expect(readFileSync(new URL(`../views/_auth/${view}`, import.meta.url), "utf8")).toContain('class="auth-hero-title"');
     }
@@ -48,6 +48,6 @@ describe("guest and account page typography", () => {
     expect(audienceDetails.light.publicValueCopy).toBe("#556e68");
     expect(audienceDetails.light.publicHealthSmall).toBe("#4c6962");
     expect(publicCss).toContain(".public-value p, .public-steps li p { margin: 0; color: var(--bb-detail-publicValueCopy); font-size: var(--bb-content-font-lead);");
-    expect(publicCss).toContain(".public-health__body small { display: block; margin-top: 0.7rem; color: var(--bb-detail-publicHealthSmall); font-size: var(--bb-content-font-supporting); }");
+    expect(publicCss).toContain(".public-health__body small { display: block; margin-top: var(--bb-rhythm-r070); color: var(--bb-detail-publicHealthSmall); font-size: var(--bb-content-font-supporting); }");
   });
 });

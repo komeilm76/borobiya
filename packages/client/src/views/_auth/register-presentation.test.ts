@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { audienceRhythm } from "../../styles/tokens";
 
 const view = readFileSync(new URL("./RegisterView.vue", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../../styles/auth.css", import.meta.url), "utf8");
@@ -8,7 +9,8 @@ const styles = readFileSync(new URL("../../styles/auth.css", import.meta.url), "
 describe("registration presentation", () => {
   it("separates the sign-in prompt from the submit button without changing other auth pages", () => {
     expect(view).toMatch(/<\/form>\s*<p class="auth-switch-copy">/);
-    expect(styles).toMatch(/\.auth-card-register \.auth-form \+ \.auth-switch-copy\s*\{\s*margin-top: 1\.5rem;/);
+    expect(styles).toMatch(/\.auth-card-register \.auth-form \+ \.auth-switch-copy\s*\{\s*margin-top: var\(--bb-rhythm-r150\);/);
+    expect(audienceRhythm.r150).toBe("1.5rem");
   });
 
   it("renders the question-count chip with Persian digits at zero and five", () => {

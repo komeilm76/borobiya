@@ -290,7 +290,57 @@ export const audienceDetailRadii = {
 
 // Large insets and repeated row rhythm are presentation, unlike minimum touch
 // areas, responsive cutoffs and diagram coordinates (which remain local).
+// A shared rem rhythm retains root-font scaling in legacy guest/sharing CSS.
+// Keys express hundredths of a rem (n = negative optical overlap). Isolated
+// optical choices instead get named roles in audienceContentLayout below.
+export const audienceRhythm = {
+  n040: "-0.4rem",
+  r010: "0.1rem",
+  r012: "0.12rem",
+  r015: "0.15rem",
+  r018: "0.18rem",
+  r020: "0.2rem",
+  r025: "0.25rem",
+  r030: "0.3rem",
+  r035: "0.35rem",
+  r040: "0.4rem",
+  r045: "0.45rem",
+  r050: "0.5rem",
+  r055: "0.55rem",
+  r060: "0.6rem",
+  r065: "0.65rem",
+  r070: "0.7rem",
+  r075: "0.75rem",
+  r080: "0.8rem",
+  r085: "0.85rem",
+  r090: "0.9rem",
+  r100: "1rem",
+  r110: "1.1rem",
+  r120: "1.2rem",
+  r125: "1.25rem",
+  r140: "1.4rem",
+  r145: "1.45rem",
+  r150: "1.5rem",
+  r160: "1.6rem",
+  r170: "1.7rem",
+  r200: "2rem",
+  r250: "2.5rem",
+  r300: "3rem",
+  r500: "5rem",
+} as const;
+
 export const audienceContentLayout = {
+  authHeroTop: "1.75rem",
+  authDividerTop: "1.3rem",
+  authPasswordRevealTop: "-0.85rem",
+  authFormIntroTop: "-0.3rem",
+  authTrustPhoneTop: "1.15rem",
+  publicActionInline: "0.95rem",
+  publicHeroTitleTop: "1.35rem",
+  publicNetworkTagBlock: "0.62rem",
+  publicStepsWideGap: "6rem",
+  publicFinalTop: "4rem",
+
   authColumnsGap: "clamp(1.25rem, 4vw, 3.5rem)",
   authIntroInset: "clamp(2rem, 5vw, 3.5rem)",
   authCardInset: "clamp(1.4rem, 4vw, 2.4rem)",
@@ -313,6 +363,27 @@ export const audienceContentLayout = {
   sharingRowInset: "0.55rem 0.65rem",
   sharingRowGap: "0.6rem"
 } as const;
+// Content measures and decorative badges are design choices; control minimum
+// sizes, responsive thresholds and the illustration's coordinates remain local.
+export const audienceContentWidths = {
+  authCopy: "33rem", authChrome: "min(100%, 78rem)",
+  publicPage: "80rem", publicHeroCopy: "35rem", publicSectionHeading: "42rem",
+  publicHealth: "52rem", publicNotFound: "45rem", sharingDialog: "45rem"
+} as const;
+export const audienceIconSizes = {
+  authMark: "42px", publicMark: "44px", authTrust: "42px",
+  broadcastDot: "0.65rem",
+  authFeature: "32px", authCard: "52px", authQuestion: "32px",
+  authRecovery: "30px", authSuccess: "70px",
+  publicValue: "52px", publicStep: "40px", publicHealth: "64px",
+  publicNotFound: "88px", eyebrowRuleWidth: "21px",
+  eyebrowRuleHeight: "2px", presenceDot: "0.42rem"
+} as const;
+export const audienceContentOptics = {
+  authUnderlineOffset: "3px", publicUnderlineOffset: "4px",
+  networkGridStep: "39px", authDividerThickness: "1px",
+  networkPathThickness: "2px"
+} as const;
 export const audienceContentRadii = { networkTag: "0.8rem", mobilePanel: "1.4rem" } as const;
 export const audienceContentMotion = { hover: "0.16s", lift: "0.18s" } as const;
 
@@ -322,6 +393,10 @@ export const audienceContentMotion = { hover: "0.16s", lift: "0.18s" } as const;
 // dark overrides; keep both theme entries in sync when adding a role.
 export const audienceFinishes = {
   light: {
+    broadcastEdge: "rgba(25, 53, 54, 0.09)",
+    broadcastFill: "rgba(var(--v-theme-surface), 0.95)",
+    broadcastBlur: "blur(10px)",
+    profileFactCaptionOpacity: "0.72",
     publicDisabledOpacity: "0.6",
     publicFinalCopyOpacity: "0.82",
     publicGridOpacity: "0.28",
@@ -419,6 +494,10 @@ export const audienceFinishes = {
     shareSelectedEdge: "var(--bb-color-success)",
   },
   dark: {
+    broadcastEdge: "rgba(25, 53, 54, 0.09)",
+    broadcastFill: "rgba(var(--v-theme-surface), 0.95)",
+    broadcastBlur: "blur(10px)",
+    profileFactCaptionOpacity: "0.72",
     publicDisabledOpacity: "0.6",
     publicFinalCopyOpacity: "0.82",
     publicGridOpacity: "0.28",
@@ -532,12 +611,13 @@ export const audienceContentType = {
   },
   weights: { emphasized: 750, strong: 850, black: 900 },
   leading: {
-    tight: 1.2, row: 1.4, display: 1.45, meta: 1.5, status: 1.85,
+    tight: 1.2, row: 1.4, display: 1.45, meta: 1.5, status: 1.85, broadcastDetail: 1.55,
     caption: 1.6, supporting: 1.7, detail: 1.8, prose: 1.9, hero: 2
   }
 } as const;
 
 export const sharingTypography = {
+  facts: "0.83rem",
   caption: "0.82rem", label: "0.88rem", body: "0.9rem",
   supporting: "0.84rem", heading: "1.1rem",
   lead: "0.92rem", avatar: "0.85rem"
@@ -559,7 +639,11 @@ export function designTokenStylesheet(): string {
     ...Object.entries(shellRadii).map(([key, value]) => `--bb-shell-radius-${key}: ${value}px`),
     ...Object.entries(audienceRadii).map(([key, value]) => `--bb-audience-radius-${key}: ${value}px`),
     ...Object.entries(audienceTypography).map(([key, value]) => `--bb-audience-font-${key}: ${value}`),
+    ...Object.entries(audienceRhythm).map(([key, value]) => `--bb-rhythm-${key}: ${value}`),
     ...Object.entries(audienceContentLayout).map(([key, value]) => `--bb-content-layout-${key}: ${value}`),
+    ...Object.entries(audienceContentWidths).map(([key, value]) => `--bb-content-width-${key}: ${value}`),
+    ...Object.entries(audienceIconSizes).map(([key, value]) => `--bb-content-icon-${key}: ${value}`),
+    ...Object.entries(audienceContentOptics).map(([key, value]) => `--bb-content-optics-${key}: ${value}`),
     ...Object.entries(audienceContentRadii).map(([key, value]) => `--bb-content-radius-${key}: ${value}`),
     ...Object.entries(audienceContentMotion).map(([key, value]) => `--bb-content-motion-${key}: ${value}`),
     ...Object.entries(audienceDetailRadii).map(([key, value]) => `--bb-detail-radius-${key}: ${value}px`),

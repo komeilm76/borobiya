@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { audienceRhythm } from "../../styles/tokens";
 
 const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
 const styles = readFileSync(new URL("../../styles/auth.css", import.meta.url), "utf8");
@@ -29,7 +30,8 @@ describe("standalone auth experience", () => {
   it("separates recovery's login return link from every step's submit action", () => {
     expect(forgot).toMatch(/<\/form>\s*<\/template>\s*<div v-else class="auth-success-state">/);
     expect(forgot).toContain('v-if="step < 4" class="auth-switch-copy auth-switch-copy--recovery"');
-    expect(styles).toMatch(/\.auth-switch-copy--recovery\s*\{[^}]*margin-top: 1\.5rem;/);
+    expect(styles).toMatch(/\.auth-switch-copy--recovery\s*\{[^}]*margin-top: var\(--bb-rhythm-r150\);/);
+    expect(audienceRhythm.r150).toBe("1.5rem");
     expect(forgot).toContain('to="/_auth/login"');
   });
 });

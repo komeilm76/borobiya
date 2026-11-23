@@ -54,14 +54,14 @@ onMounted(() => {
 <style scoped>
 .broadcast-bar {
   container-type: inline-size;
-  padding: 0.75rem 1rem;
-  border: 1px solid rgba(25, 53, 54, 0.09);
-  background: rgba(var(--v-theme-surface), 0.95);
-  backdrop-filter: blur(10px);
+  padding: var(--bb-rhythm-r075) var(--bb-rhythm-r100);
+  border: 1px solid var(--bb-finish-broadcastEdge);
+  background: var(--bb-finish-broadcastFill);
+  backdrop-filter: var(--bb-finish-broadcastBlur);
 }
 
 .broadcast-bar--compact {
-  padding: 0.6rem 0.85rem;
+  padding: var(--bb-rhythm-r060) var(--bb-rhythm-r085);
 }
 /* The dashboard places this card inside another card; standalone bars keep xl corners. */
 .broadcast-bar--inset {
@@ -72,13 +72,13 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.65rem 0.85rem;
+  gap: var(--bb-rhythm-r065) var(--bb-rhythm-r085);
 }
 
 .broadcast-bar__indicator {
   flex: 0 0 auto;
-  width: 0.65rem;
-  height: 0.65rem;
+  width: var(--bb-content-icon-broadcastDot);
+  height: var(--bb-content-icon-broadcastDot);
   border-radius: 50%;
   background: var(--bb-audience-broadcastIdle);
 }
@@ -105,21 +105,21 @@ onMounted(() => {
   margin: 0;
   color: var(--bb-audience-broadcastTitle);
   font-size: var(--bb-audience-font-broadcastTitle);
-  font-weight: 800;
-  line-height: 1.4;
+  font-weight: var(--bb-weight-heavy);
+  line-height: var(--bb-content-leading-row);
 }
 
 .broadcast-bar__detail {
-  margin: 0.12rem 0 0;
+  margin: var(--bb-rhythm-r012) 0 0;
   color: var(--bb-audience-broadcastDetail);
   font-size: var(--bb-audience-font-broadcastDetail);
-  line-height: 1.55;
+  line-height: var(--bb-content-leading-broadcastDetail);
 }
 
 .broadcast-bar__actions {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: var(--bb-rhythm-r035);
   margin-inline-start: auto;
 }
 
@@ -128,7 +128,7 @@ onMounted(() => {
  * the card; size from the host, not from the viewport. */
 @container (max-width: 380px) {
   .broadcast-bar__body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
-  .broadcast-bar__indicator { margin-top: 0.35rem; }
+  .broadcast-bar__indicator { margin-top: var(--bb-rhythm-r035); }
   .broadcast-bar__copy { min-width: 0; overflow-wrap: anywhere; }
   .broadcast-bar__actions { grid-column: 1 / -1; width: 100%; min-width: 0; margin-inline-start: 0; flex-wrap: wrap; }
   .broadcast-bar__actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
@@ -136,7 +136,7 @@ onMounted(() => {
 }
 
 :global(:root.dark .broadcast-bar) {
-  background: rgba(var(--v-theme-surface), 0.95);
+  background: var(--bb-finish-broadcastFill);
 }
 
 :global(:root.dark .broadcast-bar__headline) {
