@@ -38,9 +38,9 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain('v-for="id in category.incidentTypeIds"');
     expect(cards).toContain('v-for="member in category.members"');
     expect(cards).toContain('@click="openMembers(category)"');
-    expect(cards).toContain('@click="openEdit(category)"');
+    expect(cards).toContain('@click="openEdit(category, $event)"');
     expect(categories.match(/@click="openMembers\(category\)"/g)).toHaveLength(2);
-    expect(categories.match(/@click="openEdit\(category\)"/g)).toHaveLength(2);
+    expect(categories.match(/@click="openEdit\(category, \$event\)"/g)).toHaveLength(2);
     expect(cards).toContain('v-if="listState === \'loading\'"');
     expect(cards).not.toContain('listState === \'empty\'');
     expect(cards).not.toContain('listState === \'error\'');
@@ -60,7 +60,7 @@ describe("admin catalog lists on narrow screens", () => {
         expect(opening).toMatch(/\bscrollable\b/);
         expect(opening).toMatch(/\bpersistent\b/);
         expect(dialog).toMatch(/<v-card-text\b/);
-        expect(dialog).toMatch(/<v-card-actions class="admin-catalog-dialog-actions">/);
+        expect(dialog).toMatch(/<v-card-actions class="admin-catalog-dialog-actions(?: [^"]+)?">/);
         expect(dialog.indexOf("</v-card-text>")).toBeLessThan(dialog.indexOf("<v-card-actions"));
       }
     }
