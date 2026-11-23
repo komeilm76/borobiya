@@ -19,8 +19,39 @@ describe("admin sender identity and profile access", () => {
     expect(dispatch).toContain('title="پروفایل ارسال‌کننده"');
     expect(dispatch).toContain('@click="requestDispatch"');
     expect(dispatch).toContain('class="admin-dispatch__map-and-actions"');
-    expect(users.match(/@click="profileUserId = user.id"/g)).toHaveLength(2);
+    expect(users.match(/<button type="button" class="admin-user-identity"/g)).toHaveLength(2);
+    expect(users.match(/@click="openProfile\(user.id, \$event\)"/g)).toHaveLength(2);
+    expect(users).toContain('@closed="restoreProfileFocus"');
+    expect(users).toContain("profileTrigger?.isConnected");
+    expect(users).not.toContain('admin-users-profile-link');
     expect(users).toContain('<AdminUserProfileDialog :model-value="profileUserId !== null"');
+  });
+
+  it("makes the avatar and name one accessible profile target on desktop and mobile", () => {
+    const triggers = [...users.matchAll(/<button type="button" class="admin-user-identity"([\s\S]*?)<\/button>/g)];
+    expect(triggers).toHaveLength(2);
+    for (const [, content] of triggers) {
+      expect(content).toContain(':aria-label="`مشاهدهٔ پروفایل ${user.username}`"');
+      expect(content).toContain('class="admin-user-avatar"');
+      expect(content).toContain('dir="ltr"');
+      expect(content).toContain('admin-user-identity__arrow');
+      expect(content).not.toContain('<v-btn');
+    }
+    expect(users).toContain('.admin-user-identity:hover');
+    expect(users).toContain('.admin-user-identity:focus-visible');
+  });
+
+  it("groups verified profile data into a clear identity, account, groups and reference hierarchy", () => {
+    expect(profile).toContain('class="admin-profile__hero" aria-label="هویت کاربر"');
+    expect(profile).toContain("profile.isActive ? 'admin-profile__badge--active' : 'admin-profile__badge--inactive'");
+    expect(profile).toContain('class="admin-profile__facts"');
+    expect(profile).toContain('id="admin-profile-account-title"');
+    expect(profile).toContain('id="admin-profile-groups-title"');
+    expect(profile).toContain('id="admin-profile-id-title"');
+    expect(profile).toContain('هنوز امتیازی ثبت نشده');
+    expect(profile).toContain('گروهی به این حساب اختصاص داده نشده است.');
+    expect(profile).toContain('aria-label="کپی شناسهٔ کامل حساب"');
+    expect(profile).toContain('role="status">شناسهٔ کامل کپی شد.');
   });
 
   it("only shows an admin-authorized, current-session profile and clears stale responses", () => {
@@ -49,8 +80,10 @@ describe("admin sender identity and profile access", () => {
   it("keeps profile actions reachable on narrow screens and colors from theme tokens", () => {
     expect(dispatch).toContain('.admin-dispatch__sender-action { width: 100%; }');
     expect(dispatch).toContain('.dispatch-request-row.v-list-item--active');
-    expect(users).toContain('.admin-users-profile-link { justify-self: start; min-height: 44px;');
-    expect(profile).toContain('@media (max-width: 480px) { .admin-profile__facts { grid-template-columns: minmax(0, 1fr); } }');
+    expect(users).toContain('.admin-user-identity:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
+    expect(users).toContain('.admin-mobile-header .admin-user-identity { flex: 1 1 12rem; }');
+    expect(profile).toContain(':fullscreen="isPhone"');
+    expect(profile).toContain('.admin-profile__content { grid-template-columns: minmax(0, 1fr); }');
     expect(profile).toContain('background: var(--bb-color-inset)');
     const css = parse(dispatch).descriptor.styles[0]!.content;
     const compiled = compileStyle({ filename: "AdminDispatchView.vue", id: "data-v-dispatch-sender", scoped: true, source: css });

@@ -119,17 +119,15 @@
               <tbody>
                 <tr v-for="user in users" :key="user.id">
                   <th scope="row">
-                    <div class="admin-user-cell">
+                    <button type="button" class="admin-user-identity" :aria-label="`مشاهدهٔ پروفایل ${user.username}`"
+                      :title="`مشاهدهٔ پروفایل ${user.username}`" @click="openProfile(user.id, $event)">
                       <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
                       <span class="admin-user-copy">
                         <span class="admin-users-username" dir="ltr">{{ user.username }}</span>
-                        <small>
-                          {{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}
-                        </small>
-                        <v-btn class="admin-users-profile-link" size="small" variant="text" color="primary"
-                          :aria-label="`مشاهدهٔ پروفایل ${user.username}`" @click="profileUserId = user.id">پروفایل</v-btn>
+                        <small>{{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}</small>
                       </span>
-                    </div>
+                      <v-icon class="admin-user-identity__arrow" icon="mdi-chevron-left" size="19" aria-hidden="true" />
+                    </button>
                   </th>
                   <td>
                     <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
@@ -179,13 +177,15 @@
           <ul class="admin-users-mobile" aria-label="کاربران" role="list">
             <li v-for="user in users" :key="user.id" class="admin-mobile-card">
               <div class="admin-mobile-header">
-                <div class="admin-user-cell">
+                <button type="button" class="admin-user-identity" :aria-label="`مشاهدهٔ پروفایل ${user.username}`"
+                  :title="`مشاهدهٔ پروفایل ${user.username}`" @click="openProfile(user.id, $event)">
                   <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
                   <span class="admin-user-copy">
                     <span class="admin-mobile-username" dir="ltr">{{ user.username }}</span>
                     <small>{{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}</small>
                   </span>
-                </div>
+                  <v-icon class="admin-user-identity__arrow" icon="mdi-chevron-left" size="19" aria-hidden="true" />
+                </button>
                 <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
                   {{ user.role === "admin" ? "مدیر" : "کاربر" }}
                 </span>
@@ -208,8 +208,6 @@
                   <span class="admin-status-dot" />
                   {{ user.isActive ? "فعال" : "غیرفعال" }}
                 </span>
-                <v-btn class="admin-users-profile-link" size="small" variant="tonal" color="primary"
-                  :aria-label="`مشاهدهٔ پروفایل ${user.username}`" @click="profileUserId = user.id">پروفایل</v-btn>
                 <div class="admin-mobile-action">
                   <v-switch
                     :model-value="user.isActive"
@@ -246,7 +244,7 @@
     </v-card>
 
     <AdminUserProfileDialog :model-value="profileUserId !== null" :user-id="profileUserId"
-      @update:model-value="(open: boolean) => { if (!open) profileUserId = null; }" />
+      @update:model-value="(open: boolean) => { if (!open) profileUserId = null; }" @closed="restoreProfileFocus" />
 
     <v-dialog
       :model-value="statusChange !== null"
@@ -331,6 +329,15 @@ const categoryFilterOptions: Array<{ title: string; value: CategoryFilter }> = [
 const auth = useAuthStore();
 const users = ref<UserProfile[]>([]);
 const profileUserId = ref<string | null>(null);
+let profileTrigger: HTMLElement | null = null;
+function openProfile(userId: string, event: MouseEvent): void {
+  profileTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  profileUserId.value = userId;
+}
+function restoreProfileFocus(): void {
+  if (profileTrigger?.isConnected) profileTrigger.focus({ preventScroll: true });
+  profileTrigger = null;
+}
 const search = ref("");
 const statusFilter = ref<StatusFilter>("all");
 const categoryFilter = ref<CategoryFilter>("all");
@@ -681,11 +688,23 @@ onUnmounted(() => {
   background: rgba(var(--v-theme-primary), 0.06);
 }
 
-.admin-user-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  text-align: start;
+.admin-user-identity {
+  display: inline-flex; align-items: center; gap: .7rem; min-width: 0; max-width: 100%; min-height: 48px;
+  padding: .25rem .45rem; margin-inline: -.45rem; border: 1px solid transparent;
+  border-radius: var(--bb-radius-nested, 16px); background: transparent;
+  color: var(--bb-color-text); text-align: start; cursor: pointer;
+  transition: background .16s ease, border-color .16s ease;
+}
+.admin-user-identity:hover { background: rgba(var(--v-theme-primary), .08); border-color: rgba(var(--v-theme-primary), .2); }
+.admin-user-identity:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.admin-user-identity:hover .admin-user-avatar, .admin-user-identity:focus-visible .admin-user-avatar {
+  background: rgba(var(--v-theme-primary), .2); border-color: rgba(var(--v-theme-primary), .4);
+}
+.admin-user-identity__arrow { flex: none; color: var(--bb-color-primary); opacity: .72; }
+@media (forced-colors: active) {
+  .admin-user-identity:hover { border-color: Highlight; }
+  .admin-user-identity:focus-visible { outline-color: Highlight; }
+  .admin-user-avatar { border-color: CanvasText; }
 }
 
 .admin-user-avatar {
@@ -704,7 +723,7 @@ onUnmounted(() => {
 }
 
 .admin-user-copy {
-  display: grid;
+  display: grid; min-width: 0;
   gap: 0.15rem;
 }
 
@@ -713,6 +732,7 @@ onUnmounted(() => {
   font-size: 0.85rem;
   font-weight: 800;
   text-align: start;
+  overflow-wrap: anywhere;
 }
 
 .admin-user-copy small,
@@ -721,8 +741,6 @@ onUnmounted(() => {
   font-size: 0.82rem;
   font-weight: 500;
 }
-.admin-users-profile-link { justify-self: start; min-height: 44px; margin-inline-start: -.5rem; }
-.admin-mobile-footer .admin-users-profile-link { margin-inline-start: 0; }
 
 .admin-role-pill,
 .admin-account-status {
@@ -880,7 +898,7 @@ onUnmounted(() => {
   .admin-users-mobile { display: grid; gap: 0.75rem; margin: 0; padding: 0; list-style: none; min-width: 0; }
   .admin-mobile-card { min-width: 0; padding: 1rem; border: 1px solid rgba(var(--v-theme-on-surface), 0.14); border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); }
   .admin-mobile-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; }
-  .admin-mobile-header .admin-user-cell { min-width: 0; flex: 1 1 12rem; }
+  .admin-mobile-header .admin-user-identity { flex: 1 1 12rem; }
   .admin-mobile-header .admin-user-copy { min-width: 0; }
   .admin-mobile-username { overflow-wrap: anywhere; color: var(--bb-color-text); font-size: 0.88rem; font-weight: 800; }
   .admin-mobile-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 0.6rem; margin: 0.85rem 0; }
