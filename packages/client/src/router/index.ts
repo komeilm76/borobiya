@@ -5,9 +5,10 @@ import {
   type RouteRecordRaw,
   type RouterHistory
 } from "vue-router";
+import { checkPostLoginAssignment } from "./post-login";
 import { pinia } from "../stores";
 import { useAuthStore } from "../stores/auth";
-import { createAuthGuard, isGuestOnlyPath, resolvePostLoginDestination, type AuthGuardState } from "./guards";
+import { createAuthGuard, isGuestOnlyPath, resolvePostLoginDestinationAfterMissionCheck, type AssignmentStatus, type AuthGuardState } from "./guards";
 
 export const routeRecords: RouteRecordRaw[] = [
   { path: "/", redirect: "/_public/landing" },
@@ -128,10 +129,11 @@ export const routeRecords: RouteRecordRaw[] = [
 
 export function createAppRouter(
   history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),
-  auth: AuthGuardState = useAuthStore(pinia)
+  auth: AuthGuardState = useAuthStore(pinia),
+  checkAssignment: () => Promise<AssignmentStatus> = checkPostLoginAssignment
 ) {
   const router = createRouter({ history, routes: routeRecords });
-  router.beforeEach(createAuthGuard(auth));
+  router.beforeEach(createAuthGuard(auth, checkAssignment));
   // A guard runs only when navigation occurs. A session can also arrive while a guest
   // view is already open (e.g. a late cookie refresh); don't leave that view visible.
   watch(
@@ -148,7 +150,12 @@ export function createAppRouter(
       if (onboarding && current.path !== "/_user/complete-security-questions") {
         void router.replace("/_user/complete-security-questions");
       } else if (isGuestOnlyPath(current.path)) {
-        void router.replace(resolvePostLoginDestination(current.query.redirect, auth));
+        const currentUser = auth.user;
+        void resolvePostLoginDestinationAfterMissionCheck(current.query.redirect, auth, checkAssignment).then((destination) => {
+          // Do not override a newer navigation or a logout while the lookup was in flight.
+          if (router.currentRoute.value.fullPath === current.fullPath && auth.isAuthenticated && auth.user === currentUser &&
+            !auth.mustCompleteSecurityQuestions) void router.replace(destination);
+        });
       }
     },
     { flush: "post" }

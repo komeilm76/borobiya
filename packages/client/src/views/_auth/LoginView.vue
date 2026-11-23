@@ -121,7 +121,8 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import { loginSchema } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { loginDeviceName } from "../../device/capacitor";
-import { resolvePostLoginDestination } from "../../router/guards";
+import { checkPostLoginAssignment } from "@/router/post-login";
+import { resolvePostLoginDestinationAfterMissionCheck } from "../../router/guards";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
@@ -155,7 +156,7 @@ async function submitLogin(): Promise<void> {
     // reports something absurd is bounded before it leaves the browser.
     const deviceName = await loginDeviceName();
     await auth.login(deviceName ? { ...parsed.data, deviceName } : parsed.data);
-    await router.replace(resolvePostLoginDestination(returnTo, auth));
+    await router.replace(await resolvePostLoginDestinationAfterMissionCheck(returnTo, auth, checkPostLoginAssignment));
   } catch (error) {
     formError.value = friendlyErrorMessage(error, "ورود انجام نشد. دوباره تلاش کنید.");
   } finally {

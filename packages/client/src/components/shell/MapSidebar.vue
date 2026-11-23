@@ -17,6 +17,7 @@
           aria-label="باز کردن فهرست برنامه"
           title="فهرست برنامه"
         />
+        <NetworkStatusIcon class="map-sidebar__network" />
       </div>
     </template>
 
@@ -92,6 +93,7 @@
 </template>
 
 <script setup lang="ts">
+import NetworkStatusIcon from "./NetworkStatusIcon.vue";
 import { nextTick, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import type { AuthUser, UserCategorySummary } from "@shared/index";
@@ -133,6 +135,9 @@ async function requestLogout(): Promise<void> {
   z-index: 900;
   top: calc(0.75rem + env(safe-area-inset-top, 0px));
   left: calc(0.75rem + env(safe-area-inset-left, 0px));
+}
+.map-sidebar__network {
+  position: absolute; top: -3px; right: -3px; pointer-events: none;
 }
 .map-sidebar__menu-button {
   width: 48px; height: 48px; min-width: 48px;

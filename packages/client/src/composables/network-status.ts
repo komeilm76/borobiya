@@ -4,11 +4,11 @@ import { requestJson } from "../api/http";
 
 export type NetworkStatus = "checking" | "reachable" | "unavailable" | "offline";
 
-export const NETWORK_STATUS_PRESENTATION: Record<NetworkStatus, { icon: string; color: string; label: string }> = {
-  checking: { icon: "mdi-wifi-sync", color: "info", label: "در حال بررسی ارتباط با سرور…" },
-  reachable: { icon: "mdi-wifi-check", color: "success", label: "ارتباط با سرور برقرار است" },
-  unavailable: { icon: "mdi-wifi-alert", color: "warning", label: "ارتباط با سرور برقرار نیست؛ برای بررسی دوباره بزنید" },
-  offline: { icon: "mdi-wifi-off", color: "error", label: "دستگاه آفلاین است؛ پس از اتصال دوباره بررسی می‌شود" }
+export const NETWORK_STATUS_PRESENTATION: Record<NetworkStatus, { label: string }> = {
+  checking: { label: "در حال بررسی ارتباط با سرور…" },
+  reachable: { label: "ارتباط با سرور برقرار است" },
+  unavailable: { label: "ارتباط با سرور برقرار نیست؛ بررسی خودکار ادامه دارد" },
+  offline: { label: "دستگاه آفلاین است؛ پس از اتصال دوباره بررسی می‌شود" }
 };
 
 const PROBE_TIMEOUT_MS = 8_000;

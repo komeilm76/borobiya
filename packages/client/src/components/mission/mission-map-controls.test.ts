@@ -124,8 +124,8 @@ describe("mission map controls", () => {
     expect(compiled.errors).toEqual([]);
     expect(missionMap).not.toContain('<MapCanvas');
     expect(css).toContain('margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;');
-    expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
-    expect(network).toContain('width: 48px; height: 48px;');
+    expect(network).toContain('width: 10px; height: 10px; border-radius: 50%');
+    expect(network).not.toContain('width: 48px; height: 48px;');
     const idle = css.lastIndexOf('.mission-desk:not(.mission-desk--active) :deep(.map-canvas--action-compass .maplibregl-ctrl-top-right) {');
     expect(idle).toBeGreaterThan(css.indexOf('@media (max-width: 599px) and (max-height: 560px)'));
     const rule = css.slice(idle, css.indexOf('}', idle));

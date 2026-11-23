@@ -39,8 +39,8 @@ describe("floating map action shape", () => {
       ".map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group:not(:empty))",
       ".map-canvas--action-compass :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass)"
     ]) expect(rule(canvas, selector)).toContain(radius);
-    expect(rule(css("../components/shell/NetworkStatusIcon.vue"), ".network-status-icon__button"))
-      .toContain(radius);
+    expect(rule(css("../components/shell/NetworkStatusIcon.vue"), ".network-status-icon__dot"))
+      .toContain("border-radius: 50%");
 
     for (const path of ["./_user/UserMapView.vue", "./_user/UserMissionView.vue",
       "./_admin/AdminDispatchView.vue", "../components/map/MapCanvas.vue"] ) {

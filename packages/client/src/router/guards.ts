@@ -3,7 +3,7 @@ import type { RouteLocationRaw, RouteLocationNormalized } from "vue-router";
 
 const LOGIN_PATH = "/_auth/login";
 const USER_HOME_PATH = "/_user/map";
-const ADMIN_USERS_PATH = "/_admin/users";
+const ADMIN_DISPATCH_PATH = "/_admin/dispatch";
 const ONBOARDING_PATH = "/_user/complete-security-questions";
 
 export interface AuthGuardState {
@@ -41,14 +41,37 @@ function safeRedirectPath(candidate: unknown): string | null {
   return candidate;
 }
 
+export interface AssignmentStatus { verified: boolean; mission: { id: string } | null }
+
 export function resolvePostLoginDestination(
   redirect: unknown,
-  auth: Pick<AuthGuardState, "mustCompleteSecurityQuestions" | "user">
+  auth: Pick<AuthGuardState, "mustCompleteSecurityQuestions" | "user">,
+  assignment?: AssignmentStatus
 ): string {
   const safeRedirect = safeRedirectPath(redirect);
   if (safeRedirect) return safeRedirect;
   if (auth.mustCompleteSecurityQuestions) return ONBOARDING_PATH;
-  return auth.user?.role === "admin" ? ADMIN_USERS_PATH : USER_HOME_PATH;
+  return auth.user?.role === "admin" ? ADMIN_DISPATCH_PATH :
+    `${USER_HOME_PATH}?tab=${assignment?.verified && !assignment.mission ? "trips" : "missions"}`;
+}
+
+/** Only a confirmed empty assignment permits the Travel tab. A failed or pending
+ * lookup defaults to Missions; explicit return targets never require a lookup. */
+export async function resolvePostLoginDestinationAfterMissionCheck(
+  redirect: unknown,
+  auth: Pick<AuthGuardState, "mustCompleteSecurityQuestions" | "user">,
+  checkAssignment: () => Promise<AssignmentStatus>
+): Promise<string> {
+  const initial = resolvePostLoginDestination(redirect, auth);
+  const user = auth.user;
+  if (safeRedirectPath(redirect) || auth.mustCompleteSecurityQuestions || auth.user?.role !== "user") return initial;
+  try {
+    const assignment = await checkAssignment();
+    if (auth.user !== user || auth.mustCompleteSecurityQuestions) return resolvePostLoginDestination(redirect, auth);
+    return resolvePostLoginDestination(redirect, auth, assignment);
+  } catch {
+    return resolvePostLoginDestination(redirect, auth);
+  }
 }
 
 export function resolveAuthNavigation(
@@ -73,7 +96,7 @@ export function resolveAuthNavigation(
     return ONBOARDING_PATH;
   }
   if (!auth.mustCompleteSecurityQuestions && to.path === ONBOARDING_PATH) {
-    return auth.user?.role === "admin" ? ADMIN_USERS_PATH : USER_HOME_PATH;
+    return resolvePostLoginDestination(undefined, auth);
   }
   if (isAdminPath(to.path) && auth.user?.role !== "admin") {
     return USER_HOME_PATH;
@@ -81,7 +104,7 @@ export function resolveAuthNavigation(
   return true;
 }
 
-export function createAuthGuard(auth: AuthGuardState) {
+export function createAuthGuard(auth: AuthGuardState, checkAssignment: () => Promise<AssignmentStatus> = async () => ({ verified: false, mission: null })) {
   return async (to: RouteLocationNormalized): Promise<RouteLocationRaw | true> => {
     if (isProtectedPath(to.path) || (isGuestOnlyPath(to.path) && auth.isAuthenticated)) {
       // A protected route must never render until its session and role are verified.
@@ -92,6 +115,13 @@ export function createAuthGuard(auth: AuthGuardState) {
       // router's auth watcher redirects if a real session eventually arrives.
       void auth.ensureSession().catch(() => undefined);
     }
-    return resolveAuthNavigation(to, auth);
+    const decision = resolveAuthNavigation(to, auth);
+    if (auth.isAuthenticated && auth.user && !auth.mustCompleteSecurityQuestions &&
+      (isGuestOnlyPath(to.path) || to.path === ONBOARDING_PATH)) {
+      return resolvePostLoginDestinationAfterMissionCheck(
+        isGuestOnlyPath(to.path) ? to.query.redirect : undefined, auth, checkAssignment
+      );
+    }
+    return decision;
   };
 }

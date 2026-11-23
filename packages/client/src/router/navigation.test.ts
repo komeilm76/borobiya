@@ -4,7 +4,7 @@ import { reactive } from "vue";
 import { createPinia } from "pinia";
 import { useAuthStore } from "../stores/auth";
 import { createAppRouter } from "./index";
-import { resolvePostLoginDestination, type AuthGuardState } from "./guards";
+import { resolvePostLoginDestination, type AssignmentStatus, type AuthGuardState } from "./guards";
 
 // Resolve lazy route components without evaluating their Vuetify/CSS dependencies or mounting .vue files.
 vi.mock("@client/views/_auth/LoginView.vue", () => ({ default: {} }));
@@ -29,8 +29,8 @@ function authState(overrides: Partial<AuthGuardState> = {}): AuthGuardState {
   };
 }
 
-function setup(auth: AuthGuardState) {
-  return createAppRouter(createMemoryHistory(), auth);
+function setup(auth: AuthGuardState, check: () => Promise<AssignmentStatus> = async () => ({ verified: true, mission: null })) {
+  return createAppRouter(createMemoryHistory(), auth, check);
 }
 
 const user = { role: "user" } as const;
@@ -59,6 +59,32 @@ describe("real router auth navigation (no Vue components mounted)", () => {
       expect(router.currentRoute.value.path).toBe("/_user/map");
     }
   );
+
+  it.each([
+    [{ verified: true, mission: { id: "assigned" } }, "missions"],
+    [{ verified: true, mission: null }, "trips"],
+    [{ verified: false, mission: null }, "missions"]
+  ] as const)("routes a signed-in rescuer after verification (%s) to %s", async (assignment, tab) => {
+    const router = setup(authState({ isAuthenticated: true, user }), async () => assignment);
+    await router.push("/_auth/login");
+    expect(router.currentRoute.value.fullPath).toBe(`/_user/map?tab=${tab}`);
+  });
+
+  it("does not replace a newer navigation when the late-session mission lookup finishes", async () => {
+    let finish!: (result: AssignmentStatus) => void;
+    const check = vi.fn(() => new Promise<AssignmentStatus>((resolve) => { finish = resolve; }));
+    const auth = reactive(authState());
+    const router = setup(auth, check);
+    await router.push("/_auth/login");
+    auth.user = user;
+    auth.isAuthenticated = true;
+    await vi.waitFor(() => expect(check).toHaveBeenCalled());
+    await router.push("/_public/health");
+    finish({ verified: true, mission: null });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(router.currentRoute.value.path).toBe("/_public/health");
+  });
 
   it("leaves an already-open auth view when a session arrives without navigation", async () => {
     const auth = reactive(authState());
@@ -182,7 +208,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     const auth = authState({ isAuthenticated: true, user: admin });
     const router = setup(auth);
     await router.push("/_auth/register");
-    expect(router.currentRoute.value.path).toBe("/_admin/users");
+    expect(router.currentRoute.value.path).toBe("/_admin/dispatch");
     await router.push("/_admin/dispatch");
     expect(router.currentRoute.value.path).toBe("/_admin/dispatch");
     auth.user = user;

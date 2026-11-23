@@ -4,6 +4,7 @@ import {
   createAuthGuard,
   resolveAuthNavigation,
   resolvePostLoginDestination,
+  resolvePostLoginDestinationAfterMissionCheck,
   type AuthGuardLocation,
   type AuthGuardState
 } from "./guards";
@@ -45,22 +46,22 @@ describe("client auth navigation guard", () => {
 
   it("redirects accounts that already completed onboarding away from its form", () => {
     const auth = makeAuth({ isAuthenticated: true, user: ordinaryUser });
-    expect(resolveAuthNavigation(location("/_user/complete-security-questions"), auth)).toBe("/_user/map");
+    expect(resolveAuthNavigation(location("/_user/complete-security-questions"), auth)).toBe("/_user/map?tab=missions");
     expect(resolveAuthNavigation(location("/_user/complete-security-questions"), makeAuth({ isAuthenticated: true, user: admin })))
-      .toBe("/_admin/users");
+      .toBe("/_admin/dispatch");
   });
 
   it("keeps authenticated users out of guest-only pages and accepts only safe return paths", () => {
     const auth = makeAuth({ isAuthenticated: true, user: ordinaryUser });
 
-    expect(resolveAuthNavigation(location("/_auth/register"), auth)).toBe("/_user/map");
+    expect(resolveAuthNavigation(location("/_auth/register"), auth)).toBe("/_user/map?tab=missions");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "/_user/map?theme=dark" }), auth))
       .toBe("/_user/map?theme=dark");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "//attacker.example/path" }), auth))
-      .toBe("/_user/map");
+      .toBe("/_user/map?tab=missions");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "/_auth/register" }), auth))
-      .toBe("/_user/map");
-    expect(resolveAuthNavigation(location("/auth/forgot-password"), auth)).toBe("/_user/map");
+      .toBe("/_user/map?tab=missions");
+    expect(resolveAuthNavigation(location("/auth/forgot-password"), auth)).toBe("/_user/map?tab=missions");
     expect(resolveAuthNavigation(location("/authentic"), auth)).toBe(true);
   });
 
@@ -81,24 +82,49 @@ describe("client auth navigation guard", () => {
     expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: admin }))).toBe(true);
   });
 
-  it("sends admins to user management after login and keeps user onboarding/default destinations", () => {
-    expect(resolvePostLoginDestination(undefined, makeAuth({ user: admin }))).toBe("/_admin/users");
-    expect(resolvePostLoginDestination(undefined, makeAuth({ user: ordinaryUser }))).toBe("/_user/map");
+  it("sends admins to dispatch after login and keeps user onboarding/default destinations", () => {
+    expect(resolvePostLoginDestination(undefined, makeAuth({ user: admin }))).toBe("/_admin/dispatch");
+    expect(resolvePostLoginDestination(undefined, makeAuth({ user: ordinaryUser }))).toBe("/_user/map?tab=missions");
     expect(resolvePostLoginDestination(undefined, makeAuth({
       user: admin,
       mustCompleteSecurityQuestions: true
     }))).toBe("/_user/complete-security-questions");
   });
 
+  it("selects Trips only after a verified empty assignment, never on lookup failure", async () => {
+    const auth = makeAuth({ user: ordinaryUser });
+    const verifiedEmpty = vi.fn(async () => ({ verified: true, mission: null }));
+    await expect(resolvePostLoginDestinationAfterMissionCheck(undefined, auth, verifiedEmpty))
+      .resolves.toBe("/_user/map?tab=trips");
+    await expect(resolvePostLoginDestinationAfterMissionCheck(undefined, auth,
+      async () => ({ verified: true, mission: { id: "active" } }))).resolves.toBe("/_user/map?tab=missions");
+    await expect(resolvePostLoginDestinationAfterMissionCheck(undefined, auth,
+      async () => ({ verified: false, mission: null }))).resolves.toBe("/_user/map?tab=missions");
+    await expect(resolvePostLoginDestinationAfterMissionCheck(undefined, auth,
+      async () => { throw new Error("offline"); })).resolves.toBe("/_user/map?tab=missions");
+    await expect(resolvePostLoginDestinationAfterMissionCheck("/_user/devices?x=1", auth, verifiedEmpty))
+      .resolves.toBe("/_user/devices?x=1");
+    expect(verifiedEmpty).toHaveBeenCalledOnce();
+  });
+
+  it("does not use a previous account's assignment after the profile changes mid-lookup", async () => {
+    const auth = makeAuth({ user: ordinaryUser });
+    const destination = resolvePostLoginDestinationAfterMissionCheck(undefined, auth, async () => {
+      auth.user = admin;
+      return { verified: true, mission: null };
+    });
+    await expect(destination).resolves.toBe("/_admin/dispatch");
+  });
+
   it("preserves only safe post-login redirects", () => {
     const auth = makeAuth({ user: admin });
     expect(resolvePostLoginDestination("/_admin/dashboard?tab=overview", auth)).toBe("/_admin/dashboard?tab=overview");
-    expect(resolvePostLoginDestination("//attacker.example", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/_auth/register", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/auth/register", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/_auth?registered=1", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/\\\\attacker.example", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination(["/_user/map", "//attacker.example"], auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination("//attacker.example", auth)).toBe("/_admin/dispatch");
+    expect(resolvePostLoginDestination("/_auth/register", auth)).toBe("/_admin/dispatch");
+    expect(resolvePostLoginDestination("/auth/register", auth)).toBe("/_admin/dispatch");
+    expect(resolvePostLoginDestination("/_auth?registered=1", auth)).toBe("/_admin/dispatch");
+    expect(resolvePostLoginDestination("/\\\\attacker.example", auth)).toBe("/_admin/dispatch");
+    expect(resolvePostLoginDestination(["/_user/map", "//attacker.example"], auth)).toBe("/_admin/dispatch");
   });
 
   it("does not block guest pages on a slow refresh, but still verifies protected pages", async () => {

@@ -94,6 +94,8 @@
 </template>
 
 <script setup lang="ts">
+import { checkPostLoginAssignment } from "@/router/post-login";
+import { resolvePostLoginDestinationAfterMissionCheck } from "@/router/guards";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { completeSecurityQuestionsSchema, type SecurityQuestion } from "@shared/index";
@@ -150,7 +152,7 @@ async function submitAnswers(): Promise<void> {
   submitting.value = true;
   try {
     await auth.completeSecurityQuestions(parsed.data);
-    await router.replace("/_user/map");
+    await router.replace(await resolvePostLoginDestinationAfterMissionCheck(undefined, auth, checkPostLoginAssignment));
   } catch (error) {
     formError.value = friendlyErrorMessage(error, "ذخیرهٔ پاسخ‌ها انجام نشد. دوباره تلاش کنید.");
   } finally {

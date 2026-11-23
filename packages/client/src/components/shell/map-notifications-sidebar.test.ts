@@ -71,19 +71,12 @@ describe("map-only proposal notifications", () => {
     expect(css).toContain('forced-colors: active');
     expect(map).toContain('inset-block-start: calc(5rem + env(safe-area-inset-top, 0px))'); // Left search.
     expect(map).toMatch(/\.user-map-view__playback\s*\{[^}]*inset-block-start: calc\(5rem/); // Right history.
-    expect(network).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
     expect(sidebar).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
-    expect(shell).toContain('.app-shell--map:has(.map-proposal__launcher) .network-status-icon--floating {');
-    expect(shell).toContain('right: calc(4.25rem + env(safe-area-inset-right, 0px));');
-    expect(shell).toContain('top: calc(4.25rem + env(safe-area-inset-top, 0px));');
-    expect(shell).toContain('.app-shell--map:has(.map-proposal__launcher) .user-map-view__playback {');
-    expect(shell).toContain('inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));');
-    // Bell and Network use matching 48px targets with an 8px gap.
-    expect(network).toContain('width: 48px; height: 48px;');
-    expect((4.25 - .75) * 16 - 48).toBe(8);
-    expect(shell).toContain('.app-shell--map:has(.user-map-view--mission-idle) .network-status-icon--floating {');
-    expect(shell).toContain('top: auto; bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(shell).toContain('right: calc(7.75rem + env(safe-area-inset-right, 0px));');
+    const menu = readFileSync(new URL("./MapSidebar.vue", import.meta.url), "utf8");
+    expect(menu).toContain('<NetworkStatusIcon class="map-sidebar__network" />');
+    expect(menu).toContain('position: absolute; top: -3px; right: -3px; pointer-events: none;');
+    expect(network).toContain('width: 10px; height: 10px; border-radius: 50%');
+    expect(shell).not.toContain('.network-status-icon--floating');
     const phone = map.split("@media (max-width: 599px) {")[1]!;
     // Two-row rail: compass is to the left of SOS, below the notification bell.
     expect(phone).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*inset-block-end: calc\(4\.25rem/);

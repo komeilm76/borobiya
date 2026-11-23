@@ -91,7 +91,6 @@
       </nav>
     </v-app-bar>
 
-    <NetworkStatusIcon v-if="isMapRoute" floating />
     <MapSidebar
       v-if="isMapRoute"
       :items="mapNavItems"

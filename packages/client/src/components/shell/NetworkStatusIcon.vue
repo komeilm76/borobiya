@@ -1,16 +1,6 @@
 <template>
-  <div class="network-status-icon" :class="{ 'network-status-icon--floating': floating }">
-    <v-btn
-      class="network-status-icon__button"
-      color="surface"
-      variant="flat"
-      icon
-      :aria-label="`وضعیت ارتباط: ${presentation.label}؛ بررسی دوباره`"
-      :title="presentation.label"
-      @click="monitor.check()"
-    >
-      <v-icon :icon="presentation.icon" :color="presentation.color" size="23" aria-hidden="true" />
-    </v-btn>
+  <div class="network-status-icon" :class="`network-status-icon--${monitor.status.value}`" :title="presentation.label">
+    <span class="network-status-icon__dot" aria-hidden="true" />
     <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ presentation.label }}</span>
   </div>
 </template>
@@ -19,7 +9,6 @@
 import { computed, onBeforeUnmount, onMounted } from "vue";
 import { createNetworkStatusMonitor, NETWORK_STATUS_PRESENTATION } from "@/composables/network-status";
 
-defineProps<{ floating?: boolean }>();
 const monitor = createNetworkStatusMonitor();
 const presentation = computed(() => NETWORK_STATUS_PRESENTATION[monitor.status.value]);
 onMounted(monitor.start);
@@ -27,19 +16,14 @@ onBeforeUnmount(monitor.stop);
 </script>
 
 <style scoped>
-.network-status-icon { display: inline-flex; flex: 0 0 auto; align-items: center; }
-.network-status-icon--floating {
-  position: fixed; z-index: 900;
-  top: calc(0.75rem + env(safe-area-inset-top, 0px));
-  right: calc(0.75rem + env(safe-area-inset-right, 0px));
+.network-status-icon { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 12px; height: 12px; }
+.network-status-icon__dot {
+  display: block; width: 10px; height: 10px; border-radius: 50%;
+  background: rgb(var(--v-theme-info));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.35);
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-surface));
 }
-.network-status-icon__button {
-  width: 48px; height: 48px; min-width: 48px; padding: 0;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
-  border-radius: var(--bb-map-action-radius, var(--bb-radius-nested));
-  color: rgb(var(--v-theme-on-surface));
-  background: rgba(var(--v-theme-surface), 0.97) !important;
-  box-shadow: var(--bb-shadow-overlay) !important;
-}
-.network-status-icon__button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.network-status-icon--reachable .network-status-icon__dot { background: rgb(var(--v-theme-success)); }
+.network-status-icon--unavailable .network-status-icon__dot { background: rgb(var(--v-theme-warning)); }
+.network-status-icon--offline .network-status-icon__dot { background: rgb(var(--v-theme-error)); }
 </style>

@@ -535,31 +535,7 @@ a {
   overflow: hidden;
 }
 .app-shell--map .app-footer { display: none; }
-/* Keep network status beside, not on top of, the dispatch sidebar heading. */
-.app-shell--map:has(.admin-dispatch) .network-status-icon--floating {
-  left: calc(4.25rem + env(safe-area-inset-left, 0px)); right: auto;
-}
-
-
-/* The network indicator and mission-offer bell are both map-shell controls.
-   Give each its own 48px slot rather than painting one on top of the other. */
-.app-shell--map:has(.map-proposal__launcher) .network-status-icon--floating {
-  right: calc(4.25rem + env(safe-area-inset-right, 0px));
-}
-@media (max-width: 700px) {
-  /* The centered tab bar needs this horizontal space on compact screens. */
-  .app-shell--map:has(.map-proposal__launcher) .network-status-icon--floating {
-    top: calc(4.25rem + env(safe-area-inset-top, 0px));
-    right: calc(.75rem + env(safe-area-inset-right, 0px));
-  }
-  /* Idle Missions has a top briefing and alert. Put Network beside Broadcast
-     in the spare lower rail instead of covering either card or the tab bar. */
-  .app-shell--map:has(.user-map-view--mission-idle) .network-status-icon--floating {
-    top: auto; bottom: calc(7.75rem + env(safe-area-inset-bottom, 0px));
-    right: calc(7.75rem + env(safe-area-inset-right, 0px));
-  }
-}
-
+/* Network status is now a tiny dot on the map sidebar launcher; no separate map rail slot. */
 @media (min-width: 600px) and (max-width: 700px) {
   .app-shell--map:has(.map-proposal__launcher) .user-map-view__playback {
     inset-block-start: calc(7.75rem + env(safe-area-inset-top, 0px));

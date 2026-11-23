@@ -17,11 +17,15 @@ describe("network status indicator", () => {
   it("stays visible over the full-screen map and in the normal app bar without mounting SFCs", () => {
     const app = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
     const icon = readFileSync(new URL("../components/shell/NetworkStatusIcon.vue", import.meta.url), "utf8");
-    expect(app).toContain('<NetworkStatusIcon v-if="isMapRoute" floating />');
+    const sidebar = readFileSync(new URL("../components/shell/MapSidebar.vue", import.meta.url), "utf8");
+    expect(sidebar).toContain('<NetworkStatusIcon class="map-sidebar__network" />');
+    expect(app).not.toContain('<NetworkStatusIcon v-if="isMapRoute" floating />');
     expect(app).toContain('<nav class="top-nav" aria-label="پیمایش اصلی">\n        <NetworkStatusIcon />');
-    expect(icon).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px))');
+    expect(sidebar).toContain('position: absolute; top: -3px; right: -3px; pointer-events: none;');
+    expect(icon).toContain('width: 10px; height: 10px; border-radius: 50%');
+    expect(icon).not.toContain('<v-btn');
     expect(icon).toContain('role="status" aria-live="polite"');
-    expect(icon).toContain('@click="monitor.check()"');
+
   });
 
   it("reports actual API reachability separately from the device's connection", async () => {
