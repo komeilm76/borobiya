@@ -34,9 +34,11 @@ export interface MissionLiveRuntime {
     onError: (denied: boolean) => void) => () => void;
   now?: () => number;
   readSync?: (token: string, since: string, signal?: AbortSignal) => Promise<UserSyncResponse>;
-  readMission?: (token: string, id: string) => Promise<MissionDetail>;
+  readMission?: (token: string, id: string, signal?: AbortSignal) => Promise<MissionDetail>;
 }
 const STALE_MS = 30_000;
+/** Bound the whole post-outage status verification, including paginated sync and detail fallback. */
+export const MISSION_RECOVERY_DEADLINE_MS = 45_000;
 
 export function browserWatch(onFix: (fix: { lat: number; lon: number; accuracy?: number; timestamp?: number }) => void,
   onError: (denied: boolean) => void): () => void {
@@ -196,16 +198,28 @@ export function useMissionLiveLocations(
     const valid = () => gen === generation && !abort.signal.aborted && client === opened &&
       opened.socket.connected && mission.value?.id === current.id && userId.value === owner &&
       socketIdentity === sessionIdentity(token.value);
-    try {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const cancelled = new Promise<never>((_, reject) => {
+      abort.signal.addEventListener("abort", () => reject(new Error("MISSION_RECOVERY_ABORTED")), { once: true });
+    });
+    const deadline = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error("MISSION_RECOVERY_TIMEOUT")), MISSION_RECOVERY_DEADLINE_MS);
+    });
+    const readLatest = async () => {
       // Admins do not have a /_user sync stream: their authenticated detail read is the
       // authoritative recovery path; participant sync must never leak a global event feed.
       const result = isAdmin(bearer) ? null : await (runtime.readSync ?? readAllUserSync)(bearer, since, abort.signal);
-      if (!valid()) return;
+      if (!valid()) return null;
       // A full snapshot contains the current mission whenever it is active or changed since
       // disconnect. A truncated list or an older terminal mission needs a scoped detail read.
       const snapshot = result?.missions.find((item) => item.id === current.id);
-      const latest = snapshot ?? await (runtime.readMission ?? getMission)(token.value!, current.id);
-      if (!valid()) return;
+      return snapshot ?? await (runtime.readMission ?? getMission)(token.value!, current.id, abort.signal);
+    };
+    try {
+      // One deadline covers every page and the detail fallback; abort alone is not
+      // sufficient when a native fetch adapter ignores its signal.
+      const latest = await Promise.race([readLatest(), deadline, cancelled]);
+      if (!valid() || !latest) return;
       if (latest.status === "completed" || latest.status.startsWith("cancelled_") || latest.status === "expired") {
         endMission();
         return;
@@ -227,6 +241,8 @@ export function useMissionLiveLocations(
         error.value = "همگام‌سازی پس از اتصال دوباره ممکن نشد؛ برای بررسی وضعیت مأموریت دوباره تلاش کنید.";
       }
     } finally {
+      if (timer !== null) clearTimeout(timer);
+      abort.abort(); // Also fence a transport that resolves after the timeout or caller cancellation.
       if (syncAbort === abort) syncAbort = null;
     }
   }

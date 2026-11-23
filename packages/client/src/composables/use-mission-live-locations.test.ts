@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { RealtimeClient } from "@/services/socket";
 import type { UserSyncResponse } from "@shared/index";
 import { MISSION_LOCATION_EVENT, MISSION_LOCATION_PUBLISH_EVENT, MISSION_SUBSCRIBE_EVENT } from "@/services/socket-events";
-import { browserWatch, useMissionLiveLocations } from "./use-mission-live-locations";
+import { browserWatch, MISSION_RECOVERY_DEADLINE_MS, useMissionLiveLocations } from "./use-mission-live-locations";
 
 const mission = { id: "70000000-0000-4000-8000-000000000001",
   requesterId: "70000000-0000-4000-8000-000000000002", rescuerId: "70000000-0000-4000-8000-000000000003" };
@@ -431,6 +431,59 @@ describe("mission live positions (T3.5.7)", () => {
     scope2.stop();
   });
 
+  it("surfaces a stalled reconnect check without resuming GPS, even if the transport ignores abort", async () => {
+    vi.useFakeTimers();
+    const session = fakeSocket();
+    let finish!: (value: UserSyncResponse) => void;
+    const readSync = vi.fn(() => new Promise<UserSyncResponse>((resolve) => { finish = resolve; }));
+    const readMission = vi.fn();
+    const watchPosition = vi.fn(() => vi.fn());
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, readSync, readMission, watchPosition }, true))!;
+    try {
+      await settle();
+      session.socket.connected = false;
+      session.listeners.get("disconnect")?.("transport close");
+      session.socket.connected = true;
+      session.listeners.get("connect")?.();
+      await settle();
+      expect(live.recoveryPending.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(MISSION_RECOVERY_DEADLINE_MS);
+      expect(live.recoveryPending.value).toBe(true);
+      expect(live.sharing.value).toBe(false);
+      expect(live.error.value).toContain("همگام‌سازی");
+      finish({ events: [], missions: [], missionsTruncated: false, nextCursor: null, location: null });
+      await settle();
+      expect(readMission).not.toHaveBeenCalled();
+      expect(watchPosition).toHaveBeenCalledTimes(1); // only the initial verified room
+      expect(live.recoveryPending.value).toBe(true);
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
+  it("times out an admin's stalled mission-detail recovery and aborts its request", async () => {
+    vi.useFakeTimers();
+    const session = fakeSocket();
+    const adminToken = `x.${btoa(JSON.stringify({ role: "admin", sub: "admin", deviceId: "device-1" }))}.x`;
+    const readMission = vi.fn((_bearer: string, _id: string, _signal?: AbortSignal) => new Promise<never>(() => {}));
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(adminToken), ref("admin"),
+      async () => {}, { openSocket: async () => session.client, readMission }))!;
+    try {
+      await settle();
+      session.socket.connected = false;
+      session.listeners.get("disconnect")?.("transport close");
+      session.socket.connected = true;
+      session.listeners.get("connect")?.();
+      await settle();
+      expect(readMission).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(MISSION_RECOVERY_DEADLINE_MS);
+      expect(live.error.value).toContain("همگام‌سازی");
+      expect(live.recoveryPending.value).toBe(true);
+      expect(readMission.mock.calls[0]?.[2]?.aborted).toBe(true);
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("blocks fresh GPS consent until a reconnect verifies the mission, then honors a terminal result", async () => {
     const session = fakeSocket();
     let finish!: (value: UserSyncResponse) => void;
@@ -592,7 +645,7 @@ describe("mission live positions (T3.5.7)", () => {
     session.listeners.get("connect")?.();
     await settle();
     expect(readSync).not.toHaveBeenCalled();
-    expect(readMission).toHaveBeenCalledWith(adminToken, mission.id);
+    expect(readMission).toHaveBeenCalledWith(adminToken, mission.id, expect.any(AbortSignal));
     expect(live.error.value).toContain("پایان");
     scope.stop();
   });

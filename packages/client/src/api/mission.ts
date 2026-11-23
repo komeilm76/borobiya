@@ -55,9 +55,9 @@ export async function getMissionBrief(token: string, missionId: string, signal?:
   return brief;
 }
 
-export async function getMission(token: string, id: string): Promise<MissionDetail> {
+export async function getMission(token: string, id: string, signal?: AbortSignal): Promise<MissionDetail> {
   return missionDetailSchema.parse(await requestJson<unknown>(apiRoutes.sos.getMission.url.replace(":id", encodeURIComponent(id)),
-    { accessToken: token }));
+    { accessToken: token, signal }));
 }
 
 /** Only the assigned rescuer may request the next ordered step; the response is the persisted mission. */
