@@ -47,6 +47,27 @@ const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60_000;
 export const SESSION_RESTORE_BUDGET_MS = 12_000;
 const MAX_RECOVERY_DELAY_MS = 30_000;
 
+class SessionDeadlineError extends Error {}
+
+async function withSessionDeadline<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      // Abort is advisory: some transports never settle, so reject independently.
+      reject(new SessionDeadlineError("Session restore timed out."));
+      controller.abort();
+    }, SESSION_RESTORE_BUDGET_MS);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([work(controller.signal), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    controller.abort();
+  }
+}
+
 function refreshWasRejected(error: unknown): boolean {
   // These are the refresh endpoint's explicit revocation responses. A proxy's
   // bare 401/403, a transport error or a server failure cannot prove the cookie
@@ -176,13 +197,12 @@ export const useAuthStore = defineStore("auth", () => {
       clearProfileRecovery();
       return;
     }
-    // A recovery attempt must be bounded as well; otherwise an offline /me
-    // read can occupy the retry slot forever until a full page reload.
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), SESSION_RESTORE_BUDGET_MS);
-    timeout.unref?.();
-    try { await loadCurrentUser(pending.token, pending.generation, controller.signal); }
-    finally { clearTimeout(timeout); }
+    // A recovery attempt must be bounded even if the transport ignores abort.
+    try {
+      await withSessionDeadline((signal) => loadCurrentUser(pending.token, pending.generation, signal));
+    } catch {
+      scheduleProfileRecovery(pending.token, pending.generation);
+    }
   }
 
   function clearRecovery(): void {
@@ -301,12 +321,12 @@ export const useAuthStore = defineStore("auth", () => {
         skipAuthRefresh: true,
         signal
       }));
-      if (generation !== sessionGeneration || accessToken.value !== token) return;
+      if (signal?.aborted || generation !== sessionGeneration || accessToken.value !== token) return;
       clearProfileRecovery();
       userCategories.value = profile.categories;
       setUser(userFromProfile(profile));
     } catch (error) {
-      if (generation !== sessionGeneration || accessToken.value !== token) return;
+      if (signal?.aborted || generation !== sessionGeneration || accessToken.value !== token) return;
       if (error instanceof ApiError && error.code === "SECURITY_QUESTIONS_REQUIRED") {
         clearProfileRecovery();
         onboardingRequired.value = true;
@@ -330,36 +350,40 @@ export const useAuthStore = defineStore("auth", () => {
   function refreshFromCookie(): Promise<void> {
     if (refreshPromise && refreshPromiseGeneration === sessionGeneration) return refreshPromise;
     const generation = sessionGeneration;
-    const pending = (async () => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), SESSION_RESTORE_BUDGET_MS);
-      timeout.unref?.();
-      try {
-        const response = refreshResponseSchema.parse(await requestJson<unknown>(authApiRoutes.refresh.url, {
-          method: "POST",
-          signal: controller.signal
-        }));
-        if (generation !== sessionGeneration || controller.signal.aborted) return;
-        const restoredClaims = decodeAccessTokenClaims(response.accessToken);
-        const cachedProfileMismatch = !accessToken.value && !!user.value && response.accessToken.includes(".") &&
-          (restoredClaims?.sub !== user.value.id || typeof restoredClaims.sessionId !== "string");
-        if ((accessToken.value && !sameBearerSession(accessToken.value, response.accessToken)) || cachedProfileMismatch) {
-          // The shared cookie can name a different login even on cold start, when
-          // sessionStorage restored a user but there is no prior bearer to compare.
-          // Discard that profile before exposing the new bearer; a failed profile
-          // read must not leave the previous account in memory or sessionStorage.
-          ++sessionGeneration;
-          refreshPromiseGeneration = sessionGeneration;
-          sessionTokens.clear();
-          userCategories.value = [];
-          setUser(null);
-        }
-        setAccessToken(response.accessToken);
-        await loadCurrentUser(response.accessToken, sessionGeneration, controller.signal);
-      } finally {
-        clearTimeout(timeout);
+    let profileAttempt: { token: string; generation: number } | null = null;
+    const pending = withSessionDeadline(async (signal) => {
+      const response = refreshResponseSchema.parse(await requestJson<unknown>(authApiRoutes.refresh.url, {
+        method: "POST",
+        signal
+      }));
+      if (generation !== sessionGeneration || signal.aborted) return;
+      const restoredClaims = decodeAccessTokenClaims(response.accessToken);
+      const cachedProfileMismatch = !accessToken.value && !!user.value && response.accessToken.includes(".") &&
+        (restoredClaims?.sub !== user.value.id || typeof restoredClaims.sessionId !== "string");
+      if ((accessToken.value && !sameBearerSession(accessToken.value, response.accessToken)) || cachedProfileMismatch) {
+        // The shared cookie can name a different login even on cold start, when
+        // sessionStorage restored a user but there is no prior bearer to compare.
+        // Discard that profile before exposing the new bearer; a failed profile
+        // read must not leave the previous account in memory or sessionStorage.
+        ++sessionGeneration;
+        refreshPromiseGeneration = sessionGeneration;
+        sessionTokens.clear();
+        userCategories.value = [];
+        setUser(null);
       }
-    })();
+      setAccessToken(response.accessToken);
+      profileAttempt = { token: response.accessToken, generation: sessionGeneration };
+      await loadCurrentUser(response.accessToken, sessionGeneration, signal);
+    }).catch((error: unknown) => {
+      if (error instanceof SessionDeadlineError && profileAttempt &&
+          profileAttempt.generation === sessionGeneration && accessToken.value === profileAttempt.token) {
+        // The cookie exchange succeeded, but /me stalled. Retain the bearer and
+        // retry the profile, rather than exchanging the cookie all over again.
+        scheduleProfileRecovery(profileAttempt.token, profileAttempt.generation);
+        return;
+      }
+      throw error;
+    });
     refreshPromise = pending;
     refreshPromiseGeneration = generation;
     return pending.finally(() => {

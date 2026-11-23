@@ -87,6 +87,89 @@ describe("client auth store", () => {
     } finally { auth.$dispose(); vi.useRealTimers(); }
   });
 
+  it("finishes cold restoration when a transport ignores abort entirely", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(() => {}));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      const restoring = auth.ensureSession();
+      const finished = expect(restoring).resolves.toBeUndefined();
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_BUDGET_MS);
+      await finished;
+      expect(auth.initialized).toBe(true);
+      expect(auth.isAuthenticated).toBe(false);
+      expect((fetchMock.mock.calls[0]?.[1] as RequestInit).signal?.aborted).toBe(true);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("ignores a stale profile response after the restoration deadline", async () => {
+    vi.useFakeTimers();
+    let finishProfile!: (response: Response) => void;
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken }),
+      () => new Promise<Response>((resolve) => { finishProfile = resolve; })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      const restoring = auth.ensureSession();
+      const finished = expect(restoring).resolves.toBeUndefined();
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_BUDGET_MS);
+      await finished;
+      expect(auth.accessToken).toBe(accessToken);
+      expect(auth.user).toBeNull();
+      finishProfile(jsonResponse(profile));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(auth.user).toBeNull();
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("retries a profile read after its transport ignores the restoration deadline", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken }),
+      () => new Promise<Response>(() => {}),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      const restoring = auth.ensureSession();
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_BUDGET_MS);
+      await restoring;
+      expect(auth.user).toBeNull();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(auth.user).toMatchObject({ id: user.id });
+      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+        `/api${apiRoutes.auth.refresh.url}`,
+        `/api${apiRoutes.user.me.url}`,
+        `/api${apiRoutes.user.me.url}`
+      ]);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("reopens profile recovery when a retry ignores abort", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken }),
+      () => Promise.reject(new TypeError("offline")),
+      () => new Promise<Response>(() => {}),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.ensureSession();
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(SESSION_RESTORE_BUDGET_MS);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(auth.user).toMatchObject({ id: user.id });
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
   it("stores the access token and user returned by login", async () => {
     const fetchMock = fakeFetch(jsonResponse({ accessToken, user }));
     vi.stubGlobal("fetch", fetchMock);
