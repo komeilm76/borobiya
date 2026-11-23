@@ -1,5 +1,7 @@
 # `/_user/devices` — Section 4 follow-up: button corner consistency
 
+**Superseded radius choice:** The user found the refresh button's 16px radius excessive. [Global button-radius configuration](global-button-config-README.md) now provides the latest 8px compact and 12px normal button values. The 16px fixture captures and results below document the *earlier intermediate change*, not the final design.
+
 ## Evidence
 
 - **Genuine authenticated before:** the user's three signed-in light screenshots, already preserved as `real-current-{mobile,tablet,desktop}.png` in this folder (390 × 1105, 645 × 860, 1007 × 630). They show the original, square-ish page action buttons. These are not new captures.

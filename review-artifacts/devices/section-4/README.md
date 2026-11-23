@@ -1,6 +1,6 @@
 # `/_user/devices` — Section 4: design consistency and final evaluation
 
-**Subsequent correction:** After this no-UI-change audit, the user identified inconsistent button corners. See [the button-radius follow-up](button-radius-README.md) for the page-scoped fix, fixture-backed after captures, and pending genuine after evidence. The unchanged-state conclusion below describes the original Section 4 review, not the later button fix.
+**Subsequent corrections:** After this no-UI-change audit, the user identified inconsistent button corners. See the [initial button-radius follow-up](button-radius-README.md) and its [latest global configuration refinement](global-button-config-README.md). The unchanged-state conclusion below describes the original Section 4 review, not these later button changes. Genuine after evidence for the latest values is still pending.
 
 ## Page and screenshot provenance
 

@@ -264,14 +264,28 @@ Start the API first, then run `bun --filter @borobiya/client generate:api`. By d
 
 ### Client design tokens
 
-Change shared UI spacing, theme colors and typography in `packages/client/src/styles/tokens.ts`.
-The 8px grid includes one 4px half-step for small details. Vuetify reads the same
-palette used for the generated `--bb-*` CSS variables; use those variables in new
-component CSS instead of copying hex values. The pre-paint `public/theme-init.js`
-must remain a small static script to prevent a theme flash: when changing its
-background or foreground, update it alongside the tokens (the token tests pin
-both values). Existing one-off component colors have not all been migrated;
-this foundation does not replace a responsive or WCAG visual audit.
+The global design configuration is `packages/client/src/styles/tokens.ts`: edit its
+`spacing`, `radii`, `typography`, `palettes`, or `shadows` values, then rebuild/reload
+the client. `main.ts` installs these as `--bb-*` CSS variables, and Vuetify uses the
+same light/dark palette. Use those variables in new component CSS instead of copying
+values. The 8px spacing grid includes one 4px half-step for small details.
+
+For button corners, edit `radii.button` (default **12px**) for ordinary text actions
+or `radii["button-compact"]` (default **8px**) for small/x-small actions such as
+`/_user/devices` refresh. The shared CSS applies these defaults across Vuetify's
+app and overlay containers; changing one value updates all controls that consume
+that token on the next reload. A larger small-sized action can explicitly use
+`var(--bb-radius-button)` instead. Icon circles, tiles, pills and components with
+explicit `rounded` variants retain their intentional shapes. For example, change
+`"button-compact": 8` to `"button-compact": 6` to make compact actions less round;
+do not edit individual page styles for that adjustment.
+
+The pre-paint `public/theme-init.js` must remain a small static script to prevent
+a theme flash: when changing its background or foreground, update it alongside
+the tokens (tests pin both values). Some legacy component-local colors and explicit
+radius overrides have not all been migrated; this configuration is the source of
+truth for token-backed styles, **not** a claim that every existing CSS declaration
+is centralized. A comprehensive migration and visual audit would be separate work.
 
 ## 8. Testing
 

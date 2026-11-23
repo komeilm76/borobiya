@@ -14,9 +14,11 @@ export const spacing = {
   eight: 64
 } as const;
 
-// Vuetify's `rounded="xl"` is 24px; card-like plain CSS uses that same radius.
-// Inset cards and selectable rows have a smaller, consistent 16px corner.
-export const radii = { card: 24, nested: 16 } as const;
+// Global radius configuration. Edit these numbers to update token-backed styles
+// throughout the app; main.ts installs the resulting CSS variables at startup.
+// Card and nested surfaces are intentionally rounder than text buttons. Compact
+// buttons (such as the 28px-high refresh action) should not become pill-shaped.
+export const radii = { card: 24, nested: 16, button: 12, "button-compact": 8 } as const;
 
 export const typography = {
   fontFamily: '"Vazirmatn Variable", "Segoe UI", Tahoma, sans-serif',

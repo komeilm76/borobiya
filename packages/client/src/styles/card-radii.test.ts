@@ -54,7 +54,7 @@ const nested: Record<string, string[]> = {
 
 describe("card corner scale (source-pinned; no Vue mount)", () => {
   it("publishes a 24px outer / 16px nested scale for plain CSS", () => {
-    expect(radii).toEqual({ card: 24, nested: 16 });
+    expect(radii).toMatchObject({ card: 24, nested: 16 });
     expect(designTokenStylesheet()).toContain("--bb-radius-card: 24px");
     expect(designTokenStylesheet()).toContain("--bb-radius-nested: 16px");
   });

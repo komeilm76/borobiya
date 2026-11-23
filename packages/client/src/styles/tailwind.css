@@ -130,8 +130,14 @@ a {
   font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
   letter-spacing: normal; text-indent: 0; text-transform: none;
 }
-:is(.app-shell, .v-overlay-container) .v-btn:not(.v-btn--icon):not(.v-btn--tile):not([class*="rounded-"]):is(.v-btn--variant-flat, .v-btn--variant-tonal, .v-btn--variant-outlined) {
-  border-radius: var(--bb-radius-nested, 16px);
+/* The rendered v-app has route modifier classes, not a bare .app-shell class.
+   Match Vuetify's real root so editing radii in tokens.ts changes default
+   buttons throughout the app; keep explicit rounded, icon and tile variants. */
+:is(.v-application, .v-overlay-container) .v-btn:where(:not(.v-btn--icon):not(.v-btn--tile):not([class*="rounded-"]):is(.v-btn--variant-flat, .v-btn--variant-tonal, .v-btn--variant-outlined)) {
+  border-radius: var(--bb-radius-button, 12px);
+}
+:is(.v-application, .v-overlay-container) .v-btn:is(.v-btn--size-small, .v-btn--size-x-small):where(:not(.v-btn--icon):not(.v-btn--tile):not([class*="rounded-"]):is(.v-btn--variant-flat, .v-btn--variant-tonal, .v-btn--variant-outlined)) {
+  border-radius: var(--bb-radius-button-compact, 8px);
 }
 :is(.app-shell, .v-overlay-container) .v-field--variant-outlined:not([class*="rounded-"]) {
   border-radius: var(--bb-radius-nested, 16px);
