@@ -70,11 +70,20 @@ describe("category member management dialog", () => {
     expect(dialog).not.toContain('admin-category-members__action-hint');
   });
 
+  it("uses quiet section fills and flat member rows instead of nested outlines", () => {
+    expect(style).toContain('.admin-category-members__section { min-width: 0; padding: .8rem; border: 0; background: transparent; }');
+    expect(style).toContain('border-radius: .85rem; background: var(--bb-color-inset); }');
+    expect(style).toContain('.admin-category-members__person + .admin-category-members__person { border-top:');
+    expect(style).toContain('.admin-categories-member--selected { background: rgba(var(--v-theme-primary), .1);');
+    expect(style).toContain('.admin-categories-member--selected { outline: 2px solid Highlight;');
+    expect(style).not.toContain('.admin-category-members__person { display: flex; align-items: center; gap: .4rem; min-width: 0; min-height: 48px;\n  padding: .1rem .35rem; border: 1px');
+  });
+
   it("keeps touch targets, focus, theme and phone layout intact", () => {
     expect(style).toContain('.admin-category-members__person :deep(.v-btn) { min-width: 44px; min-height: 44px;');
     expect(style).toContain('.admin-categories-member :deep(.v-selection-control--focus-visible)');
     expect(style).toContain('.admin-category-members__section--search { grid-column: 1; grid-row: 1; }');
-    expect(style).toContain('.admin-category-members__section--current { grid-column: 2; grid-row: 1; }');
+    expect(style).toContain('.admin-category-members__section--current { grid-column: 2; grid-row: 1;');
     expect(style).toContain('.admin-category-members__section--search, .admin-category-members__section--current { grid-column: 1; grid-row: auto; }');
     expect(style).toContain('background: var(--bb-color-inset)');
     const descriptor = parse(source).descriptor;

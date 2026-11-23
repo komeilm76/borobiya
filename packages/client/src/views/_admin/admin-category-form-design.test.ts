@@ -37,6 +37,15 @@ describe("category edit/create dialog", () => {
     expect(source).toContain('categoryCreateBody(draft.value)');
   });
 
+  it("separates form steps without nested card outlines while keeping selection and focus visible", () => {
+    expect(css).toContain('.admin-category-form__section { min-width: 0; padding: 0; border: 0; background: transparent; }');
+    expect(css).toContain('.admin-category-form__section + .admin-category-form__section { padding-block-start: 1.15rem;');
+    expect(css).toContain('.admin-category-form__option { min-width: 0; border-radius: .85rem;');
+    expect(css).toContain('box-shadow: inset 0 0 0 2px rgb(var(--v-theme-primary));');
+    expect(css).toContain('.admin-category-form__option--selected { outline: 2px solid Highlight;');
+    expect(css).not.toContain('.admin-category-form__section { padding: 1rem; }');
+  });
+
   it("keeps controls legible, touch-sized and recoverable after closing", () => {
     expect(form).toContain('@after-leave="restoreFormFocus"');
     expect(source).toContain('formTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;');
