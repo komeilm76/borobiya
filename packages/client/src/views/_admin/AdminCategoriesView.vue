@@ -240,9 +240,8 @@
         <header class="admin-category-members__header">
           <span class="admin-category-members__header-icon" aria-hidden="true"><v-icon icon="mdi-account-multiple-plus-outline" size="25" /></span>
           <div class="admin-category-members__heading">
-            <span class="admin-category-members__eyebrow">گروه‌های امدادگر / اعضا</span>
+            <span class="admin-category-members__eyebrow">افزودن عضو به گروه</span>
             <h2 id="admin-category-members-title">{{ membersFor?.name ?? 'مدیریت اعضا' }}</h2>
-            <p>اعضای فعلی را بررسی کنید یا حساب‌های تازه به این گروه اضافه کنید.</p>
           </div>
           <v-btn class="admin-category-members__close" icon="mdi-close" variant="text" aria-label="بستن مدیریت اعضا"
             :disabled="saving || removingMemberId !== null" @click="membersOpen = false" />
@@ -254,7 +253,7 @@
               <span class="admin-category-members__section-icon" aria-hidden="true"><v-icon icon="mdi-account-search-outline" size="21" /></span>
               <div>
                 <h3 id="admin-category-add-title">افزودن حساب</h3>
-                <p id="admin-category-search-hint">با نام کاربری جست‌وجو کنید؛ فقط حساب‌های فعالِ خارج از این گروه نمایش داده می‌شوند.</p>
+                <p id="admin-category-search-hint">جست‌وجو فقط حساب‌های فعالِ خارج از این گروه را نشان می‌دهد.</p>
               </div>
             </div>
             <v-text-field
@@ -312,16 +311,13 @@
                     </template>
                   </v-checkbox>
                 </div>
-                <p class="admin-category-members__results-hint">حداکثر ۱۰ نتیجه نمایش داده می‌شود؛ برای موارد بیشتر جست‌وجو را دقیق‌تر کنید.</p>
+                <p v-if="candidates.length === 10" class="admin-category-members__results-hint">۱۰ نتیجهٔ نخست؛ جست‌وجو را دقیق‌تر کنید.</p>
               </template>
             </div>
           </section>
 
           <section v-if="selectedIds.length" class="admin-category-members__selection" aria-label="حساب‌های انتخاب‌شده برای افزودن">
-            <div class="admin-category-members__selection-heading">
-              <strong>آمادهٔ افزودن</strong>
-              <span>{{ selectedIds.length.toLocaleString('fa-IR') }} حساب انتخاب‌شده</span>
-            </div>
+            <strong class="admin-category-members__selection-heading">انتخاب‌شده ({{ selectedIds.length.toLocaleString('fa-IR') }})</strong>
             <div class="admin-category-members__selection-chips">
               <v-chip v-for="id in selectedIds" :key="id" closable color="primary" variant="tonal"
                 :disabled="saving || removingMemberId !== null" :close-label="`حذف ${selectedUsernames[id] ?? 'کاربر'} از انتخاب‌ها`"
@@ -329,32 +325,33 @@
             </div>
           </section>
           <section class="admin-category-members__section admin-category-members__section--current" aria-labelledby="admin-category-current-title" data-test="current-members">
-            <div class="admin-category-members__section-head">
-              <span class="admin-category-members__section-icon" aria-hidden="true"><v-icon icon="mdi-account-check-outline" size="21" /></span>
-              <div>
-                <h3 id="admin-category-current-title">اعضای فعلی</h3>
-                <p>حذف عضو فقط عضویت در همین گروه را برمی‌دارد.</p>
-              </div>
+            <button class="admin-category-members__disclosure" type="button" :aria-expanded="currentMembersExpanded"
+              aria-controls="admin-category-current-list" @click="currentMembersExpanded = !currentMembersExpanded">
+              <span class="admin-category-members__section-icon" aria-hidden="true"><v-icon icon="mdi-account-check-outline" size="20" /></span>
+              <span id="admin-category-current-title">اعضای فعلی</span>
               <span class="admin-category-members__count">{{ (membersFor?.members.length ?? 0).toLocaleString('fa-IR') }} عضو</span>
+              <v-icon :icon="currentMembersExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="20" aria-hidden="true" />
+            </button>
+            <div v-show="currentMembersExpanded" id="admin-category-current-list" class="admin-category-members__current-content">
+              <p class="admin-category-members__remove-hint">حذف عضو فقط عضویت در همین گروه را برمی‌دارد.</p>
+              <div v-if="!membersFor || membersFor.members.length === 0" class="admin-category-members__empty">
+                هنوز عضوی در این گروه ثبت نشده است.
+              </div>
+              <ul v-else class="admin-category-members__current" aria-label="اعضای فعلی گروه">
+                <li v-for="member in membersFor.members" :key="member.id" class="admin-category-members__person">
+                  <span class="admin-category-members__avatar" aria-hidden="true">{{ member.username.slice(0, 1).toUpperCase() }}</span>
+                  <span class="admin-category-members__username" dir="ltr">{{ member.username }}</span>
+                  <v-btn size="small" variant="text" color="error" prepend-icon="mdi-account-minus-outline"
+                    :loading="removingMemberId === member.id" :disabled="saving || removingMemberId !== null"
+                    :aria-label="`حذف ${member.username} از ${membersFor.name}`" @click="removeMember(member)">حذف</v-btn>
+                </li>
+              </ul>
             </div>
-            <div v-if="!membersFor || membersFor.members.length === 0" class="admin-category-members__empty">
-              هنوز عضوی در این گروه ثبت نشده است.
-            </div>
-            <ul v-else class="admin-category-members__current" aria-label="اعضای فعلی گروه">
-              <li v-for="member in membersFor.members" :key="member.id" class="admin-category-members__person">
-                <span class="admin-category-members__avatar" aria-hidden="true">{{ member.username.slice(0, 1).toUpperCase() }}</span>
-                <span class="admin-category-members__username" dir="ltr">{{ member.username }}</span>
-                <v-btn size="small" variant="text" color="error" prepend-icon="mdi-account-minus-outline"
-                  :loading="removingMemberId === member.id" :disabled="saving || removingMemberId !== null"
-                  :aria-label="`حذف ${member.username} از ${membersFor.name}`" @click="removeMember(member)">حذف</v-btn>
-              </li>
-            </ul>
           </section>
 
           <v-alert v-if="membersError" class="admin-category-members__error" type="error" variant="tonal" rounded="lg" role="alert">{{ membersError }}</v-alert>
         </v-card-text>
         <v-card-actions class="admin-catalog-dialog-actions admin-category-members__actions">
-          <span class="admin-category-members__action-hint">{{ selectedIds.length ? `${selectedIds.length.toLocaleString('fa-IR')} حساب آمادهٔ افزودن است.` : 'برای افزودن، یک یا چند حساب را انتخاب کنید.' }}</span>
           <v-spacer />
           <v-btn variant="text" rounded="lg" :disabled="saving || removingMemberId !== null" @click="membersOpen = false">بستن</v-btn>
           <v-btn color="primary" variant="flat" rounded="lg" :loading="saving"
@@ -433,6 +430,7 @@ function clearFormFeedback(field: "name" | "description" | "incidentTypeIds"): v
 
 const membersOpen = ref(false);
 const membersFor = ref<Category | null>(null);
+const currentMembersExpanded = ref(true);
 const selectedIds = ref<string[]>([]);
 const selectedUsernames = ref<Record<string, string>>({});
 let membersTrigger: HTMLElement | null = null;
@@ -589,6 +587,7 @@ async function submit(): Promise<void> {
 
 function openMembers(category: Category, event: MouseEvent): void {
   membersTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  currentMembersExpanded.value = !isPhone.value;
   resetSearch();
   membersFor.value = category;
   selectedIds.value = [];
@@ -599,6 +598,7 @@ function openMembers(category: Category, event: MouseEvent): void {
 
 // The picker is an admin username search, not a raw-UUID form. Closing or switching categories
 // invalidates replies that might otherwise offer candidates for an old dialog context.
+watch(isPhone, (phone) => { if (membersOpen.value) currentMembersExpanded.value = !phone; });
 watch(membersOpen, (open) => {
   if (!open) {
     resetSearch();
@@ -769,76 +769,81 @@ onUnmounted(() => {
 
 .admin-category-members { color: var(--bb-color-text); background: rgb(var(--v-theme-surface)); font-family: var(--bb-font-family); }
 .admin-category-members__header {
-  display: flex; align-items: center; gap: 1rem; flex: none;
-  padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--bb-color-outline);
+  display: flex; align-items: center; gap: .7rem; flex: none;
+  padding: .75rem 1.1rem; border-bottom: 1px solid var(--bb-color-outline);
   background: linear-gradient(110deg, rgba(var(--v-theme-primary), .1), rgba(var(--v-theme-primary), .025) 75%);
 }
-.admin-category-members__header-icon { display: grid; flex: none; place-items: center; width: 52px; height: 52px;
+.admin-category-members__header-icon { display: grid; flex: none; place-items: center; width: 40px; height: 40px;
   border-radius: 1rem; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
 .admin-category-members__heading { min-width: 0; flex: 1; }
 .admin-category-members__eyebrow { color: var(--bb-color-primary); font-size: .82rem; font-weight: 750; }
 .admin-category-members__heading h2 { margin: .15rem 0 0; font-size: 1.25rem; font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
-.admin-category-members__heading p { margin: .25rem 0 0; color: var(--bb-color-muted); font-size: .85rem; line-height: 1.65; }
 .admin-category-members__close { flex: none; align-self: flex-start; }
 .admin-category-members__close.v-btn { width: 44px; height: 44px; }
 .admin-category-members__body {
   display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, .8fr);
-  gap: .85rem; align-content: start; padding: 1.25rem 1.5rem 1.5rem;
+  gap: .6rem; align-content: start; align-items: start; padding: .85rem 1.1rem;
 }
-.admin-category-members__section { min-width: 0; padding: 1.15rem; border: 1px solid var(--bb-color-outline);
+.admin-category-members__section { min-width: 0; padding: .8rem; border: 1px solid var(--bb-color-outline);
   border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); }
 .admin-category-members__section--search { grid-column: 1; grid-row: 1; }
 .admin-category-members__section--current { grid-column: 2; grid-row: 1; }
-.admin-category-members__section-head { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; margin-bottom: .9rem; }
+.admin-category-members__section-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
 .admin-category-members__section-head > div { min-width: 0; flex: 1 1 9rem; }
-.admin-category-members__section-icon { display: grid; flex: none; place-items: center; width: 38px; height: 38px;
+.admin-category-members__section-icon { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
   border-radius: .8rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .1); }
 .admin-category-members__section-head h3 { margin: 0; font-size: 1rem; font-weight: 800; }
-.admin-category-members__section-head p { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .83rem; line-height: 1.65; }
+.admin-category-members__section-head p { margin: .1rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.5; }
 .admin-category-members__count { padding: .3rem .65rem; border-radius: 999px; color: var(--bb-color-primary);
   background: rgba(var(--v-theme-primary), .09); font-size: .82rem; font-weight: 750; }
-.admin-categories-members { min-width: 0; margin-top: .8rem; }
+.admin-categories-members { min-width: 0; margin-top: .5rem; }
 .admin-category-members__search-state, .admin-category-members__empty { display: flex; align-items: flex-start; gap: .55rem;
-  padding: 1rem; border: 1px dashed var(--bb-color-outline); border-radius: .8rem;
+  padding: .55rem .7rem; border: 1px dashed var(--bb-color-outline); border-radius: .8rem;
   background: var(--bb-color-inset); color: var(--bb-color-muted); font-size: .85rem; line-height: 1.7; }
 .admin-category-members__search-state :deep(.v-icon), .admin-category-members__search-state :deep(.v-progress-circular) { flex: none; margin-top: .1rem; }
-.admin-category-members__current { display: grid; gap: .45rem; max-height: 12rem; margin: 0; padding: 0 .1rem;
+.admin-category-members__current { display: grid; gap: .3rem; max-height: 11rem; margin: 0; padding: 0 .1rem;
   overflow-y: auto; list-style: none; overscroll-behavior: contain; }
-.admin-category-members__person { display: flex; align-items: center; gap: .5rem; min-width: 0; min-height: 55px;
-  padding: .35rem .5rem; border: 1px solid var(--bb-color-outline); border-radius: .8rem; background: var(--bb-color-inset); }
-.admin-category-members__avatar { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
+.admin-category-members__person { display: flex; align-items: center; gap: .4rem; min-width: 0; min-height: 48px;
+  padding: .1rem .35rem; border: 1px solid var(--bb-color-outline); border-radius: .8rem; background: var(--bb-color-inset); }
+.admin-category-members__avatar { display: grid; flex: none; place-items: center; width: 30px; height: 30px;
   border-radius: .7rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .12);
   font-size: .9rem; font-weight: 800; }
 .admin-category-members__username { min-width: 0; flex: 1; color: var(--bb-color-text); font-size: .85rem;
   font-weight: 750; overflow-wrap: anywhere; }
 .admin-category-members__person :deep(.v-btn) { min-width: 44px; min-height: 44px; flex: none; }
-.admin-category-members__results { display: grid; gap: .45rem; max-height: 17rem; overflow-y: auto;
+.admin-category-members__results { display: grid; gap: .3rem; max-height: 14rem; overflow-y: auto;
   padding: .1rem; overscroll-behavior: contain; }
 .admin-categories-member { min-width: 0; border: 1px solid var(--bb-color-outline); border-radius: .8rem;
   background: var(--bb-color-inset); transition: border-color .15s ease, background .15s ease; }
 .admin-categories-member--selected { border-color: rgba(var(--v-theme-primary), .55);
   background: rgba(var(--v-theme-primary), .1); }
 .admin-categories-member:hover:not(.v-input--disabled) { border-color: rgb(var(--v-theme-primary)); }
-.admin-categories-member :deep(.v-selection-control) { min-height: 56px; padding: .25rem .5rem; }
+.admin-categories-member :deep(.v-selection-control) { min-height: 48px; padding: .15rem .4rem; }
 .admin-categories-member :deep(.v-label) { min-width: 0; flex: 1; opacity: 1; }
 .admin-categories-member :deep(.v-selection-control--focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: 2px; border-radius: .55rem; }
 .admin-category-members__candidate { display: flex; align-items: center; gap: .55rem; min-width: 0; }
 .admin-category-members__candidate > span:last-child { min-width: 0; color: var(--bb-color-text);
   font-size: .85rem; font-weight: 700; overflow-wrap: anywhere; }
-.admin-category-members__results-hint { margin: .65rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
-.admin-category-members__selection { grid-column: 1 / -1; min-width: 0; padding: 1rem 1.15rem;
+.admin-category-members__results-hint { margin: .4rem 0 0; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.6; }
+.admin-category-members__selection { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .7rem;
+  min-width: 0; padding: .45rem .7rem;
   border: 1px solid rgba(var(--v-theme-primary), .3); border-radius: var(--bb-radius-nested, 16px);
   background: rgba(var(--v-theme-primary), .07); }
-.admin-category-members__selection-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
-  gap: .4rem; color: var(--bb-color-primary); font-size: .84rem; }
-.admin-category-members__selection-heading strong { font-weight: 800; }
-.admin-category-members__selection-chips { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .7rem; }
+.admin-category-members__selection-heading { flex: none; color: var(--bb-color-primary); font-size: .84rem; font-weight: 800; }
+.admin-category-members__selection-chips { display: flex; flex: 1 1 14rem; flex-wrap: wrap; gap: .35rem; min-width: 0;
+  max-width: 100%; max-height: 7rem; overflow-y: auto; }
 .admin-category-members__selection-chips :deep(.v-chip) { min-height: 44px; max-width: 100%; }
 .admin-category-members__selection-chips :deep(.v-chip__content) { white-space: normal; overflow-wrap: anywhere; }
 .admin-category-members__error { grid-column: 1 / -1; }
-.admin-category-members__actions { flex: none; gap: .4rem; padding: .8rem 1.5rem; border-top: 1px solid var(--bb-color-outline); }
-.admin-category-members__action-hint { max-width: 15rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.5; }
+.admin-category-members__actions { flex: none; gap: .4rem; padding: .55rem 1.1rem; border-top: 1px solid var(--bb-color-outline); }
+.admin-category-members__disclosure { display: flex; align-items: center; gap: .45rem; width: 100%; min-height: 44px;
+  padding: 0; border: 0; background: transparent; color: var(--bb-color-text); font-size: .9rem; font-weight: 800;
+  text-align: start; cursor: pointer; }
+.admin-category-members__disclosure .admin-category-members__count { margin-inline-start: auto; }
+.admin-category-members__disclosure:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; border-radius: .4rem; }
+.admin-category-members__current-content { margin-top: .45rem; }
+.admin-category-members__remove-hint { margin: 0 0 .45rem; color: var(--bb-color-muted); font-size: .8rem; line-height: 1.5; }
 .admin-category-members__actions :deep(.v-btn) { min-height: 44px; margin: 0; }
 @media (forced-colors: active) {
   .admin-category-members__header, .admin-category-members__section, .admin-category-members__person,
@@ -874,15 +879,18 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .admin-category-members { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
-  .admin-category-members__header { padding: calc(.75rem + env(safe-area-inset-top, 0px)) 1rem .75rem; }
-  .admin-category-members__header-icon { width: 44px; height: 44px; }
+  .admin-category-members__header { padding: calc(.4rem + env(safe-area-inset-top, 0px)) .75rem .4rem; }
+  .admin-category-members__header-icon { width: 36px; height: 36px; }
   .admin-category-members__heading h2 { font-size: 1.1rem; }
-  .admin-category-members__body { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
+  .admin-category-members__body { grid-template-columns: minmax(0, 1fr); gap: .45rem; padding: .6rem .75rem; }
   .admin-category-members__section--search, .admin-category-members__section--current { grid-column: 1; grid-row: auto; }
-  .admin-category-members__section { padding: 1rem; }
-  .admin-category-members__results { max-height: none; }
-  .admin-category-members__actions { padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
-  .admin-category-members__action-hint { max-width: none; text-align: center; }
+  .admin-category-members__section { padding: .65rem .75rem; }
+  .admin-category-members__section-head { margin-bottom: .4rem; }
+  .admin-category-members__section-head .admin-category-members__section-icon { display: none; }
+  .admin-category-members__results { max-height: min(34dvh, 14rem); }
+  .admin-category-members__actions { flex-direction: row; padding: .45rem .75rem calc(.45rem + env(safe-area-inset-bottom, 0px)); }
+  .admin-category-members__actions :deep(.v-btn) { flex: 1; width: auto; min-width: 0; }
+  .admin-category-members__eyebrow { display: none; }
   .admin-category-form { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
   .admin-category-form__header { padding: calc(.75rem + env(safe-area-inset-top, 0px)) 1rem .75rem; }
   .admin-category-form__header-icon { width: 44px; height: 44px; }
@@ -897,5 +905,7 @@ onUnmounted(() => {
   .admin-catalog-dialog-actions { flex-direction: column; align-items: stretch; }
   .admin-catalog-dialog-actions :deep(.v-spacer) { display: none; }
   .admin-catalog-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; white-space: normal; }
+  .admin-catalog-dialog-actions.admin-category-members__actions { flex-direction: row; }
+  .admin-catalog-dialog-actions.admin-category-members__actions :deep(.v-btn) { flex: 1; width: auto; min-width: 0; }
 }
 </style>

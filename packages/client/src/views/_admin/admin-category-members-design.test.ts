@@ -21,7 +21,7 @@ describe("category member management dialog", () => {
     expect(dialog).toContain('v-else-if="candidates.length === 0"');
     expect(dialog).toContain('role="group" aria-label="نتایج جست‌وجوی حساب‌ها"');
     expect(dialog).toContain('فقط حساب‌های فعالِ خارج از این گروه');
-    expect(dialog).toContain('حداکثر ۱۰ نتیجه');
+    expect(dialog).toContain('v-if="candidates.length === 10" class="admin-category-members__results-hint"');
   });
 
   it("keeps chosen names available across searches and clears them only when removed, closed or added", () => {
@@ -53,6 +53,19 @@ describe("category member management dialog", () => {
     expect(dialog).toContain('@after-leave="restoreMembersFocus"');
     expect(source).toContain('if (membersTrigger?.isConnected) membersTrigger.focus({ preventScroll: true });');
     expect(source).toContain('membersFor.value = withoutConfirmedMember(membersFor.value, category.id, member.id);');
+  });
+
+  it("uses compact disclosure and actions on phones without hiding member management", () => {
+    expect(dialog).toContain(':aria-expanded="currentMembersExpanded"');
+    expect(dialog).toContain('aria-controls="admin-category-current-list"');
+    expect(dialog).toContain('v-show="currentMembersExpanded"');
+    expect(source).toContain('currentMembersExpanded.value = !isPhone.value;');
+    expect(style).toContain('.admin-category-members__disclosure { display: flex;');
+    expect(style).toContain('align-items: start; padding: .85rem 1.1rem;');
+    expect(style).toContain('min-height: 44px;');
+    expect(style).toContain('.admin-category-members__results { max-height: min(34dvh, 14rem); }');
+    expect(style).toContain('.admin-catalog-dialog-actions.admin-category-members__actions { flex-direction: row; }');
+    expect(dialog).not.toContain('admin-category-members__action-hint');
   });
 
   it("keeps touch targets, focus, theme and phone layout intact", () => {
