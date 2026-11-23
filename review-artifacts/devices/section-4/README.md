@@ -1,5 +1,7 @@
 # `/_user/devices` — Section 4: design consistency and final evaluation
 
+**Subsequent correction:** After this no-UI-change audit, the user identified inconsistent button corners. See [the button-radius follow-up](button-radius-README.md) for the page-scoped fix, fixture-backed after captures, and pending genuine after evidence. The unchanged-state conclusion below describes the original Section 4 review, not the later button fix.
+
 ## Page and screenshot provenance
 
 - **Genuine authenticated light-theme screenshots, current before and final unchanged state:** `real-current-mobile.png` (390 × 1105), `real-current-tablet.png` (645 × 860), and `real-current-desktop.png` (1007 × 630). These are byte-for-byte copies of the user's Section 2 after attachments (see `../section-2/README.md`). Section 4 changes **no rendered UI**: the same genuine images therefore document both the starting and final page state. They are **not** two separately captured moments, and no new authenticated screenshot is claimed.

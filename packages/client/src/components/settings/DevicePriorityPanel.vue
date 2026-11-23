@@ -105,6 +105,7 @@ function ageText(minutes: number): string {
   padding-bottom: 0.5rem;
 }
 .device-priority__header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.2rem 0.35rem; }
+.device-priority__header > .v-btn { border-radius: var(--bb-radius-nested, 16px); }
 .device-priority__kicker { margin: 0; color: #536d6c; font-size: 0.82rem; font-weight: 700; }
 .device-priority__header h2 { margin: 0.1rem 0 0; color: #193536; font-size: 1.08rem; font-weight: 800; }
 .device-priority__hint { margin: 0; padding: 0.4rem 1.2rem; color: #536d6c; font-size: 0.82rem; line-height: 1.7; }
@@ -121,8 +122,9 @@ function ageText(minutes: number): string {
 .device-priority__meta { margin: 0.2rem 0 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem;
   color: #536d6c; font-size: 0.82rem; line-height: 1.5; }
 .device-priority__meta bdi { overflow-wrap: anywhere; }
-.device-priority__session > .v-btn { flex: none; min-height: 44px; }
+.device-priority__session > .v-btn { flex: none; min-height: 44px; border-radius: var(--bb-radius-nested, 16px); }
 .device-priority__confirm p { margin: 0 0 0.5rem; line-height: 1.7; overflow-wrap: anywhere; }
+.device-priority__confirm-actions :deep(.v-btn) { border-radius: var(--bb-radius-nested, 16px); }
 :global(:root.dark .device-priority__card) { border-color: var(--bb-color-outline); background: var(--bb-color-surface); }
 :global(:root.dark .device-priority__header h2), :global(:root.dark .device-priority__name) { color: #edf5f2; }
 :global(:root.dark .device-priority__kicker), :global(:root.dark .device-priority__hint),

@@ -66,7 +66,7 @@ onMounted(() => {
   padding: 1.25rem clamp(0.85rem, 3vw, 2rem) 2.5rem;
 }
 
-.user-devices__shares-link { align-self: flex-start; min-height: 44px; }
+.user-devices__shares-link { align-self: flex-start; min-height: 44px; border-radius: var(--bb-radius-nested, 16px); }
 @media (max-width: 599px) { .user-devices__shares-link { align-self: stretch; } }
 
 .user-devices__header {
