@@ -461,14 +461,35 @@
             </div>
 
             <div v-if="mapPointChoices.length" id="dispatch-map-choices" class="dispatch-map-choices" role="group"
-              aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه" dir="rtl">
-              <div id="dispatch-map-choices-heading" class="dispatch-map-choices__heading">
-                <strong>نقاط این مکان</strong>
-                <button id="dispatch-button-01" type="button" aria-label="بستن فهرست نقاط" @click="mapPointChoices = []">×</button>
+              aria-labelledby="dispatch-map-choices-heading" dir="rtl">
+              <div class="dispatch-map-choices__heading">
+                <span class="dispatch-map-choices__heading-icon" aria-hidden="true"><v-icon icon="mdi-map-marker-multiple-outline" size="19" /></span>
+                <div class="dispatch-map-choices__heading-copy">
+                  <strong id="dispatch-map-choices-heading">نقاط این مکان</strong>
+                  <span>{{ mapPointChoices.length.toLocaleString('fa-IR') }} مورد هم‌پوشان</span>
+                </div>
+                <button id="dispatch-button-01" type="button" class="dispatch-map-choices__close"
+                  aria-label="بستن فهرست نقاط" @click="mapPointChoices = []">
+                  <v-icon icon="mdi-close" size="19" aria-hidden="true" />
+                </button>
               </div>
               <div class="dispatch-map-choices__items">
-                <button :id="`dispatch-button-02-${choice.kind}-${choice.id}`" v-for="choice in mapPointChoices" :key="`${choice.kind}-${choice.id}`" type="button"
-                  @click="activateMapChoice(choice)">{{ choice.label }}</button>
+                <button :id="`dispatch-button-02-${choice.kind}-${choice.id}`" v-for="choice in mapPointChoices"
+                  :key="`${choice.kind}-${choice.id}`" type="button" class="dispatch-map-choices__item"
+                  :class="{ 'dispatch-map-choices__item--selected': isMapChoiceSelected(choice) }"
+                  :aria-label="`${choice.label}؛ ${mapChoiceHint(choice)}`"
+                  :aria-pressed="choice.kind === 'cluster' ? undefined : isMapChoiceSelected(choice)"
+                  @click="activateMapChoice(choice)">
+                  <span class="dispatch-map-choices__item-icon" :class="`dispatch-map-choices__item-icon--${choice.kind}`" aria-hidden="true">
+                    <v-icon :icon="choice.kind === 'sos' ? 'mdi-alarm-light-outline' : choice.kind === 'cluster' ? 'mdi-account-group-outline' : 'mdi-account-outline'" size="19" />
+                  </span>
+                  <span class="dispatch-map-choices__item-copy">
+                    <strong dir="auto">{{ choice.title ?? choice.label }}</strong>
+                    <small>{{ mapChoiceHint(choice) }}</small>
+                  </span>
+                  <v-icon :icon="isMapChoiceSelected(choice) ? 'mdi-check' : choice.kind === 'cluster' ? 'mdi-magnify-plus-outline' : 'mdi-chevron-left'"
+                    size="19" aria-hidden="true" />
+                </button>
               </div>
             </div>
           </div>
@@ -777,7 +798,7 @@ const DISPATCH_LAYER_ORDER = [
   SOS_SELECTED_CORE_LAYER_ID, SOS_SELECTED_GLYPH_LAYER_ID, SOS_SELECTED_PIN_LAYER_ID
 ] as const;
 type MapPointChoice = { kind: "sos" | "responder" | "cluster"; id: string; label: string;
-  clusterId?: number; coordinates?: [number, number] };
+  title?: string; clusterId?: number; coordinates?: [number, number] };
 const mapPointChoices = ref<MapPointChoice[]>([]);
 
 const route = useRoute();
@@ -1421,7 +1442,8 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
   if (!map.getLayer(RESPONDER_CLUSTER_LAYER_ID)) map.addLayer({
     id: RESPONDER_CLUSTER_LAYER_ID, type: "circle", source: RESPONDER_SOURCE_ID,
     filter: ["has", "point_count"],
-    paint: { "circle-color": responderPin, "circle-radius": 18,
+    paint: { "circle-color": responderPin,
+      "circle-radius": ["step", ["get", "point_count"], 19, 10, 22, 100, 25],
       "circle-stroke-color": "#ffffff", "circle-stroke-width": 3 }
   }, before);
   if (!map.getLayer(RESPONDER_LABEL_LAYER_ID)) map.addLayer({
@@ -1441,8 +1463,10 @@ function ensureResponderMapLayers(map: MapLibreMap): void {
     id: RESPONDER_COUNT_LAYER_ID, type: "symbol", source: RESPONDER_SOURCE_ID,
     filter: ["has", "point_count"],
     layout: { "text-field": ["to-string", ["get", "point_count"]],
-      "text-font": ["Borobiya Vazirmatn"], "text-size": 13, "text-allow-overlap": true },
-    paint: { "text-color": "#ffffff" }
+      "text-font": ["Borobiya Vazirmatn"], "text-size": 16, "text-allow-overlap": true },
+    // Martin supplies the regular face only. A tight same-color halo gives the
+    // numeral a semibold stroke without requesting a missing bold font stack.
+    paint: { "text-color": "#ffffff", "text-halo-color": "#ffffff", "text-halo-width": .8 }
   }, before);
   // Keep the selected fix above the cluster count and unselected SOS points;
   // only the selected SOS retains priority at coincident coordinates.
@@ -1739,6 +1763,17 @@ function focusResponders(): void {
   });
 }
 
+function isMapChoiceSelected(choice: MapPointChoice): boolean {
+  return choice.kind === "sos" ? adminSos.selectedId === choice.id :
+    choice.kind === "responder" && adminSos.selectedResponderIds.includes(choice.id);
+}
+
+function mapChoiceHint(choice: MapPointChoice): string {
+  if (choice.kind === "cluster") return "بزرگ‌نمایی ناحیه";
+  return isMapChoiceSelected(choice) ? "انتخاب‌شده · برای برداشتن بزنید" :
+    choice.kind === "sos" ? "انتخاب حادثه" : "انتخاب امدادگر";
+}
+
 function activateMapChoice(choice: MapPointChoice): void {
   mapPointChoices.value = [];
   if (choice.kind === "sos") {
@@ -1824,6 +1859,7 @@ function onMapReady(map: MapLibreMap, MarkerClass: typeof import("maplibre-gl").
         feature.layer.id === SOS_SELECTED_CORE_LAYER_ID || feature.layer.id === SOS_CORE_LAYER_ID) && typeof id === "string") {
         const request = adminSos.visibleRequests.find((item) => item.id === id);
         if (request) choices.set(`sos-${id}`, { kind: "sos", id,
+          title: incidentLabel(request.incidentTypeId),
           label: `حادثه SOS · ${incidentLabel(request.incidentTypeId)}` });
       } else if ((feature.layer.id === RESPONDER_PIN_LAYER_ID ||
         feature.layer.id === RESPONDER_SELECTED_PIN_LAYER_ID ||
@@ -1831,12 +1867,14 @@ function onMapReady(map: MapLibreMap, MarkerClass: typeof import("maplibre-gl").
         feature.layer.id === RESPONDER_SELECTED_DOT_LAYER_ID) && typeof id === "string" &&
         nearbyFeatures.value.features.some((item) => item.id === id)) {
         choices.set(`responder-${id}`, { kind: "responder", id,
+          title: `@${String(props?.username ?? "")}`,
           label: `امدادگر نزدیک · ${String(props?.username ?? "")}` });
       } else if (feature.layer.id === RESPONDER_CLUSTER_LAYER_ID &&
         typeof props?.cluster_id === "number" && feature.geometry.type === "Point") {
         const clusterId = props.cluster_id as number;
         choices.set(`cluster-${clusterId}`, { kind: "cluster", id: String(clusterId), clusterId,
           coordinates: feature.geometry.coordinates as [number, number],
+          title: `${Number(props.point_count).toLocaleString("fa-IR")} امدادگر نزدیک`,
           label: `${Number(props.point_count).toLocaleString("fa-IR")} امدادگر نزدیک · بزرگ‌نمایی` });
       }
     }
@@ -2358,21 +2396,52 @@ onBeforeUnmount(() => {
 .admin-dispatch__followup-toggle[aria-expanded="true"] { margin-bottom: .75rem; }
 
 .dispatch-map-choices { position: absolute; z-index: 5; bottom: 12px;
-  width: min(17rem, calc(100% - 44px - 2.75rem)); max-height: min(15rem, 50%);
-  display: flex; flex-direction: column; padding: .35rem;
-  border: 1px solid var(--bb-color-outline); border-radius: 16px;
-  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: var(--bb-shadow-overlay); }
-.dispatch-map-choices__heading { display: flex; justify-content: space-between; align-items: center;
-  padding-inline-start: .4rem; font-size: .82rem; }
-.dispatch-map-choices button { font: inherit; color: inherit; background: transparent; border: 0;
-  min-height: 44px; cursor: pointer; border-radius: 9px; }
-.dispatch-map-choices button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
-.dispatch-map-choices__heading button { min-width: 44px; font-size: 1.3rem; }
-.dispatch-map-choices__items { overflow-y: auto; min-height: 0; }
-.dispatch-map-choices__items button { display: block; width: 100%; text-align: start;
-  padding: .35rem .5rem; font-size: .82rem; }
-.dispatch-map-choices__items button:hover { background: var(--bb-color-inset); }
+  box-sizing: border-box; width: min(17rem, calc(100% - 44px - 2.75rem)); max-height: min(15rem, 50%);
+  display: flex; flex-direction: column; min-width: 0; padding: .55rem;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  background: rgba(var(--v-theme-surface), .98); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(12px); }
+.dispatch-map-choices__heading { display: flex; align-items: center; gap: .45rem;
+  min-width: 0; padding: .1rem .1rem .45rem;
+  border-bottom: 1px solid var(--bb-color-outline); }
+.dispatch-map-choices__heading-icon { flex: none; display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: .7rem;
+  background: rgba(var(--v-theme-primary), .12); color: rgb(var(--v-theme-primary)); }
+.dispatch-map-choices__heading-copy { display: grid; flex: 1; min-width: 0; gap: .05rem; line-height: 1.35; }
+.dispatch-map-choices__heading-copy strong { font-size: .9rem; font-weight: 800; }
+.dispatch-map-choices__heading-copy span { font-size: .8rem; color: var(--bb-color-muted); }
+.dispatch-map-choices button { font: inherit; color: inherit; cursor: pointer; }
+.dispatch-map-choices button:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
+.dispatch-map-choices__close { flex: none; display: grid; place-items: center;
+  width: 44px; height: 44px; border: 0; border-radius: .75rem;
+  background: var(--bb-color-inset); }
+.dispatch-map-choices__close:hover { background: rgba(var(--v-theme-primary), .12); }
+.dispatch-map-choices__items { overflow-y: auto; min-height: 0;
+  display: grid; gap: .35rem; padding-block-start: .5rem;
+  overscroll-behavior: contain; scrollbar-width: thin; }
+.dispatch-map-choices__item { display: grid; grid-template-columns: 34px minmax(0, 1fr) 19px;
+  align-items: center; gap: .45rem; width: 100%; min-height: 58px; padding: .4rem .5rem;
+  border: 1px solid var(--bb-color-outline); border-radius: .8rem;
+  background: var(--bb-color-inset); text-align: start; }
+.dispatch-map-choices__item:hover { border-color: rgb(var(--v-theme-primary)); }
+.dispatch-map-choices__item--selected { border-color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), .1); }
+.dispatch-map-choices__item-icon { display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: .7rem;
+  color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
+.dispatch-map-choices__item-icon--sos { color: rgb(var(--v-theme-error)); background: rgba(var(--v-theme-error), .12); }
+.dispatch-map-choices__item-copy { display: grid; min-width: 0; gap: .05rem; line-height: 1.4; }
+.dispatch-map-choices__item-copy strong { font-size: .85rem; font-weight: 750; overflow-wrap: anywhere; }
+.dispatch-map-choices__item-copy small { font-size: .8rem; color: var(--bb-color-muted); overflow-wrap: anywhere; }
+.dispatch-map-choices__item > :deep(.v-icon:last-child) { color: var(--bb-color-muted); }
+@media (forced-colors: active) {
+  .dispatch-map-choices, .dispatch-map-choices__item { background: Canvas; color: CanvasText;
+    border-color: CanvasText; box-shadow: none; }
+  .dispatch-map-choices__close, .dispatch-map-choices__heading-icon,
+  .dispatch-map-choices__item-icon { background: Canvas; color: CanvasText; }
+  .dispatch-map-choices__item--selected { outline: 2px solid Highlight; outline-offset: -3px; }
+  .dispatch-map-choices button:focus-visible { outline-color: Highlight; }
+}
 @media (max-width: 959px) {
   .admin-dispatch__filter-select { width: 15rem; }
 }
@@ -2902,7 +2971,9 @@ onBeforeUnmount(() => {
   /* Keep the whole chooser beside the 44px SOS/Broadcast/legend rail, not
      underneath its buttons. The width shrinks with narrow map viewports. */
   position: absolute; z-index: 15; right: calc(44px + 2rem);
-  left: auto; bottom: 5rem; max-height: min(30dvh, 15rem);
+  /* Use the empty lower map area, leaving a slim strip for map attribution. */
+  left: auto; bottom: calc(1.75rem + env(safe-area-inset-bottom, 0px));
+  max-height: min(15rem, calc(100% - 6rem));
 }
 :global(.dispatch-place-marker) {
   display: grid; justify-items: center; gap: 3px; max-width: min(12rem, 55vw);
@@ -2966,8 +3037,10 @@ onBeforeUnmount(() => {
     flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
   }
   .admin-dispatch__map-and-actions .dispatch-map-key li { flex: none; }
+  /* The map ends above the bottom sheet on phones; its home inset is below
+     that sheet, not between this chooser and the map attribution. */
   .admin-dispatch__map-and-actions .dispatch-map-choices {
-    bottom: 4.5rem;
+    bottom: 1.75rem;
   }
   .admin-dispatch__queue .dispatch-request-list, .admin-dispatch__responders .responder-list {
     max-height: 10rem;

@@ -58,7 +58,8 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("RESPONDER_DOT_LAYER_ID, RESPONDER_LABEL_LAYER_ID,");
     expect(viewSource).toContain("cluster: true, clusterRadius: 42, clusterMaxZoom: 18");
     expect(viewSource).toContain("getClusterExpansionZoom(choice.clusterId)");
-    expect(viewSource).toContain('aria-label="انتخاب یکی از نقاط هم‌پوشان نقشه"');
+    expect(viewSource).toContain('aria-labelledby="dispatch-map-choices-heading"');
+    expect(viewSource).toContain('class="dispatch-map-choices__item"');
     expect(viewSource).toContain('nearbyFeatures.value.features.some((feature) => feature.id === choice.id)');
     expect(viewSource).not.toContain('class="severity-legend"');
     expect(viewSource).toContain('chip.textContent = incidentLabel(incident.incidentTypeId)');

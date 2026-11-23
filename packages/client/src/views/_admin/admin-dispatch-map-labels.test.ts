@@ -118,7 +118,7 @@ describe("SOS center on-map labels and offscreen directions", () => {
       expect(contrastWithWhite(color), color).toBeGreaterThanOrEqual(4.5);
     expect(source).toContain('const responderPin = themeStore.isDark ? "#205fd1" : "#0868c8"');
     expect(source).toContain('"circle-stroke-color": "#f7b632"');
-    expect(source).toContain('paint: { "text-color": "#ffffff" }');
+    expect(source).toContain('paint: { "text-color": "#ffffff", "text-halo-color": "#ffffff", "text-halo-width": .8 }');
     expect(template!.content).toContain('class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"');
     expect(template!.content).toContain('v-for="item in sosSeverityKey"');
     expect(template!.content).toContain('SOS_MAP_MARKER_COLORS[item.severity]');
