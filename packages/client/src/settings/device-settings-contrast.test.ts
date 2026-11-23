@@ -48,6 +48,11 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
     expect(panel).toMatch(/\.device-priority__session\s*\{[^}]*border: 1px solid rgba\(98, 146, 137, 0\.32\);[^}]*background: var\(--bb-color-inset\);/);
     expect(panel).toContain(":global(:root.dark .device-priority__session) {");
     expect(panel).toContain("border-color: var(--bb-color-outline);");
+    // A longer Persian duration must not make the details' max-content width
+    // push the icon onto a separate flex line on narrow screens.
+    expect(panel).toContain(".device-priority__details { min-width: 0; flex: 1 1 0; }");
+    expect(panel).toContain(".device-priority__session { display: grid; grid-template-columns: 22px minmax(0, 1fr); row-gap: 0.35rem; }");
+    expect(panel).toContain(".device-priority__session > .v-btn { grid-column: 1 / -1; justify-self: end;");
     expect(panel).toContain('v-if="!row.isCurrent"');
   });
 

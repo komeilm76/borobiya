@@ -115,7 +115,7 @@ function ageText(minutes: number): string {
   border: 1px solid rgba(98, 146, 137, 0.32); border-radius: var(--bb-radius-nested, 16px);
   background: var(--bb-color-inset); }
 .device-priority__icon { flex: none; color: #536d6c; }
-.device-priority__details { min-width: 0; flex: 1 1 auto; }
+.device-priority__details { min-width: 0; flex: 1 1 0; }
 .device-priority__name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .device-priority__name { color: #193536; font-size: 0.93rem; overflow-wrap: anywhere; }
 .device-priority__meta { margin: 0.2rem 0 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem;
@@ -136,9 +136,10 @@ function ageText(minutes: number): string {
 @media (max-width: 599px) {
   .device-priority__header, .device-priority__hint, .device-priority__skeleton { padding-inline: 0.85rem; }
   .device-priority__list { padding-inline: 0.85rem; }
-  .device-priority__session { flex-wrap: wrap; }
+  .device-priority__session { display: grid; grid-template-columns: 22px minmax(0, 1fr); row-gap: 0.35rem; }
+  .device-priority__icon { align-self: start; margin-top: 0.2rem; }
   .device-priority__meta bdi { overflow-wrap: anywhere; }
-.device-priority__session > .v-btn { margin-inline-start: auto; }
+  .device-priority__session > .v-btn { grid-column: 1 / -1; justify-self: end; margin-inline-start: 0; }
   .device-priority__confirm-actions { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .device-priority__confirm-actions :deep(.v-spacer) { display: none; }
   .device-priority__confirm-actions :deep(.v-btn) { width: 100%; min-height: 44px; margin: 0; }
