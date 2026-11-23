@@ -958,6 +958,77 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.dispatchFeedback).toBeNull();
   });
 
+  it("does not start the admin socket after the store is disposed during login", async () => {
+    const openSocket = vi.fn(async () => ({ socket: socketEmitter as never,
+      updateToken: vi.fn(), connect: vi.fn(), close: vi.fn() }));
+    const listRequests = vi.fn(async () => ({ items: [makeSosRecord()], total: 1 }));
+    configureAdminSosRuntimeForTests({ openSocket, listRequests });
+    const auth = useAuthStore();
+    const store = useAdminSosStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    store.$dispose();
+    await nextTick();
+    expect(openSocket).not.toHaveBeenCalled();
+    expect(listRequests).not.toHaveBeenCalled();
+  });
+
+  it("revokes an SOS selection and socket on a new login for the same admin", async () => {
+    const jwt = (sessionId: string, nonce = 0) =>
+      `header.${btoa(JSON.stringify({ sub: "admin-1", sessionId, nonce }))}.sig`;
+    const row = makeSosRecord();
+    const close = vi.fn();
+    const listRequests = vi.fn(async () => ({ items: [row], total: 1 }));
+    configureAdminSosRuntimeForTests({ openSocket: async () => ({
+      socket: socketEmitter as never, updateToken: vi.fn(), connect: vi.fn(), close
+    }), listRequests, getNearestResponders: async () => ({ responders: [{
+      userId: "44444444-4444-4444-8444-444444444441", username: "rescuer",
+      distance: 100, avgRating: 4, categoryName: "امداد", lastActiveAt: "2026-10-23T12:00:00Z"
+    }] }) });
+    const auth = useAuthStore();
+    auth.accessToken = jwt("session-a");
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.requests).toEqual([row]));
+    await vi.waitFor(() => expect(store.connected).toBe(false));
+    store.selectRequest(row.id);
+    await vi.waitFor(() => expect(store.nearestResponders).toHaveLength(1));
+    store.toggleResponderSelection("44444444-4444-4444-8444-444444444441");
+    expect(store.canDispatchSelected).toBe(true);
+
+    auth.accessToken = jwt("session-a", 1);
+    expect(store.selectedResponderIds).toHaveLength(1); // Same login, renewed bearer.
+    auth.accessToken = jwt("session-b");
+    expect(store.requests).toEqual([]);
+    expect(store.selectedId).toBeNull();
+    expect(store.selectedResponderIds).toEqual([]);
+    expect(store.canDispatchSelected).toBe(false);
+    await vi.waitFor(() => expect(close).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(listRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("ignores queued events from a previous admin socket after a session replacement", async () => {
+    const jwt = (sessionId: string) => `header.${btoa(JSON.stringify({ sub: "admin-1", sessionId }))}.sig`;
+    let releaseNewList!: (result: { items: SosRequestRecord[]; total: number }) => void;
+    const newList = new Promise<{ items: SosRequestRecord[]; total: number }>((resolve) => { releaseNewList = resolve; });
+    const listRequests = vi.fn().mockResolvedValueOnce({ items: [makeSosRecord()], total: 1 })
+      .mockReturnValueOnce(newList);
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = jwt("session-a");
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(socketEmitter.listenerCount(SOS_NEW_REQUEST_EVENT)).toBe(1));
+    const oldEvent = socketEmitter.listeners(SOS_NEW_REQUEST_EVENT)[0] as (payload: unknown) => void;
+    const row = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
+    auth.accessToken = jwt("session-b");
+    expect(store.requests).toEqual([]);
+    oldEvent({ sosRequest: row }); // Event already queued before disconnect.
+    expect(store.requests).toEqual([]);
+    expect(store.latestAlert).toBeNull();
+    releaseNewList({ items: [], total: 0 });
+  });
+
   it("resets private SOS state and reconnects when switching directly between admin accounts", async () => {
     const first = makeSosRecord();
     const close = vi.fn();

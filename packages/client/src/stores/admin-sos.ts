@@ -1,4 +1,4 @@
-import { computed, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import type {
   Mission,
@@ -121,6 +121,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   const isAdminSession = computed(
     () => auth.isAuthenticated && auth.user?.role === "admin"
   );
+  const adminLoginKey = computed(() => isAdminSession.value
+    ? accountSessionKey(auth.user?.id ?? null, auth.accessToken) : null);
+  let disposed = false;
 
   const visibleRequests = computed(() => {
     if (filterStatus.value === "pending") {
@@ -398,6 +401,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   function handleIncomingPayload(payload: unknown): void {
+    if (!adminLoginKey.value) return;
     const parsed = parseSosNewRequestPayload(payload);
     if (!parsed) return;
 
@@ -489,7 +493,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   function handleRescuerCancellation(payload: unknown): void {
-    if (!isAdminSession.value) return;
+    if (!adminLoginKey.value) return;
     const alert = parseAdminRescuerCancellationPayload(payload);
     if (!alert || seenCancellationMissions.has(alert.missionId)) return;
     seenCancellationMissions.add(alert.missionId);
@@ -539,7 +543,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   async function attachRealtime(): Promise<void> {
-    if (!isAdminSession.value || !auth.accessToken) return;
+    const login = adminLoginKey.value;
+    if (disposed || !login || !auth.accessToken) return;
     if (attachedClient) {
       attachedClient.updateToken(auth.accessToken);
       attachedClient.connect();
@@ -557,7 +562,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       return;
     }
 
-    if (gen !== socketGeneration || !isAdminSession.value) {
+    const currentSocket = () => gen === socketGeneration && adminLoginKey.value === login && !disposed;
+    if (!currentSocket()) {
       client.close();
       return;
     }
@@ -565,12 +571,14 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     attachedClient = client;
 
     const onConnect = () => {
+      if (!currentSocket()) return;
       if (realtimeRetry) clearTimeout(realtimeRetry);
       realtimeRetry = null;
       connected.value = true;
       void refreshRequests();
     };
     const onDisconnect = (reason?: string) => {
+      if (!currentSocket()) return;
       connected.value = false;
       if (reason === "io server disconnect" && !refreshingSocketAuth && isAdminSession.value) {
         scheduleRealtimeRetry();
@@ -578,18 +586,19 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
         void auth
           .refreshSession()
           .then((ok) => {
-            if (ok && attachedClient && auth.accessToken) {
-              attachedClient.updateToken(auth.accessToken);
-              if (attachedClient.reconnect) attachedClient.reconnect();
-              else attachedClient.connect();
+            if (currentSocket() && ok && attachedClient === client && auth.accessToken) {
+              client.updateToken(auth.accessToken);
+              if (client.reconnect) client.reconnect();
+              else client.connect();
             }
           })
           .finally(() => {
-            refreshingSocketAuth = false;
+            if (currentSocket()) refreshingSocketAuth = false;
           });
       }
     };
     const onConnectError = (err: Error & { data?: { code?: unknown } }) => {
+      if (!currentSocket()) return;
       connected.value = false;
       // A rejected Socket.IO handshake does not automatically reconnect. Transient server
       // failures therefore need a bounded retry even if the bearer has not rotated.
@@ -604,33 +613,36 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
         void auth
           .refreshSession()
           .then((ok) => {
-            if (ok && attachedClient && auth.accessToken) {
-              attachedClient.updateToken(auth.accessToken);
-              if (attachedClient.reconnect) attachedClient.reconnect();
-              else attachedClient.connect();
+            if (currentSocket() && ok && attachedClient === client && auth.accessToken) {
+              client.updateToken(auth.accessToken);
+              if (client.reconnect) client.reconnect();
+              else client.connect();
             }
           })
           .finally(() => {
-            refreshingSocketAuth = false;
+            if (currentSocket()) refreshingSocketAuth = false;
           });
       }
     };
     const onNewRequest = (payload: unknown) => {
-      handleIncomingPayload(payload);
+      if (currentSocket()) handleIncomingPayload(payload);
+    };
+    const onCancellation = (payload: unknown) => {
+      if (currentSocket()) handleRescuerCancellation(payload);
     };
 
     client.socket.on("connect", onConnect);
     client.socket.on("disconnect", onDisconnect);
     client.socket.on("connect_error", onConnectError);
     client.socket.on(SOS_NEW_REQUEST_EVENT, onNewRequest);
-    client.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, handleRescuerCancellation);
+    client.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, onCancellation);
 
     detachSocketListeners = () => {
       client.socket.off("connect", onConnect);
       client.socket.off("disconnect", onDisconnect);
       client.socket.off("connect_error", onConnectError);
       client.socket.off(SOS_NEW_REQUEST_EVENT, onNewRequest);
-      client.socket.off(MISSION_CANCELLED_BY_RESCUER_EVENT, handleRescuerCancellation);
+      client.socket.off(MISSION_CANCELLED_BY_RESCUER_EVENT, onCancellation);
       client.close();
     };
 
@@ -651,13 +663,14 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   function startMonitoring(): void {
-    if (!isAdminSession.value) return;
+    if (disposed || !adminLoginKey.value) return;
     void attachRealtime();
     void refreshRequests();
   }
 
   function resetState(): void {
     sessionGeneration++;
+    refreshingSocketAuth = false;
     refreshGeneration++;
     seenCancellationMissions.clear();
     replacementByRequest.value = {};
@@ -739,30 +752,17 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     }
   );
 
-  watch(
-    () => auth.user?.id,
-    (nextId, previousId) => {
-      // Two admin logins can replace one another without isAdminSession ever becoming false.
-      // The socket is authenticated as the previous account, and its SOS state must not leak
-      // into the new account's view. A normal token rotation leaves the user id unchanged.
-      if (previousId && nextId && previousId !== nextId && isAdminSession.value) {
-        resetState();
-        startMonitoring();
-      }
-    }
-  );
-
-  watch(
-    isAdminSession,
-    (active) => {
-      if (active) {
-        startMonitoring();
-      } else {
-        resetState();
-      }
-    },
-    { immediate: true }
-  );
+  watch(adminLoginKey, (next) => {
+    // A different JWT login (even for the same admin) cannot inherit an old
+    // selection, socket, or pending dispatch. Revoke synchronously, then wait
+    // until a same-tick profile + bearer replacement has both settled.
+    resetState();
+    const generation = sessionGeneration;
+    if (next) queueMicrotask(() => {
+      if (!disposed && generation === sessionGeneration && adminLoginKey.value === next) startMonitoring();
+    });
+  }, { immediate: true, flush: "sync" });
+  onScopeDispose(() => { disposed = true; resetState(); });
 
   return {
     requests,

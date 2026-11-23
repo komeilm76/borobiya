@@ -202,7 +202,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
   it("useAdminSosStore automatically refreshes session and reconnects on server-initiated disconnect", async () => {
     setActivePinia(createPinia());
     const auth = useAuthStore();
-    auth.accessToken = makeJwt("admin-dev-1");
+    auth.accessToken = makeJwt("admin-dev-1", 900, "44444444-4444-4444-8444-444444444444", "admin");
     auth.user = {
       id: "44444444-4444-4444-8444-444444444444",
       username: "dispatch_ops",
@@ -210,7 +210,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
       mustCompleteSecurityQuestions: true
     };
     vi.spyOn(auth, "refreshSession").mockImplementation(async () => {
-      auth.accessToken = makeJwt("admin-dev-1", 1800);
+      auth.accessToken = makeJwt("admin-dev-1", 1800, "44444444-4444-4444-8444-444444444444", "admin");
       return true;
     });
 
