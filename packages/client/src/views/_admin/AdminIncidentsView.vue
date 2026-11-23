@@ -16,7 +16,7 @@
           <v-icon class="me-2" icon="mdi-refresh" />
           به‌روزرسانی
         </v-btn>
-        <v-btn class="admin-incidents-create" color="primary" rounded="lg" prepend-icon="mdi-plus" @click="openCreate">
+        <v-btn class="admin-incidents-create" color="primary" rounded="lg" prepend-icon="mdi-plus" @click="openCreate($event)">
           نوع رویداد جدید
         </v-btn>
       </div>
@@ -38,7 +38,7 @@
             <th>نماد</th>
             <th>رنگ</th>
             <th>توضیح</th>
-            <th aria-label="عملیات"></th>
+            <th class="admin-incidents-actions-heading">عملیات</th>
           </tr>
         </thead>
         <tbody>
@@ -56,8 +56,9 @@
               <span v-else class="opacity-50">—</span>
             </td>
             <td class="admin-incidents-description">{{ type.description || "—" }}</td>
-            <td class="text-start">
-              <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(type)">ویرایش</v-btn>
+            <td class="admin-incidents-actions">
+              <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-pencil-outline"
+                :aria-label="`ویرایش ${type.name}`" @click="openEdit(type, $event)">ویرایش</v-btn>
             </td>
           </tr>
           <tr v-if="listState === 'error'">
@@ -78,8 +79,8 @@
         <li v-for="type in types" :key="type.id" class="admin-incidents-mobile__card">
           <div class="admin-incidents-mobile__heading">
             <h2>{{ type.name }}</h2>
-            <v-btn variant="tonal" size="small" prepend-icon="mdi-pencil-outline"
-              :aria-label="`ویرایش ${type.name}`" @click="openEdit(type)">ویرایش</v-btn>
+            <v-btn variant="tonal" color="primary" size="small" prepend-icon="mdi-pencil-outline"
+              :aria-label="`ویرایش ${type.name}`" @click="openEdit(type, $event)">ویرایش</v-btn>
           </div>
           <dl class="admin-incidents-mobile__details">
             <div><dt>نامک</dt><dd><code class="admin-incidents-slug" dir="ltr">{{ type.slug }}</code></dd></div>
@@ -99,75 +100,146 @@
       <p v-if="listState === 'empty'" class="admin-incidents-mobile admin-incidents-mobile__card" role="status">موردی برای نمایش نیست.</p>
     </v-card>
 
-    <v-dialog v-model="formOpen" max-width="640" scrollable persistent>
-      <v-card rounded="xl" :title="editing ? `ویرایش ${editing.name}` : 'نوع رویداد جدید'">
-        <v-card-text>
-          <v-form class="grid gap-4" @submit.prevent="submit">
-            <v-text-field
-              v-model="draft.name"
-              label="نام"
-              density="comfortable"
-              variant="outlined"
-              rounded="lg"
-              :error-messages="fieldErrors.name ?? ''"
-              :disabled="saving"
-              data-test="incident-name"
-            />
-            <v-text-field
-              v-model="draft.slug"
-              label="نامک (اختیاری)"
-              :hint="slugHint"
-              persistent-hint
-              density="comfortable"
-              variant="outlined"
-              rounded="lg"
-              :error-messages="fieldErrors.slug ?? ''"
-              :disabled="saving"
-            />
-            <div class="grid gap-4 sm:grid-cols-2">
-              <v-text-field
-                v-model="draft.icon"
-                label="نماد"
-                placeholder="mdi-waves"
-                hint="نام یک آیکن mdi؛ خالی بگذارید تا نمادی نباشد."
-                persistent-hint
+    <v-dialog v-model="formOpen" max-width="760" scrollable persistent :fullscreen="isPhone"
+      aria-labelledby="admin-incident-form-title" @after-leave="restoreFormFocus">
+      <v-card class="admin-incident-form" rounded="xl" dir="rtl">
+        <header class="admin-incident-form__header">
+          <span class="admin-incident-form__header-icon" aria-hidden="true">
+            <v-icon :icon="editing ? 'mdi-pencil-outline' : 'mdi-alert-circle-outline'" size="25" />
+          </span>
+          <div class="admin-incident-form__heading">
+            <span class="admin-incident-form__eyebrow">نوع رویدادها / {{ editing ? 'ویرایش' : 'ایجاد' }}</span>
+            <h2 id="admin-incident-form-title">{{ editing ? `ویرایش ${editing.name}` : 'نوع رویداد جدید' }}</h2>
+            <p>مشخصات نمایشی و شناسهٔ این نوع رویداد را تنظیم کنید.</p>
+          </div>
+          <v-btn class="admin-incident-form__close" icon="mdi-close" variant="text" aria-label="بستن فرم نوع رویداد"
+            :disabled="saving" @click="closeForm" />
+        </header>
+
+        <v-card-text class="admin-incident-form__body">
+          <v-form id="admin-incident-form-fields" class="admin-incident-form__form" @submit.prevent="submit">
+            <section class="admin-incident-form__section" aria-labelledby="admin-incident-identity-title">
+              <div class="admin-incident-form__section-head">
+                <span class="admin-incident-form__step" aria-hidden="true">۱</span>
+                <div>
+                  <h3 id="admin-incident-identity-title">نام و نامک</h3>
+                  <p>نام هنگام ثبت درخواست SOS دیده می‌شود؛ نامک شناسهٔ ارجاع به این نوع رویداد است.</p>
+                </div>
+              </div>
+              <div class="admin-incident-form__fields">
+                <v-text-field
+                  v-model="draft.name"
+                  label="نام نوع رویداد"
+                  placeholder="مثلاً سیل"
+                  aria-required="true"
+                  density="comfortable"
+                  variant="outlined"
+                  rounded="lg"
+                  :error-messages="fieldErrors.name ?? ''"
+                  :disabled="saving"
+                  data-test="incident-name"
+                  @update:model-value="clearFormFeedback('name')"
+                />
+                <v-text-field
+                  v-model="draft.slug"
+                  :label="!editing && draft.name.trim() && !incidentSlugPreview(draft.name) ? 'نامک (برای این نام لازم است)' : 'نامک (اختیاری)'"
+                  placeholder="مثلاً flood-response"
+                  :aria-required="!editing && !!draft.name.trim() && !incidentSlugPreview(draft.name)"
+                  :hint="slugHint"
+                  persistent-hint
+                  density="comfortable"
+                  variant="outlined"
+                  rounded="lg"
+                  :error-messages="fieldErrors.slug ?? ''"
+                  :disabled="saving"
+                  @update:model-value="clearFormFeedback('slug')"
+                />
+              </div>
+            </section>
+
+            <section class="admin-incident-form__section" aria-labelledby="admin-incident-appearance-title">
+              <div class="admin-incident-form__section-head">
+                <span class="admin-incident-form__step" aria-hidden="true">۲</span>
+                <div>
+                  <h3 id="admin-incident-appearance-title">نمایش روی نقشه</h3>
+                  <p>نماد و رنگ اختیاری‌اند؛ خالی‌کردن آن‌ها هنگام ویرایش مقدار فعلی را حذف می‌کند.</p>
+                </div>
+              </div>
+              <div class="admin-incident-form__appearance-fields">
+                <v-text-field
+                  v-model="draft.icon"
+                  label="نماد MDI (اختیاری)"
+                  placeholder="mdi-waves"
+                  hint="نام آیکن را با mdi- شروع کنید."
+                  persistent-hint
+                  density="comfortable"
+                  variant="outlined"
+                  rounded="lg"
+                  :error-messages="fieldErrors.icon ?? ''"
+                  :disabled="saving"
+                  @update:model-value="clearFormFeedback('icon')"
+                />
+                <v-text-field
+                  v-model="draft.color"
+                  label="رنگ (اختیاری)"
+                  placeholder="#0ea5e9"
+                  hint="همان رنگی که روی نقشه نمایش داده می‌شود."
+                  persistent-hint
+                  density="comfortable"
+                  variant="outlined"
+                  rounded="lg"
+                  :error-messages="fieldErrors.color ?? ''"
+                  :disabled="saving"
+                  @update:model-value="clearFormFeedback('color')"
+                />
+              </div>
+              <div class="admin-incident-form__preview" role="group" aria-label="پیش‌نمایش نوع رویداد">
+                <span class="admin-incident-form__preview-icon" aria-hidden="true">
+                  <v-icon :icon="draft.icon.trim() || 'mdi-image-off-outline'" size="24" />
+                </span>
+                <div class="admin-incident-form__preview-copy">
+                  <strong>{{ draft.name.trim() || 'نام نوع رویداد' }}</strong>
+                  <code dir="ltr">{{ draft.slug.trim() || (editing?.slug ?? incidentSlugPreview(draft.name)) || '—' }}</code>
+                </div>
+                <span v-if="draft.color.trim()" class="admin-incident-form__preview-swatch" role="img"
+                  :style="{ backgroundColor: draft.color.trim() }" :aria-label="`رنگ ${draft.color.trim()}`" />
+                <small v-else class="admin-incident-form__preview-no-color">بدون رنگ</small>
+              </div>
+            </section>
+
+            <section class="admin-incident-form__section" aria-labelledby="admin-incident-description-title">
+              <div class="admin-incident-form__section-head">
+                <span class="admin-incident-form__step" aria-hidden="true">۳</span>
+                <div>
+                  <h3 id="admin-incident-description-title">توضیح</h3>
+                  <p>یک توضیح کوتاه برای شناخت بهتر این نوع رویداد بنویسید.</p>
+                </div>
+              </div>
+              <v-textarea
+                v-model="draft.description"
+                label="توضیح (اختیاری)"
+                placeholder="موقعیت‌هایی که این نوع رویداد برای آن‌ها به‌کار می‌رود."
+                rows="2"
+                auto-grow
                 density="comfortable"
                 variant="outlined"
                 rounded="lg"
-                :error-messages="fieldErrors.icon ?? ''"
+                :error-messages="fieldErrors.description ?? ''"
                 :disabled="saving"
+                @update:model-value="clearFormFeedback('description')"
               />
-              <v-text-field
-                v-model="draft.color"
-                label="رنگ"
-                placeholder="#0ea5e9"
-                hint="همان چیزی که در نقشه دیده می‌شود؛ خالی برای حذف."
-                persistent-hint
-                density="comfortable"
-                variant="outlined"
-                rounded="lg"
-                :error-messages="fieldErrors.color ?? ''"
-                :disabled="saving"
-              />
-            </div>
-            <v-textarea
-              v-model="draft.description"
-              label="توضیح"
-              rows="3"
-              density="comfortable"
-              variant="outlined"
-              rounded="lg"
-              :error-messages="fieldErrors.description ?? ''"
-              :disabled="saving"
-            />
-            <v-alert v-if="formError" type="error" variant="tonal" rounded="lg" role="alert">{{ formError }}</v-alert>
-            <p v-if="formNotice" class="admin-incidents-notice text-sm opacity-80" aria-live="polite">{{ formNotice }}</p>
+            </section>
+            <v-alert v-if="formError" class="admin-incident-form__alert" type="error" variant="tonal" rounded="lg" role="alert">{{ formError }}</v-alert>
+            <p v-if="formNotice" class="admin-incident-form__notice" role="status" aria-live="polite">{{ formNotice }}</p>
           </v-form>
         </v-card-text>
-        <v-card-actions class="admin-catalog-dialog-actions">
+        <v-card-actions class="admin-catalog-dialog-actions admin-incident-form__actions">
           <v-spacer />
           <v-btn variant="text" rounded="lg" :disabled="saving" @click="closeForm">انصراف</v-btn>
-          <v-btn color="primary" variant="flat" rounded="lg" :loading="saving" @click="submit">ذخیره</v-btn>
+          <v-btn color="primary" variant="flat" rounded="lg" type="submit" form="admin-incident-form-fields"
+            :loading="saving" :disabled="saving">
+            {{ editing ? 'ذخیرهٔ تغییرات' : 'ساخت نوع رویداد' }}
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -180,6 +252,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import type { IncidentType } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { createIncidentType, listIncidentTypes, updateIncidentType } from "../../api/admin-catalog";
@@ -199,6 +272,7 @@ import { catalogListPresentation } from "../../admin/catalog-list-presentation";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
+const isPhone = useMediaQuery("(max-width: 600px)");
 
 const types = ref<IncidentType[]>([]);
 const loading = ref(true);
@@ -213,6 +287,19 @@ const formError = ref("");
 const formNotice = ref("");
 const successVisible = ref(false);
 const successMessage = ref("");
+let formTrigger: HTMLElement | null = null;
+function rememberFormTrigger(event: MouseEvent): void {
+  formTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+}
+function restoreFormFocus(): void {
+  if (formTrigger?.isConnected) formTrigger.focus({ preventScroll: true });
+  formTrigger = null;
+}
+function clearFormFeedback(field: keyof IncidentFormDraft): void {
+  fieldErrors.value[field] = undefined;
+  formError.value = "";
+  formNotice.value = "";
+}
 
 let requestVersion = 0;
 let activeController: AbortController | null = null;
@@ -263,7 +350,8 @@ const slugHint = computed(() => {
   return `اگر خالی بگذارید، از نام ساخته می‌شود: ${preview}`;
 });
 
-function openCreate(): void {
+function openCreate(event: MouseEvent): void {
+  rememberFormTrigger(event);
   editing.value = null;
   draft.value = { ...EMPTY_INCIDENT_DRAFT };
   fieldErrors.value = {};
@@ -272,7 +360,8 @@ function openCreate(): void {
   formOpen.value = true;
 }
 
-function openEdit(type: IncidentType): void {
+function openEdit(type: IncidentType, event: MouseEvent): void {
+  rememberFormTrigger(event);
   editing.value = type;
   draft.value = incidentDraftFromType(type);
   fieldErrors.value = {};
@@ -374,6 +463,56 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.admin-incident-form { color: var(--bb-color-text); background: rgb(var(--v-theme-surface)); font-family: var(--bb-font-family); }
+.admin-incident-form__header { display: flex; align-items: center; gap: 1rem; flex: none;
+  padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--bb-color-outline);
+  background: linear-gradient(110deg, rgba(var(--v-theme-primary), .1), rgba(var(--v-theme-primary), .025) 75%); }
+.admin-incident-form__header-icon { display: grid; flex: none; place-items: center; width: 48px; height: 48px;
+  border-radius: 1rem; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
+.admin-incident-form__heading { min-width: 0; flex: 1; }
+.admin-incident-form__eyebrow { color: var(--bb-color-primary); font-size: .82rem; font-weight: 750; }
+.admin-incident-form__heading h2 { margin: .1rem 0 0; font-size: 1.25rem; font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
+.admin-incident-form__heading p { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .84rem; line-height: 1.6; }
+.admin-incident-form__close { flex: none; align-self: flex-start; }
+.admin-incident-form__close.v-btn { width: 44px; height: 44px; }
+.admin-incident-form__body { padding: 1.15rem 1.5rem 1.4rem; }
+.admin-incident-form__form { display: grid; gap: 1rem; }
+.admin-incident-form__section { min-width: 0; }
+.admin-incident-form__section + .admin-incident-form__section { padding-block-start: 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--bb-color-outline) 28%, transparent); }
+.admin-incident-form__section-head { display: flex; align-items: center; gap: .7rem; margin-bottom: .9rem; }
+.admin-incident-form__section-head > div { min-width: 0; }
+.admin-incident-form__step { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
+  border-radius: .7rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .1); font-weight: 800; }
+.admin-incident-form__section-head h3 { margin: 0; font-size: 1rem; font-weight: 800; }
+.admin-incident-form__section-head p { margin: .1rem 0 0; color: var(--bb-color-muted); font-size: .82rem; line-height: 1.6; }
+.admin-incident-form__fields, .admin-incident-form__appearance-fields {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; align-items: start; }
+.admin-incident-form__preview { display: flex; align-items: center; gap: .7rem; min-width: 0;
+  margin-top: .65rem; padding: .6rem .8rem; border-radius: .85rem; background: var(--bb-color-inset); }
+.admin-incident-form__preview-icon { display: grid; flex: none; place-items: center; width: 40px; height: 40px;
+  border-radius: .75rem; background: rgba(var(--v-theme-primary), .11); color: var(--bb-color-primary); }
+.admin-incident-form__preview-copy { display: grid; min-width: 0; flex: 1; gap: .05rem; }
+.admin-incident-form__preview-copy strong { font-size: .86rem; overflow-wrap: anywhere; }
+.admin-incident-form__preview-copy code { justify-self: start; max-width: 100%; color: var(--bb-color-muted);
+  font-size: .8rem; overflow-wrap: anywhere; }
+.admin-incident-form__preview-swatch { flex: none; width: 28px; height: 28px; border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(var(--v-theme-surface)), 0 0 0 3px color-mix(in srgb, var(--bb-color-outline) 45%, transparent); }
+.admin-incident-form__preview-no-color { flex: none; color: var(--bb-color-muted); font-size: .8rem; }
+.admin-incident-form__section :deep(.v-textarea .v-input__details) { min-height: 0; }
+.admin-incident-form__alert { margin: 0; }
+.admin-incident-form__notice { margin: 0; padding: .7rem .85rem; border-radius: .75rem;
+  color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .09); font-size: .85rem; }
+.admin-incident-form__actions { flex: none; gap: .4rem; padding: .75rem 1.5rem;
+  border-top: 1px solid var(--bb-color-outline); }
+.admin-incident-form__actions :deep(.v-btn) { min-height: 44px; margin: 0; }
+@media (forced-colors: active) {
+  .admin-incident-form__header, .admin-incident-form__preview, .admin-incident-form__notice {
+    background: Canvas; color: CanvasText; }
+  .admin-incident-form__section + .admin-incident-form__section { border-color: CanvasText; }
+  .admin-incident-form__preview-swatch { outline: 1px solid CanvasText; }
+}
+
 .admin-incidents-swatch {
   display: inline-block;
   width: 16px;
@@ -392,6 +531,9 @@ onUnmounted(() => {
   max-width: 24rem;
   overflow-wrap: anywhere;
 }
+.admin-incidents-table .admin-incidents-row > td:first-child { overflow-wrap: anywhere; }
+.admin-incidents-actions-heading, .admin-incidents-actions { width: 7.5rem; }
+.admin-incidents-actions :deep(.v-btn) { min-height: 36px; height: auto; padding-block: .25rem; white-space: normal; }
 
 .admin-incidents-mobile { display: none; margin: 0; padding: 0; list-style: none; }
 .admin-incidents-mobile__card { min-width: 0; padding: 1rem; border-block-start: 1px solid rgba(var(--v-theme-on-surface), .12); overflow-wrap: anywhere; }
@@ -409,6 +551,15 @@ onUnmounted(() => {
 }
 
 @media (max-width: 600px) {
+  .admin-incident-form { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
+  .admin-incident-form__header { padding: calc(.65rem + env(safe-area-inset-top, 0px)) .85rem .65rem; }
+  .admin-incident-form__header-icon { width: 40px; height: 40px; }
+  .admin-incident-form__heading h2 { font-size: 1.1rem; }
+  .admin-incident-form__heading p { display: none; }
+  .admin-incident-form__body { padding: .85rem 1rem; }
+  .admin-incident-form__fields, .admin-incident-form__appearance-fields { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
+  .admin-incident-form__section-head { margin-bottom: .6rem; }
+  .admin-incident-form__actions { padding: .55rem 1rem calc(.55rem + env(safe-area-inset-bottom, 0px)); }
   .admin-catalog-dialog-actions { flex-direction: column; align-items: stretch; }
   .admin-catalog-dialog-actions :deep(.v-spacer) { display: none; }
   .admin-catalog-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; white-space: normal; }

@@ -16,8 +16,11 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain("{{ type.description || \"—\" }}");
     expect(cards).toContain("{{ type.color || \"—\" }}");
     expect(cards).toContain('v-if="type.icon"');
-    expect(cards).toContain('@click="openEdit(type)"');
-    expect(incidents.match(/@click="openEdit\(type\)"/g)).toHaveLength(2); // desktop + mobile, one handler
+    expect(cards).toContain('@click="openEdit(type, $event)"');
+    expect(cards).toContain('variant="tonal" color="primary" size="small"');
+    expect(incidents).toContain('size="small" variant="tonal" color="primary" prepend-icon="mdi-pencil-outline"');
+    expect(incidents).toContain('.admin-incidents-actions :deep(.v-btn) { min-height: 36px;');
+    expect(incidents.match(/@click="openEdit\(type, \$event\)"/g)).toHaveLength(2); // desktop + mobile, one handler
     expect(cards).toContain('v-if="listState === \'loading\'"');
     expect(cards).not.toContain('listState === \'empty\'');
     expect(cards).not.toContain('listState === \'error\'');

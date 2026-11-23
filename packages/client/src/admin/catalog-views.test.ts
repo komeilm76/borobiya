@@ -27,7 +27,8 @@ describe("the admin catalog views' load-bearing markup", () => {
     // `PATCH /_admin/incidents/:id` validates and reports slug conflicts, so freezing the field in the
     // edit dialog would be a rule the server does not have. The hint next to it says what a rename costs.
     expect(incidents).toContain('v-model="draft.slug"');
-    expect(incidents).toMatch(/v-model="draft\.slug"[\s\S]{0,400}?:disabled="saving"\s*\//);
+    const slugField = incidents.match(/<v-text-field\s+v-model="draft\.slug"([\s\S]*?)\/>/)?.[1];
+    expect(slugField).toContain(':disabled="saving"');
     expect(incidents).not.toContain("disabled=\"saving || editing !== null\"");
   });
 
