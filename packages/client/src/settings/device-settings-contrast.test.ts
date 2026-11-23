@@ -34,11 +34,21 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
     for (const selector of [
       ".device-priority__kicker", ".device-priority__hint", ".device-priority__meta", ".device-priority__icon"
     ]) {
-      expect(contrast(lightColor(panel, selector), palettes.light.surface), selector).toBeGreaterThanOrEqual(4.5);
+      for (const background of [palettes.light.surface, palettes.light.inset]) {
+        expect(contrast(lightColor(panel, selector), background), `${selector} on ${background}`).toBeGreaterThanOrEqual(4.5);
+      }
     }
     const eyebrow = lightColor(view, ".user-devices__title-block p");
     expect(contrast(eyebrow, palettes.light.background)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(eyebrow, palettes.light.surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("centers a restrained desktop card and separates session rows without changing their controls", () => {
+    expect(panel).toMatch(/\.device-priority__card\s*\{[^}]*width: 100%;[^}]*max-width: 52rem;[^}]*align-self: center;/);
+    expect(panel).toMatch(/\.device-priority__session\s*\{[^}]*border: 1px solid rgba\(98, 146, 137, 0\.32\);[^}]*background: var\(--bb-color-inset\);/);
+    expect(panel).toContain(":global(:root.dark .device-priority__session) {");
+    expect(panel).toContain("border-color: var(--bb-color-outline);");
+    expect(panel).toContain('v-if="!row.isCurrent"');
   });
 
   it("preserves dark-theme overrides for the same labels", () => {

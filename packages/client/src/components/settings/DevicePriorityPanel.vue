@@ -96,6 +96,9 @@ function ageText(minutes: number): string {
 
 <style scoped>
 .device-priority__card {
+  width: 100%;
+  max-width: 52rem;
+  align-self: center;
   border: 1px solid rgba(25, 53, 54, 0.08);
   background: rgb(var(--v-theme-surface));
   box-shadow: var(--bb-shadow-surface) !important;
@@ -109,7 +112,8 @@ function ageText(minutes: number): string {
 .device-priority__skeleton { padding: 0.5rem 1.2rem; color: #536d6c; font-size: 0.82rem; }
 .device-priority__list { display: grid; gap: 0.5rem; list-style: none; padding: 0.5rem 1.2rem; margin: 0; }
 .device-priority__session { display: flex; align-items: center; gap: 0.85rem; padding: 0.8rem;
-  border: 1px solid rgba(25, 53, 54, 0.1); border-radius: var(--bb-radius-nested, 16px); }
+  border: 1px solid rgba(98, 146, 137, 0.32); border-radius: var(--bb-radius-nested, 16px);
+  background: var(--bb-color-inset); }
 .device-priority__icon { flex: none; color: #536d6c; }
 .device-priority__details { min-width: 0; flex: 1 1 auto; }
 .device-priority__name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
