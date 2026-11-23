@@ -37,6 +37,9 @@ describe("admin catalog lists on narrow screens", () => {
     expect(table).not.toContain('v-for="member in category.members"');
     expect(table).toContain('category.members.length.toLocaleString(\'fa-IR\')');
     expect(table).toContain('class="admin-categories-actions__buttons"');
+    expect(table).toContain('<v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-account-plus-outline"');
+    expect(table).toContain('<v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-pencil-outline"');
+    expect(categories).toContain('.admin-categories-actions__buttons :deep(.v-btn) { min-height: 36px;');
     expect(categories).toContain('<ul v-if="categories.length || listState === \'loading\'" class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading" role="list">');
     const cards = categories.split('<ul v-if="categories.length || listState === \'loading\'" class="admin-categories-mobile"')[1]?.split("</ul>")[0];
     expect(cards).toContain('v-for="category in categories"');
@@ -45,6 +48,9 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain('v-for="id in category.incidentTypeIds"');
     expect(cards).not.toContain('v-for="member in category.members"');
     expect(cards).toContain('category.members.length.toLocaleString(\'fa-IR\')');
+    expect(cards).toContain('<v-btn variant="tonal" color="primary" prepend-icon="mdi-account-plus-outline"');
+    expect(cards).toContain('<v-btn variant="tonal" color="primary" prepend-icon="mdi-pencil-outline"');
+    expect(categories).toContain('.admin-categories-mobile__actions :deep(.v-btn) { min-height: 44px;');
     expect(cards).toContain('@click="openMembers(category, $event)"');
     expect(cards).toContain('@click="openEdit(category, $event)"');
     expect(categories.match(/@click="openMembers\(category, \$event\)"/g)).toHaveLength(2);

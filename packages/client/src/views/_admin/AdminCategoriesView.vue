@@ -62,7 +62,7 @@
                 <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
                   افزودن عضو ({{ category.members.length.toLocaleString('fa-IR') }})
                 </v-btn>
-                <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
+                <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
               </div>
             </td>
           </tr>
@@ -93,10 +93,10 @@
             </dd></div>
           </dl>
           <div class="admin-categories-mobile__actions">
-            <v-btn variant="tonal" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
+            <v-btn variant="tonal" color="primary" prepend-icon="mdi-account-plus-outline" @click="openMembers(category, $event)">
               افزودن عضو ({{ category.members.length.toLocaleString('fa-IR') }})
             </v-btn>
-            <v-btn variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
+            <v-btn variant="tonal" color="primary" prepend-icon="mdi-pencil-outline" @click="openEdit(category, $event)">ویرایش</v-btn>
           </div>
         </li>
       </ul>
@@ -840,7 +840,7 @@ onUnmounted(() => {
 .admin-categories-description { max-width: 18rem; overflow-wrap: anywhere; }
 .admin-categories-actions-heading, .admin-categories-actions { width: 15rem; }
 .admin-categories-actions__buttons { display: flex; flex-wrap: wrap; gap: .25rem; }
-.admin-categories-actions__buttons :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; }
+.admin-categories-actions__buttons :deep(.v-btn) { min-height: 36px; height: auto; padding-block: .25rem; white-space: normal; }
 
 .admin-categories-mobile { display: none; margin: 0; padding: 0; list-style: none; }
 .admin-categories-mobile__card { min-width: 0; padding: 1rem; border-block-start: 1px solid rgba(var(--v-theme-on-surface), .12); overflow-wrap: anywhere; }
