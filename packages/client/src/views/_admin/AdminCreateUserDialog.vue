@@ -169,18 +169,19 @@ async function submit(): Promise<void> {
 
 <style scoped>
 .admin-create-user { color: var(--bb-color-text); background: rgb(var(--v-theme-surface)); font-family: var(--bb-font-family); }
-.admin-create-user__header { display: flex; align-items: center; gap: .8rem; flex: none; padding: 1rem 1.3rem;
+.admin-create-user :deep(.v-btn:not(.v-btn--icon)) { font-size: var(--bb-form-dialog-buttonFont); padding-inline: var(--bb-form-dialog-buttonInline); }
+.admin-create-user__header { display: flex; align-items: center; gap: .8rem; flex: none; padding: .9rem 1.2rem;
   border-bottom: 1px solid var(--bb-color-outline);
   background: linear-gradient(110deg, rgba(var(--v-theme-primary), .1), rgba(var(--v-theme-primary), .025) 75%); }
-.admin-create-user__header-icon { display: grid; flex: none; place-items: center; width: 46px; height: 46px;
+.admin-create-user__header-icon { display: grid; flex: none; place-items: center; width: 44px; height: 44px;
   border-radius: .9rem; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
 .admin-create-user__heading { min-width: 0; flex: 1; }
 .admin-create-user__eyebrow { color: var(--bb-color-primary); font-size: .82rem; font-weight: 750; }
-.admin-create-user__heading h2 { margin: .1rem 0 0; font-size: 1.25rem; font-weight: 800; line-height: 1.45; }
+.admin-create-user__heading h2 { margin: .1rem 0 0; font-size: var(--bb-form-dialog-title); font-weight: 800; line-height: 1.45; }
 .admin-create-user__heading p { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .84rem; line-height: 1.6; }
 .admin-create-user__close { flex: none; align-self: flex-start; }
 .admin-create-user__close.v-btn { width: 44px; height: 44px; }
-.admin-create-user__body { padding: 1.1rem 1.3rem 1.3rem; }
+.admin-create-user__body { padding: 1rem 1.2rem 1.2rem; }
 .admin-create-user__form { display: grid; gap: .9rem; }
 .admin-create-user__section { min-width: 0; }
 .admin-create-user__section + .admin-create-user__section { padding-block-start: .9rem;
@@ -189,7 +190,7 @@ async function submit(): Promise<void> {
 .admin-create-user__section-head > div { min-width: 0; }
 .admin-create-user__step { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
   border-radius: .7rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .1); font-weight: 800; }
-.admin-create-user__section-head h3 { margin: 0; font-size: 1rem; font-weight: 800; }
+.admin-create-user__section-head h3 { margin: 0; font-size: var(--bb-form-dialog-sectionTitle); font-weight: 800; }
 .admin-create-user__section-head p { margin: .1rem 0 0; color: var(--bb-color-muted); font-size: .82rem; line-height: 1.6; }
 .admin-create-user__password-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; align-items: start; }
 .admin-create-user__show-password { margin-top: -.25rem; }
@@ -211,6 +212,8 @@ async function submit(): Promise<void> {
   .admin-create-user__header { padding: calc(var(--bb-form-phone-headerBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-inline) var(--bb-form-phone-headerBlock); }
   .admin-create-user__header-icon { width: var(--bb-form-phone-icon); height: var(--bb-form-phone-icon); }
   .admin-create-user__heading h2 { font-size: var(--bb-form-phone-title); }
+  .admin-create-user__section-head h3 { font-size: var(--bb-form-phone-sectionTitle); }
+  .admin-create-user :deep(.v-btn:not(.v-btn--icon)) { font-size: var(--bb-form-phone-buttonFont); padding-inline: var(--bb-form-phone-buttonInline); }
   .admin-create-user__heading p { display: none; }
   .admin-create-user__body { padding: var(--bb-form-phone-bodyBlock) var(--bb-form-phone-inline); }
   .admin-create-user__form { gap: var(--bb-form-phone-sectionGap); }

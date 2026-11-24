@@ -357,7 +357,7 @@ export const audienceContentLayout = {
   publicHealthInset: "clamp(2rem, 6vw, 5rem) 1rem 5rem",
   publicHealthCardInset: "clamp(1.5rem, 4vw, 2.5rem)",
   publicValueInset: "1.7rem",
-  sharingDialogInset: "clamp(1rem, 3vw, 1.75rem)",
+  sharingDialogInset: "clamp(0.9rem, 2.8vw, 1.6rem)",
   sharingListInset: "clamp(1rem, 2.5vw, 1.5rem)",
   sharingResultInset: "0.55rem 0.7rem",
   sharingRowInset: "0.55rem 0.65rem",
@@ -743,26 +743,37 @@ export const sharingTypography = {
   facts: "0.83rem",
   caption: "0.82rem", label: "0.88rem", body: "0.9rem",
   supporting: "0.84rem", heading: "1.1rem",
-  lead: "0.92rem", avatar: "0.85rem"
+  lead: "0.9rem", avatar: "0.85rem"
 } as const;
 
-// Small-screen density for the admin editors, member picker and sharing form.
-// Only consumed inside their phone media queries; desktop typography/layout and
-// 44px minimum interactive targets stay unchanged.
+// A restrained density adjustment for the approved editor dialogs at all widths.
+// Deliberately does not shrink input text (mobile keyboard zoom) or 44px targets.
+export const formDialogDensity = {
+  title: "1.18rem",
+  sectionTitle: ".96rem",
+  buttonFont: ".86rem",
+  buttonInline: ".7rem"
+} as const;
+
+// Phone-specific insets and type for the same forms. These are used only inside
+// their phone media queries; tablet/desktop use the base density above.
 export const formPhoneLayout = {
-  title: "1.05rem",
-  icon: "38px",
-  headerBlock: ".55rem",
-  inline: ".8rem",
-  bodyBlock: ".75rem",
-  actionBlock: ".5rem",
-  sectionGap: ".8rem",
-  compactHeaderBlock: ".35rem",
-  compactInline: ".7rem",
-  compactBodyBlock: ".55rem",
-  compactSectionInset: ".6rem",
-  compactActionBlock: ".4rem",
-  compactIcon: "34px"
+  title: "1.02rem",
+  sectionTitle: ".94rem",
+  buttonFont: ".84rem",
+  buttonInline: ".6rem",
+  icon: "36px",
+  headerBlock: ".5rem",
+  inline: ".75rem",
+  bodyBlock: ".7rem",
+  actionBlock: ".45rem",
+  sectionGap: ".75rem",
+  compactHeaderBlock: ".3rem",
+  compactInline: ".65rem",
+  compactBodyBlock: ".5rem",
+  compactSectionInset: ".55rem",
+  compactActionBlock: ".35rem",
+  compactIcon: "32px"
 } as const;
 
 export type DesignTheme = keyof typeof palettes;
@@ -797,6 +808,7 @@ export function designTokenStylesheet(): string {
     ...Object.entries(rescueType.leading).map(([key, value]) => `--bb-rescue-leading-${key}: ${value}`),
     ...Object.entries(rescueType.tracking).map(([key, value]) => `--bb-rescue-tracking-${key}: ${value}`),
     ...Object.entries(sharingTypography).map(([key, value]) => `--bb-sharing-font-${key}: ${value}`),
+    ...Object.entries(formDialogDensity).map(([key, value]) => `--bb-form-dialog-${key}: ${value}`),
     ...Object.entries(formPhoneLayout).map(([key, value]) => `--bb-form-phone-${key}: ${value}`),
     ...Object.entries(shellTypography).map(([key, value]) => `--bb-shell-font-${key}: ${value}`),
     ...Object.entries(shellLayout).map(([key, value]) => `--bb-shell-layout-${key}: ${value}`),

@@ -464,18 +464,19 @@ onUnmounted(() => {
 
 <style scoped>
 .admin-incident-form { color: var(--bb-color-text); background: rgb(var(--v-theme-surface)); font-family: var(--bb-font-family); }
+.admin-incident-form :deep(.v-btn:not(.v-btn--icon)) { font-size: var(--bb-form-dialog-buttonFont); padding-inline: var(--bb-form-dialog-buttonInline); }
 .admin-incident-form__header { display: flex; align-items: center; gap: 1rem; flex: none;
-  padding: 1.15rem 1.5rem; border-bottom: 1px solid var(--bb-color-outline);
+  padding: 1.05rem 1.4rem; border-bottom: 1px solid var(--bb-color-outline);
   background: linear-gradient(110deg, rgba(var(--v-theme-primary), .1), rgba(var(--v-theme-primary), .025) 75%); }
-.admin-incident-form__header-icon { display: grid; flex: none; place-items: center; width: 48px; height: 48px;
+.admin-incident-form__header-icon { display: grid; flex: none; place-items: center; width: 46px; height: 46px;
   border-radius: 1rem; color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary)); }
 .admin-incident-form__heading { min-width: 0; flex: 1; }
 .admin-incident-form__eyebrow { color: var(--bb-color-primary); font-size: .82rem; font-weight: 750; }
-.admin-incident-form__heading h2 { margin: .1rem 0 0; font-size: 1.25rem; font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
+.admin-incident-form__heading h2 { margin: .1rem 0 0; font-size: var(--bb-form-dialog-title); font-weight: 800; line-height: 1.45; overflow-wrap: anywhere; }
 .admin-incident-form__heading p { margin: .15rem 0 0; color: var(--bb-color-muted); font-size: .84rem; line-height: 1.6; }
 .admin-incident-form__close { flex: none; align-self: flex-start; }
 .admin-incident-form__close.v-btn { width: 44px; height: 44px; }
-.admin-incident-form__body { padding: 1.15rem 1.5rem 1.4rem; }
+.admin-incident-form__body { padding: 1.05rem 1.4rem 1.3rem; }
 .admin-incident-form__form { display: grid; gap: 1rem; }
 .admin-incident-form__section { min-width: 0; }
 .admin-incident-form__section + .admin-incident-form__section { padding-block-start: 1rem;
@@ -484,7 +485,7 @@ onUnmounted(() => {
 .admin-incident-form__section-head > div { min-width: 0; }
 .admin-incident-form__step { display: grid; flex: none; place-items: center; width: 34px; height: 34px;
   border-radius: .7rem; color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .1); font-weight: 800; }
-.admin-incident-form__section-head h3 { margin: 0; font-size: 1rem; font-weight: 800; }
+.admin-incident-form__section-head h3 { margin: 0; font-size: var(--bb-form-dialog-sectionTitle); font-weight: 800; }
 .admin-incident-form__section-head p { margin: .1rem 0 0; color: var(--bb-color-muted); font-size: .82rem; line-height: 1.6; }
 .admin-incident-form__fields, .admin-incident-form__appearance-fields {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; align-items: start; }
@@ -555,6 +556,8 @@ onUnmounted(() => {
   .admin-incident-form__header { padding: calc(var(--bb-form-phone-headerBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-inline) var(--bb-form-phone-headerBlock); }
   .admin-incident-form__header-icon { width: var(--bb-form-phone-icon); height: var(--bb-form-phone-icon); }
   .admin-incident-form__heading h2 { font-size: var(--bb-form-phone-title); }
+  .admin-incident-form__section-head h3 { font-size: var(--bb-form-phone-sectionTitle); }
+  .admin-incident-form :deep(.v-btn:not(.v-btn--icon)) { font-size: var(--bb-form-phone-buttonFont); padding-inline: var(--bb-form-phone-buttonInline); }
   .admin-incident-form__heading p { display: none; }
   .admin-incident-form__body { padding: var(--bb-form-phone-bodyBlock) var(--bb-form-phone-inline); }
   .admin-incident-form__form { gap: var(--bb-form-phone-sectionGap); }

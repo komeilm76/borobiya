@@ -50,7 +50,7 @@ describe("category edit/create dialog", () => {
     expect(form).toContain('@after-leave="restoreFormFocus"');
     expect(source).toContain('formTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;');
     expect(source).toContain('if (formTrigger?.isConnected) formTrigger.focus({ preventScroll: true });');
-    expect(css).toContain('.admin-category-form__option :deep(.v-selection-control) { min-height: 62px;');
+    expect(css).toContain('.admin-category-form__option :deep(.v-selection-control) { min-height: 58px;');
     expect(css).toContain('.admin-category-form__option :deep(.v-selection-control--focus-visible)');
     expect(css).toContain('.admin-categories-picker { grid-template-columns: minmax(0, 1fr); }');
     const descriptor = parse(source).descriptor;

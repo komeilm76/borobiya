@@ -65,7 +65,7 @@ describe("category member management dialog", () => {
     expect(dialog).toContain('v-show="currentMembersExpanded"');
     expect(source).toContain('currentMembersExpanded.value = !isPhone.value;');
     expect(style).toContain('.admin-category-members__disclosure { display: flex;');
-    expect(style).toContain('align-items: start; padding: .85rem 1.1rem;');
+    expect(style).toContain('align-items: start; padding: .8rem 1rem;');
     expect(style).toContain('min-height: 44px;');
     expect(style).toContain('.admin-category-members__results { max-height: min(34dvh, 14rem); }');
     expect(style).toContain('.admin-catalog-dialog-actions.admin-category-members__actions { flex-direction: row; }');
@@ -74,7 +74,7 @@ describe("category member management dialog", () => {
 
   it("gives search a raised work surface, a tonal member rail, and selections beside search", () => {
     expect(style).toContain('background: var(--bb-color-inset);\n}');
-    expect(style).toContain('.admin-category-members__section { min-width: 0; padding: .85rem; border: 0;');
+    expect(style).toContain('.admin-category-members__section { min-width: 0; padding: .8rem; border: 0;');
     expect(style).toContain('background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-item);');
     expect(style).toContain('background: rgba(var(--v-theme-primary), .09);');
     expect(style).toContain('.admin-category-members__selection { display: flex;');
