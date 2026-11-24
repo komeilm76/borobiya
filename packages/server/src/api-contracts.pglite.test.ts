@@ -616,6 +616,12 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
         timestamp: new Date().toISOString(), priorityDeviceId: responderDeviceId }
     });
     expect(await countResponderHistory()).toBe(1);
+    // A stale initial permission read cannot bypass the write transaction's guard.
+    expect(await new DrizzleLocationHistoryStore(db).recordFixIfActive({
+      userId: createdResponder.id, deviceId: responderDeviceId, sessionId: responderDevices[0]!.id,
+      lat: 35.8014, lon: 51.4287, accuracy: 7, timestamp: new Date()
+    })).toBe(false);
+    expect(await countResponderHistory()).toBe(1);
 
     // Injection does not open a Socket.IO transport. Explicitly record the presence that
     // a connected socket would write; login/refresh alone must no longer count as online.

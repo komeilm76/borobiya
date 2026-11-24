@@ -83,6 +83,8 @@ export interface ReceivedLocationShareRecord extends LocationShareRecord {
 
 /** The minimum a realtime fan-out needs to know about one active outgoing share. */
 export interface ActiveOutgoingShare {
+  /** Stable grant identity; prevents delivering an in-flight fix to a replacement grant. */
+  id?: string;
   /** Start of this grant; used to exclude observations from before sharing. */
   createdAt?: Date;
   targetUserId: string;
@@ -423,6 +425,7 @@ export class DrizzleLocationShareStore implements LocationShareStore {
   async listActiveOutgoingShares(userId: string): Promise<ActiveOutgoingShare[]> {
     const rows = await this.db
       .select({
+        id: locationShares.id,
         targetUserId: locationShares.targetUserId,
         priorityDeviceId: locationShares.priorityDeviceId,
         createdAt: locationShares.createdAt
@@ -438,6 +441,7 @@ export class DrizzleLocationShareStore implements LocationShareStore {
       ))
       .orderBy(desc(locationShares.createdAt));
     return rows.map((row) => ({
+      id: row.id,
       targetUserId: row.targetUserId,
       priorityDeviceId: row.priorityDeviceId ?? null,
       createdAt: row.createdAt

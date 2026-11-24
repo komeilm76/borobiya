@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "./client";
-import { locationHistory, locationHistoryShares, users } from "./schema";
+import { locationHistory, locationHistoryShares, locationShares, locationTrips, missions, users } from "./schema";
 import { ownerAdvisoryLockSql } from "./owner-lock";
 
 /** PostGIS writes keep `users.last_location` and `location_history` in one transaction. */
@@ -88,6 +88,8 @@ export interface LocationHistoryShareWithOwner extends LocationHistoryShareRecor
 
 export interface LocationHistoryStore {
   recordFix(input: LocationFixInput): Promise<void>;
+  /** Recheck and lock the active activity in the same transaction as the history write. */
+  recordFixIfActive?(input: LocationFixInput & { deviceId: string; sessionId?: string }): Promise<boolean>;
 
   /**
    * Reads `fromTime..toTime` for one account, oldest first, sampled evenly down to `maxPoints`. The
@@ -395,6 +397,49 @@ export class DrizzleLocationHistoryStore implements LocationHistoryStore {
         owner: { id: row.ownerId, username: row.ownerUsername }
       }))
     };
+  }
+
+  async recordFixIfActive(input: LocationFixInput & { deviceId: string; sessionId?: string }): Promise<boolean> {
+    return this.db.transaction(async (transaction) => {
+      // Serialize fixes, then lock the permission row through commit. Revoking a live share,
+      // ending a trip, or completing a mission must either commit before this check (no
+      // write) or wait until this authorized write commits. No read-then-write TOCTOU.
+      const [owner] = await transaction.select({ id: users.id }).from(users)
+        .where(eq(users.id, input.userId)).for("update");
+      if (!owner) throw new Error("Location owner no longer exists.");
+      const [share] = await transaction.select({ id: locationShares.id })
+        .from(locationShares).innerJoin(users, eq(users.id, locationShares.targetUserId))
+        .where(and(eq(locationShares.ownerId, input.userId), eq(locationShares.isRevoked, false),
+          or(isNull(locationShares.expiresAt), sql`${locationShares.expiresAt} > clock_timestamp()`),
+          or(isNull(locationShares.priorityDeviceId), eq(locationShares.priorityDeviceId, input.deviceId)),
+          lte(locationShares.createdAt, input.timestamp),
+          eq(users.isActive, true), eq(users.isSuspended, false)))
+        .for("share", { of: locationShares }).limit(1);
+      if (!share) {
+        const [mission] = await transaction.select({ id: missions.id }).from(missions)
+          .where(and(or(eq(missions.requesterId, input.userId), eq(missions.rescuerId, input.userId)),
+            inArray(missions.status, ["pending", "on_the_way", "arrived", "in_progress"]),
+            lte(missions.createdAt, input.timestamp)))
+          .for("share").limit(1);
+        if (!mission) {
+          if (!input.sessionId) return false;
+          const [trip] = await transaction.select({ sessionId: locationTrips.sessionId })
+            .from(locationTrips).where(and(eq(locationTrips.userId, input.userId),
+              eq(locationTrips.sessionId, input.sessionId),
+              sql`${locationTrips.expiresAt} > clock_timestamp()`,
+              lte(locationTrips.startedAt, input.timestamp)))
+            .for("share").limit(1);
+          if (!trip) return false;
+        }
+      }
+      const [newest] = await transaction.select({ timestamp: locationHistory.timestamp })
+        .from(locationHistory).where(eq(locationHistory.userId, input.userId))
+        .orderBy(desc(locationHistory.timestamp)).limit(1);
+      const queries = locationFixQueries(transaction as unknown as Database, input);
+      if (!newest || input.timestamp > newest.timestamp) await queries.updateLastLocation;
+      await queries.appendHistory;
+      return true;
+    });
   }
 
   async recordFix(input: LocationFixInput): Promise<void> {

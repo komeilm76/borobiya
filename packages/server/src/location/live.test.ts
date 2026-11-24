@@ -105,6 +105,47 @@ describe("live location service", () => {
     expect(result).toMatchObject({ status: "accepted", peers: [remainingPeer] });
   });
 
+  it("does not fall back to an unguarded write or deliver a fix when permission ends before commit", async () => {
+    const peer = randomUUID();
+    const share = { id: randomUUID(), targetUserId: peer, priorityDeviceId: null };
+    const recordFix = vi.fn(async () => {});
+    const recordFixIfActive = vi.fn(async () => false);
+    const listActiveOutgoingShares = vi.fn(async () => [share]);
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares }, historyStore: { recordFix, recordFixIfActive },
+      now: () => now
+    });
+    expect(await service.applyUpdate({ userId, deviceId, payload: payload() }))
+      .toMatchObject({ status: "accepted", peers: [] });
+    expect(recordFixIfActive).toHaveBeenCalledWith(expect.objectContaining({ userId, deviceId }));
+    expect(recordFix).not.toHaveBeenCalled();
+    expect(listActiveOutgoingShares).toHaveBeenCalledOnce();
+  });
+
+  it("does not deliver a fix to a replacement grant for the same recipient", async () => {
+    const peer = randomUUID();
+    const originalId = randomUUID();
+    const replacementId = randomUUID();
+    const listActiveOutgoingShares = vi.fn()
+      .mockResolvedValueOnce([{ id: originalId, targetUserId: peer, priorityDeviceId: null }])
+      .mockResolvedValueOnce([{ id: replacementId, targetUserId: peer, priorityDeviceId: null }]);
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares } as unknown as LocationShareStore,
+      historyStore: { recordFix: async () => {} }, now: () => now
+    });
+    expect(await service.applyUpdate({ userId, deviceId, payload: payload() }))
+      .toMatchObject({ status: "accepted", peers: [] });
+  });
+
+  it("never fans out an observation made before a grant began", async () => {
+    const peer = randomUUID();
+    const { service, recorded } = makeService({ shares: [{ id: randomUUID(), targetUserId: peer,
+      priorityDeviceId: null, createdAt: new Date("2026-10-21T09:00:00.000Z") }] });
+    expect(await service.applyUpdate({ userId, deviceId, payload: payload() }))
+      .toMatchObject({ status: "accepted", peers: [] });
+    expect(recorded).toHaveLength(0);
+  });
+
   it("honors a priority-device switch and does not send an older fix to a newly granted peer", async () => {
     const pinnedPeer = randomUUID();
     const newPeer = randomUUID();
@@ -202,6 +243,20 @@ describe("live location service", () => {
     expect(recordFix).toHaveBeenCalledOnce();
     activityStore.isActive.mockResolvedValue(false);
     await service.applyUpdate({ userId, deviceId, sessionId, payload: payload() });
+    expect(recordFix).toHaveBeenCalledOnce();
+  });
+
+  it("records an active trip on a device different from a share's priority device", async () => {
+    const peer = randomUUID();
+    const activityStore = { isActive: vi.fn(async () => true) };
+    const recordFix = vi.fn(async () => {});
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares: async () => [{ targetUserId: peer,
+        priorityDeviceId: "someone-elses-device" }] },
+      historyStore: { recordFix }, activityStore, now: () => now
+    });
+    expect(await service.applyUpdate({ userId, deviceId, sessionId: randomUUID(), payload: payload() }))
+      .toMatchObject({ status: "accepted", peers: [] });
     expect(recordFix).toHaveBeenCalledOnce();
   });
 

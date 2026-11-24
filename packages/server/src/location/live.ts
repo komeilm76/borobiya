@@ -30,7 +30,7 @@ export type LiveUpdateResult =
 
 export interface LiveLocationServiceDependencies {
   shareStore: Pick<LocationShareStore, "listActiveOutgoingShares">;
-  historyStore: Pick<LocationHistoryStore, "recordFix">;
+  historyStore: Pick<LocationHistoryStore, "recordFix"> & Partial<Pick<LocationHistoryStore, "recordFixIfActive">>;
   activityStore?: Pick<LocationActivityStore, "isActive">;
   /** Injectable clock for tests. */
   now?: () => Date;
@@ -96,10 +96,17 @@ export function createLiveLocationService(
       }
 
       const shares = await dependencies.shareStore.listActiveOutgoingShares(userId);
-      const accepted = shares.filter(
-        (share) => share.priorityDeviceId === null || share.priorityDeviceId === deviceId
+      const accepted = shares.filter((share) =>
+        (share.priorityDeviceId === null || share.priorityDeviceId === deviceId) &&
+        (!share.createdAt || share.createdAt <= observedAt)
       );
-      if (shares.length > 0 && accepted.length === 0) {
+      // A pin only restricts delivery to that share. It must not prevent this device
+      // from recording its own independently authorized trip or mission.
+      const activityActive = accepted.length === 0
+        ? await dependencies.activityStore?.isActive(userId, sessionId, observedAt) ?? false
+        : false;
+      if (shares.length > 0 && accepted.length === 0 && !activityActive &&
+          shares.every((share) => share.priorityDeviceId !== null && share.priorityDeviceId !== deviceId)) {
         // T2.3.4: an account that pinned a priority device ignores GPS from every other
         // device, so a stale laptop tab cannot overwrite the phone that is actually sharing.
         return rejected(
@@ -109,15 +116,16 @@ export function createLiveLocationService(
       }
 
       // A valid fix is not consent to keep history. Share, trip, or mission must still be active.
-      if (accepted.some((share) => !share.createdAt || share.createdAt <= observedAt) ||
+      let persisted = false;
+      if (accepted.length > 0 || activityActive ||
           await dependencies.activityStore?.isActive(userId, sessionId, observedAt)) {
-        await dependencies.historyStore.recordFix({
-          userId,
-          lat,
-          lon,
-          accuracy: accuracy ?? null,
-          timestamp: observedAt
-        });
+        const fix = { userId, lat, lon, accuracy: accuracy ?? null, timestamp: observedAt };
+        if (dependencies.historyStore.recordFixIfActive) {
+          persisted = await dependencies.historyStore.recordFixIfActive({ ...fix, deviceId, sessionId });
+        } else {
+          await dependencies.historyStore.recordFix(fix);
+          persisted = true;
+        }
       }
 
       // A revocation, expiry, suspension, or priority-device switch can commit while
@@ -126,14 +134,15 @@ export function createLiveLocationService(
       // If the post-write check fails, fail closed for peers but still acknowledge the
       // possibly committed history row to avoid a duplicate. A revocation that races *after*
       // this recheck still requires transport-level ordering to prevent all deliveries.
-      const authorizedBefore = new Set(accepted.map((share) => share.targetUserId));
+      const authorizedBefore = new Set(accepted.map((share) => share.id ?? share.targetUserId));
       let peers: string[] = [];
-      if (authorizedBefore.size > 0) {
+      if (persisted && authorizedBefore.size > 0) {
         try {
           const activeNow = await dependencies.shareStore.listActiveOutgoingShares(userId);
           peers = [...new Set(activeNow.filter((share) =>
-            authorizedBefore.has(share.targetUserId) &&
-            (share.priorityDeviceId === null || share.priorityDeviceId === deviceId)
+            authorizedBefore.has(share.id ?? share.targetUserId) &&
+            (share.priorityDeviceId === null || share.priorityDeviceId === deviceId) &&
+            (!share.createdAt || share.createdAt <= observedAt)
           ).map((share) => share.targetUserId))];
         } catch (err) {
           dependencies.logger?.warn({ err, userId }, "Location share recheck failed after persistence");
