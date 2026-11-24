@@ -226,8 +226,10 @@
                       :title="item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS'">
                       <v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="16" aria-hidden="true" />
                     </span>
-                    <span v-if="item.photoUrl" role="img" aria-label="تصویر پیوست" title="تصویر پیوست">
+                    <span v-if="item.photoUrl" class="dispatch-request-row__attachment" role="img"
+                      aria-label="تصویر پیوست" title="تصویر پیوست حادثه؛ برای بررسی درخواست را انتخاب کنید">
                       <v-icon icon="mdi-image-outline" size="16" aria-hidden="true" />
+                      تصویر
                     </span>
                   </div>
                 </div>
@@ -278,6 +280,13 @@
               />
             </div>
           </v-card-title>
+          <div v-if="adminSos.selectedRequest.photoUrl && photoSrc" class="admin-dispatch__responder-evidence">
+            <span><v-icon icon="mdi-image-outline" size="18" aria-hidden="true" /> تصویر پیوست این حادثه در دسترس است</span>
+            <v-btn id="dispatch-action-29" size="small" variant="tonal" color="primary"
+              :loading="photoOpenLoading" :disabled="photoOpenLoading"
+              aria-label="بررسی تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">بررسی تصویر</v-btn>
+          </div>
+          <p v-if="photoOpenError && compactDispatch && sheetTab === 'responders'" role="alert" class="admin-dispatch__photo-error admin-dispatch__photo-error--responder">{{ photoOpenError }}</p>
           <form id="dispatch-form-01" class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
             <v-text-field id="dispatch-field-01" v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
               placeholder="حداقل ۲ حرف؛ جست‌وجوی دستی حتی بدون موقعیت یا تخصص مرتبط"
@@ -337,7 +346,9 @@
                 @click="adminSos.toggleResponderSelection(responder.userId)">
                 <span class="dispatch-responder-row__title">
                   <span class="dispatch-responder-row__identity">
-                    <v-icon v-if="adminSos.selectedResponderIds.includes(responder.userId)" icon="mdi-check-circle" size="17" aria-hidden="true" />
+                    <span class="dispatch-responder-row__selection" aria-hidden="true">
+                      <v-icon :icon="adminSos.selectedResponderIds.includes(responder.userId) ? 'mdi-check' : 'mdi-plus'" size="16" />
+                    </span>
                     <bdi class="dispatch-responder-row__name" dir="ltr" :title="responder.username">@{{ responder.username }}</bdi>
                   </span>
                   <span :id="`dispatch-chip-06-${responder.userId}`" class="dispatch-responder-row__distance"
@@ -560,18 +571,28 @@
           </button>
           <div v-show="incidentExpanded" id="dispatch-incident-content">
         <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
-          <div v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo">
+          <section v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo" aria-label="تصویر پیوست حادثه">
+            <div class="admin-dispatch__photo-heading">
+              <span class="admin-dispatch__photo-heading-icon" aria-hidden="true"><v-icon icon="mdi-image-multiple-outline" size="19" /></span>
+              <div><h3>تصویر پیوست حادثه</h3><p>برای بررسی جزئیات، تصویر را در اندازهٔ کامل ببینید.</p></div>
+            </div>
             <button id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"
               :disabled="photoOpenLoading" aria-label="نمایش تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">
-              <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
-                class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
-              <span class="admin-dispatch__photo-caption" aria-hidden="true"><v-icon icon="mdi-arrow-expand-all" size="17" /> تصویر حادثه · مشاهدهٔ کامل</span>
+              <span class="admin-dispatch__photo-preview">
+                <img :src="photoSrc" alt="تصویر پیوست درخواست امداد"
+                  class="admin-dispatch__photo-image" referrerpolicy="no-referrer" @error="photoSrc = null">
+              </span>
+              <span class="admin-dispatch__photo-caption"><span><v-icon icon="mdi-arrow-expand-all" size="18" aria-hidden="true" /> {{ photoOpenLoading ? 'در حال باز کردن تصویر…' : 'نمایش تصویر کامل' }}</span>
+                <v-icon icon="mdi-arrow-top-left" size="18" aria-hidden="true" /></span>
             </button>
-            <span v-else role="status" class="admin-dispatch__photo-state">{{ photoLoading ? "در حال دریافت تصویر حادثه…" : "تصویر حادثه در دسترس نیست." }}</span>
-            <v-btn id="dispatch-action-20" v-if="!photoLoading && !photoSrc && auth.accessToken" size="small" variant="text"
-              color="primary" @click="photoRetryNonce++">تلاش دوباره برای تصویر</v-btn>
-            <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
-          </div>
+            <div v-else class="admin-dispatch__photo-state" role="status">
+              <v-icon :icon="photoLoading ? 'mdi-image-search-outline' : 'mdi-image-off-outline'" size="22" aria-hidden="true" />
+              <span>{{ photoLoading ? "در حال دریافت تصویر حادثه…" : "تصویر حادثه در دسترس نیست." }}</span>
+              <v-btn id="dispatch-action-20" v-if="!photoLoading && auth.accessToken" size="small" variant="tonal"
+                color="primary" @click="photoRetryNonce++">تلاش دوباره</v-btn>
+            </div>
+            <p v-if="photoOpenError && (!compactDispatch || sheetTab !== 'responders')" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
+          </section>
           <v-card-title class="admin-dispatch__detail-heading">
             <div class="admin-dispatch__detail-title">
               <small>درخواست انتخاب‌شده</small>
@@ -662,8 +683,8 @@
           </v-card-text>
           <v-dialog id="dispatch-dialog-01" v-model="photoDialogOpen" max-width="min(94vw, 60rem)" aria-label="تصویر کامل پیوست حادثه">
             <v-card id="dispatch-card-01" rounded="xl" class="admin-dispatch__photo-dialog">
-              <v-card-title class="d-flex align-center justify-space-between">
-                تصویر پیوست حادثه
+              <v-card-title class="admin-dispatch__photo-dialog-heading">
+                <span><v-icon icon="mdi-image-multiple-outline" size="22" aria-hidden="true" /> تصویر پیوست حادثه</span>
                 <v-btn id="dispatch-action-23" icon="mdi-close" variant="text" aria-label="بستن تصویر" @click="photoDialogOpen = false" />
               </v-card-title>
               <v-card-text><img v-if="photoSrc" :src="photoSrc" alt="تصویر کامل پیوست درخواست امداد"
@@ -2180,26 +2201,45 @@ onBeforeUnmount(() => {
 .admin-dispatch__location-details summary .v-icon { margin-inline-start: auto; transition: transform .2s; }
 .admin-dispatch__location-details[open] summary .v-icon { transform: rotate(180deg); }
 .admin-dispatch__location-details .admin-dispatch__facts { padding-bottom: .35rem; }
-.admin-dispatch__photo { min-width: 0; margin: .55rem 1rem .2rem; }
-.admin-dispatch__photo-open { display: block; width: 100%; height: clamp(8rem, 23vh, 13rem);
-  position: relative; padding: 0; overflow: hidden; border: 1px solid var(--bb-color-outline);
-  background: var(--bb-color-inset); border-radius: .85rem; cursor: zoom-in; text-align: start; }
-.admin-dispatch__photo-open:hover { border-color: rgb(var(--v-theme-primary)); }
+/* Evidence is never cropped or covered by a gradient: an image may contain
+   information right at its edges. One quiet media frame, a separate action. */
+.admin-dispatch__photo { min-width: 0; margin: .65rem .7rem .35rem; }
+.admin-dispatch__photo-heading { display: flex; align-items: center; gap: .55rem; margin-bottom: .5rem; }
+.admin-dispatch__photo-heading-icon { flex: none; display: grid; place-items: center;
+  width: 2.15rem; height: 2.15rem; border-radius: .7rem;
+  color: var(--bb-color-primary); background: rgba(var(--v-theme-primary), .1); }
+.admin-dispatch__photo-heading h3 { margin: 0; font-size: .85rem; line-height: 1.4; font-weight: 800; }
+.admin-dispatch__photo-heading p { margin: .1rem 0 0; color: var(--bb-color-muted);
+  font-size: .8rem; line-height: 1.45; }
+.admin-dispatch__photo-open { display: flex; flex-direction: column; width: 100%; min-height: 44px;
+  padding: 0; overflow: hidden; border: 1px solid var(--bb-color-outline);
+  background: var(--bb-color-inset); border-radius: .85rem; cursor: zoom-in;
+  color: var(--bb-color-text); text-align: start; font: inherit;
+  transition: border-color .16s, background-color .16s; }
+.admin-dispatch__photo-open:hover { border-color: var(--bb-color-primary); }
 .admin-dispatch__photo-open:disabled { opacity: .65; cursor: progress; }
-.admin-dispatch__photo-caption { position: absolute; inset: auto 0 0; display: flex; align-items: center; gap: .35rem;
-  padding: 1.5rem .75rem .55rem; color: white; background: linear-gradient(transparent, rgba(0, 0, 0, .75));
-  font-size: .8rem; font-weight: 700; pointer-events: none; }
-.admin-dispatch__photo-state { display: block; padding: .8rem; border-radius: .75rem;
+.admin-dispatch__photo-preview { display: grid; place-items: center; width: 100%;
+  height: clamp(9rem, 23vh, 14rem); overflow: hidden; background: rgba(var(--v-theme-on-surface), .045); }
+.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: contain; }
+.admin-dispatch__photo-caption { display: flex; align-items: center; justify-content: space-between;
+  width: 100%; min-height: 44px; padding: .4rem .7rem; color: var(--bb-color-primary);
+  background: rgb(var(--v-theme-surface)); font-size: .8rem; font-weight: 800; }
+.admin-dispatch__photo-caption > span { display: inline-flex; align-items: center; gap: .35rem; }
+.admin-dispatch__photo-state { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem;
+  min-height: 58px; padding: .6rem .75rem; border-radius: .75rem;
   background: var(--bb-color-inset); color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__photo-error { margin: .4rem 0 0; color: rgb(var(--v-theme-error)); font-size: .82rem; }
+.admin-dispatch__photo-state :deep(.v-btn) { margin-inline-start: auto; }
+.admin-dispatch__photo-error { margin: .45rem 0 0; color: var(--bb-color-error); font-size: .82rem; }
 .admin-dispatch__photo-open:focus-visible, .admin-dispatch__location-details summary:focus-visible,
 .admin-dispatch__search-help summary:focus-visible,
 .dispatch-mission-timeline summary:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }
 .admin-dispatch__photo-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 .admin-dispatch__photo-dialog, .admin-dispatch__confirmation { font-family: var(--bb-font-family); color: rgb(var(--v-theme-on-surface)); }
 .admin-dispatch__photo-dialog :deep(.v-card-title) { flex: none; white-space: normal; font-family: var(--bb-font-family); font-weight: 800; }
+.admin-dispatch__photo-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.admin-dispatch__photo-dialog-heading > span { display: inline-flex; align-items: center; gap: .5rem; min-width: 0; }
+.admin-dispatch__photo-dialog-heading > span .v-icon { color: var(--bb-color-primary); }
 .admin-dispatch__photo-dialog :deep(.v-btn), .admin-dispatch__confirmation :deep(.v-btn) {
   min-height: 44px; min-width: 44px; border-radius: 14px; font-family: var(--bb-font-family); font-weight: 800; letter-spacing: normal; }
 .admin-dispatch__photo-dialog :deep(.v-btn:focus-visible), .admin-dispatch__confirmation :deep(.v-btn:focus-visible) {
@@ -2209,7 +2249,8 @@ onBeforeUnmount(() => {
   padding: .6rem .85rem calc(.85rem + env(safe-area-inset-bottom, 0px)); }
 .admin-dispatch__confirmation :deep(.v-card-actions .v-btn) { height: auto; white-space: normal; }
 .admin-dispatch__confirmation :deep(.v-btn__content) { white-space: normal; text-align: center; }
-.admin-dispatch__photo-dialog :deep(.v-card-text) { min-height: 0; overflow: auto; display: grid; place-items: center; }
+.admin-dispatch__photo-dialog :deep(.v-card-text) { min-height: 0; overflow: auto; display: grid; place-items: center;
+  background: var(--bb-color-inset); }
 .admin-dispatch__photo-dialog img { display: block; max-width: 100%; max-height: calc(100dvh - 7rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   width: auto; height: auto; object-fit: contain; }
 .admin-dispatch__proposal-note { color: var(--bb-color-muted); }
@@ -2932,7 +2973,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .admin-dispatch__sender-copy { min-width: 0; }
 .admin-dispatch__incident-panel .admin-dispatch__sender-copy strong { color: var(--bb-color-muted); font-size: .8rem; font-weight: 600; }
 .admin-dispatch__incident-panel .admin-dispatch__photo { margin: .05rem .3rem .15rem; }
-.admin-dispatch__incident-panel .admin-dispatch__photo-open { height: clamp(8rem, 22vh, 12rem); }
+.admin-dispatch__incident-panel .admin-dispatch__photo-preview { height: clamp(8rem, 22vh, 12rem); }
 .admin-dispatch__incident-panel .admin-dispatch__sender-action :deep(.v-btn__content) { white-space: nowrap; }
 .admin-dispatch__incident-panel #dispatch-incident :deep(.admin-dispatch__detail-body) {
   gap: .5rem; padding: .45rem .65rem .65rem; line-height: 1.5;
@@ -3163,6 +3204,69 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .admin-dispatch__sheet-nav button:focus-visible,
 #dispatch-sidebar .admin-dispatch__sheet-size:focus-visible {
   outline: 3px solid var(--bb-color-primary); outline-offset: -3px;
+}
+/* Both worklists share the form language: spacious touch rows, quiet
+   surfaces, explicit selection and no stacked-card shadows. */
+#dispatch-sidebar .dispatch-request-list,
+#dispatch-sidebar .responder-list { padding: .25rem .15rem .65rem; }
+#dispatch-sidebar .dispatch-request-row {
+  min-height: 68px; margin-bottom: .4rem; padding: .55rem .6rem;
+  background: var(--bb-color-inset);
+}
+#dispatch-sidebar .dispatch-request-row.v-list-item--active {
+  border-color: var(--bb-color-primary);
+  background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary));
+}
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {
+  gap: .3rem .5rem !important; font-size: .9rem; line-height: 1.4;
+}
+#dispatch-sidebar .dispatch-request-row__name { flex: 1 1 7rem; }
+#dispatch-sidebar .dispatch-request-row__marker { width: 11px; height: 11px; margin-inline-end: .4rem; }
+#dispatch-sidebar .dispatch-request-row__details { gap: .3rem .4rem; }
+#dispatch-sidebar .dispatch-request-row__status { min-height: 24px; padding-inline: .45rem; }
+#dispatch-sidebar .dispatch-request-row__meta { gap: .25rem .5rem; }
+#dispatch-sidebar .dispatch-request-row__attachment { gap: .2rem;
+  padding: .12rem .35rem; border-radius: .4rem; color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), .09); font-weight: 700; }
+#dispatch-sidebar .dispatch-responder-row {
+  min-height: 68px; margin-bottom: .4rem; border-radius: .85rem;
+}
+#dispatch-sidebar .dispatch-responder-row--selected {
+  border-color: var(--bb-color-primary);
+  background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary));
+}
+#dispatch-sidebar .dispatch-responder-row__select { min-height: 68px; padding: .55rem .45rem .55rem .6rem;
+  gap: .3rem; }
+#dispatch-sidebar .dispatch-responder-row__title { gap: .4rem; font-size: .9rem; line-height: 1.4; }
+#dispatch-sidebar .dispatch-responder-row__identity { gap: .5rem; }
+#dispatch-sidebar .dispatch-responder-row__selection {
+  display: grid; place-items: center; flex: none; width: 1.65rem; height: 1.65rem;
+  border: 1px solid var(--bb-color-outline); border-radius: .55rem;
+  background: rgb(var(--v-theme-surface)); color: var(--bb-color-muted);
+}
+#dispatch-sidebar .dispatch-responder-row--selected .dispatch-responder-row__selection {
+  border-color: var(--bb-color-primary); background: var(--bb-color-primary); color: white;
+}
+#dispatch-sidebar .dispatch-responder-row__distance { background: rgba(var(--v-theme-primary), .09);
+  min-height: 24px; padding-inline: .4rem; }
+#dispatch-sidebar .dispatch-responder-row__meta { gap: .2rem .55rem; line-height: 1.4; }
+#dispatch-sidebar .dispatch-responder-row__map { min-width: 44px; min-height: 44px; }
+#dispatch-sidebar .admin-dispatch__responder-evidence {
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between;
+  gap: .35rem; margin: .1rem .35rem .3rem; padding: .4rem .5rem;
+  border-radius: .7rem; background: rgba(var(--v-theme-primary), .08);
+  color: var(--bb-color-primary); font-size: .8rem; font-weight: 700;
+}
+#dispatch-sidebar .admin-dispatch__responder-evidence > span { display: inline-flex; align-items: center; gap: .3rem; }
+#dispatch-sidebar .admin-dispatch__responder-evidence :deep(.v-btn) { min-height: 38px; }
+#dispatch-sidebar .admin-dispatch__photo-error--responder { margin: .2rem .5rem; }
+@media (max-width: 900px) {
+  #dispatch-sidebar .admin-dispatch__responder-evidence :deep(.v-btn) { min-height: 44px; }
+}
+@media (forced-colors: active) {
+  #dispatch-sidebar .dispatch-request-row.v-list-item--active,
+  #dispatch-sidebar .dispatch-responder-row--selected { outline: 2px solid Highlight; outline-offset: -2px; }
+  #dispatch-sidebar .dispatch-responder-row__selection { border-color: CanvasText; }
 }
 @media (max-width: 900px) {
   #dispatch-sidebar.admin-dispatch__sidebar {

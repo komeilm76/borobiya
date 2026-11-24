@@ -55,7 +55,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(queue).toContain('statusMeta(item.status).queueLabel');
     expect(queue).toContain(':title="statusMeta(item.status).label"');
     expect(queue).toContain(':aria-label="item.location.isManual ? \'موقعیت دستی\' : \'موقعیت GPS\'"');
-    expect(queue).toContain('role="img" aria-label="تصویر پیوست"');
+    expect(queue).toMatch(/role="img"\s+aria-label="تصویر پیوست"/);
     expect(queue).not.toContain("{{ item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS' }}");
     expect(queue).toContain('formatQueueTimestamp(item.createdAt)');
     expect(queue).toContain(':title="formatTimestamp(item.createdAt)"');

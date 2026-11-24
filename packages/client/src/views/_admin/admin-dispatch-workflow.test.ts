@@ -130,8 +130,8 @@ describe("admin SOS triage flow", () => {
     expect(css).toContain('.admin-dispatch__responders:focus-visible');
     expect(css).toContain('.admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }');
     expect(css).toContain('flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px;');
-    expect(css).toContain('.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: cover; }');
-    expect(css).toContain('.admin-dispatch__photo-open { display: block; width: 100%; height: clamp(');
+    expect(css).toContain('.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: contain; }');
+    expect(css).toContain('.admin-dispatch__photo-open { display: flex; flex-direction: column; width: 100%; min-height: 44px;');
     expect(css).toContain('width: auto; height: auto; object-fit: contain;');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: template }).errors).toEqual([]);
     expect(compileStyle({ filename: "AdminDispatchView.vue", id: "dispatch-flow", source: css, scoped: true }).errors).toEqual([]);
