@@ -552,14 +552,16 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .admin-incident-form { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
-  .admin-incident-form__header { padding: calc(.65rem + env(safe-area-inset-top, 0px)) .85rem .65rem; }
-  .admin-incident-form__header-icon { width: 40px; height: 40px; }
-  .admin-incident-form__heading h2 { font-size: 1.1rem; }
+  .admin-incident-form__header { padding: calc(var(--bb-form-phone-headerBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-inline) var(--bb-form-phone-headerBlock); }
+  .admin-incident-form__header-icon { width: var(--bb-form-phone-icon); height: var(--bb-form-phone-icon); }
+  .admin-incident-form__heading h2 { font-size: var(--bb-form-phone-title); }
   .admin-incident-form__heading p { display: none; }
-  .admin-incident-form__body { padding: .85rem 1rem; }
+  .admin-incident-form__body { padding: var(--bb-form-phone-bodyBlock) var(--bb-form-phone-inline); }
+  .admin-incident-form__form { gap: var(--bb-form-phone-sectionGap); }
+  .admin-incident-form__section + .admin-incident-form__section { padding-block-start: var(--bb-form-phone-sectionGap); }
   .admin-incident-form__fields, .admin-incident-form__appearance-fields { grid-template-columns: minmax(0, 1fr); gap: .3rem; }
-  .admin-incident-form__section-head { margin-bottom: .6rem; }
-  .admin-incident-form__actions { padding: .55rem 1rem calc(.55rem + env(safe-area-inset-bottom, 0px)); }
+  .admin-incident-form__section-head { margin-bottom: .5rem; }
+  .admin-incident-form__actions { padding: var(--bb-form-phone-actionBlock) var(--bb-form-phone-inline) calc(var(--bb-form-phone-actionBlock) + env(safe-area-inset-bottom, 0px)); }
   .admin-catalog-dialog-actions { flex-direction: column; align-items: stretch; }
   .admin-catalog-dialog-actions :deep(.v-spacer) { display: none; }
   .admin-catalog-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; white-space: normal; }

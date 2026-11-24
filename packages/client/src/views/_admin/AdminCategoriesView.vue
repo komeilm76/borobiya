@@ -872,25 +872,28 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .admin-category-members { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
-  .admin-category-members__header { padding: calc(.4rem + env(safe-area-inset-top, 0px)) .75rem .4rem; }
-  .admin-category-members__header-icon { width: 36px; height: 36px; }
-  .admin-category-members__heading h2 { font-size: 1.1rem; }
-  .admin-category-members__body { grid-template-columns: minmax(0, 1fr); gap: .45rem; padding: .6rem .75rem; }
+  .admin-category-members__header { padding: calc(var(--bb-form-phone-compactHeaderBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-compactInline) var(--bb-form-phone-compactHeaderBlock); }
+  .admin-category-members__header-icon { width: var(--bb-form-phone-compactIcon); height: var(--bb-form-phone-compactIcon); }
+  .admin-category-members__heading h2 { font-size: var(--bb-form-phone-title); }
+  .admin-category-members__body { grid-template-columns: minmax(0, 1fr); gap: .4rem; padding: var(--bb-form-phone-compactBodyBlock) var(--bb-form-phone-compactInline); }
   .admin-category-members__section--search, .admin-category-members__section--current { grid-column: 1; grid-row: auto; }
-  .admin-category-members__section { padding: .65rem .75rem; }
-  .admin-category-members__section-head { margin-bottom: .4rem; }
+  .admin-category-members__section { padding: var(--bb-form-phone-compactSectionInset) var(--bb-form-phone-compactInline); }
+  .admin-category-members__section-head { margin-bottom: .35rem; }
   .admin-category-members__section-head .admin-category-members__section-icon { display: none; }
   .admin-category-members__results { max-height: min(34dvh, 14rem); }
-  .admin-category-members__actions { flex-direction: row; padding: .45rem .75rem calc(.45rem + env(safe-area-inset-bottom, 0px)); }
+  .admin-category-members__actions { flex-direction: row; padding: var(--bb-form-phone-compactActionBlock) var(--bb-form-phone-compactInline) calc(var(--bb-form-phone-compactActionBlock) + env(safe-area-inset-bottom, 0px)); }
   .admin-category-members__actions :deep(.v-btn) { flex: 1; width: auto; min-width: 0; }
   .admin-category-members__eyebrow { display: none; }
   .admin-category-form { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
-  .admin-category-form__header { padding: calc(.75rem + env(safe-area-inset-top, 0px)) 1rem .75rem; }
-  .admin-category-form__header-icon { width: 44px; height: 44px; }
-  .admin-category-form__heading h2 { font-size: 1.1rem; }
-  .admin-category-form__body { padding: 1rem; }
+  .admin-category-form__header { padding: calc(var(--bb-form-phone-headerBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-inline) var(--bb-form-phone-headerBlock); }
+  .admin-category-form__header-icon { width: var(--bb-form-phone-icon); height: var(--bb-form-phone-icon); }
+  .admin-category-form__heading h2 { font-size: var(--bb-form-phone-title); }
+  .admin-category-form__body { gap: var(--bb-form-phone-sectionGap); padding: var(--bb-form-phone-bodyBlock) var(--bb-form-phone-inline); }
+  .admin-category-form__section + .admin-category-form__section { padding-block-start: var(--bb-form-phone-sectionGap); }
+  .admin-category-form__section-head { margin-bottom: .75rem; }
+  .admin-category-form__option :deep(.v-selection-control) { min-height: 56px; }
   .admin-categories-picker { grid-template-columns: minmax(0, 1fr); }
-  .admin-category-form__actions { padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+  .admin-category-form__actions { padding: var(--bb-form-phone-actionBlock) var(--bb-form-phone-inline) calc(var(--bb-form-phone-actionBlock) + env(safe-area-inset-bottom, 0px)); }
   .admin-category-form__action-hint { max-width: none; text-align: center; }
   .admin-categories-mobile__actions { flex-direction: column; }
   .admin-categories-mobile__actions :deep(.v-btn) { width: 100%; }

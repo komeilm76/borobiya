@@ -208,14 +208,17 @@ async function submit(): Promise<void> {
 }
 @media (max-width: 600px) {
   .admin-create-user { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
-  .admin-create-user__header { padding: calc(.6rem + env(safe-area-inset-top, 0px)) .8rem .6rem; }
-  .admin-create-user__header-icon { width: 38px; height: 38px; }
-  .admin-create-user__heading h2 { font-size: 1.1rem; }
+  .admin-create-user__header { padding: calc(var(--bb-form-phone-headerBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-inline) var(--bb-form-phone-headerBlock); }
+  .admin-create-user__header-icon { width: var(--bb-form-phone-icon); height: var(--bb-form-phone-icon); }
+  .admin-create-user__heading h2 { font-size: var(--bb-form-phone-title); }
   .admin-create-user__heading p { display: none; }
-  .admin-create-user__body { padding: .8rem 1rem; }
+  .admin-create-user__body { padding: var(--bb-form-phone-bodyBlock) var(--bb-form-phone-inline); }
+  .admin-create-user__form { gap: var(--bb-form-phone-sectionGap); }
+  .admin-create-user__section + .admin-create-user__section { padding-block-start: var(--bb-form-phone-sectionGap); }
+  .admin-create-user__section-head { margin-bottom: .65rem; }
   .admin-create-user__password-fields { grid-template-columns: minmax(0, 1fr); gap: .25rem; }
   .admin-create-user__actions { flex-direction: column; align-items: stretch;
-    padding: .55rem 1rem calc(.55rem + env(safe-area-inset-bottom, 0px)); }
+    padding: var(--bb-form-phone-actionBlock) var(--bb-form-phone-inline) calc(var(--bb-form-phone-actionBlock) + env(safe-area-inset-bottom, 0px)); }
   .admin-create-user__actions :deep(.v-spacer) { display: none; }
   .admin-create-user__actions :deep(.v-btn) { width: 100%; height: auto; white-space: normal; }
 }

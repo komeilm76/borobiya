@@ -1160,19 +1160,24 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 @media (max-width: 599px) {
   .share-dialog { height: 100dvh; max-height: 100dvh; border-radius: 0 !important; }
   .share-dialog__header {
-    padding: calc(var(--bb-rhythm-r060) + env(safe-area-inset-top, 0px)) var(--bb-rhythm-r085) var(--bb-rhythm-r060);
+    padding: calc(var(--bb-form-phone-headerBlock) + env(safe-area-inset-top, 0px)) var(--bb-form-phone-inline) var(--bb-form-phone-headerBlock);
   }
-  .share-dialog__header-icon { width: 40px; height: 40px; }
-  .share-dialog__title { font-size: 1.1rem; }
+  .share-dialog__header-icon { width: var(--bb-form-phone-icon); height: var(--bb-form-phone-icon); }
+  .share-dialog__title { font-size: var(--bb-form-phone-title); }
   .share-dialog__lead { line-height: 1.45; }
-  .share-dialog__body { padding: var(--bb-rhythm-r075) var(--bb-rhythm-r085); }
-  .share-dialog__section-head { margin-bottom: var(--bb-rhythm-r060); }
+  .share-dialog__body { padding: var(--bb-form-phone-bodyBlock) var(--bb-form-phone-inline); }
+  .share-dialog__form { gap: var(--bb-form-phone-sectionGap); }
+  .share-dialog__section + .share-dialog__section { padding-block-start: var(--bb-form-phone-sectionGap); }
+  .share-dialog__section-head { margin-bottom: var(--bb-rhythm-r050); }
+  .share-dialog__kind-switch :deep(.v-btn.share-dialog__kind-option) { min-height: 64px; }
+  .share-dialog__result { min-height: 60px; }
+  .share-dialog__live-presets .share-dialog__chip, .share-dialog__history-presets .share-dialog__chip { min-height: 44px; }
   .share-dialog__presets.share-dialog__live-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .share-dialog__presets.share-dialog__history-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .share-dialog__history-fields, .share-dialog__history-window { grid-template-columns: minmax(0, 1fr); }
   .share-dialog__custom-head { flex-wrap: wrap; }
   .share-dialog__duration-value { text-align: start; }
-  .share-dialog__actions { padding-bottom: calc(var(--bb-rhythm-r075) + env(safe-area-inset-bottom, 0px)); }
+  .share-dialog__actions { padding: var(--bb-form-phone-actionBlock) var(--bb-form-phone-inline) calc(var(--bb-form-phone-actionBlock) + env(safe-area-inset-bottom, 0px)); }
   /* Fullscreen phones need room for a changing status message as well as both
    * non-shrinking Vuetify buttons; keep the separately scrollable form above. */
   .share-dialog__actions { flex-wrap: wrap; }

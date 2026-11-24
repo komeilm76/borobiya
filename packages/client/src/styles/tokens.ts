@@ -746,6 +746,25 @@ export const sharingTypography = {
   lead: "0.92rem", avatar: "0.85rem"
 } as const;
 
+// Small-screen density for the admin editors, member picker and sharing form.
+// Only consumed inside their phone media queries; desktop typography/layout and
+// 44px minimum interactive targets stay unchanged.
+export const formPhoneLayout = {
+  title: "1.05rem",
+  icon: "38px",
+  headerBlock: ".55rem",
+  inline: ".8rem",
+  bodyBlock: ".75rem",
+  actionBlock: ".5rem",
+  sectionGap: ".8rem",
+  compactHeaderBlock: ".35rem",
+  compactInline: ".7rem",
+  compactBodyBlock: ".55rem",
+  compactSectionInset: ".6rem",
+  compactActionBlock: ".4rem",
+  compactIcon: "34px"
+} as const;
+
 export type DesignTheme = keyof typeof palettes;
 
 /** Vuetify and plain CSS derive from one palette; no second palette to drift. */
@@ -778,6 +797,7 @@ export function designTokenStylesheet(): string {
     ...Object.entries(rescueType.leading).map(([key, value]) => `--bb-rescue-leading-${key}: ${value}`),
     ...Object.entries(rescueType.tracking).map(([key, value]) => `--bb-rescue-tracking-${key}: ${value}`),
     ...Object.entries(sharingTypography).map(([key, value]) => `--bb-sharing-font-${key}: ${value}`),
+    ...Object.entries(formPhoneLayout).map(([key, value]) => `--bb-form-phone-${key}: ${value}`),
     ...Object.entries(shellTypography).map(([key, value]) => `--bb-shell-font-${key}: ${value}`),
     ...Object.entries(shellLayout).map(([key, value]) => `--bb-shell-layout-${key}: ${value}`),
     `--bb-font-family: ${typography.fontFamily}`,
