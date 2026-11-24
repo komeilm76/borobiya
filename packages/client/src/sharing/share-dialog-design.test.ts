@@ -48,6 +48,29 @@ describe("location share form design", () => {
     expect(dialog).toContain('buildLiveSharePayload(current)');
   });
 
+  it("groups the recipient filter as a calm, labelled results toolbar rather than divided tiny buttons", () => {
+    const recipients = dialog.slice(dialog.indexOf('aria-labelledby="share-recipients-title">'), dialog.indexOf('aria-labelledby="share-access-title">'));
+    expect(recipients.indexOf('v-model="searchTerm"')).toBeLessThan(recipients.indexOf('class="share-dialog__online-filter"'));
+    expect(recipients.indexOf('class="share-dialog__online-filter"')).toBeLessThan(recipients.indexOf('id="share-recipient-hint"'));
+    expect(recipients).toContain('id="share-online-label" class="share-dialog__filter-label"');
+    expect(recipients).toContain('class="share-dialog__filter-switch" mandatory');
+    expect(recipients).toContain('aria-labelledby="share-online-label" :disabled="submitting"');
+    expect(recipients).toContain('value="all" variant="text" class="share-dialog__filter-choice" type="button"');
+    expect(recipients).toContain('value="online" variant="text" class="share-dialog__filter-choice" type="button"');
+    expect(recipients).toContain('class="share-dialog__filter-dot" aria-hidden="true"');
+    expect(recipients).toContain('فیلتر نتایج جست‌وجو');
+    expect(recipients).not.toContain('density="compact" divided mandatory');
+    expect(dialog).toContain('online: computed(() => (onlineFilter.value === "online" ? true : undefined))');
+    expect(css).toContain('.share-dialog__filter-switch.v-btn-group {');
+    expect(css).toContain('background: var(--bb-color-inset);');
+    expect(css).toContain('.share-dialog__filter-switch :deep(.v-btn--active) {');
+    expect(css).toContain('min-width: 0; min-height: 44px; height: auto;');
+    expect(css).toContain('.share-dialog__filter-switch :deep(.v-btn:focus-visible)');
+    expect(css).toContain('.share-dialog__online-filter { display: grid; grid-template-columns: minmax(0, 1fr); }');
+    expect(css).toContain('.share-dialog__filter-switch.v-btn-group { width: 100%; }');
+    expect(css).toContain('.share-dialog__kind-switch :deep(.v-btn--active), .share-dialog__filter-switch :deep(.v-btn--active)');
+  });
+
   it("makes temporary duration choices predictable without confusing them with indefinite access", () => {
     const live = dialog.slice(dialog.indexOf('v-if="shareKind === \'live\'"'), dialog.indexOf('v-else-if="mode === \'history\'"'));
     expect(live).toContain('class="share-dialog__presets share-dialog__live-presets"');

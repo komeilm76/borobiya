@@ -94,12 +94,16 @@
               </v-text-field>
 
               <div class="share-dialog__online-filter">
-                <span id="share-online-label" class="share-dialog__label">نمایش همراهان</span>
-                <v-btn-toggle v-model="onlineFilter" density="compact" divided mandatory aria-labelledby="share-online-label" :disabled="submitting">
-                  <v-btn value="all" size="small" type="button">همه</v-btn>
-                  <v-btn value="online" size="small" type="button">
-                    <v-icon class="me-1" icon="mdi-wifi" size="16" />
-                    آنلاین
+                <div class="share-dialog__filter-copy">
+                  <span id="share-online-label" class="share-dialog__filter-label">نمایش همراهان</span>
+                  <small>فیلتر نتایج جست‌وجو</small>
+                </div>
+                <v-btn-toggle v-model="onlineFilter" class="share-dialog__filter-switch" mandatory
+                  aria-labelledby="share-online-label" :disabled="submitting">
+                  <v-btn value="all" variant="text" class="share-dialog__filter-choice" type="button">همه</v-btn>
+                  <v-btn value="online" variant="text" class="share-dialog__filter-choice" type="button">
+                    <span class="share-dialog__filter-dot" aria-hidden="true" />
+                    فقط آنلاین
                   </v-btn>
                 </v-btn-toggle>
               </div>
@@ -908,14 +912,31 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__online-filter {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--bb-rhythm-r050) var(--bb-rhythm-r075);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: var(--bb-rhythm-r050) var(--bb-rhythm-r075);
   margin-top: var(--bb-rhythm-r075);
 }
-
-.share-dialog__online-filter .share-dialog__label { margin: 0; }
+.share-dialog__filter-copy { display: grid; min-width: 0; gap: var(--bb-rhythm-r010); }
+.share-dialog__filter-label { color: var(--bb-color-text); font-size: var(--bb-sharing-font-label); font-weight: var(--bb-weight-heavy); }
+.share-dialog__filter-copy small { color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: 1.5; }
+.share-dialog__filter-switch.v-btn-group {
+  display: inline-flex; flex: none; align-items: stretch; gap: var(--bb-rhythm-r030);
+  height: auto; padding: var(--bb-rhythm-r030);
+  border: 0; border-radius: var(--bb-radius-nested); background: var(--bb-color-inset);
+}
+.share-dialog__filter-switch :deep(.v-btn.share-dialog__filter-choice) {
+  min-width: 0; min-height: 44px; height: auto;
+  padding-inline: var(--bb-rhythm-r075); border-radius: 12px;
+  color: var(--bb-color-text); font-size: var(--bb-sharing-font-label);
+  font-weight: var(--bb-weight-bold); letter-spacing: normal;
+}
+.share-dialog__filter-switch :deep(.v-btn__content) { display: flex; align-items: center; gap: var(--bb-rhythm-r035); white-space: nowrap; }
+.share-dialog__filter-switch :deep(.v-btn--active) {
+  background: rgb(var(--v-theme-surface)); box-shadow: 0 2px 9px rgba(var(--v-theme-primary), .12);
+}
+.share-dialog__filter-switch :deep(.v-btn--active .v-btn__overlay) { opacity: 0; }
+.share-dialog__filter-switch :deep(.v-btn:focus-visible) { outline: 2px solid var(--bb-color-text); outline-offset: -2px; }
+.share-dialog__filter-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--bb-audience-shareDotOnline); }
 
 .share-dialog__hint {
   margin: var(--bb-rhythm-r050) 0 0;
@@ -1137,9 +1158,10 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 .share-dialog__actions :deep(.v-btn) { min-height: 44px; margin: 0; }
 @media (forced-colors: active) {
-  .share-dialog__header, .share-dialog__kind-switch, .share-dialog__privacy { background: Canvas; color: CanvasText; }
+  .share-dialog__header, .share-dialog__kind-switch, .share-dialog__filter-switch, .share-dialog__privacy { background: Canvas; color: CanvasText; }
   .share-dialog__section + .share-dialog__section { border-color: CanvasText; }
-  .share-dialog__kind-switch :deep(.v-btn--active) { outline: 2px solid Highlight; }
+  .share-dialog__kind-switch :deep(.v-btn--active), .share-dialog__filter-switch :deep(.v-btn--active) { outline: 2px solid Highlight; outline-offset: -2px; }
+  .share-dialog__filter-dot { background: Highlight; }
 }
 
 /* Only the device choices scroll; the confirmation controls remain reachable. */
@@ -1194,6 +1216,9 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 @media (max-width: 420px) {
   .share-dialog__kind-switch { grid-template-columns: minmax(0, 1fr); }
   .share-dialog__kind-switch :deep(.v-btn.share-dialog__kind-option) { min-height: 56px; }
+  .share-dialog__online-filter { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .share-dialog__filter-switch.v-btn-group { width: 100%; }
+  .share-dialog__filter-switch :deep(.v-btn.share-dialog__filter-choice) { flex: 1 1 0; }
 }
 :global(:root.dark .share-dialog__results) { border-color: var(--bb-finish-shareResultsEdge); }
 :global(:root.dark .share-dialog__result + .share-dialog__result) { border-top-color: var(--bb-finish-shareResultDivider); }
