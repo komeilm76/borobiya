@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
   adminUserListQuerySchema,
+  createAdminUserSchema,
   idParamsSchema,
   paginatedResponseSchema,
   toggleActiveSchema,
   userProfileSchema,
   type AdminUserListQuery,
+  type CreateAdminUserInput,
   type UserProfile
 } from "@shared/index";
 import { apiRoutes } from "@shared/api";
@@ -16,6 +18,17 @@ const adminUserListResponseSchema = paginatedResponseSchema(userProfileSchema);
 export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>;
 export type AdminUserDetail = z.infer<typeof apiRoutes.admin.getUser.schema.responses[200]>;
 export type AdminUserListOptions = Partial<AdminUserListQuery>;
+
+/** Admin provisioning never accepts security answers; the new user completes them after signing in. */
+export async function createAdminUser(input: CreateAdminUserInput, accessToken: string): Promise<UserProfile> {
+  const body = createAdminUserSchema.parse(input);
+  const response = await requestJson<unknown>(apiRoutes.admin.createUser.url, {
+    method: "POST",
+    body,
+    accessToken
+  });
+  return userProfileSchema.parse(response);
+}
 
 /** Admin-only, exact-ID lookup; never infer a sender from a fuzzy username search. */
 export async function getAdminUser(userId: string, accessToken: string, signal?: AbortSignal): Promise<AdminUserDetail> {

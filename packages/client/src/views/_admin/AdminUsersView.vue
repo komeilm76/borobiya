@@ -5,21 +5,18 @@
         <p class="admin-users-eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت</p>
         <h1>مدیریت کاربران</h1>
         <p class="admin-users-intro">
-          حساب‌ها را پیدا کنید و در صورت نیاز دسترسی ورود آن‌ها را فعال یا غیرفعال کنید.
+          حساب تازه بسازید، کاربران را پیدا کنید و در صورت نیاز دسترسی ورود آن‌ها را مدیریت کنید.
         </p>
       </div>
-      <v-btn
-        class="admin-refresh-button"
-        variant="tonal"
-        color="primary"
-        rounded="lg"
-        :loading="loading"
-        :disabled="loading"
-        @click="loadUsers"
-      >
-        <v-icon class="me-2" icon="mdi-refresh" />
-        به‌روزرسانی
-      </v-btn>
+      <div class="admin-users-header__actions">
+        <v-btn class="admin-refresh-button" variant="tonal" color="primary" rounded="lg"
+          :loading="loading" :disabled="loading" @click="loadUsers">
+          <v-icon class="me-2" icon="mdi-refresh" />
+          به‌روزرسانی
+        </v-btn>
+        <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-plus-outline"
+          class="admin-create-button" @click="openCreate($event)">ساخت کاربر جدید</v-btn>
+      </div>
     </header>
 
     <v-card class="admin-users-card" elevation="0" rounded="xl">
@@ -243,6 +240,9 @@
       </div>
     </v-card>
 
+    <AdminCreateUserDialog :model-value="createOpen" @update:model-value="createOpen = $event"
+      @created="handleUserCreated" @closed="restoreCreateFocus" />
+
     <AdminUserProfileDialog :model-value="profileUserId !== null" :user-id="profileUserId"
       @update:model-value="(open: boolean) => { if (!open) profileUserId = null; }" @closed="restoreProfileFocus" />
 
@@ -307,6 +307,7 @@ import { accountSessionKey } from "../../composables/device-identity";
 import { useAdminUserStatusChange } from "../../admin/user-status-change";
 import { useAuthStore } from "../../stores/auth";
 import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
+import AdminCreateUserDialog from "./AdminCreateUserDialog.vue";
 
 const PAGE_SIZE = 20;
 const numberFormatter = new Intl.NumberFormat("fa-IR");
@@ -328,6 +329,27 @@ const categoryFilterOptions: Array<{ title: string; value: CategoryFilter }> = [
 
 const auth = useAuthStore();
 const users = ref<UserProfile[]>([]);
+const createOpen = ref(false);
+let createTrigger: HTMLElement | null = null;
+function openCreate(event: MouseEvent): void {
+  createTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+  createOpen.value = true;
+}
+function restoreCreateFocus(): void {
+  if (createTrigger?.isConnected) createTrigger.focus({ preventScroll: true });
+  createTrigger = null;
+}
+function handleUserCreated(user: UserProfile): void {
+  successMessage.value = `حساب ${user.username} ساخته شد؛ پرسش‌های امنیتی را کاربر پس از ورود تکمیل می‌کند.`;
+  successVisible.value = true;
+  clearSearchTimer();
+  search.value = "";
+  statusFilter.value = "all";
+  categoryFilter.value = "all";
+  const wasFirstPage = page.value === 1;
+  page.value = 1;
+  if (wasFirstPage) void loadUsers(); // Otherwise the page watcher refreshes exactly once.
+}
 const profileUserId = ref<string | null>(null);
 let profileTrigger: HTMLElement | null = null;
 function openProfile(userId: string, event: MouseEvent): void {
@@ -541,10 +563,12 @@ onUnmounted(() => {
 
 .admin-users-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
 }
+.admin-users-header > div:first-child { min-width: 0; flex: 1 1 23rem; }
 
 .admin-users-eyebrow {
   display: inline-flex;
@@ -572,11 +596,8 @@ onUnmounted(() => {
   line-height: 1.9;
 }
 
-.admin-refresh-button {
-  flex: 0 0 auto;
-  min-height: 44px;
-  font-weight: 750;
-}
+.admin-users-header__actions { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.admin-refresh-button, .admin-create-button { flex: 0 0 auto; min-height: 44px; font-weight: 750; }
 
 .admin-users-card {
   overflow: hidden;
@@ -937,9 +958,8 @@ onUnmounted(() => {
     align-items: stretch;
   }
 
-  .admin-refresh-button {
-    align-self: flex-start;
-  }
+  .admin-users-header__actions { align-self: stretch; }
+  .admin-users-header__actions :deep(.v-btn) { flex: 1 1 9rem; min-width: 0; }
 
   .admin-users-intro {
     font-size: 0.9rem;

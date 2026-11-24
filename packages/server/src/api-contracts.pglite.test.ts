@@ -369,7 +369,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(typeof adminMe.avgRating).toBe("number");
 
     // 4. Admin creates an onboarding-incomplete responder -> blocks /_user/me with 403 -> completes onboarding -> 200!
-    const createdResponder = await callContract<{ id: string; username: string }>(
+    const createdResponder = await callContract<{ id: string; username: string; mustCompleteSecurityQuestions: boolean }>(
       apiRoutes.admin.createUser,
       201,
       {
@@ -381,12 +381,13 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
         }
       }
     );
+    expect(createdResponder.mustCompleteSecurityQuestions).toBe(true);
     await pg.query(`UPDATE "users" SET "avg_rating" = 4.9 WHERE "id" = $1`, [createdResponder.id]);
 
     const responderSession = await callContract<{
       accessToken: string;
       refreshToken: string;
-      user: { id: string };
+      user: { id: string; mustCompleteSecurityQuestions: boolean };
     }>(apiRoutes.auth.login, 200, {
       url: apiRoutes.auth.login.url,
       payload: {
@@ -395,6 +396,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
         deviceName: "Rescuer Garmin Phone"
       }
     });
+    expect(responderSession.user.mustCompleteSecurityQuestions).toBe(true);
     const responderHeaders = { authorization: `Bearer ${responderSession.accessToken}` };
 
     await callContract(apiRoutes.user.me, 403, {
@@ -413,7 +415,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       }
     });
 
-    const responderMe = await callContract<{ id: string; avgRating: number | null }>(
+    const responderMe = await callContract<{ id: string; avgRating: number | null; mustCompleteSecurityQuestions: boolean }>(
       apiRoutes.user.me,
       200,
       {
@@ -422,6 +424,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       }
     );
     expect(responderMe.avgRating).toBe(4.9);
+    expect(responderMe.mustCompleteSecurityQuestions).toBe(false);
 
     const responderDevices = await callContract<Array<{ id: string; deviceId: string; isCurrentDevice: boolean }>>(
       apiRoutes.user.devices,

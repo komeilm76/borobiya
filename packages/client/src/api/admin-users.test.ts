@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminUserListQuerySchema } from "@shared/index";
 import { ApiError } from "./http";
-import { getAdminUser, listAdminUsers, updateAdminUserStatus } from "./admin-users";
+import { createAdminUser, getAdminUser, listAdminUsers, updateAdminUserStatus } from "./admin-users";
 
 const user = {
   id: "00000000-0000-4000-8000-000000000099",
@@ -27,6 +27,32 @@ afterEach(() => {
 });
 
 describe("admin user API", () => {
+  it("provisions a user without security answers and expects onboarding on first login", async () => {
+    const created = { ...user, mustCompleteSecurityQuestions: true };
+    const fetchMock = vi.fn(async () => jsonResponse(created, 201));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(createAdminUser({ username: "new_responder", password: "SecurePass123", isActive: true }, "admin-token"))
+      .resolves.toEqual(created);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/_admin/users");
+    expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer admin-token");
+    expect(JSON.parse(String(init.body))).toEqual({ username: "new_responder", password: "SecurePass123", isActive: true });
+    expect(JSON.parse(String(init.body))).not.toHaveProperty("securityQuestions");
+  });
+
+  it("rejects invalid provisioning input before a request and propagates username conflicts", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ code: "USERNAME_TAKEN", message: "Taken." }, 409));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(createAdminUser({ username: "Wrong Case", password: "short", isActive: true }, "admin-token"))
+      .rejects.toThrow();
+    await expect(createAdminUser({ username: "new_responder", password: "SecurePass123", securityQuestions: [] } as unknown as Parameters<typeof createAdminUser>[0], "admin-token"))
+      .rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expect(createAdminUser({ username: "new_responder", password: "SecurePass123", isActive: false }, "admin-token"))
+      .rejects.toMatchObject({ status: 409, code: "USERNAME_TAKEN" });
+  });
+
   it("loads the exact sender profile through the admin-only detail route, without caching", async () => {
     const detail = { ...user, devices: [], missions: [] };
     const fetchMock = vi.fn(async () => jsonResponse(detail));
