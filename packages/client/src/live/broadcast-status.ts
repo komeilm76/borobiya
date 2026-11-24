@@ -38,7 +38,7 @@ function errorDetail(code: string | null): { tone: "warn" | "error"; headline: s
       return {
         tone: "error",
         headline: "دسترسی به موقعیت مکانی رد شد",
-        detail: "در تنظیمات مرورگر اجازهٔ دسترسی به موقعیت مکانی را بدهید و دوباره «شروع پخش موقعیت زنده» را بزنید."
+        detail: "در تنظیمات مرورگر اجازهٔ دسترسی به موقعیت مکانی را بدهید؛ تا وقتی سفر، مأموریت یا اشتراک فعال است، ارسال خودکار دوباره تلاش می‌شود."
       };
     case "GEOLOCATION_UNAVAILABLE":
       return {
@@ -130,7 +130,7 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
         ? `موقعیت شما زنده برای ${peerCount.toLocaleString("fa-IR")} همراه ارسال می‌شود.`
         : priority.ignoredCount > 0
           ? `ارسال فعال است (${priority.ignoredCount.toLocaleString("fa-IR")} اشتراک به دستگاه دیگری وصل است).`
-          : "موقعیت شما در حال ثبت است؛ برای دیدن توسط دیگران یک اشتراک فعال بسازید.";
+          : "موقعیت شما برای سفر یا مأموریت فعال ثبت می‌شود؛ برای دیدن توسط دیگران یک اشتراک زنده بسازید.";
     return {
       tone: "active",
       isActive: true,
@@ -144,8 +144,8 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
     priority.ignoredCount > 0 && priority.broadcastingCount === 0
       ? "اشتراک‌های فعلی روی دستگاه دیگری تنظیم شده‌اند؛ پیش از پخش، دستگاه هر همراه را در «اشتراک‌های من» بررسی کنید."
       : status === "stopped"
-        ? "پخش زنده متوقف شد؛ هر زمان آماده بودید دوباره روشنش کنید."
-        : "برای ارسال موقعیت لحظه‌ای خود به همراهان مجاز، پخش زنده را روشن کنید.";
+        ? "پخش زنده متوقف شد؛ با شروع سفر، مأموریت یا اشتراک جدید دوباره فعال می‌شود."
+        : "بدون سفر، مأموریت یا اشتراک فعال، موقعیت شما ثبت یا ارسال نمی‌شود.";
 
   return {
     tone: priority.ignoredCount > 0 && priority.broadcastingCount === 0 ? "warn" : "neutral",

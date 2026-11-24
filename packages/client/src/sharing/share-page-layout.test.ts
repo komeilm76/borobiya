@@ -22,6 +22,6 @@ describe("sharing surface by device size", () => {
     expect(shares).toContain('<ShareLists ref="shareLists"');
     expect(shares).toContain('<ShareDialog v-model="shareOpen"');
     expect(shares).toContain('void broadcast.refreshPriority()');
-    expect(map).toContain('@click="broadcast.toggle()"');
+    expect(map).not.toContain('@click="broadcast.toggle()"');
   });
 });

@@ -101,22 +101,6 @@
       variant="flat"
       @click="centerOnOwnLocation"
     />
-    <!-- General Broadcast is a separate manual choice, including during a mission or guidance. -->
-    <v-btn
-      class="user-map-view__share"
-      :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      v-show="!(isPhone && (activeTool || (mode === 'missions' && missionWorkspace?.hasOpenMapTool)))"
-      :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
-      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
-      :aria-label="broadcast.view.actionLabel"
-      :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
-      :aria-pressed="broadcast.view.isActive"
-      :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
-      variant="flat"
-      @click="broadcast.toggle()"
-    />
-    <span v-if="isPhone && activeTool !== 'live' && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
-      class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <span v-if="own.error.value || recenterError" class="sr-only" role="status" aria-live="polite">
       {{ recenterError ?? own.error.value }}
     </span>
@@ -253,13 +237,6 @@
         <v-card-title v-if="isPhone" class="user-map-view__live-title">
           <h2>همراهان</h2>
           <div class="user-map-view__dialog-actions">
-            <v-btn
-              :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
-              :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : undefined"
-              :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
-              :aria-pressed="broadcast.view.isActive"
-              :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
-              variant="text" @click="broadcast.toggle()" />
             <v-btn :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : 'mdi-crosshairs-gps'"
               :color="own.error.value || recenterError ? 'warning' : 'primary'" variant="text"
               :aria-label="recenterLabel" :title="recenterLabel" :disabled="!map || !auth.user"
@@ -485,7 +462,7 @@ function onShareCreated(result: ShareCreatedResult): void {
   shareOpen.value = false;
   if (isPhone.value && activeTool.value === "live") closeTool(false);
   shareSuccess.value = shareCreatedMessage(result);
-  // A new outgoing grant can change the device assigned to broadcast; do not start GPS here.
+  // A new outgoing grant refreshes automatic share publishing.
   void broadcast.refreshPriority();
 }
 watch(shareOpen, (open, previous) => {
@@ -505,7 +482,7 @@ let mapEntryPosition: number | undefined;
 onMounted(() => {
   const position: unknown = window.history.state?.position;
   mapEntryPosition = typeof position === "number" ? position : undefined;
-  // The modal no longer mounts LiveBroadcastBar; keep the map share control's
+  // Refresh the app-owned automatic share publisher's
   // multi-device status fresh without starting outgoing location sharing.
   void broadcast.refreshPriority();
 });

@@ -198,10 +198,12 @@ describe("UserMapView live overlay", () => {
   it("styles place search as a compact broadcast card with distinct selected and focus states", () => {
     const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
     const broadcast = readFileSync(new URL("../../components/sharing/LiveBroadcastBar.vue", import.meta.url), "utf8");
-    for (const part of ["__indicator", "__copy", "__headline", "__detail", "__actions"]) {
+    for (const part of ["__indicator", "__copy", "__headline", "__detail"]) {
       expect(search).toContain(`place-search${part}`);
       expect(broadcast).toContain(`broadcast-bar${part}`);
     }
+    expect(search).toContain("place-search__actions");
+    expect(broadcast).not.toContain("broadcast-bar__actions");
     const { descriptor } = parse(search);
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "PlaceSearchPanel.vue",
       id: "data-v-place-test", scoped: true });
@@ -294,8 +296,8 @@ describe("UserMapView live overlay", () => {
   it("keeps manual map sharing outside active navigation without mounting the standalone sharing bar", () => {
     expect(view).toMatch(/ownUserId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
     expect(view).toContain("ensureSession: () => auth.ensureSession()");
-    expect(view).toContain('class="user-map-view__share"');
-    expect(view).toContain('@click="broadcast.toggle()"');
+    expect(view).not.toContain('class="user-map-view__share"');
+    expect(view).not.toContain('@click="broadcast.toggle()"');
     expect(view).not.toContain("<LiveBroadcastBar");
   });
 });

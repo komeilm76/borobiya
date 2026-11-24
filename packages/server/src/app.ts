@@ -1,3 +1,4 @@
+import { createLocationActivityStore, type LocationActivityStore } from "./location/activity";
 import { apiRoutes } from "@borobiya/shared/api";
 import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -106,6 +107,8 @@ export interface FastifyAppDependencies {
   /** Override the mission progress write in tests. */
   missionProgressStore?: MissionProgressStore;
   missionLocationStore?: MissionLocationStore;
+  /** Activity permission store, injected with the same database as other stores in integration tests. */
+  locationActivityStore?: LocationActivityStore;
   syncStore?: SyncStore;
   /** Cancellation catalog and atomic requester cancellation. */
   sosCancellationStore?: SosCancellationStore;
@@ -197,7 +200,9 @@ export async function createFastifyApp(
   const missionLocations = dependencies.missionLocationStore ?? (database ? new DrizzleMissionLocationStore(database.db) : undefined);
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
+  const locationActivityStore = dependencies.locationActivityStore ?? (database ? createLocationActivityStore(database.db) : undefined);
   const liveLocationService = createLiveLocationService({
+    activityStore: locationActivityStore,
     shareStore: locationShareStore,
     historyStore: locationHistoryStore,
     logger: app.log
@@ -316,6 +321,18 @@ export async function createFastifyApp(
     maxShareDays: config.locationHistoryMaxShareDays,
     defaultReadPoints: config.locationHistoryReadPoints
   });
+  if (locationActivityStore) {
+    app.post("/_user/location/trip", async (request, reply) => {
+      const user = request.authenticatedUser;
+      if (!user) return reply.code(401).send({ error: true, code: "UNAUTHORIZED" });
+      const body = request.body;
+      if (!body || typeof body !== "object" || !("active" in body) || typeof body.active !== "boolean") {
+        return reply.code(400).send({ error: true, code: "VALIDATION_ERROR" });
+      }
+      await locationActivityStore.setTrip(user.userId, user.sessionId, body.active);
+      return reply.code(204).send();
+    });
+  }
   await registerLocationUpdateRoute(app, {
     service: liveLocationService,
     broadcast: (peerIds, update) => {

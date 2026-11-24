@@ -27,7 +27,7 @@ describe("proposal/mission database readiness", () => {
       expect(empty).toMatchObject({ ready: false, latestAppliedAt: null });
       expect(empty.missingTables).toEqual([
         "drizzle.__drizzle_migrations", "public.mission_proposals", "public.missions",
-        "public.mission_track_points", "public.mission_suggested_routes"
+        "public.mission_track_points", "public.mission_suggested_routes", "public.location_trips"
       ]);
       expect(empty.missingColumns).toEqual([]);
       expect(schemaReadinessMessage(empty)).toContain("db:migrate:runtime");
@@ -40,7 +40,7 @@ describe("proposal/mission database readiness", () => {
       await pg.query("INSERT INTO drizzle.__drizzle_migrations (created_at) VALUES ($1)", [REQUIRED_MIGRATION_TIMESTAMP - 1]);
       const old = await check();
       expect(old).toMatchObject({ ready: false, latestAppliedAt: REQUIRED_MIGRATION_TIMESTAMP - 1 });
-      expect(old.missingTables).toEqual(["public.mission_track_points", "public.mission_suggested_routes"]);
+      expect(old.missingTables).toEqual(["public.mission_track_points", "public.mission_suggested_routes", "public.location_trips"]);
       expect(old.missingColumns).toEqual([
         "rescuer_visible_to_requester", "requester_visible_to_rescuer",
         "admin_visible_to_requester", "admin_visible_to_rescuer"
@@ -59,7 +59,8 @@ describe("proposal/mission database readiness", () => {
         ALTER TABLE public.missions ADD COLUMN admin_visible_to_requester boolean DEFAULT false NOT NULL;
         ALTER TABLE public.missions ADD COLUMN admin_visible_to_rescuer boolean DEFAULT false NOT NULL;
         CREATE TABLE public.mission_track_points (id bigint PRIMARY KEY);
-        CREATE TABLE public.mission_suggested_routes (id uuid PRIMARY KEY);`);
+        CREATE TABLE public.mission_suggested_routes (id uuid PRIMARY KEY);
+        CREATE TABLE public.location_trips (session_id uuid PRIMARY KEY);`);
       expect(await check()).toMatchObject({ ready: true, missingTables: [], missingColumns: [],
         latestAppliedAt: REQUIRED_MIGRATION_TIMESTAMP });
       expect(REQUIRED_MIGRATION).toMatch(/^\d{4}_/);

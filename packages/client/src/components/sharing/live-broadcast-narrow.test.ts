@@ -17,21 +17,16 @@ describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)"
     const narrow = bar.slice(bar.indexOf("@container (max-width: 380px)"));
     expect(narrow).toContain("grid-template-columns: auto minmax(0, 1fr);");
     expect(narrow).toMatch(/\.broadcast-bar__copy \{[^}]*min-width: 0;/);
-    expect(narrow).toMatch(/\.broadcast-bar__actions \{[^}]*grid-column: 1 \/ -1;[^}]*width: 100%;/);
+    expect(narrow).not.toContain(".broadcast-bar__actions");
   });
 
-  it("keeps the toggle action reachable with wrapping 44px targets in all status states", () => {
+  it("keeps status legible without offering a manual action", () => {
     const unsupported = describeBroadcastState({
       status: "idle", lastErrorCode: null, peerCount: 0, isSupported: false,
       priority: { hasMultipleDevices: true, broadcastingCount: 0, ignoredCount: 0, hasShares: false }
     });
-    expect(unsupported.actionLabel.length).toBeGreaterThan(20);
-    expect(bar).not.toContain('to="/_user/devices"');
-    expect(bar).not.toContain("mapMode");
-    expect(bar).toContain('@click="broadcast.toggle()"');
-    expect(bar).toContain(':disabled="!broadcast.isSupported"');
-    const narrow = bar.slice(bar.indexOf("@container (max-width: 380px)"));
-    expect(narrow).toMatch(/\.broadcast-bar__actions :deep\(\.v-btn\) \{[^}]*flex: 1 1 100%;[^}]*min-width: 0;[^}]*min-height: 44px;[^}]*height: auto;/);
-    expect(narrow).toMatch(/\.broadcast-bar__actions :deep\(\.v-btn__content\) \{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/);
+    expect(unsupported.headline).toBeTruthy();
+    expect(bar).not.toContain('@click="broadcast.toggle()"');
+    expect(bar).toContain('role="status" aria-live="polite"');
   });
 });

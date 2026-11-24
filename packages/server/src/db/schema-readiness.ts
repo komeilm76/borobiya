@@ -20,20 +20,22 @@ const missionPolicyColumns = ["rescuer_visible_to_requester", "requester_visible
   "admin_visible_to_requester", "admin_visible_to_rescuer"] as const;
 
 /** Read-only schema probe against the API's database. A journal row alone cannot
- * prove that the mission policy columns actually exist (e.g. manual schema drift). */
+ * prove that mission policy columns or foreground trip permissions still exist after schema drift. */
 export async function checkSchemaReadiness(query: (sql: string) => Promise<readonly Record<string, unknown>[]>): Promise<SchemaReadiness> {
   const [tables] = await query(`SELECT
     to_regclass('drizzle.__drizzle_migrations')::text AS journal,
     to_regclass('public.mission_proposals')::text AS proposals,
     to_regclass('public.missions')::text AS missions,
     to_regclass('public.mission_track_points')::text AS track_points,
-    to_regclass('public.mission_suggested_routes')::text AS suggested_routes`);
+    to_regclass('public.mission_suggested_routes')::text AS suggested_routes,
+    to_regclass('public.location_trips')::text AS location_trips`);
   const missingTables = ([
     ["drizzle.__drizzle_migrations", tables?.journal],
     ["public.mission_proposals", tables?.proposals],
     ["public.missions", tables?.missions],
     ["public.mission_track_points", tables?.track_points],
-    ["public.mission_suggested_routes", tables?.suggested_routes]
+    ["public.mission_suggested_routes", tables?.suggested_routes],
+    ["public.location_trips", tables?.location_trips]
   ] as const).filter(([, found]) => !found).map(([name]) => name);
   const present = tables?.missions ? await query(`SELECT column_name FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'missions'

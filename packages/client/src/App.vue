@@ -1,5 +1,5 @@
 <template>
-  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute, 'app-shell--workspace': !isAuthRoute && !isPublicRoute, 'app-shell--floating-actions': showGeneralShareButton && !isMapRoute }">
+  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute, 'app-shell--workspace': !isAuthRoute && !isPublicRoute }">
     <v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute" class="app-topbar px-sm-6" flat height="64">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
@@ -194,15 +194,6 @@
       </RouterView>
     </v-main>
 
-    <v-btn v-if="showGeneralShareButton" class="app-general-share"
-      :class="{ 'app-general-share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
-      :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
-      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'primary' : 'surface'"
-      :aria-label="broadcast.view.actionLabel" :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
-      :aria-pressed="broadcast.view.isActive" :disabled="!broadcast.isSupported"
-      variant="flat" @click="broadcast.toggle()" />
-    <span v-if="showGeneralShareButton && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
-      class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <SosTriggerButton v-if="showSosButton" @trigger="sosSheet.openSheet()" />
     <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
     <v-snackbar :model-value="Boolean(missionShare.statusError || missionShare.gpsError) && (missionShare.hadActiveMission || !!proposalInbox.acceptedMissionId || route.name === 'user-mission')"
@@ -271,7 +262,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
 import NetworkStatusIcon from "./components/shell/NetworkStatusIcon.vue";
@@ -290,6 +281,7 @@ import { useRequesterMissionShareStore } from "./stores/requester-mission-share"
 import { useRescuerMissionShareStore } from "./stores/rescuer-mission-share";
 import { mapTripSession } from "./map/trip-session";
 import { useBroadcastStore } from "./stores/broadcast";
+import { requestJson } from "./api/http";
 import { useAuthStore } from "./stores/auth";
 import { useSosSheetStore } from "./stores/sos-sheet";
 import { useThemeStore } from "./stores/theme";
@@ -299,7 +291,7 @@ const adminSos = useAdminSosStore(pinia);
 const proposalInbox = useProposalInboxStore(pinia);
 const missionShare = useRescuerMissionShareStore(pinia);
 // Requester GPS is verified and app-owned too, not dependent on opening the room panel.
-useRequesterMissionShareStore(pinia);
+const requesterShare = useRequesterMissionShareStore(pinia);
 const broadcast = useBroadcastStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
 watch(() => proposalInbox.acceptedMissionId, (id) => { if (id) void missionShare.refresh(); }, { flush: "sync" });
@@ -322,9 +314,37 @@ const showSosButton = computed(
   // expose SOS or location-sharing actions on that interim guest screen.
   () => auth.isAuthenticated && !!auth.user && !auth.mustCompleteSecurityQuestions
 );
-// General Broadcast is a separate manual opt-in; missions and navigation never turn it on.
+// Only an active activity can wake the general GPS publisher. Mission membership
+// and trip duration are checked again by the server before persisting each fix.
+watch(() => Boolean(missionShare.mission || requesterShare.missions.length),
+  (active) => broadcast.setAutomatic("mission", active), { immediate: true, flush: "sync" });
+watch(() => mapTripSession.navigating.value,
+  (active) => broadcast.setAutomatic("navigation", active), { immediate: true, flush: "sync" });
+let tripLeaseVersion = 0;
+async function syncTripLease(active: boolean): Promise<void> {
+  const version = ++tripLeaseVersion;
+  const token = auth.accessToken;
+  if (!token) return;
+  try {
+    await requestJson("/_user/location/trip", { method: "POST", accessToken: token, body: { active } });
+    // An older in-flight activation must never outlive a Stop that crossed it.
+    if (active && version !== tripLeaseVersion && !mapTripSession.navigating.value) await syncTripLease(false);
+  } catch { /* A missing lease fails closed on the server; the next heartbeat retries. */ }
+}
+watch(() => mapTripSession.navigating.value, (active) => { void syncTripLease(active); }, { flush: "sync" });
+let activityTimer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => {
+  if (auth.isAuthenticated && auth.user && !auth.mustCompleteSecurityQuestions) void broadcast.refreshPriority();
+  activityTimer = setInterval(() => {
+    if (mapTripSession.navigating.value) void syncTripLease(true);
+    if (auth.isAuthenticated && auth.user && !auth.mustCompleteSecurityQuestions) {
+      void broadcast.refreshPriority().then(() => broadcast.retryAutomatic());
+    }
+  }, 30_000);
+});
+onUnmounted(() => { if (activityTimer) clearInterval(activityTimer); });
 // A trip started in another login must not silently inherit that session's GPS
-// or leave the Broadcast button hidden with no active publisher.
+// or leave a location publisher running for a revoked trip.
 watch(() => accountSessionKey(auth.user?.id ?? null, auth.accessToken), (next, previous) => {
   if (previous && next !== previous && mapTripSession.navigating.value) mapTripSession.endForMission();
 }, { flush: "sync" });
@@ -374,9 +394,6 @@ const route = useRoute();
 // Map-first workspaces use the same full-viewport shell and navigation drawer.
 // Proposal and route-choice overlays remain specific to the companion map.
 const isMapRoute = computed(() => route.name === "user-map" || route.name === "user-mission" || route.name === "admin-dispatch");
-// The companion map owns its share icon. Other pages keep an independent manual
-// general Broadcast action above SOS, even during an active mission.
-const showGeneralShareButton = computed(() => showSosButton.value && route.name !== "user-map");
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutUnconfirmed = ref(false);
@@ -433,18 +450,6 @@ onMounted(async () => {
   color: var(--bb-color-text); }
 .app-route-pending strong { font-size: 1rem; }
 .app-route-pending span { font-size: .875rem; color: var(--bb-color-muted); }
-/* Same 48px rail and live-broadcast states as /_user/map, immediately above SOS. */
-.app-general-share {
-  position: fixed; z-index: 951;
-  inset-inline-start: 1.25rem;
-  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
-  width: 48px; height: 48px; min-width: 48px;
-  border: 1px solid rgba(var(--v-theme-on-surface), .15);
-  border-radius: var(--bb-map-action-radius, 50%);
-  box-shadow: var(--bb-shadow-overlay);
-}
-.app-general-share--idle { border-color: var(--bb-color-outline); }
-.app-general-share:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 /* One compact, theme-aware treatment for both admin SOS notices. Vuetify
    teleports snackbars, so the content-props class is styled globally. */
 :global(.v-snackbar__wrapper.admin-sos-toast__wrapper) {

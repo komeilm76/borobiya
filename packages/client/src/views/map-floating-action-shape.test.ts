@@ -17,7 +17,7 @@ describe("floating map action shape", () => {
     const shell = read("../styles/tailwind.css");
     expect(rule(shell, ".app-shell--map")).toContain("--bb-map-action-radius: var(--bb-radius-nested);");
     expect(rule(shell, ".app-shell--map :is(.sos-fab.sos-fab)")).toContain(`${radius});`);
-    expect(rule(css("../App.vue"), ".app-general-share")).toContain(radius);
+    expect(read("../App.vue")).not.toContain("app-general-share");
 
     const user = css("./_user/UserMapView.vue");
     expect(rule(user, ".user-map-view__recenter, .user-map-view__share")).toContain(radius);

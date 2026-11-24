@@ -9,8 +9,8 @@ import { useAuthStore } from "./auth";
 /**
  * Single app-scoped live broadcast controller (`T2.1.5` + `T2.3.6`).
  *
- * Kept in Pinia rather than inside a single route component so starting a broadcast on
- * The map keeps streaming smoothly when navigating to `/_user/location-shares` or `/_user/devices`,
+ * Kept in Pinia rather than inside a single route component so an active activity
+ * keeps streaming smoothly when navigating to `/_user/location-shares` or `/_user/devices`,
  * while logging out immediately halts hardware GPS and closes the socket.
  */
 export const useBroadcastStore = defineStore("broadcast", () => {
@@ -28,16 +28,25 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     ensureSession: () => auth.refreshSession()
   });
 
-  // The Start tap first awaits a priority snapshot. Treat that interval as connecting so
-  // the same button offers Stop, and fence it before the GPS composable can be started.
+  // Activity start first awaits a priority snapshot. Fence that interval so
+  // ending an activity cannot wake the GPS composable later.
   const waitingForPriority = ref(false);
   let startAttempt = 0;
   // The confirmed mission and active guidance may overlap during handoff.
-  // A release must not stop a manually started broadcast or the other activity.
-  type AutomaticReason = "mission" | "navigation";
+  // One activity ending must not stop the publisher while another remains active.
+  type AutomaticReason = "mission" | "navigation" | "share";
   const automaticReasons = ref<Set<AutomaticReason>>(new Set());
   const automaticActive = computed(() => automaticReasons.value.size > 0);
   let automaticOwner = false;
+  function syncShareActivity(): void {
+    // A failed refresh must not keep GPS awake past a timed grant's known expiry.
+    const deviceId = priority.ownId.value;
+    setAutomatic("share", priority.liveShares.value.some((share) =>
+      (!share.expiresAt || Date.parse(share.expiresAt) > Date.now()) &&
+      (share.priorityDeviceId === null || share.priorityDeviceId === deviceId)
+    ));
+  }
+  watch(priority.liveShares, syncShareActivity, { flush: "sync" });
   const status = computed(() => waitingForPriority.value ? "connecting" : live.status.value);
   const view = computed(() =>
     describeBroadcastState({
@@ -55,7 +64,8 @@ export const useBroadcastStore = defineStore("broadcast", () => {
   );
 
   async function refreshPriority(): Promise<void> {
-    await priority.refresh();
+    try { await priority.refresh(); }
+    finally { syncShareActivity(); }
   }
 
   function stop(): void {
@@ -64,7 +74,7 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     live.stop();
   }
 
-  /** Activity owns only a broadcast it started; a prior manual broadcast survives its end. */
+  /** Every publisher is owned by a verified activity; there is no manual fallback. */
   function setAutomatic(reason: AutomaticReason, active: boolean): void {
     if (automaticReasons.value.has(reason) === active) return;
     const next = new Set(automaticReasons.value);
@@ -99,7 +109,7 @@ export const useBroadcastStore = defineStore("broadcast", () => {
       await priority.refresh();
       if (attempt !== startAttempt) return;
       const current = decodeAccessTokenClaims(auth.accessToken);
-      // Refreshing the access token for this same session is fine. A stopped tap must
+      // Refreshing the access token for this same session is fine. A stopped activity must
       // never wake GPS after the priority read returns, even if auth has not changed.
       if (auth.user?.id !== owner || current?.sub !== owner || current.sessionId !== session ||
         auth.mustCompleteSecurityQuestions) return;
@@ -107,15 +117,6 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     } finally {
       if (attempt === startAttempt) waitingForPriority.value = false;
     }
-  }
-
-  async function toggle(): Promise<void> {
-    if (automaticActive.value) return; // Activity controls its own lifetime, including the priority read.
-    if (waitingForPriority.value || live.status.value === "connecting" || live.status.value === "broadcasting") {
-      stop();
-      return;
-    }
-    await start();
   }
 
   function sessionKey(token: string | null, owner: string | null): string | null {
@@ -129,7 +130,7 @@ export const useBroadcastStore = defineStore("broadcast", () => {
       const next = sessionKey(nextToken, owner);
       const previous = sessionKey(previousToken, previousOwner);
       if (!next || onboardingIncomplete || (previous !== null && next !== previous)) {
-        // A→null→A in one tick must cancel a pending tap, not resurrect its consent.
+        // A→null→A in one tick must cancel a pending activity start.
         stop();
         automaticOwner = false;
         automaticReasons.value = new Set();
@@ -154,9 +155,6 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     automaticActive,
     setAutomatic,
     retryAutomatic,
-    start,
-    stop,
-    toggle,
     refreshPriority
   };
 });

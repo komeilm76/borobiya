@@ -18,10 +18,12 @@ const missionId = "20000000-0000-4000-8000-000000000002";
 describe("forward-only private mission schema reconciliation", () => {
   it("runs after the foreign checkpoint, preserves missions, and becomes a no-op on a complete schema", async () => {
     const checkpoint = 1793612911359; // Seen on a VM whose 0020/0021 were skipped.
-    const entry = journal.entries.at(-1);
+    const entry = journal.entries.at(-2);
+    const tripEntry = journal.entries.at(-1);
+    expect(tripEntry?.tag).toBe("0023_numerous_purple_man");
     expect(entry?.tag).toBe("0022_reconcile_private_mission_schema");
     expect(entry?.when).toBeGreaterThan(checkpoint);
-    expect(entry?.when).toBe(REQUIRED_MIGRATION_TIMESTAMP);
+    expect(tripEntry?.when).toBe(REQUIRED_MIGRATION_TIMESTAMP);
     const pg = new PGlite();
     const ready = () => checkSchemaReadiness(async (query) => (await pg.query(query)).rows as Record<string, unknown>[]);
     try {
@@ -29,7 +31,8 @@ describe("forward-only private mission schema reconciliation", () => {
         CREATE TABLE drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);
         CREATE TABLE users (id uuid PRIMARY KEY);
         CREATE TABLE missions (id uuid PRIMARY KEY);
-        CREATE TABLE mission_proposals (id uuid PRIMARY KEY);`);
+        CREATE TABLE mission_proposals (id uuid PRIMARY KEY);
+        CREATE TABLE user_sessions (id uuid PRIMARY KEY);`);
       await pg.query("INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)",
         ["foreign-branch-migration", checkpoint]);
       await pg.query("INSERT INTO users (id) VALUES ($1)", [userId]);
@@ -46,10 +49,10 @@ describe("forward-only private mission schema reconciliation", () => {
       await pg.exec('ALTER TABLE missions DROP COLUMN "rescuer_visible_to_requester";'); // disposable fixture only
 
       // Exercise Drizzle's real max(created_at) filter, SQL execution and
-      // transaction/journal write. It must skip 0020/0021 and run only 0022.
+      // transaction/journal write. It must skip 0020/0021 and run 0022/0023.
       await migrate(drizzle(pg), config);
       expect((await pg.query<{ created_at: number }>("SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1")).rows[0]?.created_at)
-        .toBe(entry!.when);
+        .toBe(tripEntry!.when);
       expect(await ready()).toMatchObject({ ready: true, missingColumns: [], missingTables: [] });
       const row = (await pg.query(`SELECT id, rescuer_visible_to_requester, requester_visible_to_rescuer,
         admin_visible_to_requester, admin_visible_to_rescuer FROM missions`)).rows[0];
@@ -65,7 +68,7 @@ describe("forward-only private mission schema reconciliation", () => {
         .toBe(true);
       expect((await pg.query<{ total: number }>("SELECT count(*)::integer AS total FROM mission_track_points")).rows[0]?.total).toBe(1);
       expect((await pg.query<{ total: number }>("SELECT count(*)::integer AS total FROM mission_suggested_routes")).rows[0]?.total).toBe(1);
-      expect((await pg.query<{ total: number }>("SELECT count(*)::integer AS total FROM drizzle.__drizzle_migrations")).rows[0]?.total).toBe(2);
+      expect((await pg.query<{ total: number }>("SELECT count(*)::integer AS total FROM drizzle.__drizzle_migrations")).rows[0]?.total).toBe(3);
     } finally { await pg.close(); }
   });
 });

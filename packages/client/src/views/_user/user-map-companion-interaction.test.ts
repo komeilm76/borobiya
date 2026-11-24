@@ -35,21 +35,12 @@ describe("map companions tool", () => {
     expect(view).toContain('env(safe-area-inset-bottom, 0px)');
   });
 
-  it("keeps manual broadcast independently of active mission/guidance on map and in Sharing", () => {
-    const start = view.indexOf('class="user-map-view__live-dialog"');
-    const dialog = view.slice(start, view.indexOf('\n    </component>', start));
-    expect(dialog).toContain('<LiveCompanionPanel :api="live"');
-    expect(dialog).toContain(':broadcast-status="broadcast.view.tone ==='); // Failures stay visible in the card.
+  it("keeps companion status visible without a map or dialog broadcast button", () => {
+    expect(view).toContain('<LiveCompanionPanel :api="live"');
+    expect(view).toContain(':broadcast-status="broadcast.view.tone ===');
     expect(panel).toContain('{{ broadcastStatus.headline }}');
-    expect(dialog).not.toContain('<LiveBroadcastBar');
-    expect(dialog).not.toContain('v-if="!broadcast.automaticActive && !missionShare.mission && !journey.navigating.value && !journey.navigationPending.value"');
-    expect(dialog).toContain(':aria-pressed="broadcast.view.isActive"');
-    expect(dialog).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
-    expect(dialog).toContain('@click="broadcast.toggle()"');
-    expect(dialog).not.toContain('to="/_user/devices"');
-    const mapActions = view.slice(0, view.indexOf('class="user-map-view__live-dialog"'));
-    expect(mapActions).toContain('class="user-map-view__share"');
-    expect(mapActions).toContain('@click="broadcast.toggle()"');
+    expect(view).not.toContain('@click="broadcast.toggle()"');
+    expect(view).not.toContain('class="user-map-view__share"');
     expect(view).toContain('void broadcast.refreshPriority()');
   });
 

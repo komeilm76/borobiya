@@ -10,15 +10,14 @@ import { decodeAccessTokenClaims, ownDeviceId } from "@/composables/device-ident
  *
  * Two boundaries it deliberately stays on the correct side of:
  *
- * - **It never suppresses a broadcast.** `location:update` is refused per share by the server (T2.3.4),
- *   which is the only party that knows the current pin; a client that stopped sending on a stale snapshot
- *   would create a device that cannot be made priority again without a reload. What this exposes is the
- *   *explanation* — `ignoredShareIds` — so a status line can say why nothing moves.
+ * - **The server remains authoritative.** `location:update` is refused per share by the server (T2.3.4).
+ *   The app avoids waking GPS on a known non-priority device, but refreshes this snapshot periodically
+ *   so a changed pin takes effect without a reload. `ignoredShareIds` explains why nothing moves.
  * - **A share with no pin is not ignored.** `priorityDeviceId === null` means the account had one live
  *   session when the share was created (T2.3.3's auto-pin rule), so any of its devices may send; treating
  *   a null as “somebody else's” would report the opposite of what the server does.
  */
-/** A half-open priority snapshot must not keep the Start action in "connecting" forever. */
+/** A half-open priority snapshot must not keep automatic startup in "connecting" forever. */
 export const PRIORITY_READ_DEADLINE_MS = 12_000;
 
 export interface UsePriorityDeviceOptions {

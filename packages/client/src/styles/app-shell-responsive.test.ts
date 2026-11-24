@@ -24,8 +24,8 @@ describe("global shell at narrow widths", () => {
   });
 
   it("lets phone users scroll the last workspace action past the Broadcast/SOS rail without padding fullscreen maps", () => {
-    expect(app).toContain("'app-shell--floating-actions': showGeneralShareButton && !isMapRoute");
-    expect(shell).toContain('.app-shell--floating-actions .app-main {\n    padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)) !important;');
+    expect(app).not.toContain("showGeneralShareButton");
+    expect(shell).not.toContain(".app-shell--floating-actions");
     expect(shell).toContain('.app-shell--map .app-main {\n  min-height: 100dvh;\n  padding-top: 0 !important;\n  padding-bottom: 0 !important;');
   });
 

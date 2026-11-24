@@ -1,3 +1,4 @@
+import { createLocationActivityStore } from "./location/activity";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -177,6 +178,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       userDeviceStore: new DrizzleUserDeviceStore(db),
       locationShareStore: new DrizzleLocationShareStore(db),
       locationHistoryStore: new DrizzleLocationHistoryStore(db),
+      locationActivityStore: createLocationActivityStore(db),
       userSearchStore: new DrizzleUserSearchStore(db),
       incidentTypeStore: new DrizzleIncidentTypeStore(db),
       categoryStore: new DrizzleCategoryStore(db),
@@ -563,6 +565,23 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     });
 
     // 7. Responder + requester GPS fixes via REST fallback + filtered user search + live/history shares
+    // A logged-in device may submit a valid fix, but without an activity it has no history permission.
+    await callContract(apiRoutes.location.updateLocation, 200, {
+      url: apiRoutes.location.updateLocation.url, headers: responderHeaders,
+      payload: { lat: 35.7, lon: 51.4, accuracy: 8,
+        timestamp: new Date().toISOString(), priorityDeviceId: responderDeviceId }
+    });
+    const countResponderHistory = async () => (await pg.query<{ count: number }>(
+      'SELECT count(*)::integer AS count FROM location_history WHERE user_id = $1',
+      [createdResponder.id])).rows[0]?.count;
+    expect(await countResponderHistory()).toBe(0);
+
+    // Foreground trips authorize history; logging in alone must not do so.
+    for (const headers of [responderHeaders, requesterHeaders]) {
+      const started = await app.inject({ method: "POST", url: "/_user/location/trip",
+        headers, payload: { active: true } });
+      expect(started.statusCode).toBe(204);
+    }
     const fixTimestamp = new Date().toISOString();
     await callContract(apiRoutes.location.updateLocation, 200, {
       url: apiRoutes.location.updateLocation.url,
@@ -587,6 +606,16 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
         priorityDeviceId: requesterDeviceId
       }
     });
+
+    expect(await countResponderHistory()).toBe(1);
+    expect((await app.inject({ method: "POST", url: "/_user/location/trip",
+      headers: responderHeaders, payload: { active: false } })).statusCode).toBe(204);
+    await callContract(apiRoutes.location.updateLocation, 200, {
+      url: apiRoutes.location.updateLocation.url, headers: responderHeaders,
+      payload: { lat: 35.8013, lon: 51.4286, accuracy: 7,
+        timestamp: new Date().toISOString(), priorityDeviceId: responderDeviceId }
+    });
+    expect(await countResponderHistory()).toBe(1);
 
     // Injection does not open a Socket.IO transport. Explicitly record the presence that
     // a connected socket would write; login/refresh alone must no longer count as online.

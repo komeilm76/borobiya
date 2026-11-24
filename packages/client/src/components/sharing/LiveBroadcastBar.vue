@@ -11,23 +11,6 @@
         <p class="broadcast-bar__headline">{{ state.headline }}</p>
         <p class="broadcast-bar__detail">{{ state.detail }}</p>
       </div>
-      <div class="broadcast-bar__actions">
-        <v-btn
-          size="small"
-          :color="state.isActive ? 'error' : 'primary'"
-          :variant="state.isActive ? 'tonal' : 'flat'"
-          rounded="lg"
-          :disabled="!broadcast.isSupported"
-          @click="broadcast.toggle()"
-        >
-          <v-icon
-            class="me-1"
-            :icon="state.isActive ? 'mdi-stop-circle-outline' : 'mdi-broadcast'"
-            size="18"
-          />
-          {{ state.actionLabel }}
-        </v-btn>
-      </div>
     </div>
   </v-card>
 </template>
@@ -116,23 +99,13 @@ onMounted(() => {
   line-height: var(--bb-content-leading-broadcastDetail);
 }
 
-.broadcast-bar__actions {
-  display: flex;
-  align-items: center;
-  gap: var(--bb-rhythm-r035);
-  margin-inline-start: auto;
-}
-
 /* Compact map overlays and dashboard inset cards can be narrow even on desktop.
- * At text zoom the 12rem copy minimum and two unwrapped buttons otherwise overflow
- * the card; size from the host, not from the viewport. */
+ * At text zoom the 12rem copy minimum otherwise overflows the card;
+ * size from the host, not from the viewport. */
 @container (max-width: 380px) {
   .broadcast-bar__body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .broadcast-bar__indicator { margin-top: var(--bb-rhythm-r035); }
   .broadcast-bar__copy { min-width: 0; overflow-wrap: anywhere; }
-  .broadcast-bar__actions { grid-column: 1 / -1; width: 100%; min-width: 0; margin-inline-start: 0; flex-wrap: wrap; }
-  .broadcast-bar__actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
-  .broadcast-bar__actions :deep(.v-btn__content) { white-space: normal; overflow-wrap: anywhere; text-align: center; }
 }
 
 :global(:root.dark .broadcast-bar) {

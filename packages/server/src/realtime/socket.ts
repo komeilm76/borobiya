@@ -408,6 +408,7 @@ async function locationUpdateAck(
   const result = await dependencies.live.applyUpdate({
     userId: identity.userId,
     deviceId: identity.deviceId,
+    sessionId: identity.sessionId,
     payload
   });
 

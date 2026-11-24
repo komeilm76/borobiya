@@ -22,19 +22,12 @@ describe("participant automatic mission share and independent general share butt
     expect(mission).toContain('@sharing-change="teamSharing = $event"');
     expect(mission).not.toContain("@click=\"live.stopSharing()\"");
   });
-  it("keeps the manual general broadcast control above SOS for requester/admin", () => {
-    expect(app).toContain("const broadcast = useBroadcastStore(pinia);");
-    expect(app).toContain('v-if="showGeneralShareButton" class="app-general-share"');
-    expect(app).toContain('route.name !== "user-map"');
-    expect(app).not.toContain("broadcast.setAutomatic(");
-    expect(app).toContain('accountSessionKey(auth.user?.id ?? null, auth.accessToken)');
+  it("records only verified activities without a manual broadcast control", () => {
+    expect(app).toContain('broadcast.setAutomatic("mission", active)');
+    expect(app).toContain('broadcast.setAutomatic("navigation", active)');
     expect(app).toContain('mapTripSession.endForMission()');
-    expect(app).toContain(':aria-pressed="broadcast.view.isActive" :disabled="!broadcast.isSupported"');
-    expect(app).toContain('@click="broadcast.toggle()"');
-    expect(app.indexOf('class="app-general-share"')).toBeLessThan(app.indexOf('<SosTriggerButton'));
-    expect(app).toContain('inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);');
-    expect(panel).toContain("پخش عمومی مستقل است");
+    expect(app).not.toContain('@click="broadcast.toggle()"');
+    expect(app).not.toContain('class="app-general-share"');
     expect(app).toContain('missionShare.statusError || missionShare.gpsError');
-    expect(app).toContain('@click="missionShare.retry()"');
   });
 });

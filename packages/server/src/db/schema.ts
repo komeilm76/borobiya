@@ -111,6 +111,14 @@ export const userSessions = pgTable(
   ]
 );
 
+/** Session-scoped, short-lived foreground trip permission; never inferred from login. */
+export const locationTrips = pgTable("location_trips", {
+  sessionId: uuid("session_id").primaryKey().references(() => userSessions.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [index("location_trips_user_expires_idx").on(table.userId, table.expiresAt)]);
+
 export const locationShares = pgTable(
   "location_shares",
   {

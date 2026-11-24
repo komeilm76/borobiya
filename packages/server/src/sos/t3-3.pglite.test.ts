@@ -1,3 +1,4 @@
+import { createLocationActivityStore } from "../location/activity";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -190,6 +191,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       userDeviceStore: new DrizzleUserDeviceStore(db),
       locationShareStore: new DrizzleLocationShareStore(db),
       locationHistoryStore: new DrizzleLocationHistoryStore(db),
+      locationActivityStore: createLocationActivityStore(db),
       userSearchStore: new DrizzleUserSearchStore(db),
       incidentTypeStore: new DrizzleIncidentTypeStore(db),
       categoryStore: new DrizzleCategoryStore(db),

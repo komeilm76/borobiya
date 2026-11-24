@@ -59,8 +59,8 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       const { createRealtimeClient } = await import("../services/socket");
       return createRealtimeClient(token);
     });
-  // `immediate: false` prevents waking GPS hardware or prompting for location permission before the
-  // user explicitly clicks "Start live broadcast", and lets `stop()` release the watcher immediately.
+  // `immediate: false` prevents waking GPS hardware before an activity-owned publisher starts,
+  // and lets `stop()` release the watcher immediately.
   const geolocation: BroadcastGeolocationSource =
     options.geolocation ??
     (useGeolocation({
@@ -91,7 +91,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   let nextUpdateSequence = 0;
   let lastHandledUpdateSequence = 0;
   let refreshingAuth = false;
-  // Consent belongs to one JWT login, not merely to an account: a new session for
+  // Publisher ownership belongs to one JWT login, not merely to an account: a new session for
   // the same user must not inherit the old session's GPS watcher and socket room.
   let consentSession: string | null = null;
 

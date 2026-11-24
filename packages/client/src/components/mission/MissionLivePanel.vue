@@ -96,7 +96,7 @@
         @click="live.stopSharing()">توقف ارسال موقعیت مدیر</v-btn>
     </details>
     <template v-if="!fullscreen && !isAdmin">
-      <p class="live-panel__note" role="status">برنامه در مأموریت فعال اشتراک خصوصی موقعیت شما را خودکار آغاز می‌کند؛ دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد. پخش عمومی مستقل است.</p>
+      <p class="live-panel__note" role="status">برنامه در مأموریت فعال اشتراک خصوصی موقعیت شما را خودکار آغاز می‌کند؛ دریافت موقعیت به اجازهٔ GPS، اتصال و فعال‌بودن دستگاه بستگی دارد. تاریخچه فقط تا پایان مأموریت یا اشتراک فعال ثبت می‌شود.</p>
       <v-alert v-if="auth.user?.id === mission.requesterId && (requesterShare.statusError || requesterShare.gpsError(mission.id))"
         type="warning" variant="tonal" role="alert">
         {{ requesterShare.statusError || requesterShare.gpsError(mission.id) }}

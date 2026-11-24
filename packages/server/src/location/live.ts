@@ -3,6 +3,7 @@ import { locationUpdateSchema, type PeerLocationEvent } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LocationShareStore } from "../db/location-share-store";
 import type { LocationHistoryStore } from "../db/location-history-store";
+import type { LocationActivityStore } from "./activity";
 
 /** A device clock ahead of the server by more than this is treated as unusable. */
 export const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60_000;
@@ -30,6 +31,7 @@ export type LiveUpdateResult =
 export interface LiveLocationServiceDependencies {
   shareStore: Pick<LocationShareStore, "listActiveOutgoingShares">;
   historyStore: Pick<LocationHistoryStore, "recordFix">;
+  activityStore?: Pick<LocationActivityStore, "isActive">;
   /** Injectable clock for tests. */
   now?: () => Date;
   /** Report a failed post-write permission recheck without failing an already committed fix. */
@@ -39,9 +41,9 @@ export interface LiveLocationServiceDependencies {
 export interface LiveLocationService {
   /**
    * Validates one `location:update` payload, applies the multi-device priority rule,
-   * persists the fix, and returns the recipients that should receive it.
+   * persists history only for a current share/trip/mission, and returns authorized recipients.
    */
-  applyUpdate(input: { userId: string; deviceId: string; payload: unknown }): Promise<LiveUpdateResult>;
+  applyUpdate(input: { userId: string; deviceId: string; sessionId?: string; payload: unknown }): Promise<LiveUpdateResult>;
 }
 
 function rejected(
@@ -58,7 +60,7 @@ export function createLiveLocationService(
   const now = dependencies.now ?? (() => new Date());
 
   return {
-    async applyUpdate({ userId, deviceId, payload }) {
+    async applyUpdate({ userId, deviceId, sessionId, payload }) {
       const parsed = locationUpdateSchema.safeParse(payload);
       if (!parsed.success) {
         return rejected(
@@ -106,19 +108,23 @@ export function createLiveLocationService(
         );
       }
 
-      await dependencies.historyStore.recordFix({
-        userId,
-        lat,
-        lon,
-        accuracy: accuracy ?? null,
-        timestamp: observedAt
-      });
+      // A valid fix is not consent to keep history. Share, trip, or mission must still be active.
+      if (accepted.some((share) => !share.createdAt || share.createdAt <= observedAt) ||
+          await dependencies.activityStore?.isActive(userId, sessionId, observedAt)) {
+        await dependencies.historyStore.recordFix({
+          userId,
+          lat,
+          lon,
+          accuracy: accuracy ?? null,
+          timestamp: observedAt
+        });
+      }
 
       // A revocation, expiry, suspension, or priority-device switch can commit while
       // recordFix is in flight. Recheck immediately before fan-out and intersect with
       // the original recipients: a newly granted recipient must not get this older fix.
       // If the post-write check fails, fail closed for peers but still acknowledge the
-      // committed history row to avoid a duplicate. A revocation that races *after*
+      // possibly committed history row to avoid a duplicate. A revocation that races *after*
       // this recheck still requires transport-level ordering to prevent all deliveries.
       const authorizedBefore = new Set(accepted.map((share) => share.targetUserId));
       let peers: string[] = [];
@@ -172,6 +178,7 @@ export async function registerLocationUpdateRoute(
     const result = await dependencies.service.applyUpdate({
       userId: user.userId,
       deviceId: user.deviceId,
+      sessionId: user.sessionId,
       payload: request.body
     });
     if (result.status === "rejected") {

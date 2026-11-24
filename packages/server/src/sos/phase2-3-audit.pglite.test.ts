@@ -1,3 +1,4 @@
+import { createLocationActivityStore } from "../location/activity";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -126,6 +127,7 @@ describe("Phase 2 & 3 cross-cutting server + realtime regression suite (PGlite)"
       userDeviceStore: new DrizzleUserDeviceStore(db),
       locationShareStore: new DrizzleLocationShareStore(db),
       locationHistoryStore: new DrizzleLocationHistoryStore(db),
+      locationActivityStore: createLocationActivityStore(db),
       userSearchStore: new DrizzleUserSearchStore(db),
       incidentTypeStore: new DrizzleIncidentTypeStore(db),
       categoryStore: new DrizzleCategoryStore(db),
@@ -353,6 +355,9 @@ describe("Phase 2 & 3 cross-cutting server + realtime regression suite (PGlite)"
       expect(liveSearch.json().items).toHaveLength(1);
       expect(liveSearch.json().items[0]).toMatchObject({ username: "responder_one", isOnline: true });
 
+      // A foreground trip, not mere login, permits general location history.
+      expect((await app.inject({ method: "POST", url: "/_user/location/trip",
+        headers: { authorization: `Bearer ${rescuerAToken}` }, payload: { active: true } })).statusCode).toBe(204);
       // Emit a live GPS fix on tab1 and verify ack succeeds + refreshes `last_active_at`:
       const ack = await new Promise<{ ok: boolean }>((resolve) => {
         tab1.emit(

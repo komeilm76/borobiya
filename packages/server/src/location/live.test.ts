@@ -173,12 +173,36 @@ describe("live location service", () => {
     expect(recordFix).not.toHaveBeenCalled();
   });
 
-  it("still records a fix when the account has no active share", async () => {
+  it("does not store history on ordinary login without an activity", async () => {
     const { service, recorded } = makeService({ shares: [] });
     const result = await service.applyUpdate({ userId, deviceId, payload: payload() });
 
     expect(result).toMatchObject({ status: "accepted", peers: [] });
-    expect(recorded).toHaveLength(1);
+    expect(recorded).toHaveLength(0);
+  });
+
+  it("does not backfill history from before a newly granted share", async () => {
+    const { service, recorded } = makeService({ shares: [{ targetUserId: randomUUID(),
+      priorityDeviceId: null, createdAt: new Date("2026-10-21T09:00:00.000Z") }] });
+    const result = await service.applyUpdate({ userId, deviceId, payload: payload() });
+    expect(result).toMatchObject({ status: "accepted" });
+    expect(recorded).toHaveLength(0);
+  });
+
+  it("stores a fix for a server-verified trip or mission without an outgoing share", async () => {
+    const activityStore = { isActive: vi.fn(async () => true) };
+    const recordFix = vi.fn(async () => {});
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares: async () => [] },
+      historyStore: { recordFix }, activityStore, now: () => now
+    });
+    const sessionId = randomUUID();
+    await service.applyUpdate({ userId, deviceId, sessionId, payload: payload() });
+    expect(activityStore.isActive).toHaveBeenCalledWith(userId, sessionId, new Date("2026-10-21T08:59:55.000Z"));
+    expect(recordFix).toHaveBeenCalledOnce();
+    activityStore.isActive.mockResolvedValue(false);
+    await service.applyUpdate({ userId, deviceId, sessionId, payload: payload() });
+    expect(recordFix).toHaveBeenCalledOnce();
   });
 
   it("rejects a payload whose reported device is not this session", async () => {
@@ -242,7 +266,7 @@ describe("live location service", () => {
   });
 
   it("accepts a buffered fix from a reconnect inside the staleness bound", async () => {
-    const { service, recorded } = makeService();
+    const { service, recorded } = makeService({ shares: [{ targetUserId: randomUUID(), priorityDeviceId: null }] });
     const observedAt = new Date(now.getTime() - 6 * 60 * 60_000);
 
     const result = await service.applyUpdate({
@@ -256,7 +280,7 @@ describe("live location service", () => {
   });
 
   it("accepts a small clock skew and omits an absent accuracy", async () => {
-    const { service, recorded } = makeService();
+    const { service, recorded } = makeService({ shares: [{ targetUserId: randomUUID(), priorityDeviceId: null }] });
     const result = await service.applyUpdate({
       userId,
       deviceId,

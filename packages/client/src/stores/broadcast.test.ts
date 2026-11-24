@@ -21,7 +21,7 @@ vi.mock("@/composables/useLiveLocationBroadcast", () => ({
 }));
 vi.mock("@/composables/use-priority-device", () => ({
   usePriorityDevice: () => ({
-    refresh, clear: vi.fn(), hasMultipleDevices: ref(false), broadcastingShares: ref([]),
+    refresh, clear: vi.fn(), ownId: ref("device-owner"), hasMultipleDevices: ref(false), broadcastingShares: ref([]),
     unassignedShares: ref([]), ignoredShareIds: ref([]), liveShares: ref([])
   })
 }));
@@ -61,12 +61,12 @@ describe("broadcast start consent across the priority-device read", () => {
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
     const broadcast = useBroadcastStore();
-    const starting = broadcast.toggle();
+    broadcast.setAutomatic("navigation", true);
     expect(refresh).toHaveBeenCalledOnce();
     auth.user = { id: B, username: "b", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(B, "44444444-4444-4444-8444-444444444444");
     finish();
-    await starting;
+    await nextTick();
     expect(start).not.toHaveBeenCalled();
   });
 
@@ -77,13 +77,13 @@ describe("broadcast start consent across the priority-device read", () => {
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
     const broadcast = useBroadcastStore();
-    const starting = broadcast.toggle();
+    broadcast.setAutomatic("navigation", true);
     auth.accessToken = null;
     auth.user = null;
     auth.accessToken = jwt(A, "55555555-5555-4555-8555-555555555555");
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     finish();
-    await starting;
+    await nextTick();
     expect(start).not.toHaveBeenCalled();
   });
 
@@ -94,13 +94,13 @@ describe("broadcast start consent across the priority-device read", () => {
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
     const broadcast = useBroadcastStore();
-    const starting = broadcast.toggle();
+    broadcast.setAutomatic("navigation", true);
     expect(broadcast.view.isActive).toBe(true);
     expect(broadcast.view.actionLabel).toContain("توقف");
-    await broadcast.toggle();
+    broadcast.setAutomatic("navigation", false);
     expect(broadcast.view.isActive).toBe(false);
     finish();
-    await starting;
+    await nextTick();
     expect(refresh).toHaveBeenCalledOnce();
     expect(start).not.toHaveBeenCalled();
   });
@@ -112,10 +112,10 @@ describe("broadcast start consent across the priority-device read", () => {
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
     const broadcast = useBroadcastStore();
-    const starting = broadcast.toggle();
-    broadcast.stop();
+    broadcast.setAutomatic("navigation", true);
+    broadcast.setAutomatic("navigation", false);
     finish();
-    await starting;
+    await nextTick();
     expect(start).not.toHaveBeenCalled();
   });
 
@@ -127,11 +127,11 @@ describe("broadcast start consent across the priority-device read", () => {
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = bearer;
     const broadcast = useBroadcastStore();
-    const starting = broadcast.toggle();
+    broadcast.setAutomatic("navigation", true);
     auth.accessToken = null;
     auth.accessToken = bearer;
     finish();
-    await starting;
+    await nextTick();
     expect(start).not.toHaveBeenCalled();
   });
 
@@ -142,13 +142,12 @@ describe("broadcast start consent across the priority-device read", () => {
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
     const broadcast = useBroadcastStore();
-    const starting = broadcast.toggle();
+    broadcast.setAutomatic("navigation", true);
     auth.accessToken = jwt(A, session, 1);
     // Renewal must not replace the very read this Start tap is waiting on.
     expect(refresh).toHaveBeenCalledOnce();
     finish();
-    await starting;
-    expect(start).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
   });
 });
 
@@ -160,6 +159,29 @@ function signedIn() {
 }
 
 describe("activity-owned general broadcast", () => {
+  it("automatically starts for an outgoing share and stops when the last share ends", async () => {
+    signedIn();
+    const broadcast = useBroadcastStore();
+    expect(start).not.toHaveBeenCalled(); // Login is not an activity.
+    broadcast.priority.liveShares = [{ id: "share-one", priorityDeviceId: null,
+      expiresAt: new Date(Date.now() + 60_000).toISOString() } as never];
+    await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
+    broadcast.priority.liveShares = [];
+    expect(stopLive).toHaveBeenCalledOnce();
+  });
+  it("does not wake GPS on a non-priority device or after a timed grant expires", async () => {
+    signedIn();
+    const broadcast = useBroadcastStore();
+    broadcast.priority.liveShares = [{ id: "other-device", priorityDeviceId: "another-device",
+      expiresAt: null } as never];
+    await nextTick();
+    expect(start).not.toHaveBeenCalled();
+    broadcast.priority.liveShares = [{ id: "expired", priorityDeviceId: null,
+      expiresAt: new Date(Date.now() - 60_000).toISOString() } as never];
+    await nextTick();
+    expect(start).not.toHaveBeenCalled();
+  });
+
   it("starts on a confirmed activity, hides manual toggles and stops only after both reasons end", async () => {
     signedIn();
     const broadcast = useBroadcastStore();
@@ -169,7 +191,6 @@ describe("activity-owned general broadcast", () => {
     broadcast.setAutomatic("navigation", true);
     broadcast.setAutomatic("mission", false);
     expect(stopLive).not.toHaveBeenCalled();
-    await broadcast.toggle();
     expect(stopLive).not.toHaveBeenCalled();
     broadcast.setAutomatic("navigation", false);
     expect(broadcast.automaticActive).toBe(false);
@@ -190,31 +211,16 @@ describe("activity-owned general broadcast", () => {
     expect(stopLive).toHaveBeenCalledOnce();
   });
 
-  it("preserves a broadcast already manually started before the mission or trip", async () => {
+  it("ends only after overlapping share and mission activities both end", async () => {
     signedIn();
     const broadcast = useBroadcastStore();
-    await broadcast.start();
-    liveState.status!.value = "broadcasting";
+    broadcast.setAutomatic("share", true);
+    await vi.waitFor(() => expect(start).toHaveBeenCalledOnce());
     broadcast.setAutomatic("mission", true);
-    broadcast.setAutomatic("navigation", true);
-    broadcast.setAutomatic("mission", false);
-    broadcast.setAutomatic("navigation", false);
-    expect(start).toHaveBeenCalledOnce();
+    broadcast.setAutomatic("share", false);
     expect(stopLive).not.toHaveBeenCalled();
-  });
-
-  it("does not cancel a manual priority read when an overlapping activity ends", async () => {
-    let finish!: () => void;
-    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
-    signedIn();
-    const broadcast = useBroadcastStore();
-    const manual = broadcast.start();
-    broadcast.setAutomatic("mission", true);
     broadcast.setAutomatic("mission", false);
-    finish();
-    await manual;
-    expect(start).toHaveBeenCalledOnce();
-    expect(stopLive).not.toHaveBeenCalled();
+    expect(stopLive).toHaveBeenCalledOnce();
   });
 
   it("revokes an automatic pending start on logout even if the priority read resolves later", async () => {

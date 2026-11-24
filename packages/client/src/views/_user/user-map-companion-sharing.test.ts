@@ -15,7 +15,7 @@ describe("sharing from the map companions widget", () => {
     expect(dialog).toContain(':fullscreen="fullscreen ?? $vuetify.display.xs"');
     expect(view).toContain('@shared="onShareCreated"');
     expect(view).toContain('void broadcast.refreshPriority()');
-    expect(view).toContain('@click="broadcast.toggle()"');
+    expect(view).not.toContain('@click="broadcast.toggle()"');
     expect(view).toContain('if (shareOpen.value) shareOpen.value = false;');
     expect(view).toContain('document.getElementById("map-share-location-button")?.focus()');
     expect(dialog).toContain(':close-on-back="!fullscreen"');

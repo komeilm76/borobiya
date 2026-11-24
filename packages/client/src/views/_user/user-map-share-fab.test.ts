@@ -14,61 +14,14 @@ function styleBlock(source: string, selector: string): string {
 }
 
 describe("map sharing quick action", () => {
-  it("is icon-only also during assignments and guidance, not private own GPS", () => {
-    expect(view).toContain('import { useBroadcastStore } from "@/stores/broadcast"');
-    expect(view).toContain('const broadcast = useBroadcastStore()');
-    const start = view.indexOf('class="user-map-view__share"');
-    expect(start).toBeGreaterThan(-1);
-    const button = view.slice(view.lastIndexOf('<v-btn', start), view.indexOf('/>', start));
-    expect(button).toContain(':icon="broadcast.view.isActive ?');
-    expect(button).toContain(':aria-label="broadcast.view.actionLabel"');
-    expect(button).toContain(':aria-pressed="broadcast.view.isActive"');
-    expect(button).toContain("broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning'");
-    expect(button).toContain("broadcast.view.isActive ? 'primary' : 'surface'");
-    expect(view).toContain(":color=\"own.error.value || recenterError ? 'warning' : 'primary'\"");
-    expect(view).not.toContain('id="map-route-choices-toggle"');
-    expect(button).toContain(":class=\"{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }\"");
-    expect(button).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
-    expect(button).toContain('@click="broadcast.toggle()"');
-    expect(button).not.toContain('<span');
-    expect(view).toContain('role="status" aria-live="polite"');
-    // Starting a private foreground GPS watch never opts the owner into sending fixes.
-    const autoGps = view.slice(view.indexOf('watch([map, () => auth.user?.id'), view.indexOf('const reverse ='));
-    expect(autoGps).not.toContain('broadcast.toggle()');
-  });
-
-  it("keeps 48px share/recenter/SOS targets in a clear stack and makes short viewports usable", () => {
-    const base = styleBlock(view, '.user-map-view__recenter, .user-map-view__share');
-    expect(base).toContain('width: 48px;');
-    expect(base).toContain('height: 48px;');
-    expect(base).toContain('border-radius: var(--bb-map-action-radius, 1rem);');
-    expect(view).toContain('v-show="!(isPhone && (activeTool || (mode === \'missions\' && missionWorkspace?.hasOpenMapTool)))"');
-    const phone = view.split('@media (max-width: 599px) {')[1]!;
-    const normalRail = phone.slice(phone.indexOf('/* Search/Location are the lower row;'));
-    const recenter = styleBlock(normalRail, '.user-map-view__recenter');
-    const share = styleBlock(normalRail, '.user-map-view__share');
-    const compass = styleBlock(phone.slice(phone.indexOf('/* On phones the compass')), '.user-map-view__canvas :deep(.maplibregl-ctrl-top-right)');
-    const sos = styleBlock(shell, '.app-shell--map .sos-fab.sos-fab');
-    expect(recenter).toContain('inset-block-end: calc(.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(share).toContain('inset-block-end: calc(7.75rem + env(safe-area-inset-bottom, 0px))');
-    expect(share).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px))');
-    expect(compass).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
-    expect(sos).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
-    // 48px controls keep an 8px gap in either direction and fit at 320px.
-    expect(4.25 - (.75 + 3)).toBe(.5);
-    expect(7.75 - (4.25 + 3)).toBe(.5); // Broadcast clears the phone compass vertically.
-    expect(320 - (7.75 * 16 + 12 + 48)).toBeGreaterThan(12);
+  it("does not show manual broadcast controls on the map or in the companion dialog", () => {
+    expect(view).not.toContain('class="user-map-view__share"');
+    expect(view).not.toContain('@click="broadcast.toggle()"');
+    expect(view).toContain('void broadcast.refreshPriority()');
     expect(view).toContain('class="user-map-view__history-dialog"');
-    expect(view).toContain('class="user-map-view__history-body"');
-    expect(view).toContain('overflow-y: auto; overscroll-behavior: contain;');
-    expect(shell).toContain('inset-block-end: calc(4.25rem + env(safe-area-inset-bottom, 0px))');
     expect(view).toContain('id="map-tool-search" class="user-map-view__search-action"');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
-    const result = compileStyle({ source: descriptor.styles[0]!.content, id: "data-v-share", filename: "UserMapView.vue", scoped: true });
-    expect(result.errors).toEqual([]);
-    expect(result.code).toContain('.user-map-view__share[data-v-share]');
-    expect(result.code).toContain('.user-map-view__share--idle[data-v-share]');
-    expect(styleBlock(view, '.user-map-view__share--idle')).toContain('border-color: var(--bb-color-outline);');
+    expect(compileStyle({ source: descriptor.styles[0]!.content, id: "data-v-share", filename: "UserMapView.vue", scoped: true }).errors).toEqual([]);
   });
 
   it("keeps the inactive icon and outline readable in both themes against the adjacent primary fill", () => {

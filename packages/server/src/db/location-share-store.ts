@@ -83,6 +83,8 @@ export interface ReceivedLocationShareRecord extends LocationShareRecord {
 
 /** The minimum a realtime fan-out needs to know about one active outgoing share. */
 export interface ActiveOutgoingShare {
+  /** Start of this grant; used to exclude observations from before sharing. */
+  createdAt?: Date;
   targetUserId: string;
   priorityDeviceId: string | null;
 }
@@ -422,7 +424,8 @@ export class DrizzleLocationShareStore implements LocationShareStore {
     const rows = await this.db
       .select({
         targetUserId: locationShares.targetUserId,
-        priorityDeviceId: locationShares.priorityDeviceId
+        priorityDeviceId: locationShares.priorityDeviceId,
+        createdAt: locationShares.createdAt
       })
       .from(locationShares)
       .innerJoin(users, eq(users.id, locationShares.targetUserId))
@@ -436,7 +439,8 @@ export class DrizzleLocationShareStore implements LocationShareStore {
       .orderBy(desc(locationShares.createdAt));
     return rows.map((row) => ({
       targetUserId: row.targetUserId,
-      priorityDeviceId: row.priorityDeviceId ?? null
+      priorityDeviceId: row.priorityDeviceId ?? null,
+      createdAt: row.createdAt
     }));
   }
 
