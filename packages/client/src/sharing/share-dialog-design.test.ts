@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+import { HISTORY_PRESET_HOURS } from "./share-form";
 
 // Source contracts: sharing views are not mounted in this repository's unit tests.
 const dialog = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
@@ -65,6 +66,30 @@ describe("location share form design", () => {
     expect(dialog).toContain('durationMinutes.value = minutesForScaleValue(durationScale.value, value);');
   });
 
+  it("makes history presets easy to scan with an exact-window preview and progressive manual controls", () => {
+    const history = dialog.slice(dialog.indexOf('v-else-if="mode === \'history\'"'), dialog.indexOf('v-if="mode !== \'history\'"'));
+    expect(HISTORY_PRESET_HOURS).toEqual([1, 6, 12, 24, 72, 168]);
+    expect(history).toContain('role="group" aria-labelledby="share-history-presets-title"');
+    expect(history).toContain('class="share-dialog__presets share-dialog__history-presets"');
+    expect(history).toContain('durationWords(hours * 60)');
+    expect(history).toContain(':aria-pressed="activeHistoryPresetHours === hours"');
+    expect(history).toContain('class="share-dialog__history-summary" role="status" aria-live="polite"');
+    expect(history).toContain('historyPreview.fromLabel');
+    expect(history).toContain('historyPreview.toLabel');
+    expect(history).toContain('historyPreview?.includesFuture');
+    expect(history).toContain(':aria-expanded="historyCustomOpen"');
+    expect(history).toContain('v-show="historyCustomOpen" id="share-history-custom-fields"');
+    expect(history).toContain('class="share-dialog__advanced"');
+    expect(history).toContain('v-if="historyPointsError" class="share-dialog__validation" role="alert"');
+    expect(dialog).toContain('historyWindowPreview({ from: historyFrom, to: historyTo })');
+    expect(dialog).toContain('if (next === "history" && previous !== "history" && activeHistoryPresetHours.value !== null)');
+    expect(dialog).toContain('historyCustomOpen.value = false;');
+    expect(dateField).toContain('value !== props.modelValue');
+    expect(css).toContain('.share-dialog__presets.share-dialog__history-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }');
+    expect(css).toContain('.share-dialog__presets.share-dialog__history-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }');
+    expect(css).toContain('.share-dialog__history-fields, .share-dialog__history-window { grid-template-columns: minmax(0, 1fr); }');
+  });
+
   it("keeps mobile actions reachable and freezes editable controls while submitting", () => {
     expect(dialog).toContain(':fullscreen="fullscreen ?? $vuetify.display.xs"');
     expect(dialog).toContain('.share-dialog { height: 100dvh; max-height: 100dvh;');
@@ -72,6 +97,8 @@ describe("location share form design", () => {
     expect(dialog).toMatch(/<v-slider[\s\S]*?:disabled="submitting"[\s\S]*?@update:model-value="setSliderDuration\(\$event\)"/);
     expect(dialog).toContain(':disabled="submitting || isSelf(candidate) || (recipientsFull && !isSelected(candidate))"');
     expect(dialog).toMatch(/:disabled="submitting"\s+@click="applyHistoryPreset\(hours\)"/);
+    expect(dialog).toContain('prepend-icon="mdi-calendar-edit" :disabled="submitting"');
+    expect(dialog).toContain('summary :aria-disabled="submitting" @click="submitting && $event.preventDefault()"');
     expect(dialog).toMatch(/:disabled="submitting"\s+:max="historyToInput"/);
     expect(dateField).toContain('disabled?: boolean');
     expect(dateField).toContain(':disabled="disabled"');

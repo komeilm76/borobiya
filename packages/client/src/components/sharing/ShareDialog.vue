@@ -267,7 +267,11 @@
               </div>
 
               <div v-else-if="mode === 'history'" class="share-dialog__duration">
-                <div class="share-dialog__presets" role="group" aria-label="میان‌برهای بازهٔ تاریخچه">
+                <div class="share-dialog__history-heading">
+                  <p id="share-history-presets-title" class="share-dialog__label">چه بخشی از مسیر را می‌بینند؟</p>
+                  <span>میان‌برهای اخیر، تا همین لحظه</span>
+                </div>
+                <div class="share-dialog__presets share-dialog__history-presets" role="group" aria-labelledby="share-history-presets-title">
                   <button
                     v-for="hours in historyPresets"
                     :key="hours"
@@ -282,41 +286,71 @@
                   </button>
                 </div>
 
-                <div class="share-dialog__history-fields">
-                  <HistoryDateTimeField
-                    v-model="historyFromInput"
-                    label="از زمان"
-                    :disabled="submitting"
-                    :max="historyToInput"
-                    @update:model-value="activeHistoryPresetHours = null"
-                  />
-                  <HistoryDateTimeField
-                    v-model="historyToInput"
-                    label="تا زمان"
-                    :disabled="submitting"
-                    :min="historyFromInput"
-                    @update:model-value="activeHistoryPresetHours = null"
-                  />
+                <div v-if="historyPreview" class="share-dialog__history-summary" role="status" aria-live="polite">
+                  <div class="share-dialog__history-summary-head">
+                    <strong>بازهٔ انتخاب‌شده</strong>
+                    <span>{{ durationWords(historyPreview.durationMinutes) }}</span>
+                  </div>
+                  <dl class="share-dialog__history-window">
+                    <div><dt>شروع</dt><dd>{{ historyPreview.fromLabel }}</dd></div>
+                    <div><dt>پایان</dt><dd>{{ historyPreview.toLabel }}</dd></div>
+                  </dl>
+                  <p>زمان‌ها به وقت دستگاه شما و با تاریخ میلادی نمایش داده می‌شوند.</p>
                 </div>
+                <v-alert v-if="historyPreview?.includesFuture" type="warning" variant="tonal" density="compact"
+                  class="share-dialog__history-future" role="status">
+                  زمان پایان در آینده است؛ نقاط تازه‌ای که تا آن زمان ثبت شوند نیز برای همراهان قابل دیدن خواهند بود.
+                </v-alert>
 
+                <v-btn class="share-dialog__history-custom-toggle" variant="tonal" color="primary" rounded="lg"
+                  prepend-icon="mdi-calendar-edit" :disabled="submitting" :aria-expanded="historyCustomOpen"
+                  aria-controls="share-history-custom-fields" @click="historyCustomOpen = !historyCustomOpen">
+                  {{ historyCustomOpen ? 'بستن انتخاب دستی' : 'انتخاب بازهٔ دلخواه' }}
+                </v-btn>
+                <v-expand-transition>
+                  <div v-show="historyCustomOpen" id="share-history-custom-fields" class="share-dialog__history-custom">
+                    <p>شروع و پایان را جداگانه تعیین کنید؛ هر تاریخ و ساعت با زمان محلی دستگاه شما تفسیر می‌شود.</p>
+                    <div class="share-dialog__history-fields">
+                      <HistoryDateTimeField
+                        v-model="historyFromInput"
+                        label="شروع بازه"
+                        :disabled="submitting"
+                        :max="historyToInput"
+                        @update:model-value="activeHistoryPresetHours = null"
+                      />
+                      <HistoryDateTimeField
+                        v-model="historyToInput"
+                        label="پایان بازه"
+                        :disabled="submitting"
+                        :min="historyFromInput"
+                        @update:model-value="activeHistoryPresetHours = null"
+                      />
+                    </div>
+                  </div>
+                </v-expand-transition>
                 <p v-if="historyRangeError" class="share-dialog__validation" role="alert">{{ historyRangeError }}</p>
-                <v-text-field
-                  v-model="historyMaxPointsInput"
-                  class="share-dialog__points"
-                  type="number"
-                  min="1"
-                  :max="maxHistoryPoints"
-                  density="comfortable"
-                  variant="outlined"
-                  rounded="lg"
-                  clearable
-                  hint="خالی بگذارید تا تعداد نقاط به‌صورت پیش‌فرض تعیین شود."
-                  persistent-hint
-                  label="حداکثر تعداد نقاط (اختیاری)"
-                  :error-messages="historyPointsError ?? ''"
-                  :disabled="submitting"
-                  :placeholder="`مثلاً ۱۰۰۰ (سقف ${maxHistoryPoints})`"
-                />
+
+                <details class="share-dialog__advanced">
+                  <summary :aria-disabled="submitting" @click="submitting && $event.preventDefault()"><v-icon icon="mdi-chevron-down" size="20" aria-hidden="true" /> تنظیم پیشرفته <span>محدود کردن تعداد نقاط مسیر (اختیاری)</span></summary>
+                  <v-text-field
+                    v-model="historyMaxPointsInput"
+                    class="share-dialog__points"
+                    type="number"
+                    min="1"
+                    :max="maxHistoryPoints"
+                    density="comfortable"
+                    variant="outlined"
+                    rounded="lg"
+                    clearable
+                    hint="خالی بگذارید تا تعداد نقاط به‌صورت پیش‌فرض تعیین شود."
+                    persistent-hint
+                    label="حداکثر تعداد نقاط (اختیاری)"
+                    :error-messages="historyPointsError ?? ''"
+                    :disabled="submitting"
+                    :placeholder="`مثلاً ۱۰۰۰ (سقف ${maxHistoryPoints})`"
+                  />
+                </details>
+                <p v-if="historyPointsError" class="share-dialog__validation" role="alert">{{ historyPointsError }}</p>
               </div>
             </div>
 
@@ -425,6 +459,7 @@ import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
 import { createLocationHistoryShare, createLocationShare } from "@/api/location";
 import { historyWindowFromInputs, isoToLocalInput } from "@/history/playback";
+import { historyWindowPreview } from "@/sharing/history-window-presentation";
 import { avatarInitial } from "@/live/avatar-initial";
 import { durationRange, minutesForScaleValue, scaleForPreset, scaleValueForMinutes, type DurationScale } from "@/sharing/duration-slider";
 import HistoryDateTimeField from "@/components/sharing/HistoryDateTimeField.vue";
@@ -533,6 +568,7 @@ const recipients = ref<UserSearchResult[]>([]);
 
 const initialHistoryWindow = historyPresetWindow(24);
 const activeHistoryPresetHours = ref<number | null>(24);
+const historyCustomOpen = ref(false);
 const historyPresetSelection = ref(initialHistoryWindow);
 const historyFromInput = ref(isoToLocalInput(initialHistoryWindow.from));
 const historyToInput = ref(isoToLocalInput(initialHistoryWindow.to));
@@ -591,6 +627,7 @@ const draft = computed<ShareDraft>(() => {
 });
 
 function applyHistoryPreset(hours: number): void {
+  historyCustomOpen.value = false;
   activeHistoryPresetHours.value = hours;
   const window = historyPresetWindow(hours);
   historyPresetSelection.value = window;
@@ -610,6 +647,10 @@ const historyRangeError = computed(() => {
 const historyPointsError = computed(() => {
   const issue = issues.value.find(({ code }) => code === "history_points_out_of_range");
   return issue ? issueText(issue.code) : null;
+});
+const historyPreview = computed(() => {
+  const { historyFrom, historyTo } = draft.value;
+  return historyFrom && historyTo ? historyWindowPreview({ from: historyFrom, to: historyTo }) : null;
 });
 const canSubmit = computed(() => !submitting.value && canSubmitShareDraft(draft.value));
 const statusText = computed(() => {
@@ -768,6 +809,12 @@ function close(): void {
   invalidateSubmission();
   emit("update:modelValue", false);
 }
+
+watch(mode, (next, previous) => {
+  if (next === "history" && previous !== "history" && activeHistoryPresetHours.value !== null) {
+    applyHistoryPreset(activeHistoryPresetHours.value);
+  }
+});
 
 watch(
   () => props.modelValue,
@@ -970,12 +1017,35 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 
 .share-dialog__duration { min-width: 0; }
 
-.share-dialog__history-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  gap: var(--bb-rhythm-r065);
-  margin-top: var(--bb-rhythm-r075);
+.share-dialog__presets.share-dialog__history-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.share-dialog__history-presets .share-dialog__chip { min-width: 0; min-height: 48px; border-radius: 12px; font-size: var(--bb-sharing-font-label); }
+.share-dialog__history-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: var(--bb-rhythm-r040); }
+.share-dialog__history-heading > span { color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); }
+.share-dialog__history-summary {
+  margin-top: var(--bb-rhythm-r100); padding: var(--bb-rhythm-r075) var(--bb-rhythm-r085);
+  border-radius: var(--bb-radius-nested); background: var(--bb-color-inset);
 }
+.share-dialog__history-summary-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--bb-rhythm-r050); }
+.share-dialog__history-summary-head span { color: var(--bb-color-primary); font-weight: var(--bb-weight-heavy); }
+.share-dialog__history-window { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bb-rhythm-r075); margin: var(--bb-rhythm-r060) 0 0; }
+.share-dialog__history-window > div { min-width: 0; }
+.share-dialog__history-window dt { color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); }
+.share-dialog__history-window dd { margin: 0; color: var(--bb-color-text); font-weight: var(--bb-weight-bold); overflow-wrap: anywhere; }
+.share-dialog__history-summary > p { margin: var(--bb-rhythm-r060) 0 0; color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); }
+.share-dialog__history-future { margin-top: var(--bb-rhythm-r060); }
+.share-dialog__history-custom-toggle { margin-top: var(--bb-rhythm-r075); min-height: 44px; }
+.share-dialog__history-custom { margin-top: var(--bb-rhythm-r075); }
+.share-dialog__history-custom > p { margin: 0; color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); line-height: 1.7; }
+.share-dialog__history-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bb-rhythm-r065); margin-top: var(--bb-rhythm-r075); }
+.share-dialog__advanced { margin-top: var(--bb-rhythm-r085); }
+.share-dialog__advanced summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--bb-rhythm-r040);
+  min-height: 44px; color: var(--bb-color-primary); cursor: pointer; font-weight: var(--bb-weight-bold); list-style: none;
+}
+.share-dialog__advanced summary::-webkit-details-marker { display: none; }
+.share-dialog__advanced[open] summary :deep(.v-icon) { transform: rotate(180deg); }
+.share-dialog__advanced summary span { color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); font-weight: normal; }
+.share-dialog__advanced summary:focus-visible { outline: 2px solid var(--bb-color-text); outline-offset: 2px; }
 
 .share-dialog__duration-value {
   flex: none; color: var(--bb-color-text); font-size: 1.12rem; font-weight: var(--bb-weight-heavy);
@@ -1098,6 +1168,8 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   .share-dialog__body { padding: var(--bb-rhythm-r075) var(--bb-rhythm-r085); }
   .share-dialog__section-head { margin-bottom: var(--bb-rhythm-r060); }
   .share-dialog__presets.share-dialog__live-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .share-dialog__presets.share-dialog__history-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .share-dialog__history-fields, .share-dialog__history-window { grid-template-columns: minmax(0, 1fr); }
   .share-dialog__custom-head { flex-wrap: wrap; }
   .share-dialog__duration-value { text-align: start; }
   .share-dialog__actions { padding-bottom: calc(var(--bb-rhythm-r075) + env(safe-area-inset-bottom, 0px)); }

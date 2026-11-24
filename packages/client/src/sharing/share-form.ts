@@ -278,7 +278,7 @@ export interface HistoryWindow {
   maxPoints?: number | null;
 }
 
-export const HISTORY_PRESET_HOURS: readonly number[] = [1, 6, 24, 72, 7 * 24];
+export const HISTORY_PRESET_HOURS: readonly number[] = [1, 6, 12, 24, 72, 7 * 24];
 
 export function historyPresetWindow(hours: number, nowMs = Date.now()): { from: string; to: string } {
   const clampedHours = Number.isFinite(hours) && hours > 0 ? hours : 1;

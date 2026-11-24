@@ -2,11 +2,12 @@
   <div class="history-date-time">
     <span class="history-date-time__label">{{ label }}</span>
     <div class="history-date-time__controls">
-      <v-dialog v-model="calendarOpen" :fullscreen="$vuetify.display.smAndDown" max-width="360" scrollable>
+      <v-dialog v-model="calendarOpen" :fullscreen="$vuetify.display.smAndDown" max-width="360" scrollable :aria-label="`${label}، تاریخ میلادی`">
         <template #activator="{ props: activator }">
           <v-text-field
             :model-value="dateLabel"
-            :label="`${label}، تاریخ میلادی`"
+            label="تاریخ"
+            :aria-label="`${label}، تاریخ میلادی`"
             prepend-inner-icon="mdi-calendar-month-outline"
             readonly
             :disabled="disabled"
@@ -32,11 +33,12 @@
           <v-card-actions><v-spacer /><v-btn variant="text" @click="calendarOpen = false">بستن</v-btn></v-card-actions>
         </v-card>
       </v-dialog>
-      <v-dialog v-model="clockOpen" max-width="360" scrollable>
+      <v-dialog v-model="clockOpen" max-width="360" scrollable :aria-label="`${label}، ساعت`">
         <template #activator="{ props: activator }">
           <v-text-field
             :model-value="modelValue.slice(11)"
-            :label="`${label}، ساعت`"
+            label="ساعت"
+            :aria-label="`${label}، ساعت`"
             prepend-inner-icon="mdi-clock-outline"
             readonly
             :disabled="disabled"
@@ -86,20 +88,20 @@ function chooseDate(date: unknown): void {
   if (props.disabled) return;
   const value = withPickerDate(props.modelValue, date);
   if (value === null) return;
-  emit("update:modelValue", value);
+  if (value !== props.modelValue) emit("update:modelValue", value);
   calendarOpen.value = false;
 }
 function chooseTime(time: unknown): void {
   if (props.disabled) return;
   const value = withPickerTime(props.modelValue, time);
-  if (value !== null) emit("update:modelValue", value);
+  if (value !== null && value !== props.modelValue) emit("update:modelValue", value);
 }
 </script>
 
 <style scoped>
 .history-date-time { min-width: 0; }
 .history-date-time__label { display: block; color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); font-weight: var(--bb-weight-bold); margin-bottom: var(--bb-rhythm-r035); }
-.history-date-time__controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--bb-rhythm-r050); }
+.history-date-time__controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(6.5rem, .6fr); gap: var(--bb-rhythm-r050); }
 .history-date-time__controls :deep(.v-field__input) { min-width: 0; }
 .history-date-time__picker { min-height: 0; }
 .history-date-time__picker :deep(.v-card-text) { min-height: 0; overflow-y: auto; padding: var(--bb-rhythm-r050); }
