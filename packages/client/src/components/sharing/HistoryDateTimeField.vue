@@ -9,8 +9,10 @@
             :label="`${label}، تاریخ میلادی`"
             prepend-inner-icon="mdi-calendar-month-outline"
             readonly
-            density="compact"
+            :disabled="disabled"
+            density="comfortable"
             variant="outlined"
+            rounded="lg"
             hide-details
             v-bind="activator"
           />
@@ -37,8 +39,10 @@
             :label="`${label}، ساعت`"
             prepend-inner-icon="mdi-clock-outline"
             readonly
-            density="compact"
+            :disabled="disabled"
+            density="comfortable"
             variant="outlined"
+            rounded="lg"
             hide-details
             v-bind="activator"
           />
@@ -67,7 +71,7 @@
 import { computed, ref } from "vue";
 import { dateForPicker, withPickerDate, withPickerTime } from "@/sharing/history-date-time";
 
-const props = defineProps<{ label: string; modelValue: string; min?: string; max?: string }>();
+const props = defineProps<{ label: string; modelValue: string; min?: string; max?: string; disabled?: boolean }>();
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 const calendarOpen = ref(false);
 const clockOpen = ref(false);
@@ -79,12 +83,14 @@ const clockMin = computed(() => props.min?.slice(0, 10) === props.modelValue.sli
 const clockMax = computed(() => props.max?.slice(0, 10) === props.modelValue.slice(0, 10) ? props.max.slice(11) : undefined);
 
 function chooseDate(date: unknown): void {
+  if (props.disabled) return;
   const value = withPickerDate(props.modelValue, date);
   if (value === null) return;
   emit("update:modelValue", value);
   calendarOpen.value = false;
 }
 function chooseTime(time: unknown): void {
+  if (props.disabled) return;
   const value = withPickerTime(props.modelValue, time);
   if (value !== null) emit("update:modelValue", value);
 }

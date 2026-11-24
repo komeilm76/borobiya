@@ -6,7 +6,7 @@ const source = readFileSync(new URL("../components/sharing/ShareDialog.vue", imp
 describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
   it("does not call a debouncing or failed recipient search verified empty", () => {
     const hint = source.split('id="share-recipient-hint"')[1]?.split("</p>")[0];
-    const empty = source.split('<v-alert\n            v-else-if="')[1]?.split('class="mt-2"')[0];
+    const empty = source.match(/<v-alert\s+v-else-if="([\s\S]*?)"\s+class="mt-2"/)?.[1];
     expect(hint).toContain('v-else-if="searchFailed"');
     expect(empty).toContain("!searchFailed && !searching");
     expect(empty).toContain("(termTooShort || searchVerified)");
@@ -70,7 +70,7 @@ describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
   it("keeps the multi-device chooser scrollable with reachable actions on short phones", () => {
     const chooser = source.split('<v-dialog v-model="deviceChooserOpen"')[1]?.split('</v-dialog>')[0];
     expect(chooser).toBeDefined();
-    expect(source).toContain('<v-dialog v-model="deviceChooserOpen" max-width="480" scrollable persistent>');
+    expect(source).toContain('<v-dialog v-model="deviceChooserOpen" max-width="480" scrollable persistent aria-labelledby="share-device-title">');
     expect(chooser).toContain('<v-card-text class="share-device-chooser__body">');
     expect(source).toContain('.share-device-chooser__body { min-height: 0; overflow-y: auto; }');
     expect(source).toContain('.share-device-chooser__body :deep(.v-label) { white-space: normal; overflow-wrap: anywhere; }');

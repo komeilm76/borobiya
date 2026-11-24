@@ -15,7 +15,7 @@ describe("compact recipient search", () => {
     expect(dialog).toContain('candidate.isOnline');
     expect(dialog).toContain('candidate.distance');
     expect(dialog).toContain('avatarInitial(candidate.username)');
-    expect(dialog).toContain(':disabled="isSelf(candidate) || (recipientsFull && !isSelected(candidate))"');
+    expect(dialog).toContain(':disabled="submitting || isSelf(candidate) || (recipientsFull && !isSelected(candidate))"');
     expect(dialog).toContain(':aria-pressed="isSelected(candidate)"');
     expect(dialog).toContain('min-width: 44px; min-height: 44px;');
     expect(dialog).toContain('max-width: var(--bb-content-width-sharingDialog);'); // Keep fullscreen desktop content readable.
