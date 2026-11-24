@@ -54,7 +54,8 @@ describe("floating map action shape", () => {
     expect(rule(admin, ".dispatch-map-choices")).toContain("width: min(17rem, calc(100% - 44px - 2.75rem));");
     expect(rule(admin, ".admin-dispatch__map-and-actions .dispatch-map-choices"))
       .toContain("right: calc(44px + 2rem);");
-    const phone = admin.slice(admin.lastIndexOf("@media (max-width: 900px) {"));
+    const phone = admin.slice(admin.indexOf("@media (max-width: 900px) {",
+      admin.indexOf(".dispatch-place-marker::after")));
     expect(rule(phone, ".admin-dispatch__map-and-actions .dispatch-map-choices"))
       .not.toContain("right:");
   });

@@ -49,7 +49,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
   it("keeps SOS rows compact and legible, with accessible icon-only location and a distinct status badge", () => {
     const markup = template!.content;
     const queue = markup.slice(markup.indexOf('id="dispatch-list-02"'), markup.indexOf('</v-list>', markup.indexOf('id="dispatch-list-02"')));
-    expect(markup).toContain('<v-icon icon="mdi-alarm-light" color="error" size="20" aria-hidden="true" /> صف درخواست‌های اضطراری');
+    expect(markup).toContain('<span class="admin-dispatch__section-number" aria-hidden="true">۰۱</span><span>صف درخواست‌های اضطراری</span>');
     expect(queue).toContain('class="dispatch-request-row__details"');
     expect(queue).toContain('statusMeta(item.status).icon');
     expect(queue).toContain('statusMeta(item.status).queueLabel');

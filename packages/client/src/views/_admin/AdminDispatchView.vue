@@ -21,12 +21,23 @@
           aria-label="بستن نتیجهٔ ارسال پیشنهاد" @click="adminSos.dispatchFeedback = null" />
       </template>
     </v-snackbar>
-    <aside id="dispatch-sidebar" class="admin-dispatch__sidebar" aria-label="صف SOS و امدادگران نزدیک">
+    <aside id="dispatch-sidebar" class="admin-dispatch__sidebar"
+      :class="{ 'admin-dispatch__sidebar--expanded': compactDispatch && sheetExpanded }"
+      aria-label="صف SOS و امدادگران نزدیک">
     <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
-        <div class="admin-dispatch__heading d-flex align-center ga-2">
-          <v-icon color="error" icon="mdi-radar" size="24" />
-          <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
+        <div class="admin-dispatch__heading">
+          <span class="admin-dispatch__brand-icon" aria-hidden="true"><v-icon icon="mdi-radar" size="23" /></span>
+          <div class="admin-dispatch__heading-copy">
+            <span class="admin-dispatch__eyebrow">عملیات اضطراری <span aria-hidden="true">/</span> SOS</span>
+            <h1>مرکز پایش و اعزام اضطراری (SOS)</h1>
+          </div>
+          <button id="dispatch-sheet-size" v-if="compactDispatch" type="button" class="admin-dispatch__sheet-size"
+            :aria-expanded="sheetExpanded" aria-controls="dispatch-sidebar-content"
+            :aria-label="sheetExpanded ? 'کوچک کردن پنل اعزام و نمایش نقشه' : 'باز کردن پنل اعزام'"
+            @click="sheetExpanded = !sheetExpanded">
+            <v-icon :icon="sheetExpanded ? 'mdi-chevron-down' : 'mdi-arrow-expand-vertical'" size="20" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
@@ -91,6 +102,23 @@
       </div>
     </header>
 
+    <nav v-if="compactDispatch" class="admin-dispatch__sheet-nav" aria-label="مراحل اعزام">
+      <button id="dispatch-sheet-queue" type="button" :class="{ 'is-active': sheetTab === 'queue' }"
+        :aria-current="sheetTab === 'queue' ? 'step' : undefined" aria-controls="dispatch-queue-region"
+        @click="selectSheetTab('queue')">
+        <v-icon icon="mdi-format-list-bulleted" size="18" aria-hidden="true" />
+        <span>درخواست‌ها</span>
+        <span class="admin-dispatch__sheet-count">{{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }}</span>
+      </button>
+      <button id="dispatch-sheet-responders" type="button" :class="{ 'is-active': sheetTab === 'responders' }"
+        :aria-current="sheetTab === 'responders' ? 'step' : undefined" aria-controls="dispatch-nearby"
+        @click="selectSheetTab('responders')">
+        <v-icon icon="mdi-account-search-outline" size="18" aria-hidden="true" />
+        <span>امدادگران</span>
+        <span v-if="adminSos.selectedResponderIds.length" class="admin-dispatch__sheet-count">{{ adminSos.selectedResponderIds.length.toLocaleString('fa-IR') }}</span>
+      </button>
+    </nav>
+    <div id="dispatch-sidebar-content" class="admin-dispatch__content">
     <v-alert id="dispatch-notice-02"
       v-if="adminSos.errorMessage"
       class="mb-4"
@@ -133,10 +161,12 @@
       </div>
     </section>
 
-    <section id="dispatch-queue-region" class="admin-dispatch__queue" aria-label="صف درخواست‌ها">
+    <section id="dispatch-queue-region" class="admin-dispatch__queue"
+      :class="{ 'admin-dispatch__section--hidden': compactDispatch && sheetTab !== 'queue' }"
+      aria-label="صف درخواست‌ها">
         <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
-            <span class="admin-dispatch__card-heading"><v-icon icon="mdi-alarm-light" color="error" size="20" aria-hidden="true" /> صف درخواست‌های اضطراری</span>
+            <span class="admin-dispatch__card-heading"><span class="admin-dispatch__section-number" aria-hidden="true">۰۱</span><span>صف درخواست‌های اضطراری</span></span>
             <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" size="small" variant="tonal">
               {{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }} مورد در این نما
             </v-chip>
@@ -206,7 +236,9 @@
         </v-card>
     </section>
 
-        <section id="dispatch-nearby" class="admin-dispatch__nearby" aria-label="امدادگران نزدیک">
+        <section id="dispatch-nearby" class="admin-dispatch__nearby"
+          :class="{ 'admin-dispatch__section--hidden': compactDispatch && sheetTab !== 'responders' }"
+          aria-label="امدادگران نزدیک">
           <div v-if="!adminSos.selectedRequest" class="admin-dispatch__nearby-empty" role="status">
             <strong>امدادگران نزدیک</strong>
             <span>برای مشاهدهٔ امدادگران واجد شرایط، یک درخواست SOS انتخاب کنید.</span>
@@ -215,7 +247,7 @@
           class="admin-dispatch__surface admin-dispatch__responders bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <div class="d-flex align-center ga-2">
-              <v-icon color="primary" icon="mdi-account-group-outline" />
+              <span class="admin-dispatch__section-number" aria-hidden="true">۰۲</span>
               <span>{{ adminSos.responderSearch ? 'جست‌وجوی دستی' : 'امدادگران واجد شرایط نزدیک' }}</span>
               <v-chip id="dispatch-chip-02" v-if="adminSos.nearestLoaded && !adminSos.nearestLoading" color="primary" size="x-small" variant="tonal">
                 {{ adminSos.nearestResponders.length }} نفر
@@ -370,6 +402,7 @@
           </v-card-actions>
         </v-card>
         </section>
+    </div>
     </aside>
     <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
         <section id="dispatch-search" class="admin-dispatch__search" aria-label="جست‌وجو روی نقشه">
@@ -719,7 +752,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useMediaQuery } from "@vueuse/core";
 import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker as MapLibreMarker } from "maplibre-gl";
@@ -1086,6 +1119,18 @@ async function testSound(): Promise<void> {
   }
 }
 const compactDispatch = useMediaQuery("(max-width: 900px)");
+const sheetTab = ref<"queue" | "responders">("queue");
+const sheetExpanded = ref(false);
+watch(compactDispatch, () => { sheetTab.value = "queue"; sheetExpanded.value = false; });
+function selectSheetTab(tab: "queue" | "responders"): void {
+  sheetTab.value = tab;
+  if (tab === "responders") sheetExpanded.value = true;
+  // Each worklist starts at its heading, not the previous tab's scroll offset.
+  void nextTick(() => {
+    const content = document.getElementById("dispatch-sidebar-content");
+    if (content) content.scrollTop = 0;
+  });
+}
 const incidentExpanded = ref(!compactDispatch.value);
 watch(compactDispatch, (compact) => { incidentExpanded.value = !compact; });
 function toggleIncidentPanel(): void {
@@ -1676,6 +1721,7 @@ function quickRedispatch(requestId: string): void {
 }
 
 function focusReplacement(requestId: string): void {
+  if (compactDispatch.value) { selectSheetTab("queue"); sheetExpanded.value = true; }
   adminSos.setFilterStatus("pending");
   const item = adminSos.requests.find((request) => request.id === requestId);
   if (item) focusRequest(item);
@@ -1692,6 +1738,7 @@ function toggleQueueRequest(item: SosRequestRecord): void {
     return;
   }
   focusRequest(item);
+  if (compactDispatch.value) selectSheetTab("responders");
 }
 
 function focusRequest(item: SosRequestRecord): void {
@@ -1754,6 +1801,11 @@ function focusNearbyResponder(userId: string): void {
 
 function focusResponders(): void {
   if (!adminSos.selectedRequest) return;
+  if (compactDispatch.value && (sheetTab.value !== "responders" || !sheetExpanded.value)) {
+    selectSheetTab("responders");
+    void nextTick(focusResponders);
+    return;
+  }
   const target = document.getElementById("dispatch-responders");
   if (!target) return;
   target.focus({ preventScroll: true });
@@ -3045,5 +3097,148 @@ onBeforeUnmount(() => {
   .admin-dispatch__queue .dispatch-request-list, .admin-dispatch__responders .responder-list {
     max-height: 10rem;
   }
+}
+
+/* Dispatch rail: one calm surface with a clear hierarchy. Only actionable
+   incident/responder rows are inset; the worklists themselves are not cards. */
+#dispatch-sidebar.admin-dispatch__sidebar {
+  overflow: hidden;
+  padding-inline: .8rem;
+  box-shadow: -12px 0 32px rgba(15, 40, 46, .08);
+}
+.admin-dispatch__header { padding: .8rem .35rem .7rem; margin-bottom: 0 !important; }
+.admin-dispatch__intro { margin-bottom: .8rem; }
+.admin-dispatch__heading { display: flex; align-items: center; gap: .7rem; min-width: 0; }
+.admin-dispatch__brand-icon {
+  display: grid; place-items: center; flex: none; width: 2.6rem; height: 2.6rem;
+  border-radius: .85rem; color: rgb(var(--v-theme-error));
+  background: rgba(var(--v-theme-error), .1);
+}
+.admin-dispatch__heading-copy { min-width: 0; }
+.admin-dispatch__eyebrow {
+  display: block; color: var(--bb-color-muted); font-size: .8rem;
+  line-height: 1.4; letter-spacing: .02em;
+}
+.admin-dispatch__heading h1 { margin: .1rem 0 0; font-size: 1.02rem !important; line-height: 1.5; font-weight: 800; }
+.admin-dispatch__eyebrow span { padding-inline: .2rem; opacity: .6; }
+.admin-dispatch__toolbar { gap: .45rem; }
+.admin-dispatch__toolbar-actions { gap: .2rem; }
+#dispatch-sidebar .admin-dispatch__toolbar-actions :deep(.v-btn) {
+  border-radius: .7rem; background: var(--bb-color-inset);
+}
+#dispatch-sidebar .admin-dispatch__content {
+  display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0;
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+}
+#dispatch-sidebar .admin-dispatch__queue,
+#dispatch-sidebar .admin-dispatch__nearby { min-height: 0; }
+#dispatch-sidebar .admin-dispatch__queue { border-top: 1px solid var(--bb-color-outline); padding-top: .55rem; }
+#dispatch-sidebar .admin-dispatch__nearby { border-top: 1px solid var(--bb-color-outline); padding-top: .55rem; }
+#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-title) { padding: .4rem .35rem .45rem; }
+.admin-dispatch__section-number {
+  display: inline-grid; place-items: center; width: 1.65rem; height: 1.65rem;
+  flex: none; border-radius: .55rem; color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), .1); font-size: .8rem; font-weight: 800;
+}
+#dispatch-sidebar .dispatch-request-list,
+#dispatch-sidebar .responder-list { scrollbar-width: thin; }
+#dispatch-sidebar .dispatch-request-row,
+#dispatch-sidebar .dispatch-responder-row {
+  box-shadow: none; transition: border-color .16s, background-color .16s, box-shadow .16s;
+}
+#dispatch-sidebar .dispatch-request-row:hover,
+#dispatch-sidebar .dispatch-responder-row:hover { box-shadow: 0 3px 12px rgba(14, 42, 45, .07); }
+:global(:root.dark #dispatch-sidebar .dispatch-request-row),
+:global(:root.dark #dispatch-sidebar .dispatch-responder-row) { box-shadow: none !important; }
+#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__content) { gap: .25rem; }
+#dispatch-sidebar .dispatch-request-row__name { font-weight: 750; }
+#dispatch-sidebar .admin-dispatch__submit {
+  margin-top: auto; padding: .65rem .35rem .5rem !important;
+  border-top: 1px solid var(--bb-color-outline);
+  background: rgb(var(--v-theme-surface));
+}
+#dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 42px; padding-inline: .75rem; }
+#dispatch-sidebar .admin-dispatch__sheet-nav { display: none; }
+#dispatch-sidebar .admin-dispatch__sheet-size { display: none; }
+#dispatch-sidebar .admin-dispatch__sheet-nav button:focus-visible,
+#dispatch-sidebar .admin-dispatch__sheet-size:focus-visible {
+  outline: 3px solid var(--bb-color-primary); outline-offset: -3px;
+}
+@media (max-width: 900px) {
+  #dispatch-sidebar.admin-dispatch__sidebar {
+    display: flex; flex-direction: column;
+    padding: .35rem max(.85rem, env(safe-area-inset-right, 0px))
+      max(.45rem, env(safe-area-inset-bottom, 0px)) max(.85rem, env(safe-area-inset-left, 0px));
+    border-radius: 1.15rem 1.15rem 0 0; box-shadow: 0 -12px 35px rgba(12, 34, 42, .18);
+    transition: height .24s ease;
+  }
+  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(82dvh, 46rem); }
+  #dispatch-sidebar .admin-dispatch__header { flex: none; padding: 0 0 .45rem; }
+  #dispatch-sidebar .admin-dispatch__intro { display: block; margin-bottom: .45rem; }
+  #dispatch-sidebar .admin-dispatch__heading { gap: .5rem; }
+  #dispatch-sidebar .admin-dispatch__brand-icon { width: 2.2rem; height: 2.2rem; border-radius: .7rem; }
+  #dispatch-sidebar .admin-dispatch__heading h1 {
+    font-size: .87rem !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #dispatch-sidebar .admin-dispatch__eyebrow { font-size: .8rem; }
+  #dispatch-sidebar .admin-dispatch__sheet-size {
+    display: grid; place-items: center; flex: none; width: 44px; height: 44px;
+    margin-inline-start: auto; border: 0; border-radius: .75rem;
+    background: var(--bb-color-inset); color: var(--bb-color-text); cursor: pointer;
+  }
+  #dispatch-sidebar .admin-dispatch__toolbar { gap: .35rem; }
+  #dispatch-sidebar .admin-dispatch__toolbar-actions { gap: .15rem; }
+  #dispatch-sidebar .admin-dispatch__filter-select { width: 100%; }
+  #dispatch-sidebar .admin-dispatch__sheet-nav {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: none; padding: .15rem 0 .4rem; gap: .3rem;
+  }
+  #dispatch-sidebar .admin-dispatch__sheet-nav button {
+    display: flex; align-items: center; justify-content: center; gap: .35rem;
+    min-width: 0; min-height: 44px; padding: .3rem .45rem;
+    border: 0; border-bottom: 2px solid transparent; border-radius: .55rem .55rem 0 0;
+    color: var(--bb-color-muted); background: transparent;
+    font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer;
+  }
+  #dispatch-sidebar .admin-dispatch__sheet-nav button.is-active {
+    color: var(--bb-color-primary); border-bottom-color: var(--bb-color-primary);
+    background: rgba(var(--v-theme-primary), .07);
+  }
+  #dispatch-sidebar .admin-dispatch__sheet-count {
+    display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem;
+    padding-inline: .2rem; border-radius: 999px;
+    background: rgba(var(--v-theme-primary), .12); font-size: .8rem;
+  }
+  #dispatch-sidebar .admin-dispatch__content { flex: 1 1 auto; overflow-y: auto; }
+  #dispatch-sidebar .admin-dispatch__section--hidden { display: none; }
+  #dispatch-sidebar .admin-dispatch__queue,
+  #dispatch-sidebar .admin-dispatch__nearby { flex: none; border-top: 1px solid var(--bb-color-outline); }
+  #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list,
+  #dispatch-sidebar .admin-dispatch__responders .responder-list {
+    max-height: none; overflow: visible;
+  }
+  #dispatch-sidebar .admin-dispatch__queue > #dispatch-queue,
+  #dispatch-sidebar .admin-dispatch__nearby > #dispatch-responders { height: auto; }
+  /* Vuetify cards normally clip descendants; let the action bar stick to
+     the sheet's scrollport while the responder rows move underneath it. */
+  #dispatch-sidebar .admin-dispatch__responders { overflow: visible !important; }
+  #dispatch-sidebar .admin-dispatch__submit { position: sticky; bottom: 0; }
+  #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; }
+  #dispatch-sidebar .admin-dispatch__responder-search :deep(.v-btn) { min-height: 44px; }
+}
+@media (max-width: 480px) {
+  #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { width: 100%; }
+  #dispatch-sidebar .admin-dispatch__submit { justify-content: stretch !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #dispatch-sidebar.admin-dispatch__sidebar,
+  #dispatch-sidebar .dispatch-request-row,
+  #dispatch-sidebar .dispatch-responder-row { transition: none; }
+}
+@media (forced-colors: active) {
+  #dispatch-sidebar .admin-dispatch__sheet-nav button.is-active { outline: 2px solid Highlight; }
+  #dispatch-sidebar .admin-dispatch__sheet-size,
+  #dispatch-sidebar .admin-dispatch__brand-icon,
+  #dispatch-sidebar .admin-dispatch__section-number { border: 1px solid CanvasText; }
 }
 </style>
