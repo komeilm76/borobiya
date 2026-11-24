@@ -16,17 +16,18 @@ describe("simplified location-sharing dialog", () => {
     expect(dialog).toContain("onlineFilter === 'online'"); // Optional online-only narrowing remains.
   });
 
-  it("keeps four live shortcuts alongside a custom slider that reaches 30 days", () => {
-    expect(DURATION_PRESET_MINUTES).toEqual([15, 60, 360]);
+  it("offers six quick durations, a separate indefinite choice, and linear custom minute/hour/day ranges", () => {
+    expect(DURATION_PRESET_MINUTES).toEqual([15, 60, 360, 1440, 4320, 10080]);
     expect(dialog).toContain('const durationMinutes = ref(60)');
-    expect(dialog).toContain('role="group" aria-label="مدت دسترسی به موقعیت زنده"');
+    expect(dialog).toContain('role="group" aria-labelledby="share-duration-title"');
     expect(dialog).toContain('v-for="minutes in presets"');
     expect(dialog).toContain('@click="chooseLiveDuration(null)"');
-    expect(dialog).toContain('تا وقتی خاموش کنم');
+    expect(dialog).toContain('پایان خودکار ندارد');
     expect(dialog).toContain('chooseLiveDuration(minutes)');
     expect(dialog).toContain('<v-slider');
-    expect(dialog).toContain(':max="DURATION_SLIDER_MAX"');
-    expect(dialog).toContain('@update:model-value="chooseLiveDuration(minutesForSliderStep($event))"');
+    expect(dialog).toContain(':min="durationRange(durationScale).min"');
+    expect(dialog).toContain(':max="durationRange(durationScale).max"');
+    expect(dialog).toContain('@update:model-value="setSliderDuration($event)"');
     expect(dialog).toContain('durationWords(maxMinutes)');
     expect(dialog).not.toContain('durationMinutes }} دقیقه');
   });

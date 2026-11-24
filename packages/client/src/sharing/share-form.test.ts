@@ -341,7 +341,7 @@ describe("duration wording", () => {
 
   it("labels every preset chip by the rule rather than as a raw minute count", () => {
     expect(DURATION_PRESET_MINUTES[0]).toBe(15);
-    expect(DURATION_PRESET_MINUTES).toEqual([15, 60, 360]);
+    expect(DURATION_PRESET_MINUTES).toEqual([15, 60, 360, 1440, 4320, 10080]);
     expect(DURATION_PRESET_MINUTES).toEqual([...DURATION_PRESET_MINUTES].sort((a, b) => a - b));
     expect(new Set(DURATION_PRESET_MINUTES).size).toBe(DURATION_PRESET_MINUTES.length);
     expect(DURATION_PRESET_MINUTES.every((minutes) => minutes >= 1 && minutes <= MAX_LOCATION_SHARE_MINUTES)).toBe(true);

@@ -47,11 +47,29 @@ describe("location share form design", () => {
     expect(dialog).toContain('buildLiveSharePayload(current)');
   });
 
+  it("makes temporary duration choices predictable without confusing them with indefinite access", () => {
+    const live = dialog.slice(dialog.indexOf('v-if="shareKind === \'live\'"'), dialog.indexOf('v-else-if="mode === \'history\'"'));
+    expect(live).toContain('class="share-dialog__presets share-dialog__live-presets"');
+    expect(live).toContain('class="share-dialog__ongoing"');
+    expect(live).toContain('v-if="mode !== \'permanent\'"');
+    expect(live).toContain('aria-label="واحد مدت دلخواه"');
+    expect(live).toContain('class="share-dialog__duration-value" role="status"');
+    expect(live).toContain(':model-value="scaleValueForMinutes(durationScale, durationMinutes)"');
+    expect(live).toContain(':aria-valuetext="durationWords(durationMinutes)"');
+    expect(live).toContain('minutesForScaleValue(durationScale, durationRange(durationScale).min)');
+    expect(live).toContain('minutesForScaleValue(durationScale, durationRange(durationScale).max)');
+    expect(css).toContain('.share-dialog__presets.share-dialog__live-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }');
+    expect(css).toContain('.share-dialog__presets.share-dialog__live-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }');
+    expect(dialog).toContain('durationScale.value = scaleForPreset(minutes);');
+    expect(dialog).toContain('durationMinutes.value = minutesForScaleValue(scale, scaleValueForMinutes(scale, durationMinutes.value));');
+    expect(dialog).toContain('durationMinutes.value = minutesForScaleValue(durationScale.value, value);');
+  });
+
   it("keeps mobile actions reachable and freezes editable controls while submitting", () => {
     expect(dialog).toContain(':fullscreen="fullscreen ?? $vuetify.display.xs"');
     expect(dialog).toContain('.share-dialog { height: 100dvh; max-height: 100dvh;');
     expect(dialog).toContain('env(safe-area-inset-bottom, 0px)');
-    expect(dialog).toContain(':disabled="submitting || mode === \'permanent\'"');
+    expect(dialog).toMatch(/<v-slider[\s\S]*?:disabled="submitting"[\s\S]*?@update:model-value="setSliderDuration\(\$event\)"/);
     expect(dialog).toContain(':disabled="submitting || isSelf(candidate) || (recipientsFull && !isSelected(candidate))"');
     expect(dialog).toMatch(/:disabled="submitting"\s+@click="applyHistoryPreset\(hours\)"/);
     expect(dialog).toMatch(/:disabled="submitting"\s+:max="historyToInput"/);

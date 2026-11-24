@@ -322,7 +322,7 @@ export function choiceDeviceOptionLabel(
 }
 
 /** Live-share choices (permanent is a separate mode, not a duration). */
-export const DURATION_PRESET_MINUTES: readonly number[] = [15, 60, 360];
+export const DURATION_PRESET_MINUTES: readonly number[] = [15, 60, 360, 1440, 4320, 10080];
 
 export const MINUTES_PER_HOUR = 60;
 export const MINUTES_PER_DAY = 24 * 60;

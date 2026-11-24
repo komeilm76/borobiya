@@ -210,8 +210,8 @@
             </div>
             <div class="share-dialog__field">
               <div v-if="shareKind === 'live'" class="share-dialog__duration">
-                <p class="share-dialog__label">مدت اشتراک زنده</p>
-                <div class="share-dialog__presets" role="group" aria-label="مدت دسترسی به موقعیت زنده">
+                <p id="share-duration-title" class="share-dialog__label">مدت دسترسی زنده</p>
+                <div class="share-dialog__presets share-dialog__live-presets" role="group" aria-labelledby="share-duration-title">
                   <button
                     v-for="minutes in presets"
                     :key="minutes"
@@ -224,34 +224,45 @@
                   >
                     {{ durationWords(minutes) }}
                   </button>
-                  <button
-                    type="button"
-                    class="share-dialog__chip"
-                    :class="{ 'share-dialog__chip--on': mode === 'permanent' }"
-                    :aria-pressed="mode === 'permanent'"
-                    :disabled="submitting"
-                    @click="chooseLiveDuration(null)"
-                  >
-                    تا وقتی خاموش کنم
-                  </button>
                 </div>
-                <p class="share-dialog__duration-value" role="status">
-                  {{ mode === 'permanent' ? 'تا وقتی خاموش کنم' : durationWords(durationMinutes) }}
-                </p>
-                <v-slider
-                  :model-value="sliderStepForMinutes(durationMinutes)"
-                  :min="0"
-                  :max="DURATION_SLIDER_MAX"
-                  :step="1"
-                  color="primary"
-                  hide-details
-                  :aria-valuetext="durationWords(durationMinutes)"
-                  :disabled="submitting || mode === 'permanent'"
-                  aria-label="تنظیم مدت اشتراک تا ۳۰ روز"
-                  @update:model-value="chooseLiveDuration(minutesForSliderStep($event))"
-                />
-                <div class="share-dialog__slider-limits" aria-hidden="true">
-                  <span>{{ durationWords(15) }}</span><span>{{ durationWords(maxMinutes) }}</span>
+
+                <button type="button" class="share-dialog__ongoing" :class="{ 'share-dialog__ongoing--on': mode === 'permanent' }"
+                  :aria-pressed="mode === 'permanent'" :disabled="submitting" @click="chooseLiveDuration(null)">
+                  <v-icon icon="mdi-infinity" size="24" aria-hidden="true" />
+                  <span><strong>تا وقتی خاموش کنم</strong><small>پایان خودکار ندارد؛ هر زمان می‌توانید دسترسی را لغو کنید.</small></span>
+                  <v-icon :icon="mode === 'permanent' ? 'mdi-check-circle' : 'mdi-chevron-left'" size="21" aria-hidden="true" />
+                </button>
+
+                <div v-if="mode !== 'permanent'" class="share-dialog__custom">
+                  <div class="share-dialog__custom-head">
+                    <div>
+                      <strong>تنظیم دلخواه</strong>
+                      <p>واحد را انتخاب کنید؛ {{ durationStepHint }}.</p>
+                    </div>
+                    <strong class="share-dialog__duration-value" role="status" aria-live="polite">{{ durationWords(durationMinutes) }}</strong>
+                  </div>
+                  <div class="share-dialog__scales" role="group" aria-label="واحد مدت دلخواه">
+                    <button v-for="scale in durationScales" :key="scale.value" type="button"
+                      :aria-pressed="durationScale === scale.value" :disabled="submitting"
+                      :class="{ 'share-dialog__scale--on': durationScale === scale.value }"
+                      @click="selectDurationScale(scale.value)">{{ scale.label }}</button>
+                  </div>
+                  <v-slider
+                    :model-value="scaleValueForMinutes(durationScale, durationMinutes)"
+                    :min="durationRange(durationScale).min"
+                    :max="durationRange(durationScale).max"
+                    :step="durationRange(durationScale).step"
+                    color="primary"
+                    hide-details
+                    :aria-valuetext="durationWords(durationMinutes)"
+                    :disabled="submitting"
+                    :aria-label="`تنظیم مدت اشتراک به ${durationScaleLabel}`"
+                    @update:model-value="setSliderDuration($event)"
+                  />
+                  <div class="share-dialog__slider-limits" aria-hidden="true">
+                    <span>{{ durationWords(minutesForScaleValue(durationScale, durationRange(durationScale).min)) }}</span>
+                    <span>{{ durationWords(minutesForScaleValue(durationScale, durationRange(durationScale).max)) }}</span>
+                  </div>
                 </div>
               </div>
 
@@ -415,7 +426,7 @@ import { ApiError } from "@/api/http";
 import { createLocationHistoryShare, createLocationShare } from "@/api/location";
 import { historyWindowFromInputs, isoToLocalInput } from "@/history/playback";
 import { avatarInitial } from "@/live/avatar-initial";
-import { DURATION_SLIDER_MAX, minutesForSliderStep, sliderStepForMinutes } from "@/sharing/duration-slider";
+import { durationRange, minutesForScaleValue, scaleForPreset, scaleValueForMinutes, type DurationScale } from "@/sharing/duration-slider";
 import HistoryDateTimeField from "@/components/sharing/HistoryDateTimeField.vue";
 import { useTargetSearch } from "@/composables/use-target-search";
 import { useAuthStore } from "@/stores/auth";
@@ -491,11 +502,31 @@ const shareKind = computed<"live" | "history">({
   }
 });
 const durationMinutes = ref(60);
+const durationScale = ref<DurationScale>("hours");
+const durationScales: ReadonlyArray<{ value: DurationScale; label: string }> = [
+  { value: "minutes", label: "دقیقه" }, { value: "hours", label: "ساعت" }, { value: "days", label: "روز" }
+];
+const durationScaleLabel = computed(() => durationScales.find(({ value }) => value === durationScale.value)!.label);
+const durationStepHint = computed(() => ({ minutes: "هر حرکت ۱۵ دقیقه", hours: "هر حرکت ۱ ساعت", days: "هر حرکت ۱ روز" })[durationScale.value]);
 
 function chooseLiveDuration(minutes: number | null): void {
   mode.value = minutes === null ? "permanent" : "timed";
-  if (minutes !== null) durationMinutes.value = minutes;
+  if (minutes !== null) {
+    durationMinutes.value = minutes;
+    durationScale.value = scaleForPreset(minutes);
+  }
   lastLiveMode.value = mode.value;
+}
+
+function selectDurationScale(scale: DurationScale): void {
+  durationScale.value = scale;
+  durationMinutes.value = minutesForScaleValue(scale, scaleValueForMinutes(scale, durationMinutes.value));
+}
+
+function setSliderDuration(value: number): void {
+  durationMinutes.value = minutesForScaleValue(durationScale.value, value);
+  mode.value = "timed";
+  lastLiveMode.value = "timed";
 }
 const note = ref("");
 const recipients = ref<UserSearchResult[]>([]);
@@ -946,9 +977,48 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   margin-top: var(--bb-rhythm-r075);
 }
 
-.share-dialog__duration-value { margin: var(--bb-rhythm-r070) 0 0; color: var(--bb-color-text); font-weight: var(--bb-weight-bold); font-size: var(--bb-sharing-font-label); }
+.share-dialog__duration-value {
+  flex: none; color: var(--bb-color-text); font-size: 1.12rem; font-weight: var(--bb-weight-heavy);
+  line-height: 1.5; text-align: end;
+}
 .share-dialog__slider-limits { display: flex; justify-content: space-between; gap: var(--bb-rhythm-r050); font-size: var(--bb-sharing-font-caption); color: var(--bb-color-muted); }
-
+.share-dialog__presets.share-dialog__live-presets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.share-dialog__live-presets .share-dialog__chip { min-width: 0; min-height: 48px; border-radius: 12px; font-size: var(--bb-sharing-font-label); }
+.share-dialog__ongoing {
+  display: flex; align-items: center; gap: var(--bb-rhythm-r065); width: 100%; min-height: 60px;
+  margin-top: var(--bb-rhythm-r060); padding: var(--bb-rhythm-r060) var(--bb-rhythm-r075);
+  border: 0; border-radius: var(--bb-radius-nested); background: var(--bb-color-inset);
+  color: var(--bb-color-text); cursor: pointer; text-align: start; font: inherit;
+}
+.share-dialog__ongoing--on { background: var(--bb-finish-shareResultSelected); }
+.share-dialog__ongoing > span { min-width: 0; flex: 1; }
+.share-dialog__ongoing strong, .share-dialog__ongoing small { display: block; line-height: 1.5; }
+.share-dialog__ongoing small { color: var(--bb-color-muted); font-size: var(--bb-sharing-font-caption); }
+.share-dialog__ongoing > :deep(.v-icon) { flex: none; color: var(--bb-color-primary); }
+.share-dialog__ongoing:focus-visible, .share-dialog__scales button:focus-visible {
+  outline: 2px solid var(--bb-color-text); outline-offset: 2px;
+}
+.share-dialog__ongoing:disabled, .share-dialog__scales button:disabled { opacity: .55; cursor: default; }
+.share-dialog__custom { margin-top: var(--bb-rhythm-r100); }
+.share-dialog__custom-head { display: flex; align-items: center; justify-content: space-between; gap: var(--bb-rhythm-r065); }
+.share-dialog__custom-head > div { min-width: 0; }
+.share-dialog__custom-head p {
+  margin: var(--bb-rhythm-r010) 0 0; color: var(--bb-color-muted);
+  font-size: var(--bb-sharing-font-caption); line-height: 1.6;
+}
+.share-dialog__scales {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--bb-rhythm-r030);
+  margin-top: var(--bb-rhythm-r075); padding: var(--bb-rhythm-r030);
+  border-radius: 12px; background: var(--bb-color-inset);
+}
+.share-dialog__scales button {
+  min-height: 44px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--bb-color-text); cursor: pointer; font: inherit; font-weight: var(--bb-weight-bold);
+}
+.share-dialog__scales button.share-dialog__scale--on {
+  background: rgb(var(--v-theme-surface)); box-shadow: 0 2px 9px rgba(var(--v-theme-primary), .12);
+}
+.share-dialog__custom :deep(.v-slider) { margin-top: var(--bb-rhythm-r060); }
 .share-dialog__presets {
   display: flex;
   flex-wrap: wrap;
@@ -983,6 +1053,10 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   background-color: var(--bb-audience-shareChipOn);
   border-color: var(--bb-audience-shareChipOn);
   color: var(--bb-audience-shareChipInk);
+}
+@media (forced-colors: active) {
+  .share-dialog__chip--on, .share-dialog__ongoing--on,
+  .share-dialog__scales button.share-dialog__scale--on { outline: 2px solid Highlight; }
 }
 
 .share-dialog__actions {
@@ -1023,6 +1097,9 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   .share-dialog__lead { line-height: 1.45; }
   .share-dialog__body { padding: var(--bb-rhythm-r075) var(--bb-rhythm-r085); }
   .share-dialog__section-head { margin-bottom: var(--bb-rhythm-r060); }
+  .share-dialog__presets.share-dialog__live-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .share-dialog__custom-head { flex-wrap: wrap; }
+  .share-dialog__duration-value { text-align: start; }
   .share-dialog__actions { padding-bottom: calc(var(--bb-rhythm-r075) + env(safe-area-inset-bottom, 0px)); }
   /* Fullscreen phones need room for a changing status message as well as both
    * non-shrinking Vuetify buttons; keep the separately scrollable form above. */

@@ -1,18 +1,34 @@
 import { MAX_LOCATION_SHARE_MINUTES } from "@shared/index";
 
-// Nonlinear steps keep 15-minute choices usable without losing the 30-day ceiling:
-// quarters up to 6 h, hours up to 1 day, then whole days. Presets are only shortcuts.
-export const DURATION_SLIDER_MAX = 23 + 18 + 29;
+/** A single 15-minute-to-30-day slider hides three different step sizes. Keep each scale linear. */
+export type DurationScale = "minutes" | "hours" | "days";
 
-export function minutesForSliderStep(step: number): number {
-  const index = Math.min(DURATION_SLIDER_MAX, Math.max(0, Math.round(step)));
-  if (index <= 23) return (index + 1) * 15;
-  if (index <= 41) return 360 + (index - 23) * 60;
-  return Math.min(MAX_LOCATION_SHARE_MINUTES, 1440 + (index - 41) * 1440);
+const MINUTES_PER_HOUR = 60;
+const MINUTES_PER_DAY = 1440;
+
+export function durationRange(scale: DurationScale): { min: number; max: number; step: number } {
+  switch (scale) {
+    case "minutes": return { min: 15, max: 360, step: 15 };
+    case "hours": return { min: 1, max: 24, step: 1 };
+    case "days": return { min: 1, max: MAX_LOCATION_SHARE_MINUTES / MINUTES_PER_DAY, step: 1 };
+  }
 }
 
-export function sliderStepForMinutes(minutes: number): number {
-  if (minutes <= 360) return Math.min(23, Math.max(0, Math.round(minutes / 15) - 1));
-  if (minutes <= 1440) return Math.min(41, 23 + Math.round((minutes - 360) / 60));
-  return Math.min(DURATION_SLIDER_MAX, 41 + Math.round((minutes - 1440) / 1440));
+export function minutesForScaleValue(scale: DurationScale, value: number): number {
+  const { min, max, step } = durationRange(scale);
+  const bounded = Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : min;
+  const snapped = min + Math.round((bounded - min) / step) * step;
+  return snapped * (scale === "minutes" ? 1 : scale === "hours" ? MINUTES_PER_HOUR : MINUTES_PER_DAY);
+}
+
+/** Switching scale preserves an exact value where possible and otherwise snaps to its nearest valid value. */
+export function scaleValueForMinutes(scale: DurationScale, minutes: number): number {
+  const unit = scale === "minutes" ? 1 : scale === "hours" ? MINUTES_PER_HOUR : MINUTES_PER_DAY;
+  const { min, max, step } = durationRange(scale);
+  const bounded = Number.isFinite(minutes) ? Math.max(min, Math.min(max, minutes / unit)) : min;
+  return min + Math.round((bounded - min) / step) * step;
+}
+
+export function scaleForPreset(minutes: number): DurationScale {
+  return minutes < MINUTES_PER_HOUR ? "minutes" : minutes < MINUTES_PER_DAY ? "hours" : "days";
 }
