@@ -97,7 +97,6 @@
 <script setup lang="ts">
 import NetworkStatusIcon from "./NetworkStatusIcon.vue";
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useMediaQuery } from "@vueuse/core";
 import { useRoute } from "vue-router";
 import type { AuthUser, UserCategorySummary } from "@shared/index";
 import type { ThemePreference } from "@/theme/theme-preference";
@@ -115,15 +114,14 @@ const emit = defineEmits<{
 }>();
 const route = useRoute();
 const open = ref(false);
-const compactMap = useMediaQuery("(max-width: 900px)");
 const launcherTarget = ref<HTMLElement | null>(null);
 let launcherObserver: MutationObserver | null = null;
 
 // The dispatch view is async and may mount after this shared map shell. Keep
-// the original launcher until the mobile search row exists; follow route,
-// viewport changes without duplicating the menu or its focus state.
+// the original launcher until the search row exists on any dispatch viewport;
+// restore it on other routes without duplicating the menu or its focus state.
 function syncLauncherTarget(): void {
-  if (route.name !== "admin-dispatch" || !compactMap.value) {
+  if (route.name !== "admin-dispatch") {
     launcherObserver?.disconnect();
     launcherObserver = null;
     launcherTarget.value = null;
@@ -140,7 +138,7 @@ function syncLauncherTarget(): void {
     launcherObserver.observe(document.body, { childList: true, subtree: true });
   }
 }
-watch([() => route.name, () => route.fullPath, compactMap], syncLauncherTarget, { flush: "post" });
+watch([() => route.name, () => route.fullPath], syncLauncherTarget, { flush: "post" });
 onMounted(syncLauncherTarget);
 onBeforeUnmount(() => { launcherObserver?.disconnect(); });
 
@@ -162,7 +160,7 @@ async function requestLogout(): Promise<void> {
 
 <style scoped>
 /* The shared launcher floats at the physical left on ordinary map routes;
-   compact dispatch alone hosts it beside the map-search field. */
+   dispatch hosts it beside the map-search field at every viewport width. */
 .map-sidebar__launcher {
   position: fixed;
   z-index: 900;

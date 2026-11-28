@@ -7,8 +7,8 @@ const sidebar = readFileSync(new URL("../../components/shell/MapSidebar.vue", im
 const dispatchSfc = parse(dispatch).descriptor;
 const sidebarSfc = parse(sidebar).descriptor;
 
-describe("map menu within compact dispatch search", () => {
-  it("hosts the original map menu beside the search field on compact dispatch", () => {
+describe("map menu within dispatch search", () => {
+  it("hosts the original map menu beside the search field on desktop and mobile", () => {
     const search = dispatchSfc.template!.content.slice(
       dispatchSfc.template!.content.indexOf('<section id="dispatch-search"'),
       dispatchSfc.template!.content.indexOf('</section>', dispatchSfc.template!.content.indexOf('<section id="dispatch-search"'))
@@ -24,19 +24,25 @@ describe("map menu within compact dispatch search", () => {
     expect(menu.match(/class="map-sidebar__menu-button"/g)).toHaveLength(1);
     expect(menu).toContain('v-bind="activatorProps"');
     expect(menu).toContain('<NetworkStatusIcon class="map-sidebar__network" />');
-    expect(dispatchSfc.styles[0]!.content).toContain('.admin-dispatch__search-menu-slot { display: none; }');
-    expect(dispatchSfc.styles[0]!.content).toContain('display: flex; flex: none; align-items: center; gap: .4rem; min-width: 0;');
-    expect(dispatchSfc.styles[0]!.content).toContain('.admin-dispatch__search-form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }');
-    expect(dispatchSfc.styles[0]!.content).toContain('display: grid; place-items: center; flex: none; width: 48px; height: 48px;');
-    expect(dispatchSfc.styles[0]!.content).toContain('top: calc(1rem + env(safe-area-inset-top, 0px)); right: .75rem;');
-    expect(dispatchSfc.styles[0]!.content).toContain('left: .75rem; width: auto; max-height: min(38dvh, 15rem);\n    padding: .6rem; gap: .3rem;');
-    expect(dispatchSfc.styles[0]!.content).not.toContain('top: calc(2.75rem + env(safe-area-inset-top, 0px)); right: .75rem;');
-    expect(dispatchSfc.styles[0]!.content).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));'); // Desktop unchanged.
+    const dispatchCss = dispatchSfc.styles[0]!.content;
+    const desktopSearch = dispatchCss.slice(dispatchCss.indexOf('.admin-dispatch__search {'), dispatchCss.indexOf('.admin-dispatch__search-form {'));
+    expect(desktopSearch).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
+    expect(desktopSearch).toContain('left: calc(.75rem + env(safe-area-inset-left, 0px));');
+    expect(desktopSearch).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));');
+    expect(desktopSearch).not.toContain('right: calc(var(--dispatch-sidebar-width)');
+    expect(dispatchCss).toContain('top: calc(5.5rem + env(safe-area-inset-top, 0px));'); // Incident card clears desktop search.
+    expect(dispatchCss).toContain('display: flex; flex: none; align-items: center; gap: .4rem; min-width: 0;');
+    expect(dispatchCss).toContain('.admin-dispatch__search-form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }');
+    expect(dispatchCss).toContain('.admin-dispatch__search-menu-slot {\n  display: grid; place-items: center; flex: none; width: 48px; height: 48px;');
+    expect(dispatchCss).toContain('top: calc(1rem + env(safe-area-inset-top, 0px)); right: .75rem;');
+    expect(dispatchCss).toContain('left: .75rem; width: auto; max-height: min(38dvh, 15rem);\n    padding: .6rem; gap: .3rem;');
+    expect(dispatchCss).not.toContain('top: calc(2.75rem + env(safe-area-inset-top, 0px)); right: .75rem;');
     expect(sidebarSfc.styles[0]!.content).toContain('.map-sidebar__launcher--inline {\n  position: relative;');
   });
 
   it("waits for the async dispatch view and restores the shared fixed launcher elsewhere", () => {
-    expect(sidebar).toContain('route.name !== "admin-dispatch" || !compactMap.value');
+    expect(sidebar).toContain('if (route.name !== "admin-dispatch") {');
+    expect(sidebar).not.toContain('compactMap.value');
     expect(sidebar).toContain('new MutationObserver(findTarget)');
     expect(sidebar).toContain('if (target) { launcherObserver?.disconnect(); launcherObserver = null; }');
     expect(sidebar).toContain('launcherTarget.value = null;');

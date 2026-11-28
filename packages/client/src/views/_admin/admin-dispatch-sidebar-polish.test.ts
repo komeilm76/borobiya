@@ -138,7 +138,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(widget).not.toContain('id="dispatch-recenter"');
     expect(widget).toContain('variant="outlined" rounded="lg"');
     expect(widget).toContain('id="dispatch-search-results"');
-    expect(css).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));');
+    expect(css).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));');
     expect(css).toContain('border-radius: var(--bb-radius-card, 24px);\n  background: rgba(var(--v-theme-surface), .95);');
     expect(css).toContain('min-height: 0; overflow-y: auto; overscroll-behavior: contain;\n  padding: .15rem;');
     expect(dispatch).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');

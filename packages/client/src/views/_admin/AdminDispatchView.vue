@@ -414,7 +414,7 @@
               placeholder="کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
               prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" variant="outlined" rounded="lg"
               autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
-            <!-- The shared map menu launcher teleports beside the field on compact dispatch. -->
+            <!-- The shared map menu launcher lives beside the field at every dispatch width. -->
             <div id="dispatch-search-menu-slot" class="admin-dispatch__search-menu-slot" />
           </div>
           <div v-if="searchQuery.length >= 2" id="dispatch-search-results" class="admin-dispatch__search-results"
@@ -3024,7 +3024,7 @@ onBeforeUnmount(() => {
   display: block; width: 100%; height: 100%; min-height: 0;
 }
 .admin-dispatch__incident-panel {
-  position: absolute; z-index: 9; top: calc(4.75rem + env(safe-area-inset-top, 0px));
+  position: absolute; z-index: 9; top: calc(5.5rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px));
   width: min(23rem, calc(100% - var(--dispatch-sidebar-width) - 2rem));
   max-height: min(86dvh, calc(100dvh - 6rem));
@@ -3120,9 +3120,9 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .2rem .6rem .35rem; }
 .admin-dispatch__search {
   position: absolute; z-index: 11; top: calc(.75rem + env(safe-area-inset-top, 0px));
-  right: calc(var(--dispatch-sidebar-width) + .75rem);
-  /* The shared menu and Network button occupy the first 7.25rem of the map. */
-  width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));
+  left: calc(.75rem + env(safe-area-inset-left, 0px));
+  /* Share the former menu corner; stay within the map before the right rail. */
+  width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));
   max-height: min(65dvh, 30rem); padding: .6rem .8rem;
   display: flex; flex-direction: column; gap: .5rem; overflow: hidden;
   border: 1px solid rgba(var(--v-theme-on-surface), .1);
@@ -3135,7 +3135,9 @@ onBeforeUnmount(() => {
   display: flex; flex: none; align-items: center; gap: .4rem; min-width: 0;
 }
 .admin-dispatch__search-form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }
-.admin-dispatch__search-menu-slot { display: none; }
+.admin-dispatch__search-menu-slot {
+  display: grid; place-items: center; flex: none; width: 48px; height: 48px;
+}
 .admin-dispatch__search-results {
   min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: .15rem; border-radius: .75rem;
@@ -3208,9 +3210,6 @@ onBeforeUnmount(() => {
     top: calc(1rem + env(safe-area-inset-top, 0px)); right: .75rem;
     left: .75rem; width: auto; max-height: min(38dvh, 15rem);
     padding: .6rem; gap: .3rem;
-  }
-  .admin-dispatch__search-menu-slot {
-    display: grid; place-items: center; flex: none; width: 48px; height: 48px;
   }
   .admin-dispatch__search-results { max-height: none; }
   .admin-dispatch__incident-panel {
