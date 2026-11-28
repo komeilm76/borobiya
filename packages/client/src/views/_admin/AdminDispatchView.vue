@@ -409,7 +409,8 @@
     </div>
     </aside>
     <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
-        <section id="dispatch-search" class="admin-dispatch__search" aria-label="جست‌وجو روی نقشه">
+        <section id="dispatch-search" class="admin-dispatch__search" aria-label="جست‌وجو روی نقشه"
+          :inert="compactDispatch && (sheetExpanded || sheetDragging)">
           <div class="admin-dispatch__search-form" role="search">
             <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجو در نقشه"
               placeholder="کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
@@ -543,7 +544,8 @@
           </ul>
         </v-card>
         <div v-if="adminSos.selectedRequest" id="dispatch-incident-panel" class="admin-dispatch__incident-panel"
-          :class="{ 'admin-dispatch__incident-panel--expanded': incidentExpanded }">
+          :class="{ 'admin-dispatch__incident-panel--expanded': incidentExpanded }"
+          @click.self="collapseSheetForIncident">
           <button id="dispatch-incident-toggle" type="button" class="admin-dispatch__incident-toggle"
             :aria-expanded="incidentExpanded" aria-controls="dispatch-incident-content"
             @click="toggleIncidentPanel">
@@ -1169,6 +1171,16 @@ function setSheetExpanded(expanded: boolean): void {
   sheetExpanded.value = expanded;
   sheetDragHeight.value = null;
 }
+// Search and the shell's map actions become unavailable under the open sheet.
+// Return focus to its handle only if it was on one of those hidden controls.
+watch(sheetExpanded, (expanded) => {
+  if (!expanded || !compactDispatch.value) return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement &&
+    (document.getElementById("dispatch-search")?.contains(active) || active.closest(".sos-fab, .app-general-share"))) {
+    document.getElementById("dispatch-sheet-handle")?.focus({ preventScroll: true });
+  }
+}, { flush: "sync" });
 function startSheetDrag(event: PointerEvent): void {
   if (!compactDispatch.value || !event.isPrimary || event.button !== 0 || sheetPointer) return;
   const sidebar = dispatchSidebar.value;
@@ -1245,8 +1257,15 @@ function selectSheetTab(tab: "queue" | "responders", expand = false): void {
 }
 const incidentExpanded = ref(!compactDispatch.value);
 watch(compactDispatch, (compact) => { incidentExpanded.value = !compact; });
+function collapseSheetForIncident(): void {
+  if (compactDispatch.value && sheetExpanded.value) setSheetExpanded(false);
+}
 function toggleIncidentPanel(): void {
-  incidentExpanded.value = !incidentExpanded.value;
+  // An open worklist obscures the map. Tapping the incident moves to its
+  // details: first return the sheet to peek, then show (not hide) the details.
+  const wasExpandedSheet = compactDispatch.value && sheetExpanded.value;
+  collapseSheetForIncident();
+  incidentExpanded.value = wasExpandedSheet || !incidentExpanded.value;
   if (!incidentExpanded.value) {
     photoDialogOpen.value = false;
     showLivePanel.value = false;
@@ -3185,9 +3204,13 @@ onBeforeUnmount(() => {
   }
 }
 @media (max-width: 900px) {
-  .admin-dispatch { --dispatch-current-sheet-height: min(40dvh, 21rem); }
+  .admin-dispatch {
+    --dispatch-current-sheet-height: min(40dvh, 21rem);
+    --dispatch-incident-top: 6rem;
+  }
   .admin-dispatch:has(.admin-dispatch__sidebar--expanded) {
     --dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);
+    --dispatch-incident-top: 1rem;
   }
   .admin-dispatch__sidebar {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%;
@@ -3212,13 +3235,19 @@ onBeforeUnmount(() => {
     padding: .6rem; gap: .3rem;
   }
   .admin-dispatch__search-results { max-height: none; }
+  /* The list takes priority when expanded; keep the search/menu in the DOM so
+     it returns intact on collapse, but remove its focusable controls. */
+  .admin-dispatch:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__search,
+  .admin-dispatch:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__search {
+    visibility: hidden; pointer-events: none;
+  }
   .admin-dispatch__incident-panel {
-    /* Align with search, immediately below its 48px menu row. */
-    top: calc(6rem + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;
-    width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px));
+    /* Below search at peek; in its place when the sheet is expanded. */
+    top: calc(var(--dispatch-incident-top) + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;
+    width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px));
   }
   .admin-dispatch__incident-panel--expanded {
-    max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px)));
+    max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px)));
   }
   .admin-dispatch__incident-panel .admin-dispatch__detail-badges { min-width: 0; }
   .admin-dispatch__incident-panel .admin-dispatch__detail-badges :deep(.v-chip) {

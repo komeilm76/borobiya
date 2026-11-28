@@ -606,15 +606,18 @@ a {
   }
 }
 @media (max-width: 900px) {
-  /* Keep the SOS action below search and above the expanded sheet, including
-     the top safe area on short/notched phones. */
+  /* Reserve the map's top area for the selected incident on short/notched
+     phones; SOS and search return when the sheet is at peek. */
   .app-shell--map:has(.admin-dispatch) {
     --dispatch-expanded-sheet-height: min(68dvh, 38rem,
       max(min(40dvh, 21rem), calc(100dvh - 12.5rem - env(safe-area-inset-top, 0px))));
   }
-  /* During a drag the sheet can pass through the SOS action. Restore it
-     at the final stop instead of letting it cover the handle. */
-  .app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab {
+  /* While dispatch owns the expanded map area, hide the shell's SOS and
+     broadcast actions; restore them when the sheet returns to peek. */
+  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,
+  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share,
+  .app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab,
+  .app-shell--map:has(.admin-dispatch__sidebar--dragging) .app-general-share {
     visibility: hidden; pointer-events: none;
   }
   .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,

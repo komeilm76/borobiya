@@ -89,9 +89,11 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('height: min(40dvh, 21rem);');
     const compactLayout = css.slice(css.indexOf('@media (max-width: 900px) {', css.indexOf('.admin-dispatch__search {')),
       css.indexOf('/* Dispatch rail: one calm surface'));
-    expect(compactLayout).toContain('top: calc(6rem + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;');
-    expect(compactLayout).toContain('width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px));');
-    expect(compactLayout).toContain('max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px)));');
+    expect(compactLayout).toContain('--dispatch-incident-top: 6rem;');
+    expect(compactLayout).toContain('--dispatch-incident-top: 1rem;');
+    expect(compactLayout).toContain('top: calc(var(--dispatch-incident-top) + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;');
+    expect(compactLayout).toContain('width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px));');
+    expect(compactLayout).toContain('max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px)));');
     expect(compactLayout).toContain('max-width: 100%; height: auto; min-height: 32px; white-space: normal;');
     expect(compactLayout).toContain('.admin-dispatch__detail-badges :deep(.v-chip__content)');
     expect(css).toContain('padding: .5rem .65rem .35rem; line-height: 1.35;\n  white-space: normal; overflow-wrap: anywhere;');

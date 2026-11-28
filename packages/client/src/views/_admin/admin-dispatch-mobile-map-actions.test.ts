@@ -29,7 +29,7 @@ describe("dispatch map controls across screen sizes", () => {
     expect(source).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');
     expect(source).toContain('map.flyTo({ center: [incident.location.lon, incident.location.lat], offset: dispatchFocusOffset()');
     expect(shell).toContain('inset-block-end: calc(var(--dispatch-expanded-sheet-height) + 3.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(shell).toContain('visibility: hidden; pointer-events: none;'); // Only while dragging.
+    expect(shell).toContain('visibility: hidden; pointer-events: none;'); // While dragging or expanded.
     for (const [height, safeTop] of [[844, 0], [568, 47]]) {
       const { peek, expanded } = dispatchSheetBounds(height, 16, safeTop);
       expect(expanded).toBeGreaterThan(peek);

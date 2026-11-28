@@ -43,7 +43,7 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(css).toContain('height: min(40dvh, 21rem);');
     expect(css).toContain('inset: 0 0 min(40dvh, 21rem) 0;');
     expect(shell).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab {');
+    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab,');
     expect(shell).toContain('visibility: hidden; pointer-events: none;');
     expect(css).toContain('order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;');
     expect(css).toContain('border-top: 1px solid var(--bb-color-outline);\n    background: rgb(var(--v-theme-surface));');
@@ -61,6 +61,26 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__submit { position: sticky; bottom: 0; }');
     expect(rail.indexOf('class="responder-list"')).toBeLessThan(rail.indexOf('class="admin-dispatch__submit'));
     expect(rail).toContain('id="dispatch-responders" tabindex="-1"');
+  });
+
+  it("gives the expanded sheet the map controls' space and returns to incident details on tap", () => {
+    expect(markup).toContain(':inert="compactDispatch && (sheetExpanded || sheetDragging)"');
+    expect(markup).toContain('@click.self="collapseSheetForIncident"'); // Child actions can still expand the sheet.
+    expect(markup).toContain('@click="toggleIncidentPanel"');
+    expect(css).toContain('--dispatch-incident-top: 6rem;');
+    expect(css).toContain('--dispatch-incident-top: 1rem;');
+    expect(css).toContain('top: calc(var(--dispatch-incident-top) + env(safe-area-inset-top, 0px));');
+    expect(css).toContain('.admin-dispatch:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__search,');
+    expect(css).toContain('.admin-dispatch:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__search {\n    visibility: hidden; pointer-events: none;');
+    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,');
+    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share,');
+    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .app-general-share {\n    visibility: hidden; pointer-events: none;');
+    const toggle = source.slice(source.indexOf('function collapseSheetForIncident()'), source.indexOf('const showLivePanel = ref(false);'));
+    expect(toggle).toContain('if (compactDispatch.value && sheetExpanded.value) setSheetExpanded(false);');
+    expect(toggle).toContain('const wasExpandedSheet = compactDispatch.value && sheetExpanded.value;');
+    expect(toggle).toContain('incidentExpanded.value = wasExpandedSheet || !incidentExpanded.value;');
+    expect(source).toContain('watch(sheetExpanded, (expanded) => {');
+    expect(source).toContain('document.getElementById("dispatch-sheet-handle")?.focus({ preventScroll: true });');
   });
 
   it("uses one spaced divider between the mobile worklist and fixed tabs", () => {
