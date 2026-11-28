@@ -3227,9 +3227,11 @@ onBeforeUnmount(() => {
   .admin-dispatch {
     --dispatch-current-sheet-height: min(40dvh, 21rem);
     --dispatch-incident-top: 6rem;
+    --dispatch-incident-bottom-clearance: 2rem; /* Keep map attribution accessible above the sheet. */
   }
   .admin-dispatch:has(.admin-dispatch__sidebar--expanded) {
     --dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);
+    --dispatch-incident-bottom-clearance: .75rem;
   }
   .admin-dispatch--incident-at-top { --dispatch-incident-top: 1rem; }
   .admin-dispatch__sidebar {
@@ -3259,13 +3261,16 @@ onBeforeUnmount(() => {
      or the incident details are open. An empty sheet keeps search available. */
   .admin-dispatch__search--hidden { visibility: hidden; pointer-events: none; }
   .admin-dispatch__incident-panel {
-    /* Below search at peek; in its place for an open sheet or open details. */
+    /* Below search at peek; in its place for an open sheet or open details.
+       Use the actual sheet height so the panel never covers its drag handle. */
+    --dispatch-incident-available-height: calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - var(--dispatch-incident-bottom-clearance) - env(safe-area-inset-top, 0px));
     top: calc(var(--dispatch-incident-top) + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;
-    width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px));
+    width: auto; max-height: var(--dispatch-incident-available-height);
   }
   .admin-dispatch__incident-panel--expanded {
-    max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px)));
+    height: var(--dispatch-incident-available-height);
   }
+  .admin-dispatch__incident-panel--expanded #dispatch-incident-content { flex: 1 1 auto; }
   .admin-dispatch__incident-panel .admin-dispatch__detail-badges { min-width: 0; }
   .admin-dispatch__incident-panel .admin-dispatch__detail-badges :deep(.v-chip) {
     max-width: 100%; height: auto; min-height: 32px; white-space: normal;
