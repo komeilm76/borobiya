@@ -428,6 +428,8 @@
               <h2>جست‌وجو روی نقشه</h2>
               <p>درخواست SOS، کاربر و مکان</p>
             </div>
+            <!-- The shared map menu launcher teleports here only on compact dispatch. -->
+            <div id="dispatch-search-menu-slot" class="admin-dispatch__search-menu-slot" />
             <v-btn v-if="adminSos.selectedRequest && !compactDispatch" id="dispatch-recenter" class="map-selected-alert-card"
               icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
               :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
@@ -3126,6 +3128,7 @@ onBeforeUnmount(() => {
   pointer-events: auto;
 }
 .admin-dispatch__search-header { display: flex; flex: none; align-items: center; gap: .6rem; min-width: 0; }
+.admin-dispatch__search-menu-slot { display: none; }
 .admin-dispatch__search-indicator { flex: none; width: .65rem; height: .65rem;
   border-radius: 50%; background: #7d9291; }
 .admin-dispatch__search-indicator--active { background: #1f8a5b; box-shadow: 0 0 0 4px rgba(31, 138, 91, .18); }
@@ -3204,6 +3207,9 @@ onBeforeUnmount(() => {
     top: calc(4.25rem + env(safe-area-inset-top, 0px)); right: .75rem;
     left: .75rem; width: auto; max-height: min(38dvh, 15rem);
     padding: .4rem .6rem; gap: .3rem;
+  }
+  .admin-dispatch__search-menu-slot {
+    display: grid; place-items: center; flex: none; width: 48px; height: 48px;
   }
   .admin-dispatch__search-copy p { display: none; }
   .admin-dispatch__search-results { max-height: none; }

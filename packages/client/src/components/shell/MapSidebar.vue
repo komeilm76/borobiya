@@ -7,18 +7,20 @@
     aria-labelledby="map-sidebar-title"
   >
     <template #activator="{ props: activatorProps }">
-      <div class="map-sidebar__launcher">
-        <v-btn
-          v-bind="activatorProps"
-          class="map-sidebar__menu-button"
-          icon="mdi-menu"
-          color="surface"
-          variant="flat"
-          aria-label="باز کردن فهرست برنامه"
-          title="فهرست برنامه"
-        />
-        <NetworkStatusIcon class="map-sidebar__network" />
-      </div>
+      <Teleport :to="launcherTarget ?? 'body'" :disabled="!launcherTarget">
+        <div class="map-sidebar__launcher" :class="{ 'map-sidebar__launcher--inline': launcherTarget }">
+          <v-btn
+            v-bind="activatorProps"
+            class="map-sidebar__menu-button"
+            icon="mdi-menu"
+            color="surface"
+            variant="flat"
+            aria-label="باز کردن فهرست برنامه"
+            title="فهرست برنامه"
+          />
+          <NetworkStatusIcon class="map-sidebar__network" />
+        </div>
+      </Teleport>
     </template>
 
     <v-card class="map-sidebar__panel" rounded="xl" elevation="0">
@@ -94,7 +96,8 @@
 
 <script setup lang="ts">
 import NetworkStatusIcon from "./NetworkStatusIcon.vue";
-import { nextTick, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import { useRoute } from "vue-router";
 import type { AuthUser, UserCategorySummary } from "@shared/index";
 import type { ThemePreference } from "@/theme/theme-preference";
@@ -112,6 +115,35 @@ const emit = defineEmits<{
 }>();
 const route = useRoute();
 const open = ref(false);
+const compactMap = useMediaQuery("(max-width: 900px)");
+const launcherTarget = ref<HTMLElement | null>(null);
+let launcherObserver: MutationObserver | null = null;
+
+// The dispatch view is async and may mount after this shared map shell. Keep
+// the original launcher until the mobile search header exists; follow route,
+// viewport changes without duplicating the menu or its focus state.
+function syncLauncherTarget(): void {
+  if (route.name !== "admin-dispatch" || !compactMap.value) {
+    launcherObserver?.disconnect();
+    launcherObserver = null;
+    launcherTarget.value = null;
+    return;
+  }
+  const findTarget = () => {
+    const target = document.getElementById("dispatch-search-menu-slot");
+    if (launcherTarget.value !== target) launcherTarget.value = target;
+    if (target) { launcherObserver?.disconnect(); launcherObserver = null; }
+  };
+  findTarget();
+  if (!launcherTarget.value && !launcherObserver) {
+    launcherObserver = new MutationObserver(findTarget);
+    launcherObserver.observe(document.body, { childList: true, subtree: true });
+  }
+}
+watch([() => route.name, () => route.fullPath, compactMap], syncLauncherTarget, { flush: "post" });
+onMounted(syncLauncherTarget);
+onBeforeUnmount(() => { launcherObserver?.disconnect(); });
+
 const themeOptions: { value: ThemePreference; title: string; icon: string }[] = [
   { value: "system", title: "دستگاه", icon: "mdi-theme-light-dark" },
   { value: "light", title: "روشن", icon: "mdi-white-balance-sunny" },
@@ -129,7 +161,8 @@ async function requestLogout(): Promise<void> {
 </script>
 
 <style scoped>
-/* Physical left even in the RTL app. Only the launcher sits over the map; no toolbar. */
+/* The shared launcher floats at the physical left on ordinary map routes;
+   compact dispatch alone hosts it inside the map-search heading. */
 .map-sidebar__launcher {
   position: fixed;
   z-index: 900;
@@ -138,6 +171,14 @@ async function requestLogout(): Promise<void> {
 }
 .map-sidebar__network {
   position: absolute; top: -3px; right: -3px; pointer-events: none;
+}
+.map-sidebar__launcher--inline {
+  position: relative; z-index: auto; top: auto; left: auto;
+  width: 48px; height: 48px;
+}
+.map-sidebar__launcher--inline .map-sidebar__menu-button {
+  box-shadow: none !important; backdrop-filter: none;
+  background: var(--bb-color-inset) !important;
 }
 .map-sidebar__menu-button {
   width: 48px; height: 48px; min-width: 48px;
