@@ -106,7 +106,7 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(start).toBeGreaterThan(0);
     expect(mobile).not.toContain('admin-dispatch__sheet-nav');
     expect(mobile).toContain('flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
-    expect(mobile).toContain('flex-wrap: nowrap !important; padding: .35rem .2rem .15rem !important; border-top: 0;');
+    expect(mobile).toContain('flex-wrap: nowrap !important; gap: .75rem !important;\n    padding: .35rem .2rem .15rem !important; border-top: 0;');
   });
 
   it("reveals responder controls from an SOS choice or detail action, without bypassing dispatch validation", () => {
@@ -117,7 +117,7 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(back).toContain('document.getElementById("dispatch-queue")?.focus({ preventScroll: true })');
     expect(markup).toContain('<v-card id="dispatch-queue" tabindex="-1"');
     expect(source).toContain('watch(() => adminSos.selectedId, (selectedId) => {\n  if (!compactDispatch.value) return;');
-    expect(source).toContain('active.closest(selectedId ? "#dispatch-queue-region" : "#dispatch-nearby")');
+    expect(source).toContain('active.closest(selectedId ? "#dispatch-queue-region, #dispatch-header-01" : "#dispatch-nearby")');
     expect(source).toContain('adminSos.selectedRequest ? "dispatch-responders" : "dispatch-action-30"');
     expect(source).toContain(': "dispatch-queue")?.focus({ preventScroll: true });');
     expect(source).toContain('if (!compactDispatch.value || !event.isPrimary || event.button !== 0 || sheetPointer) return;');

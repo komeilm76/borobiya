@@ -23,6 +23,20 @@ describe("compact dispatch search and on-demand guidance", () => {
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__responder-search :deep(.v-btn) { height: 44px; }');
   });
 
+  it("shows SOS-only controls on the queue, not the mobile responder step", () => {
+    const header = markup.slice(markup.indexOf('id="dispatch-header-01"'), markup.indexOf('</header>'));
+    expect(markup).toContain('<header v-if="!compactDispatch || !adminSos.selectedId" id="dispatch-header-01"');
+    expect(header).toContain('id="dispatch-select-01"');
+    expect(header).toContain('id="dispatch-voice-settings"');
+    expect(header).toContain('id="dispatch-action-06"');
+    expect(header).toContain('id="dispatch-help-button"');
+    expect(markup).toContain('id="dispatch-sheet-handle" v-if="compactDispatch"');
+    expect(source).toContain('if (compact && adminSos.selectedId) {\n    soundSettingsOpen.value = false;\n    helpDialogOpen.value = false;');
+    expect(source).toContain('if (selectedId) {\n    soundSettingsOpen.value = false;\n    helpDialogOpen.value = false;');
+    expect(source).toContain('active.closest(selectedId ? "#dispatch-queue-region, #dispatch-header-01" : "#dispatch-nearby")');
+    expect(worklist).toContain('id="dispatch-action-29"');
+  });
+
   it("moves non-actionable information out of the scrollport without hiding dispatch safeguards", () => {
     expect(markup).toContain('id="dispatch-help-button" icon="mdi-help-circle-outline"');
     expect(markup).toContain('aria-controls="dispatch-help-dialog" :aria-expanded="helpDialogOpen"');

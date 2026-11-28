@@ -37,7 +37,8 @@
       @click="clickSheetHandle" @keydown.up.prevent="setSheetExpanded(true)" @keydown.down.prevent="setSheetExpanded(false)">
       <span aria-hidden="true" />
     </button>
-    <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
+    <!-- Queue controls are not part of the selected SOS's responder workflow. -->
+    <header v-if="!compactDispatch || !adminSos.selectedId" id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
         <div class="admin-dispatch__heading">
           <span class="admin-dispatch__brand-icon" aria-hidden="true"><v-icon icon="mdi-radar" size="23" /></span>
@@ -1222,19 +1223,27 @@ function clickSheetHandle(): void {
   if (suppressSheetClick) return;
   setSheetExpanded(!sheetExpanded.value);
 }
-watch(compactDispatch, () => {
+watch(compactDispatch, (compact) => {
   sheetPointer = null;
   sheetDragHeight.value = null;
   sheetDragging.value = false;
   sheetExpanded.value = false;
+  if (compact && adminSos.selectedId) {
+    soundSettingsOpen.value = false;
+    helpDialogOpen.value = false;
+  }
 });
 // The selected SOS is the only mobile step state. Reset the shared scrollport
 // whenever selection changes, including changes from the map or a deep link.
 watch(() => adminSos.selectedId, (selectedId) => {
   if (!compactDispatch.value) return;
+  if (selectedId) {
+    soundSettingsOpen.value = false;
+    helpDialogOpen.value = false;
+  }
   const active = document.activeElement;
   const focusedInHiddenSection = active instanceof HTMLElement &&
-    active.closest(selectedId ? "#dispatch-queue-region" : "#dispatch-nearby");
+    active.closest(selectedId ? "#dispatch-queue-region, #dispatch-header-01" : "#dispatch-nearby");
   void nextTick(() => {
     const content = document.getElementById("dispatch-sidebar-content");
     if (content) content.scrollTop = 0;
@@ -3473,9 +3482,10 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__responder-search { padding: .1rem .2rem .15rem !important; }
   #dispatch-sidebar .admin-dispatch__responders .responder-list { padding: .15rem .1rem .2rem; }
   #dispatch-sidebar .dispatch-responder-row { margin-bottom: .25rem; }
-  /* Allow breathing room around the dispatch action without extra dividers. */
+  /* Separate the back action from the proposal button without adding a divider. */
   #dispatch-sidebar .admin-dispatch__submit {
-    flex-wrap: nowrap !important; padding: .35rem .2rem .15rem !important; border-top: 0;
+    flex-wrap: nowrap !important; gap: .75rem !important;
+    padding: .35rem .2rem .15rem !important; border-top: 0;
   }
   #dispatch-sidebar .admin-dispatch__submit :deep(.admin-dispatch__back-to-queue) {
     flex: 0 0 44px; width: 44px; min-width: 44px; padding: 0;
