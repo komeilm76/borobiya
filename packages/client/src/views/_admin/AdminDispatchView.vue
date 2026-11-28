@@ -428,7 +428,7 @@
               <h2>جست‌وجو روی نقشه</h2>
               <p>درخواست SOS، کاربر و مکان</p>
             </div>
-            <v-btn v-if="adminSos.selectedRequest" id="dispatch-recenter" class="map-selected-alert-card"
+            <v-btn v-if="adminSos.selectedRequest && !compactDispatch" id="dispatch-recenter" class="map-selected-alert-card"
               icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
               :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
               :title="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران' : 'نمایش محل حادثه'"
@@ -542,14 +542,19 @@
               </div>
             </div>
           </div>
-          <v-btn id="dispatch-legend-toggle" class="admin-dispatch__legend-toggle"
+          <v-btn v-if="!compactDispatch" id="dispatch-legend-toggle" class="admin-dispatch__legend-toggle"
             icon="mdi-map-outline" :color="legendOpen ? 'primary' : 'surface'" variant="flat"
             :aria-label="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
             :title="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
             :aria-expanded="legendOpen" aria-controls="dispatch-map-legend"
             @click="legendOpen = !legendOpen" />
+          <v-btn v-if="compactDispatch && adminSos.selectedRequest" id="dispatch-recenter-mobile"
+            class="admin-dispatch__recenter-mobile map-selected-alert-card"
+            icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
+            aria-label="نمایش محل حادثه روی نقشه" title="نمایش محل حادثه روی نقشه"
+            @click="focusSelectedSosOnMap" />
           <ul id="dispatch-map-legend" class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
-            v-show="legendOpen"
+            v-show="legendOpen && !compactDispatch"
             :style="{ '--dispatch-helper-color': themeStore.isDark ? '#205fd1' : '#0868c8' }">
             <li v-for="item in sosSeverityKey" :key="item.severity">
               <span class="dispatch-map-key__icon dispatch-map-key__icon--sos mdi mdi-alert"
@@ -1875,6 +1880,15 @@ function frameSelectedIncident(): void {
   });
 }
 
+function focusSelectedSosOnMap(): void {
+  const incident = adminSos.selectedRequest;
+  const map = mapInstance;
+  if (!incident || !map) return;
+  map.flyTo({ center: [incident.location.lon, incident.location.lat],
+    offset: dispatchFocusOffset(), zoom: Math.max(map.getZoom(), 14),
+    duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650 });
+}
+
 function focusSelectedIncidentMap(): void {
   if (!adminSos.selectedRequest) return;
   frameSelectedIncident();
@@ -1884,7 +1898,7 @@ function focusSelectedIncidentMap(): void {
     block: "start"
   });
   // The canvas is not focusable; hand keyboard users to the widget's recenter action.
-  document.getElementById("dispatch-recenter")?.focus({ preventScroll: true });
+  document.getElementById(compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter")?.focus({ preventScroll: true });
 }
 
 function focusNearbyResponder(userId: string): void {
@@ -3198,8 +3212,13 @@ onBeforeUnmount(() => {
     width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
   }
   .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
-  .admin-dispatch__legend-toggle {
-    right: .875rem; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
+  /* The selected SOS map action takes the legend's former slot, aligned
+     directly beneath the app's SOS action with an 8px gap. */
+  .admin-dispatch__recenter-mobile {
+    position: absolute; z-index: 5; right: calc(.875rem + env(safe-area-inset-right, 0px));
+    bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
+    border-radius: var(--bb-map-action-radius, 1rem);
+    box-shadow: var(--bb-shadow-overlay);
   }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));

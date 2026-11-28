@@ -121,9 +121,10 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(shellCss).toContain('inset-block-end: calc(min(45dvh, 24rem) + 3.75rem + env(safe-area-inset-bottom, 0px));');
     expect(shellCss).toContain('inset-block-end: calc(min(45dvh, 24rem) + 7.25rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('position: absolute; z-index: 5; right: 1.125rem;');
-    expect(css).toContain('right: .875rem; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('right: calc(.875rem + env(safe-area-inset-right, 0px));');
+    expect(css).toContain('bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
     expect((4 - .75) * 16 - 44).toBe(8); // Desktop legend to SOS.
-    expect((3.75 - .5) * 16 - 44).toBe(8); // Mobile legend to SOS.
+    expect((3.75 - .5) * 16 - 44).toBe(8); // Mobile SOS locator to SOS.
     expect((7.5 - 4) * 16 - 48).toBe(8); // Desktop SOS to Broadcast.
     expect((7.25 - 3.75) * 16 - 48).toBe(8); // Mobile SOS to Broadcast.
     expect((1.125 * 16 + 44 / 2) - (1 * 16 + 48 / 2)).toBe(0); // Desktop centers.
@@ -142,7 +143,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(css).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));');
     expect(css).toContain('border-radius: var(--bb-radius-card, 24px);\n  background: rgba(var(--v-theme-surface), .95);');
     expect(css).toContain('min-height: 0; overflow-y: auto; overscroll-behavior: contain;\n  padding: .15rem;');
-    expect(dispatch).toContain('document.getElementById("dispatch-recenter")?.focus({ preventScroll: true });');
+    expect(dispatch).toContain('document.getElementById(compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter")?.focus({ preventScroll: true });');
     expect(css).not.toContain('.admin-dispatch__map-and-actions .map-selected-alert-card {');
   });
 

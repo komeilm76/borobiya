@@ -45,7 +45,7 @@ describe("admin SOS triage flow", () => {
     expect(mapJump).toContain('frameSelectedIncident();');
     expect(mapJump).toContain('document.getElementById("dispatch-map")');
     expect(mapJump).toContain('scrollIntoView({');
-    expect(mapJump).toContain('document.getElementById("dispatch-recenter")?.focus({ preventScroll: true });');
+    expect(mapJump).toContain('document.getElementById(compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter")?.focus({ preventScroll: true });');
     expect(css).toContain('#dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(source).toMatch(/function focusResponders\(\): void \{\s*if \(!adminSos\.selectedRequest\) return;/);
     expect(source).toContain('target.focus({ preventScroll: true });');

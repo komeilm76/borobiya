@@ -157,7 +157,7 @@ describe("SOS center on-map labels and offscreen directions", () => {
     expect(legend).toContain(':aria-expanded="legendOpen" aria-controls="dispatch-map-legend"');
     expect(legend).toContain('@click="legendOpen = !legendOpen"');
     expect(legend).toContain('id="dispatch-map-legend" class="dispatch-map-key"');
-    expect(legend).toContain('v-show="legendOpen"');
+    expect(legend).toContain('v-show="legendOpen && !compactDispatch"');
     expect(legend).toContain('v-for="item in sosSeverityKey"');
     const css = styles[0]!.content;
     expect(css).toContain('.admin-dispatch__legend-toggle {\n  position: absolute; z-index: 5; right: 1.125rem;');

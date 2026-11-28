@@ -1,0 +1,34 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+
+const source = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
+const { template, styles } = parse(source).descriptor;
+const markup = template!.content;
+const css = styles[0]!.content;
+
+describe("compact dispatch map actions", () => {
+  it("keeps the desktop legend and recenter control, but hides both legend UI elements on mobile", () => {
+    expect(markup).toContain('v-if="!compactDispatch" id="dispatch-legend-toggle"');
+    expect(markup).toContain('v-show="legendOpen && !compactDispatch"');
+    expect(markup).toContain('v-if="adminSos.selectedRequest && !compactDispatch" id="dispatch-recenter"');
+    expect(markup).toContain('v-for="item in sosSeverityKey"');
+    expect(css).toContain('.admin-dispatch__legend-toggle {\n  position: absolute; z-index: 5; right: 1.125rem;');
+  });
+
+  it("puts a selected-SOS locator in the former legend slot, clear of the SOS action", () => {
+    const locatorStart = markup.indexOf('<v-btn v-if="compactDispatch && adminSos.selectedRequest" id="dispatch-recenter-mobile"');
+    const locator = markup.slice(locatorStart, markup.indexOf('/>', locatorStart));
+    expect(locator).toContain('v-if="compactDispatch && adminSos.selectedRequest"');
+    expect(locator).toContain('class="admin-dispatch__recenter-mobile map-selected-alert-card"');
+    expect(locator).toContain('aria-label="نمایش محل حادثه روی نقشه"');
+    expect(locator).toContain('@click="focusSelectedSosOnMap"');
+    expect(css).toContain('right: calc(.875rem + env(safe-area-inset-right, 0px));');
+    expect(css).toContain('bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('.map-selected-alert-card {\n  flex: none; width: 44px; height: 44px;');
+    expect(source).toContain('map.flyTo({ center: [incident.location.lon, incident.location.lat],');
+    expect(source).toContain('compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter"');
+    expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "mobile-map-actions", source: markup }).errors).toEqual([]);
+    expect(compileStyle({ filename: "AdminDispatchView.vue", id: "mobile-map-actions", scoped: true, source: css }).errors).toEqual([]);
+  });
+});
