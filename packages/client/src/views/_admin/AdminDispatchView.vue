@@ -1,5 +1,6 @@
 <template>
   <main id="dispatch-workspace" class="admin-dispatch" aria-label="مرکز پایش و اعزام اضطراری"
+    :class="{ 'admin-dispatch--incident-at-top': incidentAtMapTop }"
     :style="compactDispatch && sheetDragHeight !== null ? { '--dispatch-current-sheet-height': `${sheetDragHeight}px` } : undefined">
     <!-- Teleported above the workspace: feedback must not shrink or hide the responder list. -->
     <v-snackbar id="dispatch-notice-05"
@@ -410,7 +411,7 @@
     </aside>
     <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
         <section id="dispatch-search" class="admin-dispatch__search" aria-label="جست‌وجو روی نقشه"
-          :inert="compactDispatch && (sheetExpanded || sheetDragging)">
+          :class="{ 'admin-dispatch__search--hidden': hideDispatchSearch }" :inert="hideDispatchSearch">
           <div class="admin-dispatch__search-form" role="search">
             <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجو در نقشه"
               placeholder="کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
@@ -595,18 +596,20 @@
             </div>
           </v-card-title>
           <v-divider />
-          <div class="admin-dispatch__sender" role="group" aria-label="ارسال‌کنندهٔ درخواست">
-            <button id="dispatch-action-19" type="button" class="admin-dispatch__sender-avatar"
+          <div class="admin-dispatch__sender-group" role="group" aria-label="ارسال‌کنندهٔ درخواست">
+            <button id="dispatch-action-19" type="button" class="admin-dispatch__sender"
               aria-label="مشاهدهٔ پروفایل ارسال‌کننده" aria-haspopup="dialog" title="مشاهدهٔ پروفایل ارسال‌کننده"
-              @click="profileUserId = null; senderProfileOpen = true">
-              <v-icon icon="mdi-account-circle-outline" size="26" aria-hidden="true" />
+              @click="collapseSheetForIncident(); profileUserId = null; senderProfileOpen = true">
+              <span class="admin-dispatch__sender-avatar" aria-hidden="true">
+                <v-icon icon="mdi-account-circle-outline" size="26" />
+              </span>
+              <span class="admin-dispatch__sender-copy">
+                <strong>ارسال‌کنندهٔ درخواست</strong>
+                <span class="admin-dispatch__sender-name" dir="ltr" v-if="requesterName">@{{ requesterName }}</span>
+                <span v-else class="admin-dispatch__sender-placeholder" role="status">{{ requesterLoading ? 'در حال دریافت نام کاربری…' : 'نام کاربری در دسترس نیست' }}</span>
+              </span>
             </button>
-            <div class="admin-dispatch__sender-copy">
-              <strong>ارسال‌کنندهٔ درخواست</strong>
-              <span class="admin-dispatch__sender-name" dir="ltr" v-if="requesterName">@{{ requesterName }}</span>
-              <span v-else class="admin-dispatch__sender-placeholder" role="status">{{ requesterLoading ? 'در حال دریافت نام کاربری…' : 'نام کاربری در دسترس نیست' }}</span>
-              <button id="dispatch-button-06" v-if="requesterFailed" type="button" class="admin-dispatch__inline-retry" @click="requesterRetry++">تلاش دوباره</button>
-            </div>
+            <button id="dispatch-button-06" v-if="requesterFailed" type="button" class="admin-dispatch__inline-retry" @click="requesterRetry++">تلاش دوباره</button>
           </div>
           <div id="dispatch-notice-08"
             v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer' &&
@@ -828,6 +831,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
 import { dispatchDraggedHeight, dispatchSheetBounds, dispatchSheetShouldExpand } from "@/admin/dispatch-sheet-gesture";
+import { dispatchMapPanelState } from "@/admin/dispatch-map-panel-state";
 
 const sosSeverityKey = [
   { severity: "high", label: "فوری" },
@@ -1171,13 +1175,12 @@ function setSheetExpanded(expanded: boolean): void {
   sheetExpanded.value = expanded;
   sheetDragHeight.value = null;
 }
-// Search and the shell's map actions become unavailable under the open sheet.
-// Return focus to its handle only if it was on one of those hidden controls.
+// The shell's floating actions become unavailable under the open sheet.
+// Return focus to the handle if one of those actions was focused.
 watch(sheetExpanded, (expanded) => {
   if (!expanded || !compactDispatch.value) return;
   const active = document.activeElement;
-  if (active instanceof HTMLElement &&
-    (document.getElementById("dispatch-search")?.contains(active) || active.closest(".sos-fab, .app-general-share"))) {
+  if (active instanceof HTMLElement && active.closest(".sos-fab, .app-general-share")) {
     document.getElementById("dispatch-sheet-handle")?.focus({ preventScroll: true });
   }
 }, { flush: "sync" });
@@ -1257,6 +1260,19 @@ function selectSheetTab(tab: "queue" | "responders", expand = false): void {
 }
 const incidentExpanded = ref(!compactDispatch.value);
 watch(compactDispatch, (compact) => { incidentExpanded.value = !compact; });
+// With no incident selected, search stays available even over an expanded
+// worklist. Open incident details take the search slot at the top of the map.
+const mapPanelState = computed(() => dispatchMapPanelState(compactDispatch.value, !!adminSos.selectedRequest,
+  sheetExpanded.value, sheetDragging.value, incidentExpanded.value));
+const incidentAtMapTop = computed(() => mapPanelState.value.incidentAtTop);
+const hideDispatchSearch = computed(() => mapPanelState.value.hideSearch);
+watch(hideDispatchSearch, (hidden) => {
+  if (!hidden) return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && document.getElementById("dispatch-search")?.contains(active)) {
+    document.getElementById(sheetExpanded.value ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });
+  }
+}, { flush: "sync" });
 function collapseSheetForIncident(): void {
   if (compactDispatch.value && sheetExpanded.value) setSheetExpanded(false);
 }
@@ -2376,16 +2392,19 @@ onBeforeUnmount(() => {
 #dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
 .admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
 .admin-dispatch__responders:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
+.admin-dispatch__sender-group { margin: .85rem 1rem 0; }
 .admin-dispatch__sender { display: grid; grid-template-columns: 44px minmax(0, 1fr);
-  align-items: center; gap: .65rem; min-width: 0;
-  margin: .85rem 1rem 0; padding: .55rem .7rem;
+  align-items: center; gap: .65rem; min-width: 0; width: 100%;
+  padding: .55rem .7rem; text-align: start; font: inherit; color: inherit; cursor: pointer;
   border: 1px solid rgba(var(--v-theme-on-surface), .1);
   border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); }
+.admin-dispatch__sender:hover, .admin-dispatch__sender:focus-visible {
+  border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .08); }
+.admin-dispatch__sender:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__sender-avatar { display: grid; place-items: center; width: 44px; height: 44px;
-  padding: 0; border: 1px solid rgba(var(--v-theme-primary), .22); border-radius: 50%;
-  color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); cursor: pointer; }
-.admin-dispatch__sender-avatar:hover { border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .2); }
-.admin-dispatch__sender-avatar:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+  border: 1px solid rgba(var(--v-theme-primary), .22); border-radius: 50%;
+  color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
+.admin-dispatch__sender:hover .admin-dispatch__sender-avatar { background: rgba(var(--v-theme-primary), .2); }
 .admin-dispatch__sender-copy { display: grid; min-width: 0; gap: .12rem; }
 .admin-dispatch__sender-copy strong { font-size: .9rem; }
 .admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .88rem;
@@ -3086,8 +3105,9 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__incident-panel .admin-dispatch__detail-heading { justify-content: flex-start; gap: .4rem; }
 .admin-dispatch__incident-panel .admin-dispatch__detail-badges { gap: .3rem; }
+.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem .6rem .2rem; }
 .admin-dispatch__incident-panel .admin-dispatch__sender {
-  gap: .5rem; margin: .4rem .6rem .2rem; padding: .4rem .55rem;
+  gap: .5rem; padding: .4rem .55rem;
   border: 1px solid color-mix(in srgb, var(--bb-color-outline) 50%, transparent);
   border-radius: .75rem; background: var(--bb-color-inset);
 }
@@ -3210,8 +3230,8 @@ onBeforeUnmount(() => {
   }
   .admin-dispatch:has(.admin-dispatch__sidebar--expanded) {
     --dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);
-    --dispatch-incident-top: 1rem;
   }
+  .admin-dispatch--incident-at-top { --dispatch-incident-top: 1rem; }
   .admin-dispatch__sidebar {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%;
     height: min(40dvh, 21rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
@@ -3235,14 +3255,11 @@ onBeforeUnmount(() => {
     padding: .6rem; gap: .3rem;
   }
   .admin-dispatch__search-results { max-height: none; }
-  /* The list takes priority when expanded; keep the search/menu in the DOM so
-     it returns intact on collapse, but remove its focusable controls. */
-  .admin-dispatch:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__search,
-  .admin-dispatch:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__search {
-    visibility: hidden; pointer-events: none;
-  }
+  /* Only a selected incident displaces search: while the sheet owns the map
+     or the incident details are open. An empty sheet keeps search available. */
+  .admin-dispatch__search--hidden { visibility: hidden; pointer-events: none; }
   .admin-dispatch__incident-panel {
-    /* Below search at peek; in its place when the sheet is expanded. */
+    /* Below search at peek; in its place for an open sheet or open details. */
     top: calc(var(--dispatch-incident-top) + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;
     width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - var(--dispatch-incident-top) - .75rem - env(safe-area-inset-top, 0px));
   }

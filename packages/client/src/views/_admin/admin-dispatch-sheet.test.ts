@@ -64,14 +64,19 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
   });
 
   it("gives the expanded sheet the map controls' space and returns to incident details on tap", () => {
-    expect(markup).toContain(':inert="compactDispatch && (sheetExpanded || sheetDragging)"');
+    expect(markup).toContain(':class="{ \'admin-dispatch--incident-at-top\': incidentAtMapTop }"');
+    expect(markup).toContain(":class=\"{ 'admin-dispatch__search--hidden': hideDispatchSearch }\" :inert=\"hideDispatchSearch\"");
     expect(markup).toContain('@click.self="collapseSheetForIncident"'); // Child actions can still expand the sheet.
     expect(markup).toContain('@click="toggleIncidentPanel"');
     expect(css).toContain('--dispatch-incident-top: 6rem;');
     expect(css).toContain('--dispatch-incident-top: 1rem;');
     expect(css).toContain('top: calc(var(--dispatch-incident-top) + env(safe-area-inset-top, 0px));');
-    expect(css).toContain('.admin-dispatch:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__search,');
-    expect(css).toContain('.admin-dispatch:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__search {\n    visibility: hidden; pointer-events: none;');
+    expect(css).toContain('.admin-dispatch--incident-at-top { --dispatch-incident-top: 1rem; }');
+    expect(css).toContain('.admin-dispatch__search--hidden { visibility: hidden; pointer-events: none; }');
+    expect(css).not.toContain('.admin-dispatch:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__search');
+    expect(source).toContain('dispatchMapPanelState(compactDispatch.value, !!adminSos.selectedRequest,\n  sheetExpanded.value, sheetDragging.value, incidentExpanded.value)');
+    expect(source).toContain('watch(hideDispatchSearch, (hidden) => {');
+    expect(source).toContain('document.getElementById(sheetExpanded.value ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share,');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .app-general-share {\n    visibility: hidden; pointer-events: none;');

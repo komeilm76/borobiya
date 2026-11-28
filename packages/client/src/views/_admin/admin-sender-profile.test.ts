@@ -9,16 +9,19 @@ const profile = readFileSync(new URL("./AdminUserProfileDialog.vue", import.meta
 
 describe("admin sender identity and profile access", () => {
   it("links the selected SOS requester by exact ID without interrupting dispatch", () => {
-    expect(dispatch).toContain('class="admin-dispatch__sender" role="group"');
+    expect(dispatch).toContain('class="admin-dispatch__sender-group" role="group"');
     const incident = dispatch.slice(dispatch.indexOf('id="dispatch-incident"'), dispatch.indexOf('id="dispatch-dialog-01"'));
     expect(incident).not.toContain('adminSos.selectedRequest.requesterId');
     expect(incident).toContain('class="admin-dispatch__sender-name"');
-    const avatar = incident.slice(incident.indexOf('<button id="dispatch-action-19"'), incident.indexOf('</button>', incident.indexOf('<button id="dispatch-action-19"')));
-    expect(avatar).toContain('type="button" class="admin-dispatch__sender-avatar"');
-    expect(avatar).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده" aria-haspopup="dialog"');
-    expect(avatar).toContain('@click="profileUserId = null; senderProfileOpen = true"');
-    expect(avatar).toContain('icon="mdi-account-circle-outline"');
-    expect(avatar).not.toContain('>پروفایل<');
+    const card = incident.slice(incident.indexOf('<button id="dispatch-action-19"'), incident.indexOf('</button>', incident.indexOf('<button id="dispatch-action-19"')));
+    expect(card).toContain('type="button" class="admin-dispatch__sender"');
+    expect(card).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده" aria-haspopup="dialog"');
+    expect(card).toContain('@click="collapseSheetForIncident(); profileUserId = null; senderProfileOpen = true"');
+    expect(card).toContain('class="admin-dispatch__sender-avatar" aria-hidden="true"');
+    expect(card).toContain('class="admin-dispatch__sender-name"');
+    expect(card.match(/<button/g)).toHaveLength(1); // No nested retry action inside the profile trigger.
+    expect(incident).toContain('id="dispatch-button-06" v-if="requesterFailed"');
+    expect(card).not.toContain('>پروفایل<');
     expect(incident).not.toContain('class="admin-dispatch__sender-action"');
     expect(dispatch).toContain(':user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"');
     expect(dispatch).toMatch(/watch\(\(\) => adminSos\.selectedRequest\?\.id, \(\) => \{\s*senderProfileOpen\.value = false;\s*profileUserId\.value = null;\s*photoDialogOpen\.value = false;[\s\S]*?\}, \{ flush: "sync" \}\);/);
@@ -85,8 +88,9 @@ describe("admin sender identity and profile access", () => {
 
   it("keeps profile actions reachable on narrow screens and colors from theme tokens", () => {
     expect(dispatch).toContain('.admin-dispatch__sender-avatar { display: grid; place-items: center; width: 44px; height: 44px;');
-    expect(dispatch).toContain('.admin-dispatch__sender-avatar:hover');
-    expect(dispatch).toContain('.admin-dispatch__sender-avatar:focus-visible');
+    expect(dispatch).toContain('.admin-dispatch__sender:hover, .admin-dispatch__sender:focus-visible');
+    expect(dispatch).toContain('.admin-dispatch__sender:focus-visible');
+    expect(dispatch).toContain('width: 100%;\n  padding: .55rem .7rem; text-align: start; font: inherit; color: inherit; cursor: pointer;');
     expect(dispatch).toContain('grid-template-columns: 44px minmax(0, 1fr);');
     expect(dispatch).toContain('.dispatch-request-row.v-list-item--active');
     expect(users).toContain('.admin-user-identity:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
