@@ -208,7 +208,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     loading.value = true;
     errorMessage.value = null;
 
-    const targetFilter = statusOverride;
+    // Manual reloads and socket-triggered refreshes must read the same server
+    // subset as the active queue, not the first page of all SOS requests.
+    const targetFilter = statusOverride ?? filterStatus.value;
     try {
       const response = await fetchListWithAuthRetry(
         targetFilter && targetFilter !== "all" && targetFilter !== "pending"

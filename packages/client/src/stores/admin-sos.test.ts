@@ -113,6 +113,31 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(listRequests.mock.calls[1]?.[1]).toMatchObject({ status: "dispatched" });
   });
 
+  it("reloads the active dispatched subset instead of the first unfiltered page", async () => {
+    const pending = makeSosRecord();
+    const dispatched = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "dispatched" });
+    const listRequests = vi.fn(async (_token: string, options?: { status?: string }) =>
+      options?.status === "dispatched"
+        ? { items: [dispatched], total: 1 }
+        : { items: [pending], total: 101 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.listLoaded).toBe(true));
+    store.setFilterStatus("dispatched");
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    expect(store.visibleRequests).toEqual([dispatched]);
+    await store.refreshRequests(); // Same entry point as the sidebar reload button.
+    expect(listRequests.mock.calls[2]?.[1]).toMatchObject({ status: "dispatched" });
+    expect(store.visibleRequests).toEqual([dispatched]);
+    expect(store.queueVerified).toBe(true);
+    store.setFilterStatus("all");
+    await vi.waitFor(() => expect(listRequests).toHaveBeenCalledTimes(4));
+    expect(listRequests.mock.calls[3]?.[1]?.status).toBeUndefined();
+  });
+
   it("clears a selected request when switching to a queue that hides it", async () => {
     const pending = makeSosRecord();
     const dispatched = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "dispatched" });
