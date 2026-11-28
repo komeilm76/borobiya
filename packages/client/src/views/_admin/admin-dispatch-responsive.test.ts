@@ -87,8 +87,18 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
   it("keeps the narrow layout usable and its actions identifiable", () => {
     expect(css).toContain('@media (max-width: 900px) {');
     expect(css).toContain('height: min(40dvh, 21rem);');
-    expect(css).toContain('max-height: min(25dvh, 15rem);');
-    expect(css).toContain('.admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }');
+    const compactLayout = css.slice(css.indexOf('@media (max-width: 900px) {', css.indexOf('.admin-dispatch__search {')),
+      css.indexOf('/* Dispatch rail: one calm surface'));
+    expect(compactLayout).toContain('top: calc(6rem + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;');
+    expect(compactLayout).toContain('width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px));');
+    expect(compactLayout).toContain('max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px)));');
+    expect(compactLayout).toContain('max-width: 100%; height: auto; min-height: 32px; white-space: normal;');
+    expect(compactLayout).toContain('.admin-dispatch__detail-badges :deep(.v-chip__content)');
+    expect(css).toContain('padding: .5rem .65rem .35rem; line-height: 1.35;\n  white-space: normal; overflow-wrap: anywhere;');
+    expect(css).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender { grid-template-columns: 2rem minmax(0, 1fr); }');
+    expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
+    expect(source).toContain("'--dispatch-current-sheet-height': `${sheetDragHeight}px`");
+    expect(compactLayout).toContain('--dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);');
     // Child map controls use offsets within the map card, not the outer sidebar width twice.
     expect(css).toContain('right: 4.25rem; left: 24rem;');
     expect(css).toContain('max-width: calc(100% - 28.5rem);');

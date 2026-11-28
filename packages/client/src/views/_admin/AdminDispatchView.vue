@@ -1,5 +1,6 @@
 <template>
-  <main id="dispatch-workspace" class="admin-dispatch" aria-label="مرکز پایش و اعزام اضطراری">
+  <main id="dispatch-workspace" class="admin-dispatch" aria-label="مرکز پایش و اعزام اضطراری"
+    :style="compactDispatch && sheetDragHeight !== null ? { '--dispatch-current-sheet-height': `${sheetDragHeight}px` } : undefined">
     <!-- Teleported above the workspace: feedback must not shrink or hide the responder list. -->
     <v-snackbar id="dispatch-notice-05"
       :model-value="Boolean(adminSos.dispatchFeedback)"
@@ -3059,6 +3060,7 @@ onBeforeUnmount(() => {
    card's wide spacing would otherwise wrap every action in this narrow overlay. */
 .admin-dispatch__incident-panel #dispatch-incident :deep(.v-card-title) {
   padding: .5rem .65rem .35rem; line-height: 1.35;
+  white-space: normal; overflow-wrap: anywhere;
 }
 .admin-dispatch__incident-panel .admin-dispatch__detail-heading { justify-content: flex-start; gap: .4rem; }
 .admin-dispatch__incident-panel .admin-dispatch__detail-badges { gap: .3rem; }
@@ -3189,6 +3191,10 @@ onBeforeUnmount(() => {
   }
 }
 @media (max-width: 900px) {
+  .admin-dispatch { --dispatch-current-sheet-height: min(40dvh, 21rem); }
+  .admin-dispatch:has(.admin-dispatch__sidebar--expanded) {
+    --dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);
+  }
   .admin-dispatch__sidebar {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%;
     height: min(40dvh, 21rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
@@ -3213,10 +3219,20 @@ onBeforeUnmount(() => {
   }
   .admin-dispatch__search-results { max-height: none; }
   .admin-dispatch__incident-panel {
-    top: calc(11rem + env(safe-area-inset-top, 0px)); left: .75rem;
-    width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
+    /* Align with search, immediately below its 48px menu row. */
+    top: calc(6rem + env(safe-area-inset-top, 0px)); left: .75rem; right: .75rem;
+    width: auto; max-height: calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px));
   }
-  .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
+  .admin-dispatch__incident-panel--expanded {
+    max-height: min(45dvh, 24rem, calc(100dvh - var(--dispatch-current-sheet-height) - 6.75rem - env(safe-area-inset-top, 0px)));
+  }
+  .admin-dispatch__incident-panel .admin-dispatch__detail-badges { min-width: 0; }
+  .admin-dispatch__incident-panel .admin-dispatch__detail-badges :deep(.v-chip) {
+    max-width: 100%; height: auto; min-height: 32px; white-space: normal;
+  }
+  .admin-dispatch__incident-panel .admin-dispatch__detail-badges :deep(.v-chip__content) {
+    white-space: normal; overflow-wrap: anywhere;
+  }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
     left: .75rem; right: 4.25rem; width: calc(100% - 5rem);
