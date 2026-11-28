@@ -49,6 +49,13 @@ describe("dispatch worklists and incident evidence", () => {
     expect(title.indexOf('class="dispatch-request-row__marker"')).toBeGreaterThan(0);
     expect(title.indexOf('class="dispatch-request-row__marker"')).toBeLessThan(title.indexOf('class="dispatch-request-row__name"'));
     expect(title).toContain('role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`"');
+    expect(title).not.toContain('pulse-indicator');
+    expect(queue).not.toContain('dispatch-request-row--replacement');
+    expect(css).not.toContain('.pulse-indicator');
+    expect(css).not.toContain('@keyframes sos-pulse');
+    expect(css).not.toContain('.dispatch-request-row--replacement .dispatch-request-row__marker');
+    expect(css).toContain('border-radius: 50%; background: var(--sos-priority-accent);');
+    expect(source).toContain('id: SOS_PULSE_LAYER_ID'); // Map alerts still pulse; only queue dots are static.
     expect(css).not.toContain('.dispatch-request-row :deep(.v-list-item__prepend)');
     expect(css).toContain('display: flex; align-items: center; gap: .35rem !important;\n  white-space: normal; min-width: 0;');
     const meta = queue.slice(queue.indexOf('class="dispatch-request-row__meta'), queue.indexOf('</div>', queue.indexOf('class="dispatch-request-row__meta')));

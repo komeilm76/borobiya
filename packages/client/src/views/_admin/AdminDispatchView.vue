@@ -198,12 +198,11 @@
               :aria-current="item.id === adminSos.selectedId ? 'true' : undefined"
               :aria-pressed="item.id === adminSos.selectedId"
               class="dispatch-request-row" rounded="lg"
-              :class="{ 'dispatch-request-row--replacement': item.status === 'cancelled_by_rescuer' }"
               :style="sosPriorityStyle(item.severity)"
               @click="toggleQueueRequest(item)"
             >
                 <v-list-item-title class="dispatch-request-row__title font-weight-bold">
-                  <span class="dispatch-request-row__marker" :class="{ 'pulse-indicator': item.severity === 'high' || item.status === 'cancelled_by_rescuer' }"
+                  <span class="dispatch-request-row__marker"
                     role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`" />
                   <span class="dispatch-request-row__name">{{ incidentLabel(item.incidentTypeId) }}</span>
                 </v-list-item-title>
@@ -755,9 +754,10 @@
         </v-card-title>
         <v-card-text class="admin-dispatch__help-content">
           <section>
-            <h2>انتخاب درخواست و امدادگر</h2>
-            <p>از تب «درخواست‌ها» یک SOS را انتخاب کنید؛ سپس در تب «امدادگران» افراد را بررسی و انتخاب کنید. با دستگیرهٔ بالای پنل می‌توانید فضای نقشه و فهرست را تغییر دهید.</p>
-            <p>اکنون <strong>{{ adminSos.selectedResponderIds.length.toLocaleString('fa-IR') }} امدادگر</strong> انتخاب شده است. تعداد انتخاب‌ها روی دکمهٔ ارسال پیشنهاد هم نمایش داده می‌شود.</p>
+            <h2>انتخاب درخواست و ارسال پیشنهاد</h2>
+            <p>در موبایل، ابتدا فهرست درخواست‌های SOS نمایش داده می‌شود. با انتخاب یک درخواست، فهرست امدادگران نزدیک آن باز می‌شود. دکمهٔ پیکان کنار «ارسال پیشنهاد» به فهرست SOS برمی‌گردد و انتخاب درخواست را لغو می‌کند. با دستگیرهٔ بالای پنل می‌توانید ارتفاع فهرست را تغییر دهید.</p>
+            <p>در نمایش بزرگ‌تر، صف درخواست‌ها و فهرست امدادگران هم‌زمان دیده می‌شوند. نقطهٔ رنگی کنار عنوان، اولویت حادثه را نشان می‌دهد؛ نماد تصویر یعنی درخواست پیوست دارد. وضعیت درخواست جداگانه نمایش داده می‌شود.</p>
+            <p>امدادگران را بررسی و انتخاب کنید؛ تعداد افراد انتخاب‌شده روی دکمهٔ «ارسال پیشنهاد» دیده می‌شود. ارسال بدون انتخاب امدادگر ممکن نیست.</p>
           </section>
           <section>
             <h2>معیارهای فهرست امدادگران</h2>
@@ -2701,17 +2701,6 @@ onBeforeUnmount(() => {
   .admin-dispatch__submit :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 
-.pulse-indicator {
-  position: relative;
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--alert-color, #dc2626);
-  box-shadow: 0 0 0 0 var(--alert-color, #dc2626);
-  animation: sos-pulse 1.6s infinite ease-out;
-}
-
 /* Replacement is a compact work item, not a red modal-style alert. The
    same quiet surface and nested radius as the SOS and responder rows apply. */
 :global(.dispatch-feedback-toast__wrapper .admin-sos-toast__message > .v-icon.text-success) {
@@ -2754,21 +2743,6 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .dispatch-replacement__actions :deep(.v-btn),
   .admin-dispatch__incident-panel .admin-dispatch__replacement-action { min-height: 44px; height: 44px; }
   .dispatch-replacement__location summary { min-height: 44px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .pulse-indicator { animation: none; }
-}
-
-@keyframes sos-pulse {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--alert-color, #dc2626) 65%, transparent);
-  }
-  75% {
-    box-shadow: 0 0 0 10px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
 }
 .mission-timeline-select {
   width: 100%; min-height: 44px;
@@ -2922,10 +2896,6 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .dispatch-request-row__marker {
   display: block; flex: none; width: 9px; height: 9px;
   border-radius: 50%; background: var(--sos-priority-accent);
-  --alert-color: var(--sos-priority-accent);
-}
-#dispatch-sidebar .dispatch-request-row--replacement .dispatch-request-row__marker {
-  background: #dc2626; --alert-color: #dc2626;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {
   display: flex; align-items: center; gap: .35rem !important;

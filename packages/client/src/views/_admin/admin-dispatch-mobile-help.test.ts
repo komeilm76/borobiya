@@ -42,7 +42,14 @@ describe("compact dispatch search and on-demand guidance", () => {
     expect(markup).toContain('aria-controls="dispatch-help-dialog" :aria-expanded="helpDialogOpen"');
     expect(guide).toContain('معیارهای فهرست امدادگران');
     expect(guide).toContain('جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند');
-    expect(guide).toContain("adminSos.selectedResponderIds.length.toLocaleString('fa-IR')");
+    expect(guide).toContain('در موبایل، ابتدا فهرست درخواست‌های SOS نمایش داده می‌شود.');
+    expect(guide).toContain('دکمهٔ پیکان کنار «ارسال پیشنهاد» به فهرست SOS برمی‌گردد و انتخاب درخواست را لغو می‌کند.');
+    expect(guide).toContain('در نمایش بزرگ‌تر، صف درخواست‌ها و فهرست امدادگران هم‌زمان دیده می‌شوند.');
+    expect(guide).toContain('نقطهٔ رنگی کنار عنوان، اولویت حادثه را نشان می‌دهد');
+    expect(guide).toContain('تعداد افراد انتخاب‌شده روی دکمهٔ «ارسال پیشنهاد» دیده می‌شود.');
+    expect(guide).not.toContain('از تب «درخواست‌ها»');
+    expect(guide).not.toContain('در تب «امدادگران»');
+    expect(guide).not.toContain('اکنون <strong>');
     expect(worklist).not.toContain('معیارهای فهرست امدادگران');
     expect(worklist).not.toContain('جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند');
     expect(worklist).not.toContain('امدادگر انتخاب شده است.');
