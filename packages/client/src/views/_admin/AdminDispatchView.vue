@@ -246,7 +246,7 @@
               : adminSos.loading ? 'در حال دریافت درخواست SOS…'
                 : 'این درخواست در فهرست فعلی موجود نیست؛ به فهرست SOS بازگردید.' }}</span>
             <v-btn v-if="compactDispatch && adminSos.selectedId" id="dispatch-action-30"
-              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="text"
+              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="tonal"
               aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"
               aria-controls="dispatch-queue-region" @click="returnToSosQueue" />
           </div>
@@ -387,7 +387,7 @@
 
           <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
             <v-btn v-if="compactDispatch" id="dispatch-action-29"
-              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="text"
+              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="tonal"
               aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"
               aria-controls="dispatch-queue-region" @click="returnToSosQueue" />
             <v-btn id="dispatch-action-17"

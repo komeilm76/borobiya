@@ -34,7 +34,8 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     const actions = rail.slice(rail.indexOf('class="admin-dispatch__submit'), rail.indexOf('</v-card-actions>'));
     expect(actions).toContain('v-if="compactDispatch" id="dispatch-action-29"');
     expect(actions.indexOf('id="dispatch-action-29"')).toBeLessThan(actions.indexOf('id="dispatch-action-17"'));
-    expect(actions).toContain('icon="mdi-arrow-right" size="small" variant="text"');
+    expect(actions).toContain('icon="mdi-arrow-right" size="small" variant="tonal"');
+    expect(rail).toContain('id="dispatch-action-30"\n              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="tonal"');
     expect(actions).toContain('aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"');
     expect(actions).toContain('aria-controls="dispatch-queue-region" @click="returnToSosQueue"');
     expect(rail).toContain('v-if="compactDispatch && adminSos.selectedId" id="dispatch-action-30"'); // Back remains possible while a deep link is loading.
