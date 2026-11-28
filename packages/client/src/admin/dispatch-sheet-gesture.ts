@@ -1,10 +1,12 @@
-// Use the same dvh/rem stops as the CSS sheet and map clearance. These
-// bounds are evaluated at gesture start so a browser toolbar resize cannot
-// cause the handle to jump mid-drag.
-export function dispatchSheetBounds(viewportHeight: number, rootFontSize: number): { peek: number; expanded: number } {
+// Match the CSS sheet stops, including its short-phone clearance for the
+// stacked SOS and incident-location controls. Evaluate once at drag start so
+// browser toolbar changes cannot make the handle jump mid-gesture.
+export function dispatchSheetBounds(viewportHeight: number, rootFontSize: number, safeAreaTop = 0): { peek: number; expanded: number } {
+  const peek = Math.min(viewportHeight * .40, rootFontSize * 21);
   return {
-    peek: Math.min(viewportHeight * .40, rootFontSize * 21),
-    expanded: Math.min(viewportHeight * .68, rootFontSize * 38)
+    peek,
+    expanded: Math.min(viewportHeight * .68, rootFontSize * 38,
+      Math.max(peek, viewportHeight - rootFontSize * 12.5 - safeAreaTop))
   };
 }
 

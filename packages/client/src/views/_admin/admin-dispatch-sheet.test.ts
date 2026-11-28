@@ -33,7 +33,8 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(rail).toContain('admin-dispatch__section--hidden');
     expect(rail.indexOf('id="dispatch-notice-04"')).toBeLessThan(rail.indexOf('id="dispatch-queue-region"'));
     expect(rail.indexOf('id="dispatch-queue-region"')).toBeLessThan(rail.indexOf('id="dispatch-nearby"'));
-    expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(68dvh, 38rem); }');
+    expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: var(--dispatch-expanded-sheet-height); }');
+    expect(shell).toContain('--dispatch-expanded-sheet-height: min(68dvh, 38rem,');
     expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }');
     expect(css).toContain('width: 100%; height: 44px;');
     expect(css).toContain('cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;');

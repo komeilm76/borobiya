@@ -607,9 +607,14 @@ a {
   }
 }
 @media (max-width: 900px) {
-  /* An open/dragging dispatch sheet owns this area; floating map actions
-     must not sit above its interactive worklists. They return on collapse. */
-  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,
+  /* Leave room for the 48px SOS and 44px selected-incident locator above the
+     expanded sheet, including the top safe area on short/notched phones. */
+  .app-shell--map:has(.admin-dispatch) {
+    --dispatch-expanded-sheet-height: min(68dvh, 38rem,
+      max(min(40dvh, 21rem), calc(100dvh - 12.5rem - env(safe-area-inset-top, 0px))));
+  }
+  /* During a drag the sheet can pass through the action rail. Restore both
+     controls at their final stop instead of letting them cover the handle. */
   .app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab {
     visibility: hidden; pointer-events: none;
   }
@@ -621,6 +626,9 @@ a {
   }
   .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
     inset-block-end: calc(min(40dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab {
+    inset-block-end: calc(var(--dispatch-expanded-sheet-height) + 3.75rem + env(safe-area-inset-bottom, 0px));
   }
   .app-shell--map:has(.admin-dispatch) .app-general-share {
     inset-block-end: calc(min(40dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));

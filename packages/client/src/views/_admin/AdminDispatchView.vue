@@ -1189,9 +1189,14 @@ function startSheetDrag(event: PointerEvent): void {
   const sidebar = dispatchSidebar.value;
   if (!sidebar) return;
   const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  // The compact search panel sits at 1rem + the top safe area. Read its
+  // resolved inset so gesture bounds match the sheet's CSS on notched phones.
+  const search = document.getElementById("dispatch-search");
+  const searchTop = search ? parseFloat(getComputedStyle(search).top) : NaN;
+  const safeAreaTop = Number.isFinite(searchTop) ? Math.max(0, searchTop - fontSize) : 0;
   sheetPointer = { id: event.pointerId, startY: event.clientY, startHeight: sidebar.getBoundingClientRect().height,
     lastY: event.clientY, lastTime: event.timeStamp, velocityY: 0,
-    bounds: dispatchSheetBounds(window.innerHeight, fontSize), moved: false };
+    bounds: dispatchSheetBounds(window.innerHeight, fontSize, safeAreaTop), moved: false };
   (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
 }
 function moveSheetDrag(event: PointerEvent): void {
@@ -3246,12 +3251,20 @@ onBeforeUnmount(() => {
   }
   .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
   /* The selected SOS map action takes the legend's former slot, aligned
-     directly beneath the app's SOS action with an 8px gap. */
+     directly beneath the app's SOS action with an 8px gap. The map canvas
+     retains the collapsed clearance, so offset the locator inside it when
+     the sheet expands instead of letting the sheet cover the button. */
   .admin-dispatch__recenter-mobile {
     position: absolute; z-index: 5; right: calc(.875rem + env(safe-area-inset-right, 0px));
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
     border-radius: var(--bb-map-action-radius, 1rem);
     box-shadow: var(--bb-shadow-overlay);
+  }
+  #dispatch-workspace:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__recenter-mobile {
+    bottom: calc(var(--dispatch-expanded-sheet-height) - min(40dvh, 21rem) + .5rem + env(safe-area-inset-bottom, 0px));
+  }
+  #dispatch-workspace:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__recenter-mobile {
+    visibility: hidden; pointer-events: none;
   }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
@@ -3407,7 +3420,7 @@ onBeforeUnmount(() => {
     transition: height .24s ease;
   }
   #dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }
-  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(68dvh, 38rem); }
+  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: var(--dispatch-expanded-sheet-height); }
   #dispatch-sidebar .admin-dispatch__sheet-handle {
     display: grid; place-items: center; flex: none; width: 100%; height: 44px;
     padding: 0 0 18px; border: 0; border-radius: .75rem; background: transparent;
