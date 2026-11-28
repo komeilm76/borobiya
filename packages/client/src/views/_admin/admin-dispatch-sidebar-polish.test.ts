@@ -131,11 +131,12 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect((.875 * 16 + 44 / 2) - (.75 * 16 + 48 / 2)).toBe(0); // Mobile centers.
   });
 
-  it("uses a single map search widget and a compact recenter action in its heading", () => {
+  it("uses a single map search row with a compact recenter action", () => {
     const markup = template!.content;
     const widget = markup.slice(markup.indexOf('<section id="dispatch-search"'), markup.indexOf('</section>', markup.indexOf('<section id="dispatch-search"')));
-    expect(widget).toContain('class="admin-dispatch__search-header"');
-    expect(widget).toContain('class="admin-dispatch__search-indicator"');
+    expect(widget).toContain('class="admin-dispatch__search-form" role="search"');
+    expect(widget).not.toContain('class="admin-dispatch__search-header"');
+    expect(widget).not.toContain('<h2>جست‌وجو روی نقشه</h2>');
     expect(widget).toContain('id="dispatch-recenter" class="map-selected-alert-card"');
     expect(widget).toContain('icon="mdi-crosshairs-gps"');
     expect(widget).toContain('variant="outlined" rounded="lg"');

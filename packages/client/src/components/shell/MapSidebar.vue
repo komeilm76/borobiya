@@ -120,7 +120,7 @@ const launcherTarget = ref<HTMLElement | null>(null);
 let launcherObserver: MutationObserver | null = null;
 
 // The dispatch view is async and may mount after this shared map shell. Keep
-// the original launcher until the mobile search header exists; follow route,
+// the original launcher until the mobile search row exists; follow route,
 // viewport changes without duplicating the menu or its focus state.
 function syncLauncherTarget(): void {
   if (route.name !== "admin-dispatch" || !compactMap.value) {
@@ -162,7 +162,7 @@ async function requestLogout(): Promise<void> {
 
 <style scoped>
 /* The shared launcher floats at the physical left on ordinary map routes;
-   compact dispatch alone hosts it inside the map-search heading. */
+   compact dispatch alone hosts it beside the map-search field. */
 .map-sidebar__launcher {
   position: fixed;
   z-index: 900;

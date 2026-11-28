@@ -8,21 +8,27 @@ const dispatchSfc = parse(dispatch).descriptor;
 const sidebarSfc = parse(sidebar).descriptor;
 
 describe("map menu within compact dispatch search", () => {
-  it("hosts the original map menu and network badge inside the search heading on compact dispatch", () => {
+  it("hosts the original map menu beside the search field on compact dispatch", () => {
     const search = dispatchSfc.template!.content.slice(
       dispatchSfc.template!.content.indexOf('<section id="dispatch-search"'),
       dispatchSfc.template!.content.indexOf('</section>', dispatchSfc.template!.content.indexOf('<section id="dispatch-search"'))
     );
     const menu = sidebarSfc.template!.content;
     expect(search).toContain('id="dispatch-search-menu-slot" class="admin-dispatch__search-menu-slot"');
-    expect(search.indexOf('id="dispatch-search-menu-slot"')).toBeLessThan(search.indexOf('id="dispatch-search-input"'));
+    const form = search.slice(search.indexOf('class="admin-dispatch__search-form"'), search.indexOf('</div>', search.indexOf('class="admin-dispatch__search-form"')));
+    expect(form.indexOf('id="dispatch-search-input"')).toBeLessThan(form.indexOf('id="dispatch-search-menu-slot"'));
+    expect(search).not.toContain('<h2>جست‌وجو روی نقشه</h2>');
+    expect(search).toContain('aria-label="جست‌وجو روی نقشه"');
+    expect(search).toContain('label="جست‌وجو در نقشه"');
     expect(menu).toContain('<Teleport :to="launcherTarget ?? \'body\'" :disabled="!launcherTarget">');
     expect(menu.match(/class="map-sidebar__menu-button"/g)).toHaveLength(1);
     expect(menu).toContain('v-bind="activatorProps"');
     expect(menu).toContain('<NetworkStatusIcon class="map-sidebar__network" />');
     expect(dispatchSfc.styles[0]!.content).toContain('.admin-dispatch__search-menu-slot { display: none; }');
+    expect(dispatchSfc.styles[0]!.content).toContain('display: flex; flex: none; align-items: center; gap: .4rem; min-width: 0;');
+    expect(dispatchSfc.styles[0]!.content).toContain('.admin-dispatch__search-form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }');
     expect(dispatchSfc.styles[0]!.content).toContain('display: grid; place-items: center; flex: none; width: 48px; height: 48px;');
-    expect(dispatchSfc.styles[0]!.content).toContain('top: calc(1.5rem + env(safe-area-inset-top, 0px)); right: .75rem;');
+    expect(dispatchSfc.styles[0]!.content).toContain('top: calc(1rem + env(safe-area-inset-top, 0px)); right: .75rem;');
     expect(dispatchSfc.styles[0]!.content).toContain('left: .75rem; width: auto; max-height: min(38dvh, 15rem);\n    padding: .6rem; gap: .3rem;');
     expect(dispatchSfc.styles[0]!.content).not.toContain('top: calc(2.75rem + env(safe-area-inset-top, 0px)); right: .75rem;');
     expect(dispatchSfc.styles[0]!.content).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));'); // Desktop unchanged.

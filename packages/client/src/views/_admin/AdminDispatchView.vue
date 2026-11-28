@@ -416,25 +416,18 @@
     </aside>
     <section id="dispatch-map-region" class="admin-dispatch__map-and-actions" aria-label="نقشه و جزئیات اعزام">
         <section id="dispatch-search" class="admin-dispatch__search" aria-label="جست‌وجو روی نقشه">
-          <div class="admin-dispatch__search-header">
-            <span class="admin-dispatch__search-indicator" :class="{ 'admin-dispatch__search-indicator--active': searchQuery.length >= 2 }" aria-hidden="true" />
-            <div class="admin-dispatch__search-copy">
-              <h2>جست‌وجو روی نقشه</h2>
-              <p>درخواست SOS، کاربر و مکان</p>
-            </div>
-            <!-- The shared map menu launcher teleports here only on compact dispatch. -->
+          <div class="admin-dispatch__search-form" role="search">
+            <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجو در نقشه"
+              placeholder="کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
+              prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" variant="outlined" rounded="lg"
+              autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
+            <!-- The shared map menu launcher teleports beside the field on compact dispatch. -->
             <div id="dispatch-search-menu-slot" class="admin-dispatch__search-menu-slot" />
             <v-btn v-if="adminSos.selectedRequest && !compactDispatch" id="dispatch-recenter" class="map-selected-alert-card"
               icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
               :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
               :title="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران' : 'نمایش محل حادثه'"
               @click="frameSelectedIncident" />
-          </div>
-          <div class="admin-dispatch__search-form" role="search">
-            <v-text-field id="dispatch-search-input" v-model="mapSearch" label="جست‌وجو در نقشه"
-              placeholder="کاربر، SOS، مکان یا نقطهٔ موردعلاقه"
-              prepend-inner-icon="mdi-magnify" clearable hide-details density="compact" variant="outlined" rounded="lg"
-              autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
           </div>
           <div v-if="searchQuery.length >= 2" id="dispatch-search-results" class="admin-dispatch__search-results"
             role="listbox" aria-label="نتایج جست‌وجوی نقشه">
@@ -3165,15 +3158,11 @@ onBeforeUnmount(() => {
   box-shadow: var(--bb-shadow-overlay); backdrop-filter: blur(10px);
   pointer-events: auto;
 }
-.admin-dispatch__search-header { display: flex; flex: none; align-items: center; gap: .6rem; min-width: 0; }
+.admin-dispatch__search-form {
+  display: flex; flex: none; align-items: center; gap: .4rem; min-width: 0;
+}
+.admin-dispatch__search-form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }
 .admin-dispatch__search-menu-slot { display: none; }
-.admin-dispatch__search-indicator { flex: none; width: .65rem; height: .65rem;
-  border-radius: 50%; background: #7d9291; }
-.admin-dispatch__search-indicator--active { background: #1f8a5b; box-shadow: 0 0 0 4px rgba(31, 138, 91, .18); }
-.admin-dispatch__search-copy { flex: 1; min-width: 0; }
-.admin-dispatch__search-copy h2 { margin: 0; font-size: .86rem; font-weight: 800; line-height: 1.4; }
-.admin-dispatch__search-copy p { margin: .1rem 0 0; color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__search-form { flex: none; min-width: 0; }
 .admin-dispatch__search-results {
   min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding: .15rem; border-radius: .75rem;
@@ -3242,16 +3231,14 @@ onBeforeUnmount(() => {
   .admin-dispatch__filter-select { display: block !important; }
   .admin-dispatch__toolbar-actions { flex-wrap: wrap; }
   .admin-dispatch__search {
-    /* The menu now lives inside this panel, so leave a modest safe-area gap
-       instead of reserving the former floating launcher's full height. */
-    top: calc(1.5rem + env(safe-area-inset-top, 0px)); right: .75rem;
+    /* The single-row search stays clear of the safe area and exposes more map. */
+    top: calc(1rem + env(safe-area-inset-top, 0px)); right: .75rem;
     left: .75rem; width: auto; max-height: min(38dvh, 15rem);
     padding: .6rem; gap: .3rem;
   }
   .admin-dispatch__search-menu-slot {
     display: grid; place-items: center; flex: none; width: 48px; height: 48px;
   }
-  .admin-dispatch__search-copy p { display: none; }
   .admin-dispatch__search-results { max-height: none; }
   .admin-dispatch__incident-panel {
     top: calc(11rem + env(safe-area-inset-top, 0px)); left: .75rem;
