@@ -153,7 +153,8 @@ describe("dispatch pinned rail and uncluttered map", () => {
   it("fits the selected SOS actions and facts without losing their labels or touch targets", () => {
     const markup = template!.content;
     const panel = css.slice(css.indexOf('/* Keep the information and actions on the RTL start edge.'));
-    expect(panel).toContain('.admin-dispatch__detail-heading { justify-content: flex-start;');
+    expect(panel).not.toContain('.admin-dispatch__detail-heading { justify-content: flex-start;');
+    expect(panel).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem .6rem .2rem; }');
     expect(css).toContain('grid-template-columns: 44px minmax(0, 1fr);');
     expect(panel).not.toContain('.admin-dispatch__sender-action');
     expect(panel).toContain('gap: .5rem; padding: .45rem .65rem .65rem;');

@@ -102,9 +102,10 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(compactLayout).toContain('height: var(--dispatch-incident-available-height);');
     expect(compactLayout).toContain('.admin-dispatch__incident-panel--expanded #dispatch-incident-content { flex: 1 1 auto; }');
     expect(compactLayout).not.toContain('max-height: min(45dvh, 24rem');
-    expect(compactLayout).toContain('max-width: 100%; height: auto; min-height: 32px; white-space: normal;');
-    expect(compactLayout).toContain('.admin-dispatch__detail-badges :deep(.v-chip__content)');
-    expect(css).toContain('padding: .5rem .65rem .35rem; line-height: 1.35;\n  white-space: normal; overflow-wrap: anywhere;');
+    expect(compactLayout).toContain('.admin-dispatch__incident-status { height: auto; min-height: 26px; white-space: normal; }');
+    expect(compactLayout).toContain('.admin-dispatch__incident-status :deep(.v-chip__content) { white-space: normal; overflow-wrap: anywhere; }');
+    expect(css).toContain('.admin-dispatch__incident-summary {\n  display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center;');
+    expect(css).toContain('.admin-dispatch__priority-dot {\n  display: inline-block; flex: none; width: 9px; height: 9px;');
     expect(css).toContain('.admin-dispatch__sender { display: grid; grid-template-columns: 44px minmax(0, 1fr);');
     expect(css).not.toContain('.admin-dispatch__incident-panel .admin-dispatch__sender { grid-template-columns: 2rem');
     expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');

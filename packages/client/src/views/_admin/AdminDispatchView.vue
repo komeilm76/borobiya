@@ -553,8 +553,18 @@
             <button id="dispatch-incident-toggle" type="button" class="admin-dispatch__incident-toggle"
               :aria-expanded="incidentExpanded" aria-controls="dispatch-incident-content"
               @click="toggleIncidentPanel">
-              <span><strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
-                <small>{{ statusMeta(adminSos.selectedRequest.status).label }} · {{ severityMeta(adminSos.selectedRequest.severity).label }}</small></span>
+              <span class="admin-dispatch__incident-summary">
+                <span class="admin-dispatch__incident-name">
+                  <span class="admin-dispatch__priority-dot" :style="sosPriorityStyle(adminSos.selectedRequest.severity)"
+                    role="img" :aria-label="`اولویت: ${severityMeta(adminSos.selectedRequest.severity).label}`" />
+                  <strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
+                </span>
+                <v-chip v-if="!incidentExpanded" id="dispatch-chip-14" class="admin-dispatch__incident-status"
+                  :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
+                  :prepend-icon="statusMeta(adminSos.selectedRequest.status).icon" size="small" variant="tonal">
+                  {{ statusMeta(adminSos.selectedRequest.status).label }}
+                </v-chip>
+              </span>
               <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
             </button>
           </div>
@@ -582,23 +592,6 @@
             </div>
             <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
           </section>
-          <v-card-title class="admin-dispatch__detail-heading">
-            <div class="admin-dispatch__detail-title">
-              <small>درخواست انتخاب‌شده</small>
-              <h2>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</h2>
-            </div>
-            <div class="admin-dispatch__detail-badges">
-              <v-chip id="dispatch-chip-14" :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
-                :prepend-icon="statusMeta(adminSos.selectedRequest.status).icon" size="small" variant="tonal">
-                {{ statusMeta(adminSos.selectedRequest.status).label }}
-              </v-chip>
-              <span id="dispatch-chip-15" class="admin-dispatch__priority-pill"
-                :style="sosPriorityStyle(adminSos.selectedRequest.severity)">
-                {{ severityMeta(adminSos.selectedRequest.severity).label }}
-              </span>
-            </div>
-          </v-card-title>
-          <v-divider />
           <div class="admin-dispatch__sender-group" role="group" aria-label="ارسال‌کنندهٔ درخواست">
             <button id="dispatch-action-19" type="button" class="admin-dispatch__sender"
               aria-label="مشاهدهٔ پروفایل ارسال‌کننده" aria-haspopup="dialog" title="مشاهدهٔ پروفایل ارسال‌کننده"
@@ -2324,11 +2317,6 @@ onBeforeUnmount(() => {
 }
 .dispatch-request-list, .responder-list { padding: .55rem; }
 .dispatch-request-row, .dispatch-responder-row { padding: .55rem .7rem; min-height: 44px; }
-.admin-dispatch__detail-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; }
-.admin-dispatch__detail-title { min-width: 0; }
-.admin-dispatch__detail-title small { display: block; color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__detail-title h2 { margin: 0; font-size: 1.05rem; font-weight: 800; overflow-wrap: anywhere; }
-.admin-dispatch__detail-badges { display: flex; flex-wrap: wrap; gap: .35rem; }
 .admin-dispatch__detail-body { display: grid; gap: .75rem; font-size: .87rem; line-height: 1.6; }
 .admin-dispatch__detail-body h3 { margin: 0 0 .2rem; font-size: .8rem; font-weight: 650; }
 .admin-dispatch__description { padding: .2rem .1rem .7rem;
@@ -2943,7 +2931,7 @@ onBeforeUnmount(() => {
   font-size: .84rem; line-height: 1.35;
 }
 #dispatch-sidebar .dispatch-request-row__name { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
-.dispatch-request-row__priority, .admin-dispatch__priority-pill {
+.dispatch-request-row__priority {
   display: inline-flex; align-items: center; flex: none; min-height: 23px;
   padding: .1rem .5rem; border-radius: 100px; font-size: .8rem;
   line-height: 1.4; font-weight: 800; color: var(--sos-priority-ink);
@@ -2987,8 +2975,7 @@ onBeforeUnmount(() => {
 :global(:root.dark .dispatch-responder-row) {
   box-shadow: 0 2px 8px rgba(0, 0, 0, .32) !important;
 }
-:global(:root.dark .dispatch-request-row__priority),
-:global(:root.dark .admin-dispatch__priority-pill) {
+:global(:root.dark .dispatch-request-row__priority) {
   color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
 }
 /* Independent pressed button and map action: no nested controls, checkbox,
@@ -3112,7 +3099,7 @@ onBeforeUnmount(() => {
   scrollbar-width: thin; padding-inline: .15rem; border-radius: .65rem;
 }
 /* The floating panel supplies the surface. Keep facts flat; only the sender
-   identity gets a subtle inset treatment, while status chips and alerts remain. */
+   identity gets a subtle inset treatment, while alerts remain. */
 .admin-dispatch__incident-panel #dispatch-incident {
   border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
   background: transparent !important; backdrop-filter: none !important; margin: 0;
@@ -3122,18 +3109,10 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .admin-dispatch__followup {
   border: 0; border-radius: 0; box-shadow: none; background: transparent;
 }
-.admin-dispatch__incident-panel #dispatch-incident :deep(.v-divider) { display: none; }
 .admin-dispatch__incident-panel .admin-dispatch__description,
 .admin-dispatch__incident-panel .admin-dispatch__location-details,
 .admin-dispatch__incident-panel .admin-dispatch__next { border: 0; }
-/* Keep the information and actions on the RTL start edge. The ordinary page
-   card's wide spacing would otherwise wrap every action in this narrow overlay. */
-.admin-dispatch__incident-panel #dispatch-incident :deep(.v-card-title) {
-  padding: .5rem .65rem .35rem; line-height: 1.35;
-  white-space: normal; overflow-wrap: anywhere;
-}
-.admin-dispatch__incident-panel .admin-dispatch__detail-heading { justify-content: flex-start; gap: .4rem; }
-.admin-dispatch__incident-panel .admin-dispatch__detail-badges { gap: .3rem; }
+/* Keep the information and actions on the RTL start edge. */
 .admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem .6rem .2rem; }
 .admin-dispatch__incident-panel .admin-dispatch__sender {
   gap: .5rem; padding: .4rem .55rem;
@@ -3171,7 +3150,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .dispatch-mission-timeline :deep(.timeline) {
   border: 0; box-shadow: none; background: transparent;
 }
-.admin-dispatch__incident-header { display: flex; align-items: center; gap: .25rem; min-width: 0; padding-inline: .25rem; }
+.admin-dispatch__incident-header { display: flex; flex: none; align-items: center; gap: .25rem; min-width: 0; padding-inline: .25rem; }
 .admin-dispatch__incident-toggle {
   display: flex; flex: 1 1 auto; align-items: center; gap: .5rem; min-width: 0; min-height: 48px;
   padding: .45rem .4rem; border: 0; border-radius: 1rem; cursor: pointer;
@@ -3179,9 +3158,17 @@ onBeforeUnmount(() => {
   text-align: start; font: inherit;
 }
 .admin-dispatch__incident-map { flex: none; width: 44px; min-width: 44px; height: 44px; border-radius: .85rem; }
-.admin-dispatch__incident-toggle > span { display: grid; flex: 1; min-width: 0; }
-.admin-dispatch__incident-toggle strong, .admin-dispatch__incident-toggle small { overflow-wrap: anywhere; }
-.admin-dispatch__incident-toggle small { font-size: .8rem; color: var(--bb-color-muted); }
+.admin-dispatch__incident-summary {
+  display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center;
+  gap: .25rem .45rem; min-width: 0;
+}
+.admin-dispatch__incident-name { display: inline-flex; flex: 1 1 9rem; align-items: center; gap: .35rem; min-width: 0; }
+.admin-dispatch__incident-name strong { min-width: 0; overflow-wrap: anywhere; }
+.admin-dispatch__priority-dot {
+  display: inline-block; flex: none; width: 9px; height: 9px;
+  border-radius: 50%; background: var(--sos-priority-accent);
+}
+.admin-dispatch__incident-status { flex: none; max-width: 100%; }
 .admin-dispatch__incident-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
 .admin-dispatch__incident-panel #dispatch-incident { margin-bottom: .3rem; }
 .admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .2rem .6rem .35rem; }
@@ -3302,13 +3289,8 @@ onBeforeUnmount(() => {
     height: var(--dispatch-incident-available-height);
   }
   .admin-dispatch__incident-panel--expanded #dispatch-incident-content { flex: 1 1 auto; }
-  .admin-dispatch__incident-panel .admin-dispatch__detail-badges { min-width: 0; }
-  .admin-dispatch__incident-panel .admin-dispatch__detail-badges :deep(.v-chip) {
-    max-width: 100%; height: auto; min-height: 32px; white-space: normal;
-  }
-  .admin-dispatch__incident-panel .admin-dispatch__detail-badges :deep(.v-chip__content) {
-    white-space: normal; overflow-wrap: anywhere;
-  }
+  .admin-dispatch__incident-status { height: auto; min-height: 26px; white-space: normal; }
+  .admin-dispatch__incident-status :deep(.v-chip__content) { white-space: normal; overflow-wrap: anywhere; }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
     left: .75rem; right: 4.25rem; width: calc(100% - 5rem);

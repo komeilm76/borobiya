@@ -12,7 +12,7 @@ describe("admin SOS triage flow", () => {
     const responders = template.indexOf('id="dispatch-responders"');
     const queue = template.indexOf('id="dispatch-queue"');
     const map = template.indexOf('<MapCanvas');
-    const detail = template.indexOf('class="admin-dispatch__detail-heading"');
+    const detail = template.indexOf('id="dispatch-incident"');
     const timeline = template.indexOf('class="mb-3 pa-3 dispatch-mission-timeline"');
     const live = template.indexOf('v-for="mission in activeMissions"');
     expect(responders).toBeGreaterThan(0);
@@ -50,6 +50,11 @@ describe("admin SOS triage flow", () => {
     expect(header).not.toContain('icon="mdi-alert-circle-outline"');
     expect(header).not.toContain(':title='); // Avoid a native tooltip covering the subtitle.
     expect(header).not.toContain('>روی نقشه</v-btn>');
+    expect(header).toContain('class="admin-dispatch__priority-dot" :style="sosPriorityStyle(adminSos.selectedRequest.severity)"');
+    expect(header).toContain('role="img" :aria-label="`اولویت: ${severityMeta(adminSos.selectedRequest.severity).label}`"');
+    expect(header).toContain('v-if="!incidentExpanded" id="dispatch-chip-14" class="admin-dispatch__incident-status"');
+    expect(header).toContain('statusMeta(adminSos.selectedRequest.status).label');
+    expect(header).not.toContain('severityMeta(adminSos.selectedRequest.severity).label }}</small>');
     // The map jump keeps the incident framed and hands off keyboard focus.
     const mapJump = source.slice(source.indexOf('function focusSelectedIncidentMap(): void {'),
       source.indexOf('function focusNearbyResponder(userId: string): void {'));
@@ -92,8 +97,12 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain(':key="adminSos.selectedRequest.id" class="admin-dispatch__location-details"');
     expect(template).toContain('class="admin-dispatch__photo-open"');
     const incident = template.slice(template.indexOf('id="dispatch-incident"'), template.indexOf('id="dispatch-dialog-01"'));
-    expect(incident.indexOf('class="admin-dispatch__photo"')).toBeLessThan(incident.indexOf('class="admin-dispatch__detail-heading"'));
-    expect(incident.indexOf('class="admin-dispatch__detail-heading"')).toBeLessThan(incident.indexOf('class="admin-dispatch__sender"'));
+    expect(incident.indexOf('class="admin-dispatch__photo"')).toBeLessThan(incident.indexOf('class="admin-dispatch__sender"'));
+    expect(incident).not.toContain('درخواست انتخاب‌شده');
+    expect(incident).not.toContain('admin-dispatch__detail-heading');
+    expect(incident).not.toContain('incidentLabel(adminSos.selectedRequest.incidentTypeId)');
+    expect(incident).not.toContain('dispatch-chip-14');
+    expect(incident).not.toContain('dispatch-chip-15');
     expect(template.indexOf('class="admin-dispatch__photo"')).toBeLessThan(template.indexOf('class="admin-dispatch__map-note"'));
     expect(template).toContain('class="admin-dispatch__sender-name"');
     expect(incident).not.toContain('شناسهٔ حساب');
