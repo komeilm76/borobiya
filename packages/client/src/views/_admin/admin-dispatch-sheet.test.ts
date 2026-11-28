@@ -44,9 +44,11 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(shell).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab {');
     expect(shell).toContain('visibility: hidden; pointer-events: none;');
-    expect(css).toContain('order: 3; flex: none; padding: .25rem 0 .1rem; gap: .3rem;');
+    expect(css).toContain('order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;');
     expect(css).toContain('border-top: 1px solid var(--bb-color-outline);\n    background: rgb(var(--v-theme-surface));');
-    expect(css).toContain('#dispatch-sidebar .admin-dispatch__content { order: 2; flex: 1 1 auto; overflow-y: auto; }');
+    expect(css).toContain('order: 2; flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__queue { flex: none; border-top: 0; }');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__nearby:not(.admin-dispatch__section--hidden) {\n    display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0;\n    border-top: 0;\n  }');
     expect(rail.indexOf('class="admin-dispatch__sheet-nav"')).toBeLessThan(rail.indexOf('id="dispatch-sidebar-content"')); // Logical keyboard order.
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__section--hidden { display: none; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }');
@@ -58,6 +60,16 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__submit { position: sticky; bottom: 0; }');
     expect(rail.indexOf('class="responder-list"')).toBeLessThan(rail.indexOf('class="admin-dispatch__submit'));
     expect(rail).toContain('id="dispatch-responders" tabindex="-1"');
+  });
+
+  it("uses one spaced divider between the mobile worklist and fixed tabs", () => {
+    const start = css.indexOf('  #dispatch-sidebar.admin-dispatch__sidebar {\n    display: flex; flex-direction: column;');
+    const mobile = css.slice(start, css.indexOf('@media (max-width: 480px)', start));
+    expect(start).toBeGreaterThan(0);
+    expect(mobile.match(/border-top: 1px solid var\(--bb-color-outline\)/g)).toHaveLength(1);
+    expect(mobile).toContain('order: 2; flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
+    expect(mobile).toContain('order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;');
+    expect(mobile).toContain('padding: .35rem .2rem .15rem !important; border-top: 0;');
   });
 
   it("reveals responder controls from an SOS choice or detail action, without bypassing dispatch validation", () => {

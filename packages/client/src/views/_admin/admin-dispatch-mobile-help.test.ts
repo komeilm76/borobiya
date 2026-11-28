@@ -41,7 +41,7 @@ describe("compact dispatch search and on-demand guidance", () => {
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__nearby { padding-top: .3rem; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__responder-search { padding: .1rem .2rem .15rem !important; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__responders .responder-list { padding: .15rem .1rem .2rem; }');
-    expect(css).toContain('#dispatch-sidebar .admin-dispatch__submit { padding: .35rem .2rem .15rem !important; }');
+    expect(css).toContain('padding: .35rem .2rem .15rem !important; border-top: 0;');
     expect(css).toContain('.admin-dispatch__help-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }');
     expect(css).toContain('max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "dispatch-help", source: markup }).errors).toEqual([]);

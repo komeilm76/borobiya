@@ -3447,7 +3447,8 @@ onBeforeUnmount(() => {
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     /* Keep DOM navigation before long lists for keyboard users, but dock it
        visually below the independent scrollport in both sheet positions. */
-    order: 3; flex: none; padding: .25rem 0 .1rem; gap: .3rem;
+    order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;
+    /* One quiet boundary between the scrollable worklist and fixed tabs. */
     border-top: 1px solid var(--bb-color-outline);
     background: rgb(var(--v-theme-surface));
   }
@@ -3467,15 +3468,19 @@ onBeforeUnmount(() => {
     padding-inline: .2rem; border-radius: 999px;
     background: rgba(var(--v-theme-primary), .12); font-size: .8rem;
   }
-  #dispatch-sidebar .admin-dispatch__content { order: 2; flex: 1 1 auto; overflow-y: auto; }
+  #dispatch-sidebar .admin-dispatch__content {
+    order: 2; flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;
+  }
   #dispatch-sidebar .admin-dispatch__section--hidden { display: none; }
-  #dispatch-sidebar .admin-dispatch__queue { flex: none; border-top: 1px solid var(--bb-color-outline); }
+  /* The mobile toolbar and worklist are one surface; desktop section rules
+     remain intact, but do not draw another rule immediately below the filter. */
+  #dispatch-sidebar .admin-dispatch__queue { flex: none; border-top: 0; }
   /* Grow the responder worklist into the remaining space. On short/peek
      sheets the card keeps room for its controls and the outer scrollport
      exposes them; on expanded sheets only its result rows need to scroll. */
   #dispatch-sidebar .admin-dispatch__nearby:not(.admin-dispatch__section--hidden) {
     display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0;
-    border-top: 1px solid var(--bb-color-outline);
+    border-top: 0;
   }
   /* The step label and count already live in the fixed tab bar. Do not spend
      another row repeating them above the first emergency request. */
@@ -3486,7 +3491,11 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__responder-search { padding: .1rem .2rem .15rem !important; }
   #dispatch-sidebar .admin-dispatch__responders .responder-list { padding: .15rem .1rem .2rem; }
   #dispatch-sidebar .dispatch-responder-row { margin-bottom: .25rem; }
-  #dispatch-sidebar .admin-dispatch__submit { padding: .35rem .2rem .15rem !important; }
+  /* The fixed tab bar supplies the only divider; allow breathing room
+     around the dispatch action instead of sandwiching it between rules. */
+  #dispatch-sidebar .admin-dispatch__submit {
+    padding: .35rem .2rem .15rem !important; border-top: 0;
+  }
   #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list {
     max-height: none; overflow: visible;
   }
