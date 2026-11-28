@@ -46,6 +46,9 @@ describe("admin SOS triage flow", () => {
     expect(header).toContain("'نمایش حادثه و امدادگران نزدیک روی نقشه'");
     expect(header).toContain('aria-controls="dispatch-map"');
     expect(header).toContain('@click.stop="focusSelectedIncidentMap"');
+    expect(header.indexOf('id="dispatch-action-21"')).toBeLessThan(header.indexOf('id="dispatch-incident-toggle"'));
+    expect(header).not.toContain('icon="mdi-alert-circle-outline"');
+    expect(header).not.toContain(':title='); // Avoid a native tooltip covering the subtitle.
     expect(header).not.toContain('>روی نقشه</v-btn>');
     // The map jump keeps the incident framed and hands off keyboard focus.
     const mapJump = source.slice(source.indexOf('function focusSelectedIncidentMap(): void {'),

@@ -548,19 +548,17 @@
           :class="{ 'admin-dispatch__incident-panel--expanded': incidentExpanded }"
           @click.self="collapseSheetForIncident">
           <div class="admin-dispatch__incident-header">
+            <v-btn id="dispatch-action-21" class="admin-dispatch__incident-map" icon="mdi-map-marker-radius-outline"
+              color="primary" variant="tonal" aria-controls="dispatch-map"
+              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
+              @click.stop="focusSelectedIncidentMap" />
             <button id="dispatch-incident-toggle" type="button" class="admin-dispatch__incident-toggle"
               :aria-expanded="incidentExpanded" aria-controls="dispatch-incident-content"
               @click="toggleIncidentPanel">
-              <v-icon icon="mdi-alert-circle-outline" color="error" size="22" aria-hidden="true" />
               <span><strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
                 <small>{{ statusMeta(adminSos.selectedRequest.status).label }} · {{ severityMeta(adminSos.selectedRequest.severity).label }}</small></span>
               <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
             </button>
-            <v-btn id="dispatch-action-21" class="admin-dispatch__incident-map" icon="mdi-map-marker-radius-outline"
-              color="primary" variant="tonal" aria-controls="dispatch-map"
-              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
-              :title="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
-              @click.stop="focusSelectedIncidentMap" />
           </div>
           <div v-show="incidentExpanded" id="dispatch-incident-content">
         <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
