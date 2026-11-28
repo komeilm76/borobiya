@@ -3206,9 +3206,9 @@ onBeforeUnmount(() => {
   .admin-dispatch__search {
     /* The menu now lives inside this panel, so leave a modest safe-area gap
        instead of reserving the former floating launcher's full height. */
-    top: calc(2.75rem + env(safe-area-inset-top, 0px)); right: .75rem;
+    top: calc(1.5rem + env(safe-area-inset-top, 0px)); right: .75rem;
     left: .75rem; width: auto; max-height: min(38dvh, 15rem);
-    padding: .4rem .6rem; gap: .3rem;
+    padding: .6rem; gap: .3rem;
   }
   .admin-dispatch__search-menu-slot {
     display: grid; place-items: center; flex: none; width: 48px; height: 48px;

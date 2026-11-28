@@ -22,8 +22,9 @@ describe("map menu within compact dispatch search", () => {
     expect(menu).toContain('<NetworkStatusIcon class="map-sidebar__network" />');
     expect(dispatchSfc.styles[0]!.content).toContain('.admin-dispatch__search-menu-slot { display: none; }');
     expect(dispatchSfc.styles[0]!.content).toContain('display: grid; place-items: center; flex: none; width: 48px; height: 48px;');
-    expect(dispatchSfc.styles[0]!.content).toContain('top: calc(2.75rem + env(safe-area-inset-top, 0px)); right: .75rem;');
-    expect(dispatchSfc.styles[0]!.content).not.toContain('top: calc(4.25rem + env(safe-area-inset-top, 0px)); right: .75rem;');
+    expect(dispatchSfc.styles[0]!.content).toContain('top: calc(1.5rem + env(safe-area-inset-top, 0px)); right: .75rem;');
+    expect(dispatchSfc.styles[0]!.content).toContain('left: .75rem; width: auto; max-height: min(38dvh, 15rem);\n    padding: .6rem; gap: .3rem;');
+    expect(dispatchSfc.styles[0]!.content).not.toContain('top: calc(2.75rem + env(safe-area-inset-top, 0px)); right: .75rem;');
     expect(dispatchSfc.styles[0]!.content).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));'); // Desktop unchanged.
     expect(sidebarSfc.styles[0]!.content).toContain('.map-sidebar__launcher--inline {\n  position: relative;');
   });
