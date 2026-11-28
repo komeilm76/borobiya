@@ -42,13 +42,13 @@ describe('dispatch controls match the map Mission and Travel design language', (
     expect(template!.content).toContain('rounded="lg"\n            color="primary"\n            hide-details');
     expect(template!.content).toContain('hide-details\n            @update:model-value="onFilterChange"');
     expect(template!.content).toContain('variant="outlined" rounded="lg" color="primary" density="compact"');
-    expect(template!.content).toContain('type="submit" color="primary" variant="flat" rounded="lg"');
+    expect(template!.content).toContain('icon="mdi-magnify" color="primary" variant="flat" rounded="lg"');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__toolbar :deep(.v-btn) { height: 38px; min-height: 38px; }');
     expect(css).toContain('min-width: 44px; min-height: 44px; height: auto;');
     expect(css).toContain('font-family: var(--bb-font-family); letter-spacing: normal;');
     expect(css).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender {');
     expect(css).toContain('border-radius: .75rem; background: var(--bb-color-inset);');
-    expect(css).toContain('.admin-dispatch__search-help summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }');
+    expect(css).toContain('.admin-dispatch__help-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }');
     expect(template!.content).toContain('class="admin-dispatch__confirmation" rounded="xl"');
     expect(template!.content).toContain('color="error" variant="flat" rounded="lg"');
     expect(compileTemplate({ filename: 'AdminDispatchView.vue', id: 'dispatch-parity', source: template!.content }).errors).toEqual([]);

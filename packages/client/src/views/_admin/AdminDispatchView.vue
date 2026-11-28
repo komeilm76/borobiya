@@ -65,7 +65,7 @@
           />
         </div>
 
-        <div class="admin-dispatch__toolbar-actions" role="group" aria-label="تنظیمات و بازخوانی">
+        <div class="admin-dispatch__toolbar-actions" role="group" aria-label="تنظیمات، بازخوانی و راهنما">
           <v-menu v-model="soundSettingsOpen" location="bottom end" :close-on-content-click="false">
             <template #activator="{ props: menuProps }">
               <v-btn id="dispatch-voice-settings" v-bind="menuProps" icon="mdi-cog-outline"
@@ -103,6 +103,10 @@
             variant="text"
             @click="adminSos.refreshRequests()"
           />
+          <v-btn id="dispatch-help-button" icon="mdi-help-circle-outline" size="small" variant="text"
+            aria-label="راهنمای مرکز اعزام و شرایط امدادگران" title="راهنمای مرکز اعزام"
+            aria-controls="dispatch-help-dialog" :aria-expanded="helpDialogOpen"
+            @click="helpDialogOpen = true" />
         </div>
       </div>
     </header>
@@ -293,23 +297,16 @@
           </div>
           <p v-if="photoOpenError && compactDispatch && sheetTab === 'responders'" role="alert" class="admin-dispatch__photo-error admin-dispatch__photo-error--responder">{{ photoOpenError }}</p>
           <form id="dispatch-form-01" class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
-            <v-text-field id="dispatch-field-01" v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
-              placeholder="حداقل ۲ حرف؛ جست‌وجوی دستی حتی بدون موقعیت یا تخصص مرتبط"
+            <v-text-field id="dispatch-field-01" v-model="responderSearchInput" label="نام کاربری امدادگر"
+              placeholder="حداقل ۲ حرف از نام کاربری"
               variant="outlined" rounded="lg" color="primary" density="compact" hide-details autocomplete="off" maxlength="64"
               aria-label="جست‌وجوی امدادگر با نام کاربری" />
-            <v-btn id="dispatch-action-13" type="submit" color="primary" variant="flat" rounded="lg" :disabled="responderSearchInput.trim().length === 1"
-              :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
+            <v-btn id="dispatch-action-13" class="admin-dispatch__responder-search-submit" type="submit"
+              icon="mdi-magnify" color="primary" variant="flat" rounded="lg"
+              :aria-label="responderSearchInput.trim() ? 'جست‌وجوی امدادگر' : 'نمایش امدادگران نزدیک'"
+              :title="responderSearchInput.trim() ? 'جست‌وجوی امدادگر' : 'نمایش امدادگران نزدیک'"
+              :disabled="responderSearchInput.trim().length === 1" :loading="adminSos.nearestLoading" />
           </form>
-          <p v-if="adminSos.responderSearch" class="admin-dispatch__manual-warning" role="note">
-            <v-icon icon="mdi-alert-outline" size="18" aria-hidden="true" />
-            جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند؛ پیش از اعزام صلاحیت و دسترسی را بررسی کنید.
-          </p>
-          <details id="dispatch-details-01" class="admin-dispatch__search-help">
-            <summary>معیارهای فهرست امدادگران</summary>
-            <p>{{ adminSos.responderSearch
-              ? 'تا ۱۰ حساب فعال و آزاد با نام کاربری منطبق؛ موقعیت/فاصله در جست‌وجوی دستی نمایش داده نمی‌شود و تخصص مرتبط ممکن است ثبت نشده باشد.'
-              : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند. فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده در فهرست نزدیک‌ترین‌ها هستند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}</p>
-          </details>
           <div v-if="hiddenSelectedResponderIds.length" class="admin-dispatch__hidden-selections" aria-label="انتخاب‌های خارج از فهرست کنونی">
             <span>انتخاب‌های دیگر:</span>
             <v-chip :id="`dispatch-chip-04-${id}`" v-for="id in hiddenSelectedResponderIds" :key="id" closable size="small" color="primary"
@@ -400,9 +397,6 @@
           </v-card-text>
 
           <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
-            <span class="text-caption text-medium-emphasis">
-              {{ adminSos.selectedResponderIds.length }} امدادگر انتخاب شده است.
-            </span>
             <v-btn id="dispatch-action-17"
               :aria-label="`ارسال پیشنهاد مأموریت به ${adminSos.selectedResponderIds.length} امدادگر انتخاب‌شده`"
               :disabled="!adminSos.canDispatchSelected"
@@ -779,6 +773,33 @@
           </v-card>
         </v-dialog>
     </section>
+    <v-dialog id="dispatch-help-dialog" v-model="helpDialogOpen" max-width="520"
+      aria-label="راهنمای مرکز اعزام و شرایط امدادگران">
+      <v-card id="dispatch-help-card" class="admin-dispatch__help-dialog" rounded="xl">
+        <v-card-title class="admin-dispatch__help-heading">
+          <span><v-icon icon="mdi-help-circle-outline" size="22" aria-hidden="true" /> راهنمای مرکز اعزام</span>
+          <v-btn id="dispatch-help-close" icon="mdi-close" variant="text" aria-label="بستن راهنمای مرکز اعزام"
+            @click="helpDialogOpen = false" />
+        </v-card-title>
+        <v-card-text class="admin-dispatch__help-content">
+          <section>
+            <h2>انتخاب درخواست و امدادگر</h2>
+            <p>از تب «درخواست‌ها» یک SOS را انتخاب کنید؛ سپس در تب «امدادگران» افراد را بررسی و انتخاب کنید. با دستگیرهٔ بالای پنل می‌توانید فضای نقشه و فهرست را تغییر دهید.</p>
+            <p>اکنون <strong>{{ adminSos.selectedResponderIds.length.toLocaleString('fa-IR') }} امدادگر</strong> انتخاب شده است. تعداد انتخاب‌ها روی دکمهٔ ارسال پیشنهاد هم نمایش داده می‌شود.</p>
+          </section>
+          <section>
+            <h2>معیارهای فهرست امدادگران</h2>
+            <p>در فهرست نزدیک‌ترین‌ها حداکثر ۱۰ امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده نمایش داده می‌شوند. فاصله بر پایهٔ آخرین موقعیت ثبت‌شده است، نه زمان رسیدن.</p>
+          </section>
+          <section>
+            <h2>جست‌وجوی دستی و شرایط اعزام</h2>
+            <p>برای یافتن افراد دیگر، حداقل ۲ حرف از نام کاربری را وارد و دکمهٔ جست‌وجو را بزنید. حداکثر ۱۰ حساب فعال و آزادِ منطبق نمایش داده می‌شود. پاک‌کردن فیلد و زدن همان دکمه، فهرست نزدیک‌ترین‌ها را بازمی‌گرداند.</p>
+            <p class="admin-dispatch__help-caution"><v-icon icon="mdi-alert-outline" size="20" aria-hidden="true" />
+              جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند؛ پیش از اعزام صلاحیت و دسترسی را بررسی کنید. برای انتخاب‌های نامطمئن، پیش از ارسال پیشنهاد تأیید جداگانه خواسته می‌شود.</p>
+          </section>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
     <AdminUserProfileDialog v-model="senderProfileOpen" :user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"
       title="پروفایل ارسال‌کننده" />
   </main>
@@ -1144,6 +1165,7 @@ function focusSearchPlace(place: GeocodeResult): void {
   mapSearch.value = "";
 }
 const responderSearchInput = ref("");
+const helpDialogOpen = ref(false);
 const soundSettingsOpen = ref(false);
 const soundTestError = ref<string | null>(null);
 async function testSound(): Promise<void> {
@@ -2327,7 +2349,6 @@ onBeforeUnmount(() => {
 .admin-dispatch__photo-state :deep(.v-btn) { margin-inline-start: auto; }
 .admin-dispatch__photo-error { margin: .45rem 0 0; color: var(--bb-color-error); font-size: .82rem; }
 .admin-dispatch__photo-open:focus-visible, .admin-dispatch__location-details summary:focus-visible,
-.admin-dispatch__search-help summary:focus-visible,
 .dispatch-mission-timeline summary:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .admin-dispatch__photo-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
@@ -2559,12 +2580,25 @@ onBeforeUnmount(() => {
   max-height: min(38dvh, 20rem);
   overflow-y: auto; overscroll-behavior: contain;
 }
-.admin-dispatch__manual-warning { display: flex; align-items: center; gap: .4rem; margin: .5rem 1rem 0;
-  color: rgb(var(--v-theme-on-surface)); font-size: .82rem; line-height: 1.5; }
-.admin-dispatch__manual-warning .v-icon { flex: none; color: rgb(var(--v-theme-error)); }
-.admin-dispatch__search-help { margin: .45rem 1rem .65rem; color: var(--bb-color-muted); font-size: .8rem; }
-.admin-dispatch__search-help summary { padding-block: .55rem; cursor: pointer; min-height: 44px; }
-.admin-dispatch__search-help p { margin: .3rem 0; line-height: 1.65; }
+.admin-dispatch__help-dialog {
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  font-family: var(--bb-font-family); color: rgb(var(--v-theme-on-surface));
+}
+.admin-dispatch__help-heading {
+  display: flex; align-items: center; justify-content: space-between; gap: .5rem;
+  flex: none; white-space: normal; font-family: inherit; font-size: 1rem; font-weight: 800;
+}
+.admin-dispatch__help-heading > span { display: inline-flex; align-items: center; gap: .45rem; min-width: 0; }
+.admin-dispatch__help-heading > span .v-icon { color: var(--bb-color-primary); }
+.admin-dispatch__help-heading :deep(.v-btn) { flex: none; min-width: 44px; min-height: 44px; }
+.admin-dispatch__help-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.admin-dispatch__help-content section + section {
+  margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--bb-color-outline);
+}
+.admin-dispatch__help-content h2 { margin: 0 0 .25rem; font-size: .95rem; font-weight: 800; }
+.admin-dispatch__help-content p { margin: .25rem 0; font-size: .86rem; line-height: 1.7; }
+.admin-dispatch__help-caution { display: flex; align-items: flex-start; gap: .4rem; }
+.admin-dispatch__help-caution .v-icon { flex: none; margin-top: .15rem; color: rgb(var(--v-theme-error)); }
 .admin-dispatch__submit { position: sticky; bottom: 0; z-index: 1;
   background: rgb(var(--v-theme-surface)); border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .admin-dispatch__submit :deep(.v-btn) { min-height: 46px; font-weight: 800; }
@@ -2647,8 +2681,6 @@ onBeforeUnmount(() => {
   .admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }
   .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; }
   .admin-dispatch__submit :deep(.v-btn__content) { white-space: normal; text-align: center; }
-  .admin-dispatch__responder-search { flex-wrap: wrap; }
-  .admin-dispatch__responder-search :deep(.v-input) { flex: 1 1 100%; min-width: 0; }
 }
 
 .pulse-indicator {
@@ -2986,9 +3018,13 @@ onBeforeUnmount(() => {
   display: flex; flex-wrap: wrap; align-items: center; gap: .3rem;
   padding: .25rem .4rem; color: var(--bb-color-muted); font-size: .8rem;
 }
-#dispatch-sidebar .admin-dispatch__responder-search { padding: .3rem .3rem .1rem !important; gap: .25rem; }
-#dispatch-sidebar .admin-dispatch__manual-warning { margin: .3rem .5rem 0; font-size: .8rem; }
-#dispatch-sidebar .admin-dispatch__search-help { margin: .15rem .3rem .25rem; }
+#dispatch-sidebar .admin-dispatch__responder-search {
+  flex-wrap: nowrap; padding: .3rem .3rem .1rem !important; gap: .35rem;
+}
+#dispatch-sidebar .admin-dispatch__responder-search :deep(.v-input) {
+  flex: 1 1 auto; min-width: 0; width: 0;
+}
+#dispatch-sidebar .admin-dispatch__responder-search-submit { flex: none; }
 #dispatch-sidebar .admin-dispatch__submit {
   padding: .25rem .3rem !important; gap: .15rem !important;
   border-top: 0; justify-content: flex-start !important;
@@ -3439,6 +3475,12 @@ onBeforeUnmount(() => {
      another row repeating them above the first emergency request. */
   #dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }
   #dispatch-sidebar .admin-dispatch__queue { padding-top: .2rem; }
+  #dispatch-sidebar .admin-dispatch__nearby { padding-top: .3rem; }
+  #dispatch-sidebar .admin-dispatch__responders :deep(.v-card-title) { padding: .2rem .25rem .1rem; }
+  #dispatch-sidebar .admin-dispatch__responder-search { padding: .1rem .2rem .15rem !important; }
+  #dispatch-sidebar .admin-dispatch__responders .responder-list { padding: .15rem .1rem .2rem; }
+  #dispatch-sidebar .dispatch-responder-row { margin-bottom: .25rem; }
+  #dispatch-sidebar .admin-dispatch__submit { padding: .35rem .2rem .15rem !important; }
   #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list,
   #dispatch-sidebar .admin-dispatch__responders .responder-list {
     max-height: none; overflow: visible;

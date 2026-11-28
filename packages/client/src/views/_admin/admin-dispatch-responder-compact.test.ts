@@ -61,7 +61,9 @@ describe("compact SOS and nearby responder worklists", () => {
     expect(markup).toContain('v-if="hiddenSelectedResponderIds.length"');
     expect(source).toContain('!adminSos.nearestResponders.some((responder) => responder.userId === id)');
     expect(markup).toContain('@click:close="adminSos.toggleResponderSelection(id)"');
-    expect(markup).toContain('جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند');
+    expect(markup.slice(markup.indexOf('id="dispatch-nearby"'), markup.indexOf('id="dispatch-map-region"')))
+      .not.toContain('جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند');
+    expect(markup).toContain('id="dispatch-help-dialog" v-model="helpDialogOpen"');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "compact-responders", source: markup }).errors).toEqual([]);
     expect(compileStyle({ filename: "AdminDispatchView.vue", id: "compact-responders", scoped: true, source: css }).errors).toEqual([]);
   });

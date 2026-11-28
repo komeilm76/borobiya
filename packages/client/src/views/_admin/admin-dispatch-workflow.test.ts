@@ -100,10 +100,11 @@ describe("admin SOS triage flow", () => {
     expect(source).toContain('generation !== photoOpenGeneration');
   });
 
-  it("keeps dispatch safety visible while putting optional history and live maps behind disclosure", () => {
-    expect(template).toContain('class="admin-dispatch__manual-warning" role="note"');
+  it("keeps dispatch safety at confirmation while putting instructions in help and optional history behind disclosure", () => {
+    expect(template).toContain('id="dispatch-help-dialog" v-model="helpDialogOpen"');
     expect(template).toContain('جست‌وجوی دستی فاصله و تخصص را تأیید نمی‌کند');
-    expect(template).toContain('class="admin-dispatch__search-help"');
+    expect(template).toContain('v-model="manualDispatchConfirmation"');
+    expect(template).toContain('پیش از ارسال پیشنهاد مأموریت، صلاحیت و دسترسی آن‌ها را بررسی کنید');
     expect(template).toContain('v-else-if="adminSos.nearestError"');
     expect(template).toContain('class="admin-dispatch__submit');
     expect(template).toContain(':key="adminSos.selectedRequest?.id" class="mb-3 pa-3 dispatch-mission-timeline"');
