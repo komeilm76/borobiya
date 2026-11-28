@@ -41,6 +41,25 @@ describe("dispatch worklists and incident evidence", () => {
     expect(css).toContain('#dispatch-sidebar .dispatch-request-row.v-list-item--active {\n  border-color: var(--bb-color-primary);');
   });
 
+  it("keeps the priority dot with the SOS title and the icon-only image before its date", () => {
+    const queue = markup.slice(markup.indexOf('id="dispatch-list-02"'),
+      markup.indexOf('</v-list>', markup.indexOf('id="dispatch-list-02"')));
+    const title = queue.slice(queue.indexOf('<v-list-item-title'), queue.indexOf('</v-list-item-title>'));
+    expect(queue).not.toContain('<template #prepend>');
+    expect(title.indexOf('class="dispatch-request-row__marker"')).toBeGreaterThan(0);
+    expect(title.indexOf('class="dispatch-request-row__marker"')).toBeLessThan(title.indexOf('class="dispatch-request-row__name"'));
+    expect(title).toContain('role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`"');
+    expect(css).not.toContain('.dispatch-request-row :deep(.v-list-item__prepend)');
+    expect(css).toContain('display: flex; align-items: center; gap: .35rem !important;\n  white-space: normal; min-width: 0;');
+    const meta = queue.slice(queue.indexOf('class="dispatch-request-row__meta'), queue.indexOf('</div>', queue.indexOf('class="dispatch-request-row__meta')));
+    const image = meta.indexOf('class="dispatch-request-row__attachment"');
+    expect(image).toBeGreaterThan(0);
+    expect(image).toBeLessThan(meta.indexOf('<time :datetime="item.createdAt"'));
+    expect(meta).toMatch(/icon="mdi-image-outline" size="16" aria-hidden="true" \/>\s*<\/span>/);
+    expect(meta).toContain('aria-label="تصویر پیوست"');
+    expect(css).toContain('justify-content: center; min-width: 26px; min-height: 26px;');
+  });
+
   it("keeps multi-selection visible without duplicating incident photo controls in the responder list", () => {
     const responders = markup.slice(markup.indexOf('id="dispatch-responders" tabindex="-1"'),
       markup.indexOf('</section>', markup.indexOf('id="dispatch-responders" tabindex="-1"')));

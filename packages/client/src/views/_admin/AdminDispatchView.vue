@@ -202,12 +202,9 @@
               :style="sosPriorityStyle(item.severity)"
               @click="toggleQueueRequest(item)"
             >
-                <template #prepend>
+                <v-list-item-title class="dispatch-request-row__title font-weight-bold">
                   <span class="dispatch-request-row__marker" :class="{ 'pulse-indicator': item.severity === 'high' || item.status === 'cancelled_by_rescuer' }"
                     role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`" />
-                </template>
-
-                <v-list-item-title class="dispatch-request-row__title font-weight-bold">
                   <span class="dispatch-request-row__name">{{ incidentLabel(item.incidentTypeId) }}</span>
                 </v-list-item-title>
                 <div class="dispatch-request-row__details">
@@ -217,15 +214,14 @@
                     {{ statusMeta(item.status).queueLabel }}
                   </span>
                   <div class="dispatch-request-row__meta text-caption">
+                    <span v-if="item.photoUrl" class="dispatch-request-row__attachment" role="img"
+                      aria-label="تصویر پیوست" title="تصویر پیوست حادثه؛ برای بررسی درخواست را انتخاب کنید">
+                      <v-icon icon="mdi-image-outline" size="16" aria-hidden="true" />
+                    </span>
                     <time :datetime="item.createdAt" :title="formatTimestamp(item.createdAt)">{{ formatQueueTimestamp(item.createdAt) }}</time>
                     <span role="img" :aria-label="item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS'"
                       :title="item.location.isManual ? 'موقعیت دستی' : 'موقعیت GPS'">
                       <v-icon :icon="item.location.isManual ? 'mdi-map-marker-check-outline' : 'mdi-crosshairs-gps'" size="16" aria-hidden="true" />
-                    </span>
-                    <span v-if="item.photoUrl" class="dispatch-request-row__attachment" role="img"
-                      aria-label="تصویر پیوست" title="تصویر پیوست حادثه؛ برای بررسی درخواست را انتخاب کنید">
-                      <v-icon icon="mdi-image-outline" size="16" aria-hidden="true" />
-                      تصویر
                     </span>
                   </div>
                 </div>
@@ -2922,10 +2918,9 @@ onBeforeUnmount(() => {
    rounded border, without an inset side stripe or a rectangular overlay. */
 #dispatch-sidebar .dispatch-request-row.v-list-item--active::before { opacity: 0 !important; }
 #dispatch-sidebar .dispatch-request-row.v-list-item--active :deep(.v-list-item__overlay) { opacity: 0; }
-#dispatch-sidebar .dispatch-request-row :deep(.v-list-item__prepend) { align-self: flex-start; padding-top: .25rem; }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item__content) { display: grid; gap: .15rem; }
 #dispatch-sidebar .dispatch-request-row__marker {
-  display: block; flex: none; width: 9px; height: 9px; margin-inline-end: .35rem;
+  display: block; flex: none; width: 9px; height: 9px;
   border-radius: 50%; background: var(--sos-priority-accent);
   --alert-color: var(--sos-priority-accent);
 }
@@ -2933,11 +2928,10 @@ onBeforeUnmount(() => {
   background: #dc2626; --alert-color: #dc2626;
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {
-  display: flex; align-items: center; justify-content: space-between !important;
-  flex-wrap: wrap; gap: .1rem .35rem !important; white-space: normal; min-width: 0;
-  font-size: .84rem; line-height: 1.35;
+  display: flex; align-items: center; gap: .35rem !important;
+  white-space: normal; min-width: 0; font-size: .84rem; line-height: 1.35;
 }
-#dispatch-sidebar .dispatch-request-row__name { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
+#dispatch-sidebar .dispatch-request-row__name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 #dispatch-sidebar .dispatch-request-row__details {
   display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .3rem; min-width: 0;
 }
@@ -3390,16 +3384,17 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--bb-color-inset) 84%, var(--bb-color-primary));
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {
-  gap: .3rem .5rem !important; font-size: .9rem; line-height: 1.4;
+  gap: .4rem !important; font-size: .9rem; line-height: 1.4;
 }
-#dispatch-sidebar .dispatch-request-row__name { flex: 1 1 7rem; }
-#dispatch-sidebar .dispatch-request-row__marker { width: 11px; height: 11px; margin-inline-end: .4rem; }
+#dispatch-sidebar .dispatch-request-row__marker { width: 11px; height: 11px; }
 #dispatch-sidebar .dispatch-request-row__details { gap: .3rem .4rem; }
 #dispatch-sidebar .dispatch-request-row__status { min-height: 24px; padding-inline: .45rem; }
 #dispatch-sidebar .dispatch-request-row__meta { gap: .25rem .5rem; }
-#dispatch-sidebar .dispatch-request-row__attachment { gap: .2rem;
-  padding: .12rem .35rem; border-radius: .4rem; color: var(--bb-color-primary);
-  background: rgba(var(--v-theme-primary), .09); font-weight: 700; }
+#dispatch-sidebar .dispatch-request-row__attachment {
+  justify-content: center; min-width: 26px; min-height: 26px;
+  padding: .25rem; border-radius: .4rem; color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), .09);
+}
 #dispatch-sidebar .dispatch-responder-row {
   min-height: 68px; margin-bottom: .4rem; border-radius: .85rem;
 }
