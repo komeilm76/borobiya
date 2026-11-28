@@ -114,20 +114,11 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(markup).toContain('aria-label="پاک‌سازی انتخاب امدادگران"');
     expect(markup).toContain(':aria-label="`ارسال پیشنهاد مأموریت به ${adminSos.selectedResponderIds.length} امدادگر انتخاب‌شده`"');
     expect(rail).toContain('#dispatch-sidebar .admin-dispatch__surface :deep(.v-card-text[role="status"])');
-    expect(shellCss).toContain('.app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,');
-    expect(shellCss).toContain('inset-inline-start: calc(clamp(20rem, 28vw, 25rem) + 1rem);');
-    expect(shellCss).toContain('inset-block-end: calc(4rem + env(safe-area-inset-bottom, 0px));');
-    expect(shellCss).toContain('inset-block-end: calc(7.5rem + env(safe-area-inset-bottom, 0px));');
-    expect(shellCss).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));');
-    expect(shellCss).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(shellCss).toContain('inset-block-end: calc(min(40dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('--dispatch-expanded-sheet-height: min(68dvh, 38rem,');
+    expect(shellCss).not.toContain('.app-shell--map:has(.admin-dispatch) .sos-fab');
+    expect(shellCss).not.toContain('.app-shell--map:has(.admin-dispatch) .app-general-share');
     expect(css).toContain('position: absolute; z-index: 5; right: 1.125rem;');
     expect(css).not.toContain('.admin-dispatch__recenter-mobile {');
-    expect(shellCss).toContain('inset-block-end: calc(var(--dispatch-expanded-sheet-height) + 3.75rem');
-    expect((4 - .75) * 16 - 44).toBe(8); // Desktop legend to SOS.
-    expect((7.5 - 4) * 16 - 48).toBe(8); // Desktop SOS to Broadcast.
-    expect((7.25 - 3.75) * 16 - 48).toBe(8); // Mobile SOS to Broadcast.
-    expect((1.125 * 16 + 44 / 2) - (1 * 16 + 48 / 2)).toBe(0); // Desktop centers.
   });
 
   it("uses a single map search row without a redundant selected-SOS control", () => {

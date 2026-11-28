@@ -202,9 +202,9 @@
               @click="toggleQueueRequest(item)"
             >
                 <v-list-item-title class="dispatch-request-row__title font-weight-bold">
+                  <span class="dispatch-request-row__name">{{ incidentLabel(item.incidentTypeId) }}</span>
                   <span class="dispatch-request-row__marker"
                     role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`" />
-                  <span class="dispatch-request-row__name">{{ incidentLabel(item.incidentTypeId) }}</span>
                 </v-list-item-title>
                 <div class="dispatch-request-row__details">
                   <span class="dispatch-request-row__status" :class="`dispatch-request-row__status--${item.status}`"
@@ -756,7 +756,7 @@
           <section>
             <h2>انتخاب درخواست و ارسال پیشنهاد</h2>
             <p>در موبایل، ابتدا فهرست درخواست‌های SOS نمایش داده می‌شود. با انتخاب یک درخواست، فهرست امدادگران نزدیک آن باز می‌شود. دکمهٔ پیکان کنار «ارسال پیشنهاد» به فهرست SOS برمی‌گردد و انتخاب درخواست را لغو می‌کند. با دستگیرهٔ بالای پنل می‌توانید ارتفاع فهرست را تغییر دهید.</p>
-            <p>در نمایش بزرگ‌تر، صف درخواست‌ها و فهرست امدادگران هم‌زمان دیده می‌شوند. نقطهٔ رنگی کنار عنوان، اولویت حادثه را نشان می‌دهد؛ نماد تصویر یعنی درخواست پیوست دارد. وضعیت درخواست جداگانه نمایش داده می‌شود.</p>
+            <p>در نمایش بزرگ‌تر، صف درخواست‌ها و فهرست امدادگران هم‌زمان دیده می‌شوند. نقطهٔ رنگی در انتهای چپ سطر عنوان، اولویت حادثه را نشان می‌دهد؛ نماد تصویر یعنی درخواست پیوست دارد. وضعیت درخواست جداگانه نمایش داده می‌شود.</p>
             <p>امدادگران را بررسی و انتخاب کنید؛ تعداد افراد انتخاب‌شده روی دکمهٔ «ارسال پیشنهاد» دیده می‌شود. ارسال بدون انتخاب امدادگر ممکن نیست.</p>
           </section>
           <section>
@@ -1256,15 +1256,6 @@ const mapPanelState = computed(() => dispatchMapPanelState(compactDispatch.value
   sheetExpanded.value, sheetDragging.value, incidentExpanded.value));
 const incidentAtMapTop = computed(() => mapPanelState.value.incidentAtTop);
 const hideDispatchSearch = computed(() => mapPanelState.value.hideSearch);
-// Do not leave keyboard focus on a floating action after either transition
-// makes it invisible. Empty expanded sheets still hide the shell's actions.
-watch([sheetExpanded, incidentAtMapTop], ([expanded, atTop]) => {
-  if (!compactDispatch.value || (!expanded && !atTop)) return;
-  const active = document.activeElement;
-  if (active instanceof HTMLElement && active.closest(".sos-fab, .app-general-share")) {
-    document.getElementById(expanded ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });
-  }
-}, { flush: "sync" });
 watch(hideDispatchSearch, (hidden) => {
   if (!hidden) return;
   const active = document.activeElement;
@@ -2870,7 +2861,7 @@ onBeforeUnmount(() => {
 }
 #dispatch-sidebar .dispatch-request-row :deep(.text-caption) { font-size: .8rem !important; gap: .25rem !important; }
 /* SOS rows are compact, separate tappable surfaces within the otherwise flat
-   rail. Priority stays by the title; status and evidence share a second line. */
+   rail. Priority sits at the left end of the title line; status and evidence share a second line. */
 #dispatch-sidebar .dispatch-request-list { padding: .25rem .2rem .5rem; }
 #dispatch-sidebar .dispatch-request-row {
   position: relative; margin-bottom: .3rem; padding: .35rem .45rem;
@@ -2894,7 +2885,7 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .dispatch-request-row.v-list-item--active :deep(.v-list-item__overlay) { opacity: 0; }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item__content) { display: grid; gap: .15rem; }
 #dispatch-sidebar .dispatch-request-row__marker {
-  display: block; flex: none; width: 9px; height: 9px;
+  display: block; flex: none; width: 9px; height: 9px; margin-inline-start: auto;
   border-radius: 50%; background: var(--sos-priority-accent);
 }
 #dispatch-sidebar .dispatch-request-row :deep(.v-list-item-title.dispatch-request-row__title) {

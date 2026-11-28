@@ -312,7 +312,8 @@ const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
   // A bearer can precede its verified profile on a slow connection. Never
   // expose SOS or location-sharing actions on that interim guest screen.
-  () => auth.isAuthenticated && !!auth.user && !auth.mustCompleteSecurityQuestions
+  // Dispatch is for triaging received requests, not creating a new SOS.
+  () => auth.isAuthenticated && !!auth.user && !auth.mustCompleteSecurityQuestions && route.name !== "admin-dispatch"
 );
 // Only an active activity can wake the general GPS publisher. Mission membership
 // and trip duration are checked again by the server before persisting each fix.

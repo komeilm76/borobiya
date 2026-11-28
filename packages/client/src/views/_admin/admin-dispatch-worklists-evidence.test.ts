@@ -41,14 +41,16 @@ describe("dispatch worklists and incident evidence", () => {
     expect(css).toContain('#dispatch-sidebar .dispatch-request-row.v-list-item--active {\n  border-color: var(--bb-color-primary);');
   });
 
-  it("keeps the priority dot with the SOS title and the icon-only image before its date", () => {
+  it("places the static priority dot at the left end of the SOS title line and the icon-only image before its date", () => {
     const queue = markup.slice(markup.indexOf('id="dispatch-list-02"'),
       markup.indexOf('</v-list>', markup.indexOf('id="dispatch-list-02"')));
     const title = queue.slice(queue.indexOf('<v-list-item-title'), queue.indexOf('</v-list-item-title>'));
     expect(queue).not.toContain('<template #prepend>');
     expect(title.indexOf('class="dispatch-request-row__marker"')).toBeGreaterThan(0);
-    expect(title.indexOf('class="dispatch-request-row__marker"')).toBeLessThan(title.indexOf('class="dispatch-request-row__name"'));
+    expect(title.indexOf('class="dispatch-request-row__marker"')).toBeGreaterThan(title.indexOf('class="dispatch-request-row__name"'));
     expect(title).toContain('role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`"');
+    expect(css).toContain('width: 9px; height: 9px; margin-inline-start: auto;');
+    expect(css).toContain('.dispatch-request-row__name { flex: 1 1 auto; min-width: 0;');
     expect(title).not.toContain('pulse-indicator');
     expect(queue).not.toContain('dispatch-request-row--replacement');
     expect(css).not.toContain('.pulse-indicator');

@@ -45,7 +45,7 @@ describe("compact dispatch search and on-demand guidance", () => {
     expect(guide).toContain('در موبایل، ابتدا فهرست درخواست‌های SOS نمایش داده می‌شود.');
     expect(guide).toContain('دکمهٔ پیکان کنار «ارسال پیشنهاد» به فهرست SOS برمی‌گردد و انتخاب درخواست را لغو می‌کند.');
     expect(guide).toContain('در نمایش بزرگ‌تر، صف درخواست‌ها و فهرست امدادگران هم‌زمان دیده می‌شوند.');
-    expect(guide).toContain('نقطهٔ رنگی کنار عنوان، اولویت حادثه را نشان می‌دهد');
+    expect(guide).toContain('نقطهٔ رنگی در انتهای چپ سطر عنوان، اولویت حادثه را نشان می‌دهد');
     expect(guide).toContain('تعداد افراد انتخاب‌شده روی دکمهٔ «ارسال پیشنهاد» دیده می‌شود.');
     expect(guide).not.toContain('از تب «درخواست‌ها»');
     expect(guide).not.toContain('در تب «امدادگران»');

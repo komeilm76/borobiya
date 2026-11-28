@@ -585,57 +585,12 @@ a {
   }
 }
 
-/* Dispatch's fixed Broadcast/SOS actions clear the sidebar. The map legend
-   remains a desktop control; the redundant selected-SOS locator is gone. */
-@media (min-width: 901px) {
-  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
-  .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-inline-start: calc(clamp(20rem, 28vw, 25rem) + 1rem);
-  }
-  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
-    inset-block-end: calc(4rem + env(safe-area-inset-bottom, 0px));
-  }
-  .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-block-end: calc(7.5rem + env(safe-area-inset-bottom, 0px));
-  }
-}
-@media (min-width: 901px) and (max-width: 1100px) {
-  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
-  .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-inline-start: 20rem;
-  }
-}
+/* The dispatch workspace manages incoming SOS requests; its own sidebar and
+   map controls replace the global SOS action. Keep the compact sheet sized. */
 @media (max-width: 900px) {
-  /* Reserve the map's top area for the selected incident on short/notched
-     phones; SOS and search return when the sheet is at peek. */
   .app-shell--map:has(.admin-dispatch) {
     --dispatch-expanded-sheet-height: min(68dvh, 38rem,
       max(min(40dvh, 21rem), calc(100dvh - 12.5rem - env(safe-area-inset-top, 0px))));
-  }
-  /* Hide the shell's SOS and broadcast actions while the sheet is open or a
-     selected incident occupies the search slot; restore them at peek/close. */
-  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,
-  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share,
-  .app-shell--map:has(.admin-dispatch--incident-at-top) .sos-fab.sos-fab,
-  .app-shell--map:has(.admin-dispatch--incident-at-top) .app-general-share,
-  .app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab,
-  .app-shell--map:has(.admin-dispatch__sidebar--dragging) .app-general-share {
-    visibility: hidden; pointer-events: none;
-  }
-  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
-  .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));
-    inset-inline-end: auto;
-    inset-block-start: auto;
-  }
-  .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
-    inset-block-end: calc(min(40dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));
-  }
-  .app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab {
-    inset-block-end: calc(var(--dispatch-expanded-sheet-height) + 3.75rem + env(safe-area-inset-bottom, 0px));
-  }
-  .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-block-end: calc(min(40dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

@@ -23,15 +23,16 @@ describe("dispatch map controls across screen sizes", () => {
     expect(css).toContain('.admin-dispatch__legend-toggle {\n  position: absolute; z-index: 5; right: 1.125rem;');
   });
 
-  it("keeps SOS and the incident-details map action usable without an extra floating button", () => {
+  it("keeps the incident-details map action usable without a dispatch SOS floating button", () => {
     expect(markup).toContain('class="admin-dispatch__incident-header"');
     expect(markup).toContain('icon="mdi-map-marker-radius-outline"');
     expect(markup).toContain('@click.stop="focusSelectedIncidentMap"');
     expect(markup).toContain('<MapCanvas id="dispatch-canvas-01" tabindex="-1"');
     expect(source).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');
     expect(source).toContain('map.flyTo({ center: [incident.location.lon, incident.location.lat], offset: dispatchFocusOffset()');
-    expect(shell).toContain('inset-block-end: calc(var(--dispatch-expanded-sheet-height) + 3.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(shell).toContain('visibility: hidden; pointer-events: none;'); // While dragging or expanded.
+    expect(shell).toContain('--dispatch-expanded-sheet-height: min(68dvh, 38rem,');
+    expect(shell).not.toContain('.app-shell--map:has(.admin-dispatch) .sos-fab');
+    expect(css).toContain('.admin-dispatch__search--hidden { visibility: hidden; pointer-events: none; }');
     for (const [height, safeTop] of [[844, 0], [568, 47]]) {
       const { peek, expanded } = dispatchSheetBounds(height, 16, safeTop);
       expect(expanded).toBeGreaterThan(peek);

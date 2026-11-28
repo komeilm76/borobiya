@@ -29,6 +29,10 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(appSource).toContain("<SosTriggerButton");
     expect(appSource).toContain("<SosRequestSheet");
     expect(appSource).toContain("auth.isAuthenticated && !!auth.user && !auth.mustCompleteSecurityQuestions");
+    expect(appSource).toContain('route.name !== "admin-dispatch"'); // Dispatch handles received SOS, not new requests.
+    expect(appSource).toContain('<SosTriggerButton v-if="showSosButton"');
+    expect(appSource).toContain('<SosRequestSheet v-if="showSosButton"');
+    expect(appSource).toContain('if (!visible) sosSheet.closeSheet();'); // Close if navigation enters dispatch.
     expect(triggerSource).toContain('data-test="sos-trigger"');
     expect(triggerSource).toContain("prefers-reduced-motion: reduce");
   });

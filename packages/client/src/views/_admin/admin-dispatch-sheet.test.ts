@@ -50,9 +50,8 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(markup).toContain('<h1>مرکز پایش و اعزام اضطراری (SOS)</h1>'); // Desktop title remains.
     expect(css).toContain('height: min(40dvh, 21rem);');
     expect(css).toContain('inset: 0 0 min(40dvh, 21rem) 0;');
-    expect(shell).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab,');
-    expect(shell).toContain('visibility: hidden; pointer-events: none;');
+    expect(shell).toContain('--dispatch-expanded-sheet-height: min(68dvh, 38rem,');
+    expect(shell).not.toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__back-to-queue {\n    display: inline-flex; flex: none; padding: 0;');
     expect(css).toContain('width: 44px; min-width: 44px; height: 44px; min-height: 44px;');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__submit :deep(.admin-dispatch__back-to-queue) {\n    flex: 0 0 44px; width: 44px; min-width: 44px; padding: 0;');
@@ -87,17 +86,15 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(source).toContain('dispatchMapPanelState(compactDispatch.value, !!adminSos.selectedRequest,\n  sheetExpanded.value, sheetDragging.value, incidentExpanded.value)');
     expect(source).toContain('watch(hideDispatchSearch, (hidden) => {');
     expect(source).toContain('document.getElementById(sheetExpanded.value ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share,');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch--incident-at-top) .sos-fab.sos-fab,');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch--incident-at-top) .app-general-share,');
-    expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .app-general-share {\n    visibility: hidden; pointer-events: none;');
+    expect(shell).not.toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab');
+    expect(shell).not.toContain('.app-shell--map:has(.admin-dispatch--incident-at-top) .sos-fab');
+    expect(shell).not.toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share');
     const toggle = source.slice(source.indexOf('function collapseSheetForIncident()'), source.indexOf('const showLivePanel = ref(false);'));
     expect(toggle).toContain('if (compactDispatch.value && sheetExpanded.value) setSheetExpanded(false);');
     expect(toggle).toContain('const wasExpandedSheet = compactDispatch.value && sheetExpanded.value;');
     expect(toggle).toContain('incidentExpanded.value = wasExpandedSheet || !incidentExpanded.value;');
-    expect(source).toContain('watch([sheetExpanded, incidentAtMapTop], ([expanded, atTop]) => {');
-    expect(source).toContain('document.getElementById(expanded ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });');
+    expect(source).not.toContain('active.closest(".sos-fab, .app-general-share")');
+    expect(source).toContain('watch(hideDispatchSearch, (hidden) => {');
   });
 
   it("leaves mobile space for the worklist rather than a fixed tab bar", () => {
