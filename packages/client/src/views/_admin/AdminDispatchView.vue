@@ -122,10 +122,6 @@
       {{ adminSos.quickDispatchFeedback.message }}
     </v-alert>
 
-    <v-btn v-if="compactDispatch && adminSos.selectedId" id="dispatch-action-29"
-      class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="text"
-      aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"
-      aria-controls="dispatch-queue-region" @click="returnToSosQueue" />
     <div id="dispatch-sidebar-content" class="admin-dispatch__content">
     <v-alert id="dispatch-notice-02"
       v-if="adminSos.errorMessage"
@@ -249,6 +245,10 @@
               ? 'برای مشاهدهٔ امدادگران واجد شرایط، یک درخواست SOS انتخاب کنید.'
               : adminSos.loading ? 'در حال دریافت درخواست SOS…'
                 : 'این درخواست در فهرست فعلی موجود نیست؛ به فهرست SOS بازگردید.' }}</span>
+            <v-btn v-if="compactDispatch && adminSos.selectedId" id="dispatch-action-30"
+              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="text"
+              aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"
+              aria-controls="dispatch-queue-region" @click="returnToSosQueue" />
           </div>
         <v-card v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"
           class="admin-dispatch__surface admin-dispatch__responders bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
@@ -386,6 +386,10 @@
           </v-card-text>
 
           <v-card-actions class="admin-dispatch__submit pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
+            <v-btn v-if="compactDispatch" id="dispatch-action-29"
+              class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="text"
+              aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"
+              aria-controls="dispatch-queue-region" @click="returnToSosQueue" />
             <v-btn id="dispatch-action-17"
               :aria-label="`ارسال پیشنهاد مأموریت به ${adminSos.selectedResponderIds.length} امدادگر انتخاب‌شده`"
               :disabled="!adminSos.canDispatchSelected"
@@ -1243,8 +1247,9 @@ watch(() => adminSos.selectedId, (selectedId) => {
   void nextTick(() => {
     const content = document.getElementById("dispatch-sidebar-content");
     if (content) content.scrollTop = 0;
-    if (focusedInHiddenSection) document.getElementById(selectedId ? "dispatch-action-29" : "dispatch-queue")
-      ?.focus({ preventScroll: true });
+    if (focusedInHiddenSection) document.getElementById(selectedId
+      ? adminSos.selectedRequest ? "dispatch-responders" : "dispatch-action-30"
+      : "dispatch-queue")?.focus({ preventScroll: true });
   });
 });
 const incidentExpanded = ref(!compactDispatch.value);
@@ -3380,7 +3385,6 @@ onBeforeUnmount(() => {
   background: rgb(var(--v-theme-surface));
 }
 #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 42px; padding-inline: .75rem; }
-#dispatch-sidebar .admin-dispatch__back-to-queue,
 #dispatch-sidebar .admin-dispatch__sheet-handle { display: none; }
 #dispatch-sidebar .admin-dispatch__back-to-queue:focus-visible,
 #dispatch-sidebar .admin-dispatch__sheet-handle:focus-visible {
@@ -3472,9 +3476,12 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__toolbar-actions { gap: .15rem; }
   #dispatch-sidebar .admin-dispatch__filter-select { width: 100%; }
   #dispatch-sidebar .admin-dispatch__back-to-queue {
-    display: inline-flex; align-self: flex-start; flex: none;
+    display: inline-flex; flex: none; padding: 0;
     width: 44px; min-width: 44px; height: 44px; min-height: 44px;
-    margin: .1rem .2rem .25rem; color: var(--bb-color-primary);
+    color: var(--bb-color-primary);
+  }
+  #dispatch-sidebar .admin-dispatch__nearby-empty .admin-dispatch__back-to-queue {
+    align-self: flex-start; margin-top: .3rem;
   }
   #dispatch-sidebar .admin-dispatch__content {
     flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;
@@ -3501,7 +3508,13 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .dispatch-responder-row { margin-bottom: .25rem; }
   /* Allow breathing room around the dispatch action without extra dividers. */
   #dispatch-sidebar .admin-dispatch__submit {
-    padding: .35rem .2rem .15rem !important; border-top: 0;
+    flex-wrap: nowrap !important; padding: .35rem .2rem .15rem !important; border-top: 0;
+  }
+  #dispatch-sidebar .admin-dispatch__submit :deep(.admin-dispatch__back-to-queue) {
+    flex: 0 0 44px; width: 44px; min-width: 44px; padding: 0;
+  }
+  #dispatch-sidebar .admin-dispatch__submit :deep(#dispatch-action-17) {
+    flex: 1 1 auto; min-width: 0; width: auto;
   }
   #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list {
     max-height: none; overflow: visible;
@@ -3521,10 +3534,6 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__submit { position: sticky; bottom: 0; }
   #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; }
   #dispatch-sidebar .admin-dispatch__responder-search :deep(.v-btn) { min-height: 44px; }
-}
-@media (max-width: 480px) {
-  #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { width: 100%; }
-  #dispatch-sidebar .admin-dispatch__submit { justify-content: stretch !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   #dispatch-sidebar.admin-dispatch__sidebar,
