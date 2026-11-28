@@ -1175,15 +1175,6 @@ function setSheetExpanded(expanded: boolean): void {
   sheetExpanded.value = expanded;
   sheetDragHeight.value = null;
 }
-// The shell's floating actions become unavailable under the open sheet.
-// Return focus to the handle if one of those actions was focused.
-watch(sheetExpanded, (expanded) => {
-  if (!expanded || !compactDispatch.value) return;
-  const active = document.activeElement;
-  if (active instanceof HTMLElement && active.closest(".sos-fab, .app-general-share")) {
-    document.getElementById("dispatch-sheet-handle")?.focus({ preventScroll: true });
-  }
-}, { flush: "sync" });
 function startSheetDrag(event: PointerEvent): void {
   if (!compactDispatch.value || !event.isPrimary || event.button !== 0 || sheetPointer) return;
   const sidebar = dispatchSidebar.value;
@@ -1266,6 +1257,15 @@ const mapPanelState = computed(() => dispatchMapPanelState(compactDispatch.value
   sheetExpanded.value, sheetDragging.value, incidentExpanded.value));
 const incidentAtMapTop = computed(() => mapPanelState.value.incidentAtTop);
 const hideDispatchSearch = computed(() => mapPanelState.value.hideSearch);
+// Do not leave keyboard focus on a floating action after either transition
+// makes it invisible. Empty expanded sheets still hide the shell's actions.
+watch([sheetExpanded, incidentAtMapTop], ([expanded, atTop]) => {
+  if (!compactDispatch.value || (!expanded && !atTop)) return;
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active.closest(".sos-fab, .app-general-share")) {
+    document.getElementById(expanded ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });
+  }
+}, { flush: "sync" });
 watch(hideDispatchSearch, (hidden) => {
   if (!hidden) return;
   const active = document.activeElement;

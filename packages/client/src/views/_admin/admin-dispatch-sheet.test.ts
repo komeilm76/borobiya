@@ -79,13 +79,15 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(source).toContain('document.getElementById(sheetExpanded.value ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .sos-fab.sos-fab,');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--expanded) .app-general-share,');
+    expect(shell).toContain('.app-shell--map:has(.admin-dispatch--incident-at-top) .sos-fab.sos-fab,');
+    expect(shell).toContain('.app-shell--map:has(.admin-dispatch--incident-at-top) .app-general-share,');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .app-general-share {\n    visibility: hidden; pointer-events: none;');
     const toggle = source.slice(source.indexOf('function collapseSheetForIncident()'), source.indexOf('const showLivePanel = ref(false);'));
     expect(toggle).toContain('if (compactDispatch.value && sheetExpanded.value) setSheetExpanded(false);');
     expect(toggle).toContain('const wasExpandedSheet = compactDispatch.value && sheetExpanded.value;');
     expect(toggle).toContain('incidentExpanded.value = wasExpandedSheet || !incidentExpanded.value;');
-    expect(source).toContain('watch(sheetExpanded, (expanded) => {');
-    expect(source).toContain('document.getElementById("dispatch-sheet-handle")?.focus({ preventScroll: true });');
+    expect(source).toContain('watch([sheetExpanded, incidentAtMapTop], ([expanded, atTop]) => {');
+    expect(source).toContain('document.getElementById(expanded ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });');
   });
 
   it("uses one spaced divider between the mobile worklist and fixed tabs", () => {
