@@ -539,7 +539,7 @@
             @click="legendOpen = !legendOpen" />
           <v-btn v-if="compactDispatch && adminSos.selectedRequest" id="dispatch-recenter-mobile"
             class="admin-dispatch__recenter-mobile map-selected-alert-card"
-            icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
+            icon="mdi-crosshairs-gps" color="primary" variant="flat" size="small"
             aria-label="نمایش محل حادثه روی نقشه" title="نمایش محل حادثه روی نقشه"
             @click="focusSelectedSosOnMap" />
           <ul id="dispatch-map-legend" class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
@@ -3257,9 +3257,13 @@ onBeforeUnmount(() => {
   .admin-dispatch__recenter-mobile {
     position: absolute; z-index: 5; right: calc(.875rem + env(safe-area-inset-right, 0px));
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
-    border-radius: var(--bb-map-action-radius, 1rem);
-    box-shadow: var(--bb-shadow-overlay);
+    border: 2px solid #fff; border-radius: var(--bb-map-action-radius, 1rem);
+    /* A light edge reads on dark tiles; a dark outer ring reads on pale roads. */
+    box-shadow: 0 0 0 2px rgba(8, 35, 38, .82), 0 5px 16px rgba(8, 21, 38, .55) !important;
   }
+  :global(:root.dark .admin-dispatch__recenter-mobile) { border-color: #fff; }
+  .admin-dispatch__recenter-mobile :deep(.v-icon) { font-size: 24px; }
+  .admin-dispatch__recenter-mobile:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
   #dispatch-workspace:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__recenter-mobile {
     bottom: calc(var(--dispatch-expanded-sheet-height) - min(40dvh, 21rem) + .5rem + env(safe-area-inset-bottom, 0px));
   }
@@ -3529,5 +3533,10 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__sheet-handle,
   #dispatch-sidebar .admin-dispatch__brand-icon,
   #dispatch-sidebar .admin-dispatch__section-number { border: 1px solid CanvasText; }
+  .admin-dispatch__recenter-mobile,
+  :global(:root.dark .admin-dispatch__recenter-mobile) {
+    border-color: ButtonText; box-shadow: none !important;
+  }
+  .admin-dispatch__recenter-mobile:focus-visible { outline-color: Highlight; }
 }
 </style>

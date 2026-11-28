@@ -23,10 +23,16 @@ describe("compact dispatch map actions", () => {
     const locator = markup.slice(locatorStart, markup.indexOf('/>', locatorStart));
     expect(locator).toContain('v-if="compactDispatch && adminSos.selectedRequest"');
     expect(locator).toContain('class="admin-dispatch__recenter-mobile map-selected-alert-card"');
+    expect(locator).toContain('icon="mdi-crosshairs-gps" color="primary" variant="flat" size="small"');
     expect(locator).toContain('aria-label="نمایش محل حادثه روی نقشه"');
     expect(locator).toContain('@click="focusSelectedSosOnMap"');
     expect(css).toContain('right: calc(.875rem + env(safe-area-inset-right, 0px));');
     expect(css).toContain('bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).toContain('border: 2px solid #fff; border-radius: var(--bb-map-action-radius, 1rem);');
+    expect(css).toContain('box-shadow: 0 0 0 2px rgba(8, 35, 38, .82), 0 5px 16px rgba(8, 21, 38, .55) !important;');
+    expect(css).toContain(':global(:root.dark .admin-dispatch__recenter-mobile) { border-color: #fff; }');
+    expect(css).toContain('.admin-dispatch__recenter-mobile :deep(.v-icon) { font-size: 24px; }');
+    expect(css).toContain('border-color: ButtonText; box-shadow: none !important;');
     expect(css).toContain('bottom: calc(var(--dispatch-expanded-sheet-height) - min(40dvh, 21rem) + .5rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('#dispatch-workspace:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__recenter-mobile {\n    visibility: hidden; pointer-events: none;');
     expect(shell).toContain('--dispatch-expanded-sheet-height: min(68dvh, 38rem,');
