@@ -66,6 +66,22 @@ describe("compact, consistent admin SOS notifications", () => {
     expect(feedback).toContain('@click:close="adminSos.quickDispatchFeedback = null"');
   });
 
+  it("shows replacement feedback above the scrollport at its content height on desktop and mobile", () => {
+    const quick = markup.indexOf('id="dispatch-notice-03"');
+    const scrollport = markup.indexOf('id="dispatch-sidebar-content"');
+    expect(quick).toBeGreaterThan(markup.indexOf('</header>'));
+    expect(quick).toBeLessThan(scrollport);
+    const alert = markup.slice(quick, markup.indexOf('</v-alert>', quick));
+    expect(alert).toContain('density="compact" closable');
+    expect(alert).toContain('class="dispatch-quick-feedback"');
+    expect(alert).toContain('adminSos.quickDispatchFeedback.message');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__content > :deep(.v-alert) { flex: 0 0 auto; }');
+    expect(css).toContain('#dispatch-sidebar > :deep(.dispatch-quick-feedback) {\n  min-width: 0; margin: .2rem .3rem .45rem; padding: .5rem .65rem;');
+    expect(css).toContain('grid-template-columns: max-content minmax(0, 1fr) max-content max-content;');
+    expect(css).toContain('min-width: 0; white-space: normal; overflow-wrap: anywhere;');
+    expect(css).toContain('margin: .1rem .2rem .35rem; padding: .45rem .55rem;');
+  });
+
   it("keeps a concise fallback in the selected SOS panel after the toast is dismissed", () => {
     const detail = markup.slice(markup.indexOf('id="dispatch-notice-08"'),
       markup.indexOf('id="dispatch-action-25"'));

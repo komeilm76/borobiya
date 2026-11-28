@@ -113,6 +113,15 @@
       </div>
     </header>
 
+    <!-- Keep replacement feedback above the scrollport: a previously scrolled
+         worklist must not hide the result, and the alert must not grow as a row. -->
+    <v-alert id="dispatch-notice-03" v-if="adminSos.quickDispatchFeedback" :type="adminSos.quickDispatchFeedback.type"
+      variant="tonal" rounded="lg" density="compact" closable
+      :role="adminSos.quickDispatchFeedback.type === 'error' ? 'alert' : 'status'" class="dispatch-quick-feedback"
+      @click:close="adminSos.quickDispatchFeedback = null">
+      {{ adminSos.quickDispatchFeedback.message }}
+    </v-alert>
+
     <nav v-if="compactDispatch" class="admin-dispatch__sheet-nav" aria-label="مراحل اعزام">
       <button id="dispatch-sheet-queue" type="button" :class="{ 'is-active': sheetTab === 'queue' }"
         :aria-current="sheetTab === 'queue' ? 'step' : undefined" aria-controls="dispatch-queue-region"
@@ -141,12 +150,6 @@
       {{ adminSos.errorMessage }}
     </v-alert>
 
-    <v-alert id="dispatch-notice-03" v-if="adminSos.quickDispatchFeedback" :type="adminSos.quickDispatchFeedback.type"
-      variant="tonal" rounded="lg" closable
-      :role="adminSos.quickDispatchFeedback.type === 'error' ? 'alert' : 'status'" class="mb-4"
-      @click:close="adminSos.quickDispatchFeedback = null">
-      {{ adminSos.quickDispatchFeedback.message }}
-    </v-alert>
     <section id="dispatch-notice-04" v-if="adminSos.urgentReplacement"
       class="dispatch-replacement" role="alert" aria-live="assertive" aria-label="اعزام جایگزین لازم است">
       <div class="dispatch-replacement__heading">
@@ -2849,7 +2852,18 @@ onBeforeUnmount(() => {
 #dispatch-sidebar .admin-dispatch__surface :deep(.v-card-text[role="status"]) {
   flex: 1 1 auto; display: grid; place-content: center;
 }
-#dispatch-sidebar > :deep(.v-alert) { flex: none; }
+#dispatch-sidebar > :deep(.v-alert),
+#dispatch-sidebar .admin-dispatch__content > :deep(.v-alert) { flex: 0 0 auto; }
+/* Replacement feedback stays visible above the scrolling worklists. Vuetify's
+   default v-alert flex: 1 1 would otherwise make a short message fill the rail. */
+#dispatch-sidebar > :deep(.dispatch-quick-feedback) {
+  min-width: 0; margin: .2rem .3rem .45rem; padding: .5rem .65rem;
+  grid-template-columns: max-content minmax(0, 1fr) max-content max-content;
+  font-size: .84rem; line-height: 1.5;
+}
+#dispatch-sidebar > :deep(.dispatch-quick-feedback .v-alert__content) {
+  min-width: 0; white-space: normal; overflow-wrap: anywhere;
+}
 .admin-dispatch__queue .mb-4 { margin-bottom: 0 !important; }
 /* The pinned rail is one surface, not cards stacked inside another card.
    Restrict these overrides to the rail; the map, dialogs and floating incident
@@ -3449,6 +3463,9 @@ onBeforeUnmount(() => {
   }
   #dispatch-sidebar.admin-dispatch__sidebar--dragging .admin-dispatch__sheet-handle { cursor: grabbing; }
   #dispatch-sidebar .admin-dispatch__header { flex: none; padding: 0 0 .3rem; }
+  #dispatch-sidebar > :deep(.dispatch-quick-feedback) {
+    margin: .1rem .2rem .35rem; padding: .45rem .55rem;
+  }
   /* The sheet handle and step tabs identify the workspace on mobile. Keep
      the full page title on desktop without spending a mobile row on it. */
   #dispatch-sidebar .admin-dispatch__intro { display: none; }
