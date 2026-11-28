@@ -594,16 +594,17 @@
           </v-card-title>
           <v-divider />
           <div class="admin-dispatch__sender" role="group" aria-label="ارسال‌کنندهٔ درخواست">
-            <span class="admin-dispatch__sender-icon" aria-hidden="true"><v-icon icon="mdi-account-circle-outline" size="23" /></span>
+            <button id="dispatch-action-19" type="button" class="admin-dispatch__sender-avatar"
+              aria-label="مشاهدهٔ پروفایل ارسال‌کننده" aria-haspopup="dialog" title="مشاهدهٔ پروفایل ارسال‌کننده"
+              @click="profileUserId = null; senderProfileOpen = true">
+              <v-icon icon="mdi-account-circle-outline" size="26" aria-hidden="true" />
+            </button>
             <div class="admin-dispatch__sender-copy">
               <strong>ارسال‌کنندهٔ درخواست</strong>
               <span class="admin-dispatch__sender-name" dir="ltr" v-if="requesterName">@{{ requesterName }}</span>
               <span v-else class="admin-dispatch__sender-placeholder" role="status">{{ requesterLoading ? 'در حال دریافت نام کاربری…' : 'نام کاربری در دسترس نیست' }}</span>
               <button id="dispatch-button-06" v-if="requesterFailed" type="button" class="admin-dispatch__inline-retry" @click="requesterRetry++">تلاش دوباره</button>
             </div>
-            <v-btn id="dispatch-action-19" color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-account-details-outline"
-              aria-label="مشاهدهٔ پروفایل ارسال‌کننده" class="admin-dispatch__sender-action"
-              @click="profileUserId = null; senderProfileOpen = true">پروفایل</v-btn>
           </div>
           <div id="dispatch-notice-08"
             v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer' &&
@@ -2356,23 +2357,26 @@ onBeforeUnmount(() => {
 #dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
 .admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }
 .admin-dispatch__responders:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
-.admin-dispatch__sender { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem;
-  margin: .85rem 1rem 0; padding: .65rem .8rem;
+.admin-dispatch__sender { display: grid; grid-template-columns: 44px minmax(0, 1fr);
+  align-items: center; gap: .65rem; min-width: 0;
+  margin: .85rem 1rem 0; padding: .55rem .7rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .1);
   border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); }
-.admin-dispatch__sender-icon { display: grid; flex: none; place-items: center; width: 42px; height: 42px;
-  border-radius: 50%; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .14); }
-.admin-dispatch__sender-copy { display: grid; flex: 1 1 10rem; min-width: 0; gap: .12rem; }
+.admin-dispatch__sender-avatar { display: grid; place-items: center; width: 44px; height: 44px;
+  padding: 0; border: 1px solid rgba(var(--v-theme-primary), .22); border-radius: 50%;
+  color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); cursor: pointer; }
+.admin-dispatch__sender-avatar:hover { border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .2); }
+.admin-dispatch__sender-avatar:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.admin-dispatch__sender-copy { display: grid; min-width: 0; gap: .12rem; }
 .admin-dispatch__sender-copy strong { font-size: .9rem; }
-.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .8rem;
-  font-weight: 650; line-height: 1.5; overflow-wrap: anywhere; }
+.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .88rem;
+  font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
 .admin-dispatch__sender-placeholder { color: var(--bb-color-muted); font-size: .8rem; }
 .admin-dispatch__inline-retry { display: inline-block; min-height: 36px; padding: .2rem .35rem; border: 0;
   background: transparent; color: rgb(var(--v-theme-primary)); cursor: pointer; font: inherit; font-size: .8rem; }
 .admin-dispatch__inline-retry:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); border-radius: .35rem; }
 .admin-dispatch__address, .admin-dispatch__location-coordinates { grid-column: 1 / -1; }
 .admin-dispatch__coordinates { display: flex; flex-wrap: wrap; gap: .2rem .8rem; justify-content: flex-end; }
-.admin-dispatch__sender-action { flex: none; min-height: 44px; }
 
 /* The timeline sits between other cards; give it a boundary, not another shadow. */
 .dispatch-mission-timeline {
@@ -2644,7 +2648,6 @@ onBeforeUnmount(() => {
 @media (max-width: 599px) {
   .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
   .admin-dispatch__toolbar { width: 100%; }
-  .admin-dispatch__sender-action { width: 100%; }
   .admin-dispatch__facts { grid-template-columns: minmax(0, 1fr); }
   .admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }
   .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; }
@@ -3065,17 +3068,13 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .admin-dispatch__detail-heading { justify-content: flex-start; gap: .4rem; }
 .admin-dispatch__incident-panel .admin-dispatch__detail-badges { gap: .3rem; }
 .admin-dispatch__incident-panel .admin-dispatch__sender {
-  display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center;
   gap: .5rem; margin: .4rem .6rem .2rem; padding: .4rem .55rem;
   border: 1px solid color-mix(in srgb, var(--bb-color-outline) 50%, transparent);
   border-radius: .75rem; background: var(--bb-color-inset);
 }
-.admin-dispatch__incident-panel .admin-dispatch__sender-icon { width: 32px; height: 32px; }
-.admin-dispatch__incident-panel .admin-dispatch__sender-copy { min-width: 0; }
 .admin-dispatch__incident-panel .admin-dispatch__sender-copy strong { color: var(--bb-color-muted); font-size: .8rem; font-weight: 600; }
 .admin-dispatch__incident-panel .admin-dispatch__photo { margin: .05rem .3rem .15rem; }
 .admin-dispatch__incident-panel .admin-dispatch__photo-preview { height: clamp(8rem, 22vh, 12rem); }
-.admin-dispatch__incident-panel .admin-dispatch__sender-action :deep(.v-btn__content) { white-space: nowrap; }
 .admin-dispatch__incident-panel #dispatch-incident :deep(.admin-dispatch__detail-body) {
   gap: .5rem; padding: .45rem .65rem .65rem; line-height: 1.5;
 }
@@ -3089,17 +3088,12 @@ onBeforeUnmount(() => {
   display: flex; flex-wrap: wrap; justify-content: flex-start; gap: .35rem;
   padding: .55rem 0 0; border-top: 1px solid var(--bb-color-outline);
 }
-.admin-dispatch__incident-panel .admin-dispatch__next :deep(.v-btn),
-.admin-dispatch__incident-panel .admin-dispatch__sender-action {
+.admin-dispatch__incident-panel .admin-dispatch__next :deep(.v-btn) {
   min-height: 44px; height: 44px; padding-inline: .5rem; font-size: .8rem;
 }
 .admin-dispatch__incident-panel .admin-dispatch__mission-header { margin-bottom: .2rem; }
 .admin-dispatch__incident-panel .admin-dispatch__mission-header :deep(.v-btn) { width: 44px; height: 44px; padding: 0; }
 .admin-dispatch__incident-panel .admin-dispatch__mission-header + p { margin-bottom: .25rem !important; }
-@media (max-width: 900px) {
-  .admin-dispatch__incident-panel .admin-dispatch__sender { grid-template-columns: 2rem minmax(0, 1fr); }
-  .admin-dispatch__incident-panel .admin-dispatch__sender-action { grid-column: 2; justify-self: start; width: auto; }
-}
 .admin-dispatch__incident-panel :deep(.live-panel) {
   border: 0; border-radius: 0; box-shadow: none; background: transparent;
   margin-block: .5rem; padding: .35rem 0;

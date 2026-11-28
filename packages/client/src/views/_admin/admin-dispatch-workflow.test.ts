@@ -85,7 +85,7 @@ describe("admin SOS triage flow", () => {
     expect(template).toContain('class="admin-dispatch__sender-name"');
     expect(incident).not.toContain('شناسهٔ حساب');
     expect(source).not.toContain('copyRequesterId');
-    expect(css).toContain('.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .8rem;');
+    expect(css).toContain('.admin-dispatch__sender-name { justify-self: start; max-width: 100%; font-size: .88rem;');
     expect(css).toContain('.admin-dispatch__detail-body h3 { margin: 0 0 .2rem; font-size: .8rem;');
     expect(template).toContain('lat: {{ adminSos.selectedRequest.location.lat.toFixed(6) }}');
     expect(template).toContain('lng: {{ adminSos.selectedRequest.location.lon.toFixed(6) }}');

@@ -154,7 +154,8 @@ describe("dispatch pinned rail and uncluttered map", () => {
     const markup = template!.content;
     const panel = css.slice(css.indexOf('/* Keep the information and actions on the RTL start edge.'));
     expect(panel).toContain('.admin-dispatch__detail-heading { justify-content: flex-start;');
-    expect(panel).toContain('grid-template-columns: 2rem minmax(0, 1fr) auto;');
+    expect(css).toContain('grid-template-columns: 44px minmax(0, 1fr);');
+    expect(panel).not.toContain('.admin-dispatch__sender-action');
     expect(panel).toContain('gap: .5rem; padding: .45rem .65rem .65rem;');
     expect(panel).toContain('border-radius: .75rem; background: var(--bb-color-inset);');
     expect(panel).toContain('min-height: 44px; height: 44px; padding-inline: .5rem;');

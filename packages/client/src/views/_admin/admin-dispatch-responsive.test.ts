@@ -95,7 +95,8 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(compactLayout).toContain('max-width: 100%; height: auto; min-height: 32px; white-space: normal;');
     expect(compactLayout).toContain('.admin-dispatch__detail-badges :deep(.v-chip__content)');
     expect(css).toContain('padding: .5rem .65rem .35rem; line-height: 1.35;\n  white-space: normal; overflow-wrap: anywhere;');
-    expect(css).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender { grid-template-columns: 2rem minmax(0, 1fr); }');
+    expect(css).toContain('.admin-dispatch__sender { display: grid; grid-template-columns: 44px minmax(0, 1fr);');
+    expect(css).not.toContain('.admin-dispatch__incident-panel .admin-dispatch__sender { grid-template-columns: 2rem');
     expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
     expect(source).toContain("'--dispatch-current-sheet-height': `${sheetDragHeight}px`");
     expect(compactLayout).toContain('--dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);');

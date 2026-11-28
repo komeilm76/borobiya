@@ -13,7 +13,13 @@ describe("admin sender identity and profile access", () => {
     const incident = dispatch.slice(dispatch.indexOf('id="dispatch-incident"'), dispatch.indexOf('id="dispatch-dialog-01"'));
     expect(incident).not.toContain('adminSos.selectedRequest.requesterId');
     expect(incident).toContain('class="admin-dispatch__sender-name"');
-    expect(dispatch).toContain('@click="profileUserId = null; senderProfileOpen = true"');
+    const avatar = incident.slice(incident.indexOf('<button id="dispatch-action-19"'), incident.indexOf('</button>', incident.indexOf('<button id="dispatch-action-19"')));
+    expect(avatar).toContain('type="button" class="admin-dispatch__sender-avatar"');
+    expect(avatar).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده" aria-haspopup="dialog"');
+    expect(avatar).toContain('@click="profileUserId = null; senderProfileOpen = true"');
+    expect(avatar).toContain('icon="mdi-account-circle-outline"');
+    expect(avatar).not.toContain('>پروفایل<');
+    expect(incident).not.toContain('class="admin-dispatch__sender-action"');
     expect(dispatch).toContain(':user-id="profileUserId ?? adminSos.selectedRequest?.requesterId ?? null"');
     expect(dispatch).toMatch(/watch\(\(\) => adminSos\.selectedRequest\?\.id, \(\) => \{\s*senderProfileOpen\.value = false;\s*profileUserId\.value = null;\s*photoDialogOpen\.value = false;[\s\S]*?\}, \{ flush: "sync" \}\);/);
     expect(dispatch).toContain('title="پروفایل ارسال‌کننده"');
@@ -78,7 +84,10 @@ describe("admin sender identity and profile access", () => {
   });
 
   it("keeps profile actions reachable on narrow screens and colors from theme tokens", () => {
-    expect(dispatch).toContain('.admin-dispatch__sender-action { width: 100%; }');
+    expect(dispatch).toContain('.admin-dispatch__sender-avatar { display: grid; place-items: center; width: 44px; height: 44px;');
+    expect(dispatch).toContain('.admin-dispatch__sender-avatar:hover');
+    expect(dispatch).toContain('.admin-dispatch__sender-avatar:focus-visible');
+    expect(dispatch).toContain('grid-template-columns: 44px minmax(0, 1fr);');
     expect(dispatch).toContain('.dispatch-request-row.v-list-item--active');
     expect(users).toContain('.admin-user-identity:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
     expect(users).toContain('.admin-mobile-header .admin-user-identity { flex: 1 1 12rem; }');
