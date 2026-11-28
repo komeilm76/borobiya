@@ -122,22 +122,10 @@
       {{ adminSos.quickDispatchFeedback.message }}
     </v-alert>
 
-    <nav v-if="compactDispatch" class="admin-dispatch__sheet-nav" aria-label="مراحل اعزام">
-      <button id="dispatch-sheet-queue" type="button" :class="{ 'is-active': sheetTab === 'queue' }"
-        :aria-current="sheetTab === 'queue' ? 'step' : undefined" aria-controls="dispatch-queue-region"
-        @click="selectSheetTab('queue')">
-        <v-icon icon="mdi-format-list-bulleted" size="18" aria-hidden="true" />
-        <span>درخواست‌ها</span>
-        <span class="admin-dispatch__sheet-count">{{ adminSos.visibleRequests.length.toLocaleString('fa-IR') }}</span>
-      </button>
-      <button id="dispatch-sheet-responders" type="button" :class="{ 'is-active': sheetTab === 'responders' }"
-        :aria-current="sheetTab === 'responders' ? 'step' : undefined" aria-controls="dispatch-nearby"
-        @click="selectSheetTab('responders')">
-        <v-icon icon="mdi-account-search-outline" size="18" aria-hidden="true" />
-        <span>امدادگران</span>
-        <span v-if="adminSos.selectedResponderIds.length" class="admin-dispatch__sheet-count">{{ adminSos.selectedResponderIds.length.toLocaleString('fa-IR') }}</span>
-      </button>
-    </nav>
+    <v-btn v-if="compactDispatch && adminSos.selectedId" id="dispatch-action-29"
+      class="admin-dispatch__back-to-queue" icon="mdi-arrow-right" size="small" variant="text"
+      aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"
+      aria-controls="dispatch-queue-region" @click="returnToSosQueue" />
     <div id="dispatch-sidebar-content" class="admin-dispatch__content">
     <v-alert id="dispatch-notice-02"
       v-if="adminSos.errorMessage"
@@ -176,9 +164,9 @@
     </section>
 
     <section id="dispatch-queue-region" class="admin-dispatch__queue"
-      :class="{ 'admin-dispatch__section--hidden': compactDispatch && sheetTab !== 'queue' }"
+      :class="{ 'admin-dispatch__section--hidden': compactDispatch && !!adminSos.selectedId }"
       aria-label="صف درخواست‌ها">
-        <v-card id="dispatch-queue" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
+        <v-card id="dispatch-queue" tabindex="-1" class="admin-dispatch__surface admin-dispatch__surface--queue bb-map-navigation-card bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <span class="admin-dispatch__card-heading"><span class="admin-dispatch__section-number" aria-hidden="true">۰۱</span><span>صف درخواست‌های اضطراری</span></span>
             <v-chip id="dispatch-chip-08" v-if="adminSos.queueVerified" size="small" variant="tonal">
@@ -253,11 +241,14 @@
     </section>
 
         <section id="dispatch-nearby" class="admin-dispatch__nearby"
-          :class="{ 'admin-dispatch__section--hidden': compactDispatch && sheetTab !== 'responders' }"
+          :class="{ 'admin-dispatch__section--hidden': compactDispatch && !adminSos.selectedId }"
           aria-label="امدادگران نزدیک">
           <div v-if="!adminSos.selectedRequest" class="admin-dispatch__nearby-empty" role="status">
             <strong>امدادگران نزدیک</strong>
-            <span>برای مشاهدهٔ امدادگران واجد شرایط، یک درخواست SOS انتخاب کنید.</span>
+            <span>{{ !adminSos.selectedId
+              ? 'برای مشاهدهٔ امدادگران واجد شرایط، یک درخواست SOS انتخاب کنید.'
+              : adminSos.loading ? 'در حال دریافت درخواست SOS…'
+                : 'این درخواست در فهرست فعلی موجود نیست؛ به فهرست SOS بازگردید.' }}</span>
           </div>
         <v-card v-if="adminSos.selectedRequest" id="dispatch-responders" tabindex="-1"
           class="admin-dispatch__surface admin-dispatch__responders bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
@@ -1165,7 +1156,6 @@ async function testSound(): Promise<void> {
   }
 }
 const compactDispatch = useMediaQuery("(max-width: 900px)");
-const sheetTab = ref<"queue" | "responders">("queue");
 const sheetExpanded = ref(false);
 const dispatchSidebar = ref<HTMLElement | null>(null);
 const sheetDragHeight = ref<number | null>(null);
@@ -1241,20 +1231,22 @@ watch(compactDispatch, () => {
   sheetPointer = null;
   sheetDragHeight.value = null;
   sheetDragging.value = false;
-  sheetTab.value = "queue";
   sheetExpanded.value = false;
 });
-function selectSheetTab(tab: "queue" | "responders", expand = false): void {
-  sheetTab.value = tab;
-  // Tab switching alone respects the operator's chosen sheet height. Opening
-  // a request or jumping to dispatch expands it so the controls stay usable.
-  if (expand) sheetExpanded.value = true;
-  // Each worklist starts at its heading, not the previous tab's scroll offset.
+// The selected SOS is the only mobile step state. Reset the shared scrollport
+// whenever selection changes, including changes from the map or a deep link.
+watch(() => adminSos.selectedId, (selectedId) => {
+  if (!compactDispatch.value) return;
+  const active = document.activeElement;
+  const focusedInHiddenSection = active instanceof HTMLElement &&
+    active.closest(selectedId ? "#dispatch-queue-region" : "#dispatch-nearby");
   void nextTick(() => {
     const content = document.getElementById("dispatch-sidebar-content");
     if (content) content.scrollTop = 0;
+    if (focusedInHiddenSection) document.getElementById(selectedId ? "dispatch-action-29" : "dispatch-queue")
+      ?.focus({ preventScroll: true });
   });
-}
+});
 const incidentExpanded = ref(!compactDispatch.value);
 watch(compactDispatch, (compact) => { incidentExpanded.value = !compact; });
 // With no incident selected, search stays available even over an expanded
@@ -1874,7 +1866,7 @@ function quickRedispatch(requestId: string): void {
 }
 
 function focusReplacement(requestId: string): void {
-  if (compactDispatch.value) selectSheetTab("queue", true);
+  if (compactDispatch.value) setSheetExpanded(true);
   adminSos.setFilterStatus("pending");
   const item = adminSos.requests.find((request) => request.id === requestId);
   if (item) focusRequest(item);
@@ -1884,6 +1876,14 @@ function focusReplacement(requestId: string): void {
   }
 }
 
+function returnToSosQueue(): void {
+  pendingDeepLinkId = null;
+  adminSos.selectRequest(null);
+  // The back button is removed with the selection. Restore keyboard focus to
+  // the now-visible queue rather than leaving it on a hidden/removed element.
+  void nextTick(() => document.getElementById("dispatch-queue")?.focus({ preventScroll: true }));
+}
+
 function toggleQueueRequest(item: SosRequestRecord): void {
   pendingDeepLinkId = null; // A manual choice supersedes an unresolved route target.
   if (toggleSosQueueSelection(adminSos.selectedId, item.id) === null) {
@@ -1891,7 +1891,7 @@ function toggleQueueRequest(item: SosRequestRecord): void {
     return;
   }
   focusRequest(item);
-  if (compactDispatch.value) selectSheetTab("responders", true);
+  if (compactDispatch.value) setSheetExpanded(true);
 }
 
 function focusRequest(item: SosRequestRecord): void {
@@ -1962,8 +1962,8 @@ function focusNearbyResponder(userId: string): void {
 
 function focusResponders(): void {
   if (!adminSos.selectedRequest) return;
-  if (compactDispatch.value && (sheetTab.value !== "responders" || !sheetExpanded.value)) {
-    selectSheetTab("responders", true);
+  if (compactDispatch.value && !sheetExpanded.value) {
+    setSheetExpanded(true);
     void nextTick(focusResponders);
     return;
   }
@@ -3380,9 +3380,9 @@ onBeforeUnmount(() => {
   background: rgb(var(--v-theme-surface));
 }
 #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 42px; padding-inline: .75rem; }
-#dispatch-sidebar .admin-dispatch__sheet-nav { display: none; }
+#dispatch-sidebar .admin-dispatch__back-to-queue,
 #dispatch-sidebar .admin-dispatch__sheet-handle { display: none; }
-#dispatch-sidebar .admin-dispatch__sheet-nav button:focus-visible,
+#dispatch-sidebar .admin-dispatch__back-to-queue:focus-visible,
 #dispatch-sidebar .admin-dispatch__sheet-handle:focus-visible {
   outline: 3px solid var(--bb-color-primary); outline-offset: -3px;
 }
@@ -3466,39 +3466,18 @@ onBeforeUnmount(() => {
   #dispatch-sidebar > :deep(.dispatch-quick-feedback) {
     margin: .1rem .2rem .35rem; padding: .45rem .55rem;
   }
-  /* The sheet handle and step tabs identify the workspace on mobile. Keep
-     the full page title on desktop without spending a mobile row on it. */
+  /* Keep the full page title on desktop without spending a mobile row on it. */
   #dispatch-sidebar .admin-dispatch__intro { display: none; }
   #dispatch-sidebar .admin-dispatch__toolbar { gap: .35rem; }
   #dispatch-sidebar .admin-dispatch__toolbar-actions { gap: .15rem; }
   #dispatch-sidebar .admin-dispatch__filter-select { width: 100%; }
-  #dispatch-sidebar .admin-dispatch__sheet-nav {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    /* Keep DOM navigation before long lists for keyboard users, but dock it
-       visually below the independent scrollport in both sheet positions. */
-    order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;
-    /* One quiet boundary between the scrollable worklist and fixed tabs. */
-    border-top: 1px solid var(--bb-color-outline);
-    background: rgb(var(--v-theme-surface));
-  }
-  #dispatch-sidebar .admin-dispatch__sheet-nav button {
-    display: flex; align-items: center; justify-content: center; gap: .35rem;
-    min-width: 0; min-height: 44px; padding: .3rem .45rem;
-    border: 0; border-bottom: 2px solid transparent; border-radius: .55rem .55rem 0 0;
-    color: var(--bb-color-muted); background: transparent;
-    font: inherit; font-size: .8rem; font-weight: 700; cursor: pointer;
-  }
-  #dispatch-sidebar .admin-dispatch__sheet-nav button.is-active {
-    color: var(--bb-color-primary); border-bottom-color: var(--bb-color-primary);
-    background: rgba(var(--v-theme-primary), .07);
-  }
-  #dispatch-sidebar .admin-dispatch__sheet-count {
-    display: inline-grid; place-items: center; min-width: 1.35rem; height: 1.35rem;
-    padding-inline: .2rem; border-radius: 999px;
-    background: rgba(var(--v-theme-primary), .12); font-size: .8rem;
+  #dispatch-sidebar .admin-dispatch__back-to-queue {
+    display: inline-flex; align-self: flex-start; flex: none;
+    width: 44px; min-width: 44px; height: 44px; min-height: 44px;
+    margin: .1rem .2rem .25rem; color: var(--bb-color-primary);
   }
   #dispatch-sidebar .admin-dispatch__content {
-    order: 2; flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;
+    flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;
   }
   #dispatch-sidebar .admin-dispatch__section--hidden { display: none; }
   /* The mobile toolbar and worklist are one surface; desktop section rules
@@ -3511,8 +3490,8 @@ onBeforeUnmount(() => {
     display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0;
     border-top: 0;
   }
-  /* The step label and count already live in the fixed tab bar. Do not spend
-     another row repeating them above the first emergency request. */
+  /* Use all available space for the SOS rows; the queue is the only mobile
+     entry view, so its desktop heading would repeat the current context. */
   #dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }
   #dispatch-sidebar .admin-dispatch__queue { padding-top: .2rem; }
   #dispatch-sidebar .admin-dispatch__nearby { padding-top: .3rem; }
@@ -3520,8 +3499,7 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__responder-search { padding: .1rem .2rem .15rem !important; }
   #dispatch-sidebar .admin-dispatch__responders .responder-list { padding: .15rem .1rem .2rem; }
   #dispatch-sidebar .dispatch-responder-row { margin-bottom: .25rem; }
-  /* The fixed tab bar supplies the only divider; allow breathing room
-     around the dispatch action instead of sandwiching it between rules. */
+  /* Allow breathing room around the dispatch action without extra dividers. */
   #dispatch-sidebar .admin-dispatch__submit {
     padding: .35rem .2rem .15rem !important; border-top: 0;
   }
@@ -3554,7 +3532,6 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .dispatch-responder-row { transition: none; }
 }
 @media (forced-colors: active) {
-  #dispatch-sidebar .admin-dispatch__sheet-nav button.is-active { outline: 2px solid Highlight; }
   #dispatch-sidebar .admin-dispatch__sheet-handle,
   #dispatch-sidebar .admin-dispatch__brand-icon,
   #dispatch-sidebar .admin-dispatch__section-number { border: 1px solid CanvasText; }

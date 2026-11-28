@@ -19,7 +19,7 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__submit {\n  margin-top: auto;');
   });
 
-  it("lets a narrow-screen operator switch steps and enlarge the sheet without losing alerts", () => {
+  it("shows only the SOS queue until selection, then nearby responders with a back action", () => {
     const rail = markup.slice(markup.indexOf('id="dispatch-sidebar"'), markup.indexOf('</aside>'));
     expect(rail).toContain('id="dispatch-sheet-handle" v-if="compactDispatch"');
     expect(rail).not.toContain('id="dispatch-sheet-size"');
@@ -27,10 +27,14 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(rail).toContain('@pointercancel="cancelSheetDrag" @lostpointercapture="cancelSheetDrag"');
     expect(rail).toContain('@keydown.up.prevent="setSheetExpanded(true)" @keydown.down.prevent="setSheetExpanded(false)"');
     expect(rail).toContain(':aria-expanded="sheetExpanded" aria-controls="dispatch-sidebar-content"');
-    expect(rail).toContain('id="dispatch-sheet-queue" type="button"');
-    expect(rail).toContain('id="dispatch-sheet-responders" type="button"');
-    expect(rail).toContain(':aria-current="sheetTab === \'queue\' ? \'step\' : undefined"');
-    expect(rail).toContain('admin-dispatch__section--hidden');
+    expect(rail).not.toContain('admin-dispatch__sheet-nav');
+    expect(source).not.toContain('sheetTab');
+    expect(rail).toContain(':class="{ \'admin-dispatch__section--hidden\': compactDispatch && !!adminSos.selectedId }"');
+    expect(rail).toContain(':class="{ \'admin-dispatch__section--hidden\': compactDispatch && !adminSos.selectedId }"');
+    expect(rail).toContain('v-if="compactDispatch && adminSos.selectedId" id="dispatch-action-29"');
+    expect(rail).toContain('icon="mdi-arrow-right" size="small" variant="text"');
+    expect(rail).toContain('aria-label="بازگشت به فهرست درخواست‌های SOS و لغو انتخاب درخواست"');
+    expect(rail).toContain('aria-controls="dispatch-queue-region" @click="returnToSosQueue"');
     expect(rail.indexOf('id="dispatch-notice-04"')).toBeLessThan(rail.indexOf('id="dispatch-queue-region"'));
     expect(rail.indexOf('id="dispatch-queue-region"')).toBeLessThan(rail.indexOf('id="dispatch-nearby"'));
     expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: var(--dispatch-expanded-sheet-height); }');
@@ -45,12 +49,12 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(shell).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab,');
     expect(shell).toContain('visibility: hidden; pointer-events: none;');
-    expect(css).toContain('order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;');
-    expect(css).toContain('border-top: 1px solid var(--bb-color-outline);\n    background: rgb(var(--v-theme-surface));');
-    expect(css).toContain('order: 2; flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__back-to-queue {\n    display: inline-flex; align-self: flex-start; flex: none;');
+    expect(css).toContain('width: 44px; min-width: 44px; height: 44px; min-height: 44px;');
+    expect(css).toContain('flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__queue { flex: none; border-top: 0; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__nearby:not(.admin-dispatch__section--hidden) {\n    display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0;\n    border-top: 0;\n  }');
-    expect(rail.indexOf('class="admin-dispatch__sheet-nav"')).toBeLessThan(rail.indexOf('id="dispatch-sidebar-content"')); // Logical keyboard order.
+    expect(rail.indexOf('id="dispatch-action-29"')).toBeLessThan(rail.indexOf('id="dispatch-sidebar-content"')); // Back stays above the scrollport.
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__section--hidden { display: none; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }');
     expect(css).toContain('max-height: none; overflow: visible;'); // Queue still scrolls with the sheet.
@@ -90,20 +94,25 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(source).toContain('document.getElementById(expanded ? "dispatch-sheet-handle" : "dispatch-incident-toggle")?.focus({ preventScroll: true });');
   });
 
-  it("uses one spaced divider between the mobile worklist and fixed tabs", () => {
+  it("leaves mobile space for the worklist rather than a fixed tab bar", () => {
     const start = css.indexOf('  #dispatch-sidebar.admin-dispatch__sidebar {\n    display: flex; flex-direction: column;');
     const mobile = css.slice(start, css.indexOf('@media (max-width: 480px)', start));
     expect(start).toBeGreaterThan(0);
-    expect(mobile.match(/border-top: 1px solid var\(--bb-color-outline\)/g)).toHaveLength(1);
-    expect(mobile).toContain('order: 2; flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
-    expect(mobile).toContain('order: 3; flex: none; padding: .5rem 0 .1rem; gap: .3rem;');
+    expect(mobile).not.toContain('admin-dispatch__sheet-nav');
+    expect(mobile).toContain('flex: 1 1 auto; overflow-y: auto; padding-bottom: .5rem;');
     expect(mobile).toContain('padding: .35rem .2rem .15rem !important; border-top: 0;');
   });
 
   it("reveals responder controls from an SOS choice or detail action, without bypassing dispatch validation", () => {
-    expect(markup).toContain(`@click="selectSheetTab('responders')"`);
-    expect(source).toContain('if (compactDispatch.value) selectSheetTab("responders", true);');
-    expect(source).toContain('if (expand) sheetExpanded.value = true;');
+    expect(source).toContain('if (compactDispatch.value) setSheetExpanded(true);');
+    const back = source.slice(source.indexOf('function returnToSosQueue()'), source.indexOf('function toggleQueueRequest('));
+    expect(back).toContain('pendingDeepLinkId = null;');
+    expect(back).toContain('adminSos.selectRequest(null);');
+    expect(back).toContain('document.getElementById("dispatch-queue")?.focus({ preventScroll: true })');
+    expect(markup).toContain('<v-card id="dispatch-queue" tabindex="-1"');
+    expect(source).toContain('watch(() => adminSos.selectedId, (selectedId) => {\n  if (!compactDispatch.value) return;');
+    expect(source).toContain('active.closest(selectedId ? "#dispatch-queue-region" : "#dispatch-nearby")');
+    expect(source).toContain('document.getElementById(selectedId ? "dispatch-action-29" : "dispatch-queue")');
     expect(source).toContain('if (!compactDispatch.value || !event.isPrimary || event.button !== 0 || sheetPointer) return;');
     expect(source).toContain('if (pointer.moved) {');
     expect(source).toContain('if (suppressSheetClick) return;');
