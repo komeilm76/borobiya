@@ -17,7 +17,8 @@ describe("compact SOS and nearby responder worklists", () => {
     expect(responders).toContain('class="dispatch-responder-row"');
     expect(responders).not.toContain('v-checkbox-btn');
     expect(responders).not.toContain('<v-list-item');
-    expect(css).toContain('#dispatch-sidebar .dispatch-request-row__priority {\n  min-height: 20px; padding: 0 .35rem; line-height: 1.25; font-weight: 600;');
+    expect(css).toContain('#dispatch-sidebar .dispatch-request-row__marker {\n  display: block; flex: none; width: 9px; height: 9px;');
+    expect(css).not.toContain('.dispatch-request-row__priority');
     expect(css).toMatch(/#dispatch-sidebar \.dispatch-request-row \{[\s\S]*?border-radius: var\(--bb-radius-nested, 16px\) !important; background: var\(--bb-color-inset\);/);
     const row = css.slice(css.indexOf('#dispatch-sidebar .dispatch-responder-row {'),
       css.indexOf('#dispatch-sidebar .dispatch-responder-row:last-child'));

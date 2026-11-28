@@ -39,11 +39,13 @@ describe("SOS severity language across all surfaces", () => {
     expect(proposalSeverity.low.label).toBe("کم‌خطر");
   });
 
-  it("groups queue title/priority, status, and evidence separately without a rainbow of status chips", () => {
+  it("keeps queue priority in the labelled dot, separate from status and evidence", () => {
     const template = parse(dispatch).descriptor.template!.content;
     const queue = template.slice(template.indexOf('id="dispatch-list-02"'), template.indexOf('</v-list>', template.indexOf('id="dispatch-list-02"')));
     expect(queue).toContain(':style="sosPriorityStyle(item.severity)"');
-    expect(queue).toContain('dispatch-request-row__priority');
+    expect(queue).toContain('dispatch-request-row__marker');
+    expect(queue).toContain('role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`"');
+    expect(queue).not.toContain('dispatch-request-row__priority');
     expect(queue).toContain('dispatch-request-row__status');
     expect(queue).toContain('dispatch-request-row__meta');
     expect(queue).toContain(':aria-pressed="item.id === adminSos.selectedId"');
@@ -60,8 +62,12 @@ describe("SOS severity language across all surfaces", () => {
     for (const [filename, view] of [["AdminDispatchView.vue", dispatch], ["ProposalInboxContent.vue", offers], ["MapProposalSidebar.vue", sidebar]]) {
       const { styles } = parse(view).descriptor;
       expect(compileStyle({ filename, id: "priority-palette", scoped: true, source: styles[0]!.content }).errors).toEqual([]);
-      expect(styles[0]!.content).toContain('var(--sos-priority-dark-ink)');
-      expect(styles[0]!.content).toContain('var(--sos-priority-dark-surface)');
+      if (filename === "AdminDispatchView.vue") {
+        expect(styles[0]!.content).toContain('background: var(--sos-priority-accent);');
+      } else {
+        expect(styles[0]!.content).toContain('var(--sos-priority-dark-ink)');
+        expect(styles[0]!.content).toContain('var(--sos-priority-dark-surface)');
+      }
     }
   });
 });

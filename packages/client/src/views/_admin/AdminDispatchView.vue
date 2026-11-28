@@ -203,14 +203,11 @@
             >
                 <template #prepend>
                   <span class="dispatch-request-row__marker" :class="{ 'pulse-indicator': item.severity === 'high' || item.status === 'cancelled_by_rescuer' }"
-                    aria-hidden="true" />
+                    role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`" />
                 </template>
 
                 <v-list-item-title class="dispatch-request-row__title font-weight-bold">
                   <span class="dispatch-request-row__name">{{ incidentLabel(item.incidentTypeId) }}</span>
-                  <span :id="`dispatch-chip-13-${item.id}`" class="dispatch-request-row__priority">
-                    {{ severityMeta(item.severity).label }}
-                  </span>
                 </v-list-item-title>
                 <div class="dispatch-request-row__details">
                   <span class="dispatch-request-row__status" :class="`dispatch-request-row__status--${item.status}`"
@@ -561,8 +558,9 @@
                 </span>
                 <v-chip v-if="!incidentExpanded" id="dispatch-chip-14" class="admin-dispatch__incident-status"
                   :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
-                  :prepend-icon="statusMeta(adminSos.selectedRequest.status).icon" size="small" variant="tonal">
-                  {{ statusMeta(adminSos.selectedRequest.status).label }}
+                  :prepend-icon="statusMeta(adminSos.selectedRequest.status).icon" size="small" variant="tonal"
+                  :aria-label="statusMeta(adminSos.selectedRequest.status).label">
+                  {{ statusMeta(adminSos.selectedRequest.status).queueLabel }}
                 </v-chip>
               </span>
               <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
@@ -2931,15 +2929,6 @@ onBeforeUnmount(() => {
   font-size: .84rem; line-height: 1.35;
 }
 #dispatch-sidebar .dispatch-request-row__name { flex: 1 1 9rem; min-width: 0; overflow-wrap: anywhere; }
-.dispatch-request-row__priority {
-  display: inline-flex; align-items: center; flex: none; min-height: 23px;
-  padding: .1rem .5rem; border-radius: 100px; font-size: .8rem;
-  line-height: 1.4; font-weight: 800; color: var(--sos-priority-ink);
-  background: var(--sos-priority-surface);
-}
-#dispatch-sidebar .dispatch-request-row__priority {
-  min-height: 20px; padding: 0 .35rem; line-height: 1.25; font-weight: 600;
-}
 #dispatch-sidebar .dispatch-request-row__details {
   display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .3rem; min-width: 0;
 }
@@ -2974,9 +2963,6 @@ onBeforeUnmount(() => {
 :global(:root.dark .dispatch-request-row),
 :global(:root.dark .dispatch-responder-row) {
   box-shadow: 0 2px 8px rgba(0, 0, 0, .32) !important;
-}
-:global(:root.dark .dispatch-request-row__priority) {
-  color: var(--sos-priority-dark-ink); background: var(--sos-priority-dark-surface);
 }
 /* Independent pressed button and map action: no nested controls, checkbox,
    Vuetify active overlay, or selection stripe. Standard rows stay two lines. */
@@ -3162,13 +3148,14 @@ onBeforeUnmount(() => {
   display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center;
   gap: .25rem .45rem; min-width: 0;
 }
-.admin-dispatch__incident-name { display: inline-flex; flex: 1 1 9rem; align-items: center; gap: .35rem; min-width: 0; }
+.admin-dispatch__incident-name { display: inline-flex; flex: 1 1 6rem; align-items: center; gap: .35rem; min-width: 0; }
 .admin-dispatch__incident-name strong { min-width: 0; overflow-wrap: anywhere; }
 .admin-dispatch__priority-dot {
   display: inline-block; flex: none; width: 9px; height: 9px;
   border-radius: 50%; background: var(--sos-priority-accent);
 }
-.admin-dispatch__incident-status { flex: none; max-width: 100%; }
+.admin-dispatch__incident-status { flex: none; max-width: 100%; white-space: nowrap; }
+.admin-dispatch__incident-status :deep(.v-chip__content) { white-space: nowrap; }
 .admin-dispatch__incident-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
 .admin-dispatch__incident-panel #dispatch-incident { margin-bottom: .3rem; }
 .admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .2rem .6rem .35rem; }
@@ -3289,8 +3276,6 @@ onBeforeUnmount(() => {
     height: var(--dispatch-incident-available-height);
   }
   .admin-dispatch__incident-panel--expanded #dispatch-incident-content { flex: 1 1 auto; }
-  .admin-dispatch__incident-status { height: auto; min-height: 26px; white-space: normal; }
-  .admin-dispatch__incident-status :deep(.v-chip__content) { white-space: normal; overflow-wrap: anywhere; }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
     left: .75rem; right: 4.25rem; width: calc(100% - 5rem);

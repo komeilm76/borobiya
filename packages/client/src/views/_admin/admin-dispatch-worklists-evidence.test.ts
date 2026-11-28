@@ -30,7 +30,10 @@ describe("dispatch worklists and incident evidence", () => {
     const queue = markup.slice(markup.indexOf('id="dispatch-list-02"'), markup.indexOf('</v-list>', markup.indexOf('id="dispatch-list-02"')));
     expect(queue).toContain('@click="toggleQueueRequest(item)"');
     expect(queue).toContain(':aria-pressed="item.id === adminSos.selectedId"');
-    expect(queue).toContain('dispatch-request-row__priority');
+    expect(queue).toContain('class="dispatch-request-row__marker"');
+    expect(queue).toContain('role="img" :aria-label="`اولویت: ${severityMeta(item.severity).label}`"');
+    expect(queue).not.toContain('dispatch-chip-13');
+    expect(queue).not.toContain('dispatch-request-row__priority');
     expect(queue).toContain('dispatch-request-row__status');
     expect(queue).toContain('class="dispatch-request-row__attachment" role="img"');
     expect(queue).toContain('title="تصویر پیوست حادثه؛ برای بررسی درخواست را انتخاب کنید"');
