@@ -2751,6 +2751,7 @@ onBeforeUnmount(() => {
   position: relative; width: 100%; height: 100dvh; max-width: none;
   margin: 0; padding: 0; overflow: hidden;
   --dispatch-sidebar-width: clamp(20rem, 28vw, 25rem);
+  --dispatch-map-panel-width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));
 }
 .admin-dispatch__sidebar {
   position: absolute; z-index: 12; top: 0; right: 0; bottom: 0;
@@ -3026,7 +3027,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel {
   position: absolute; z-index: 9; top: calc(5.5rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px));
-  width: min(23rem, calc(100% - var(--dispatch-sidebar-width) - 2rem));
+  width: var(--dispatch-map-panel-width);
   max-height: min(86dvh, calc(100dvh - 6rem));
   display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;
   border-radius: var(--bb-radius-card, 24px);
@@ -3122,7 +3123,7 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 11; top: calc(.75rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px));
   /* Share the former menu corner; stay within the map before the right rail. */
-  width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));
+  width: var(--dispatch-map-panel-width);
   max-height: min(65dvh, 30rem); padding: .6rem .8rem;
   display: flex; flex-direction: column; gap: .5rem; overflow: hidden;
   border: 1px solid rgba(var(--v-theme-on-surface), .1);
@@ -3182,7 +3183,6 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 1100px) {
   .admin-dispatch { --dispatch-sidebar-width: 19rem; }
-  .admin-dispatch__incident-panel { width: min(19rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem)); }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     left: .75rem; max-width: calc(100% - 5rem);
     bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));

@@ -28,7 +28,7 @@ describe("map menu within dispatch search", () => {
     const desktopSearch = dispatchCss.slice(dispatchCss.indexOf('.admin-dispatch__search {'), dispatchCss.indexOf('.admin-dispatch__search-form {'));
     expect(desktopSearch).toContain('top: calc(.75rem + env(safe-area-inset-top, 0px));');
     expect(desktopSearch).toContain('left: calc(.75rem + env(safe-area-inset-left, 0px));');
-    expect(desktopSearch).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));');
+    expect(desktopSearch).toContain('width: var(--dispatch-map-panel-width);');
     expect(desktopSearch).not.toContain('right: calc(var(--dispatch-sidebar-width)');
     expect(dispatchCss).toContain('top: calc(5.5rem + env(safe-area-inset-top, 0px));'); // Incident card clears desktop search.
     expect(dispatchCss).toContain('display: flex; flex: none; align-items: center; gap: .4rem; min-width: 0;');

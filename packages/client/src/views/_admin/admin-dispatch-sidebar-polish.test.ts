@@ -138,7 +138,12 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(widget).not.toContain('id="dispatch-recenter"');
     expect(widget).toContain('variant="outlined" rounded="lg"');
     expect(widget).toContain('id="dispatch-search-results"');
-    expect(css).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));');
+    expect(css).toContain('--dispatch-map-panel-width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 1.5rem - env(safe-area-inset-left, 0px)));');
+    const desktopSearch = css.slice(css.indexOf('.admin-dispatch__search {'), css.indexOf('.admin-dispatch__search-form {'));
+    const desktopIncident = css.slice(css.indexOf('.admin-dispatch__incident-panel {'), css.indexOf('#dispatch-incident-content {'));
+    expect(desktopSearch).toContain('width: var(--dispatch-map-panel-width);');
+    expect(desktopIncident).toContain('width: var(--dispatch-map-panel-width);');
+    expect(css).not.toContain('.admin-dispatch__incident-panel { width: min(19rem');
     expect(css).toContain('border-radius: var(--bb-radius-card, 24px);\n  background: rgba(var(--v-theme-surface), .95);');
     expect(css).toContain('min-height: 0; overflow-y: auto; overscroll-behavior: contain;\n  padding: .15rem;');
     expect(dispatch).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');
