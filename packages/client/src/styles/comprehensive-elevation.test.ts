@@ -50,10 +50,9 @@ describe("all page and component elevation roles", () => {
     expect(userMap).toContain('class="user-map-view__recenter"');
     expect(source("../components/map/OwnPositionBar.vue")).toContain('class="own-position bb-floating-card" :class="`own-position--${tone}`" elevation="2"');
     const dispatch = source("../views/_admin/AdminDispatchView.vue");
-    expect(dispatch).toContain('class="map-selected-alert-card"');
+    expect(dispatch).not.toContain('class="map-selected-alert-card"');
     expect(dispatch).toMatch(/\.admin-dispatch__search\s*\{[^}]*box-shadow: var\(--bb-shadow-overlay\);/);
-    expect(dispatch).toMatch(/\.map-selected-alert-card\s*\{[^}]*width: 44px; height: 44px;/);
-    expect(dispatch).not.toContain('class="map-selected-alert-card bb-floating-card"');
+    expect(dispatch).not.toContain('.map-selected-alert-card {');
     expect(source("../components/sharing/LiveBroadcastBar.vue"))
       .toContain("'bb-floating-card': compact");
     expect(source("../components/map/MapCanvas.vue")).not.toContain("bb-floating-card");

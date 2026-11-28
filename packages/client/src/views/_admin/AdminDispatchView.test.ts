@@ -39,7 +39,7 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(view).toContain('در حال دریافت مأموریت‌های این درخواست');
     expect(view).toContain('بازخوانی مأموریت‌ها');
   });
-  it("renders pulsing MapLibre circles, compact map recenter control, responder list, guarded dispatch controls, and admin alerts", () => {
+  it("renders pulsing MapLibre circles, responder list, guarded dispatch controls, and admin alerts", () => {
     const viewSource = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
     expect(viewSource).toContain("admin-sos-pulse");
     expect(viewSource).toContain("admin-sos-core");
@@ -90,7 +90,6 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(severity).toContain("SOS_PRIORITY_PALETTE.low.accent");
 
     // T3.3.4 nearest responder suggestions + multi-select dispatch console
-    expect(viewSource).toContain("map-selected-alert-card");
     expect(viewSource).toContain("nearestResponders");
     expect(viewSource).toContain("toggleResponderSelection");
     expect(viewSource).toContain("selectAllNearestResponders");

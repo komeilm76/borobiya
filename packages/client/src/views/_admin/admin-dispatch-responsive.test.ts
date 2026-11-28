@@ -38,7 +38,8 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;');
     expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
-    expect(template).toContain('@click="frameSelectedIncident"');
+    expect(template).toContain('aria-controls="dispatch-map" @click="focusSelectedIncidentMap"');
+    expect(source).toContain('frameSelectedIncident();');
     expect(template).toContain('id="dispatch-map-legend"');
     expect(template).toContain('id="dispatch-map-choices"');
   });
@@ -100,7 +101,8 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(source).toContain('offset: dispatchFocusOffset()');
     expect(template).toContain(':id="`dispatch-sos-${item.id}`"');
     expect(template).toContain(':id="`dispatch-responder-${responder.userId}`"');
-    expect(template).toContain('id="dispatch-recenter"');
+    expect(template).not.toContain('id="dispatch-recenter"');
+    expect(template).toContain('<MapCanvas id="dispatch-canvas-01" tabindex="-1"');
     expect(template).toContain('id="dispatch-responders"');
     expect(template).toContain('id="dispatch-incident"');
     expect(template).not.toContain('صف را بررسی کنید، شواهد و موقعیت را بسنجید');

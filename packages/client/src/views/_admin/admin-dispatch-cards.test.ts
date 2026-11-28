@@ -29,12 +29,10 @@ describe("dispatch surface and type hierarchy", () => {
     expect(shadows.light.surface).not.toBe(shadows.dark.surface);
   });
 
-  it("retains a compact map recenter action, inset timeline and readable Persian typography", () => {
-    expect(template).toContain('class="map-selected-alert-card"');
-    expect(cssRule(".map-selected-alert-card")).toContain("width: 44px; height: 44px;");
-    expect(cssRule(".map-selected-alert-card")).not.toContain("box-shadow:");
+  it("keeps the map search, inset timeline and readable Persian typography without a duplicate focus button", () => {
+    expect(template).not.toContain('class="map-selected-alert-card"');
     expect(cssRule(".admin-dispatch__search")).toContain("box-shadow: var(--bb-shadow-overlay);");
-    expect(template).toMatch(/<section id="dispatch-search"[\s\S]*?id="dispatch-recenter" class="map-selected-alert-card"/);
+    expect(template).not.toContain('id="dispatch-recenter"');
     expect(template).not.toContain('admin-dispatch__map-caption');
     expect(cssRule(".dispatch-map-wrapper")).toContain("height: clamp(18rem, 37dvh, 23rem);");
     expect(cssRule(".dispatch-mission-timeline")).toContain("border-radius: var(--bb-radius-nested, 16px);");

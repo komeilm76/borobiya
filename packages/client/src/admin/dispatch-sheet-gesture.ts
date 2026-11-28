@@ -1,5 +1,5 @@
 // Match the CSS sheet stops, including its short-phone clearance for the
-// stacked SOS and incident-location controls. Evaluate once at drag start so
+// SOS action below the search field. Evaluate once at drag start so
 // browser toolbar changes cannot make the handle jump mid-gesture.
 export function dispatchSheetBounds(viewportHeight: number, rootFontSize: number, safeAreaTop = 0): { peek: number; expanded: number } {
   const peek = Math.min(viewportHeight * .40, rootFontSize * 21);

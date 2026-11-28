@@ -121,31 +121,28 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(shellCss).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));');
     expect(shellCss).toContain('inset-block-end: calc(min(40dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('position: absolute; z-index: 5; right: 1.125rem;');
-    expect(css).toContain('right: calc(.875rem + env(safe-area-inset-right, 0px));');
-    expect(css).toContain('bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
+    expect(css).not.toContain('.admin-dispatch__recenter-mobile {');
+    expect(shellCss).toContain('inset-block-end: calc(var(--dispatch-expanded-sheet-height) + 3.75rem');
     expect((4 - .75) * 16 - 44).toBe(8); // Desktop legend to SOS.
-    expect((3.75 - .5) * 16 - 44).toBe(8); // Mobile SOS locator to SOS.
     expect((7.5 - 4) * 16 - 48).toBe(8); // Desktop SOS to Broadcast.
     expect((7.25 - 3.75) * 16 - 48).toBe(8); // Mobile SOS to Broadcast.
     expect((1.125 * 16 + 44 / 2) - (1 * 16 + 48 / 2)).toBe(0); // Desktop centers.
-    expect((.875 * 16 + 44 / 2) - (.75 * 16 + 48 / 2)).toBe(0); // Mobile centers.
   });
 
-  it("uses a single map search row with a compact recenter action", () => {
+  it("uses a single map search row without a redundant selected-SOS control", () => {
     const markup = template!.content;
     const widget = markup.slice(markup.indexOf('<section id="dispatch-search"'), markup.indexOf('</section>', markup.indexOf('<section id="dispatch-search"')));
     expect(widget).toContain('class="admin-dispatch__search-form" role="search"');
     expect(widget).not.toContain('class="admin-dispatch__search-header"');
     expect(widget).not.toContain('<h2>جست‌وجو روی نقشه</h2>');
-    expect(widget).toContain('id="dispatch-recenter" class="map-selected-alert-card"');
-    expect(widget).toContain('icon="mdi-crosshairs-gps"');
+    expect(widget).not.toContain('id="dispatch-recenter"');
     expect(widget).toContain('variant="outlined" rounded="lg"');
     expect(widget).toContain('id="dispatch-search-results"');
     expect(css).toContain('width: min(25rem, calc(100% - var(--dispatch-sidebar-width) - 8.25rem));');
     expect(css).toContain('border-radius: var(--bb-radius-card, 24px);\n  background: rgba(var(--v-theme-surface), .95);');
     expect(css).toContain('min-height: 0; overflow-y: auto; overscroll-behavior: contain;\n  padding: .15rem;');
-    expect(dispatch).toContain('document.getElementById(compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter")?.focus({ preventScroll: true });');
-    expect(css).not.toContain('.admin-dispatch__map-and-actions .map-selected-alert-card {');
+    expect(dispatch).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');
+    expect(css).not.toContain('.map-selected-alert-card {');
   });
 
   it("fits the selected SOS actions and facts without losing their labels or touch targets", () => {

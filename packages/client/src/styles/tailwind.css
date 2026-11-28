@@ -585,9 +585,8 @@ a {
   }
 }
 
-/* Dispatch's fixed Broadcast/SOS actions form an evenly spaced rail with the
-   44px map legend toggle. Keep 8px between controls and clear of the sidebar;
-   on phones the legend's bottom is measured from the map above the bottom rail. */
+/* Dispatch's fixed Broadcast/SOS actions clear the sidebar. The map legend
+   remains a desktop control; the redundant selected-SOS locator is gone. */
 @media (min-width: 901px) {
   .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab,
   .app-shell--map:has(.admin-dispatch) .app-general-share {
@@ -607,14 +606,14 @@ a {
   }
 }
 @media (max-width: 900px) {
-  /* Leave room for the 48px SOS and 44px selected-incident locator above the
-     expanded sheet, including the top safe area on short/notched phones. */
+  /* Keep the SOS action below search and above the expanded sheet, including
+     the top safe area on short/notched phones. */
   .app-shell--map:has(.admin-dispatch) {
     --dispatch-expanded-sheet-height: min(68dvh, 38rem,
       max(min(40dvh, 21rem), calc(100dvh - 12.5rem - env(safe-area-inset-top, 0px))));
   }
-  /* During a drag the sheet can pass through the action rail. Restore both
-     controls at their final stop instead of letting them cover the handle. */
+  /* During a drag the sheet can pass through the SOS action. Restore it
+     at the final stop instead of letting it cover the handle. */
   .app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab {
     visibility: hidden; pointer-events: none;
   }

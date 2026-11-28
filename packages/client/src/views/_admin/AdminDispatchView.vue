@@ -416,11 +416,6 @@
               autocomplete="off" maxlength="200" aria-controls="dispatch-search-results" @click:clear="mapSearch = ''" />
             <!-- The shared map menu launcher teleports beside the field on compact dispatch. -->
             <div id="dispatch-search-menu-slot" class="admin-dispatch__search-menu-slot" />
-            <v-btn v-if="adminSos.selectedRequest && !compactDispatch" id="dispatch-recenter" class="map-selected-alert-card"
-              icon="mdi-crosshairs-gps" color="primary" variant="tonal" size="small"
-              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
-              :title="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران' : 'نمایش محل حادثه'"
-              @click="frameSelectedIncident" />
           </div>
           <div v-if="searchQuery.length >= 2" id="dispatch-search-results" class="admin-dispatch__search-results"
             role="listbox" aria-label="نتایج جست‌وجوی نقشه">
@@ -466,7 +461,7 @@
         </section>
         <v-card id="dispatch-map" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
-            <MapCanvas id="dispatch-canvas-01"
+            <MapCanvas id="dispatch-canvas-01" tabindex="-1"
               aria-label="نقشهٔ درخواست‌های SOS و آخرین موقعیت ثبت‌شدهٔ امدادگران نزدیک"
               :style-url="mapStyleUrl"
               :constrain-bounds="false"
@@ -530,11 +525,6 @@
             :title="legendOpen ? 'بستن راهنمای نقشه' : 'نمایش راهنمای نقشه'"
             :aria-expanded="legendOpen" aria-controls="dispatch-map-legend"
             @click="legendOpen = !legendOpen" />
-          <v-btn v-if="compactDispatch && adminSos.selectedRequest" id="dispatch-recenter-mobile"
-            class="admin-dispatch__recenter-mobile map-selected-alert-card"
-            icon="mdi-crosshairs-gps" color="primary" variant="flat" size="small"
-            aria-label="نمایش محل حادثه روی نقشه" title="نمایش محل حادثه روی نقشه"
-            @click="focusSelectedSosOnMap" />
           <ul id="dispatch-map-legend" class="dispatch-map-key" aria-label="راهنمای نشانگرهای نقشه"
             v-show="legendOpen && !compactDispatch"
             :style="{ '--dispatch-helper-color': themeStore.isDark ? '#205fd1' : '#0868c8' }">
@@ -1897,15 +1887,6 @@ function frameSelectedIncident(): void {
   });
 }
 
-function focusSelectedSosOnMap(): void {
-  const incident = adminSos.selectedRequest;
-  const map = mapInstance;
-  if (!incident || !map) return;
-  map.flyTo({ center: [incident.location.lon, incident.location.lat],
-    offset: dispatchFocusOffset(), zoom: Math.max(map.getZoom(), 14),
-    duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650 });
-}
-
 function focusSelectedIncidentMap(): void {
   if (!adminSos.selectedRequest) return;
   frameSelectedIncident();
@@ -1914,8 +1895,9 @@ function focusSelectedIncidentMap(): void {
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     block: "start"
   });
-  // The canvas is not focusable; hand keyboard users to the widget's recenter action.
-  document.getElementById(compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter")?.focus({ preventScroll: true });
+  // Keep keyboard focus on the labelled map region after removing the
+  // redundant recenter buttons; do not strand it on the incident card.
+  document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });
 }
 
 function focusNearbyResponder(userId: string): void {
@@ -2557,12 +2539,6 @@ onBeforeUnmount(() => {
 .admin-dispatch__map-note { margin: -.7rem .75rem .85rem; color: var(--bb-color-muted);
   font-size: .82rem; line-height: 1.5; overflow-wrap: anywhere; }
 
-.map-selected-alert-card {
-  flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px;
-  font-family: var(--bb-font-family); letter-spacing: normal;
-}
-.map-selected-alert-card:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-
 .dispatch-request-list {
   max-height: min(42dvh, 24rem);
   overflow-y: auto; overscroll-behavior: contain;
@@ -2760,7 +2736,6 @@ onBeforeUnmount(() => {
 }
 
 :global(:root.dark .dispatch-mission-timeline),
-:global(:root.dark .map-selected-alert-card),
 :global(:root.dark .mission-timeline-select) {
   border-color: var(--bb-color-outline);
 }
@@ -3243,26 +3218,6 @@ onBeforeUnmount(() => {
     width: min(14rem, calc(100% - 1.5rem)); max-height: min(25dvh, 15rem);
   }
   .admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }
-  /* The selected SOS map action takes the legend's former slot, aligned
-     directly beneath the app's SOS action with an 8px gap. The map canvas
-     retains the collapsed clearance, so offset the locator inside it when
-     the sheet expands instead of letting the sheet cover the button. */
-  .admin-dispatch__recenter-mobile {
-    position: absolute; z-index: 5; right: calc(.875rem + env(safe-area-inset-right, 0px));
-    bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
-    border: 2px solid #fff; border-radius: var(--bb-map-action-radius, 1rem);
-    /* A light edge reads on dark tiles; a dark outer ring reads on pale roads. */
-    box-shadow: 0 0 0 2px rgba(8, 35, 38, .82), 0 5px 16px rgba(8, 21, 38, .55) !important;
-  }
-  :global(:root.dark .admin-dispatch__recenter-mobile) { border-color: #fff; }
-  .admin-dispatch__recenter-mobile :deep(.v-icon) { font-size: 24px; }
-  .admin-dispatch__recenter-mobile:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
-  #dispatch-workspace:has(.admin-dispatch__sidebar--expanded) .admin-dispatch__recenter-mobile {
-    bottom: calc(var(--dispatch-expanded-sheet-height) - min(40dvh, 21rem) + .5rem + env(safe-area-inset-bottom, 0px));
-  }
-  #dispatch-workspace:has(.admin-dispatch__sidebar--dragging) .admin-dispatch__recenter-mobile {
-    visibility: hidden; pointer-events: none;
-  }
   .admin-dispatch__map-and-actions .dispatch-map-key {
     bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));
     left: .75rem; right: 4.25rem; width: calc(100% - 5rem);
@@ -3514,10 +3469,5 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__sheet-handle,
   #dispatch-sidebar .admin-dispatch__brand-icon,
   #dispatch-sidebar .admin-dispatch__section-number { border: 1px solid CanvasText; }
-  .admin-dispatch__recenter-mobile,
-  :global(:root.dark .admin-dispatch__recenter-mobile) {
-    border-color: ButtonText; box-shadow: none !important;
-  }
-  .admin-dispatch__recenter-mobile:focus-visible { outline-color: Highlight; }
 }
 </style>

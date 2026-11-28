@@ -45,7 +45,8 @@ describe("admin SOS triage flow", () => {
     expect(mapJump).toContain('frameSelectedIncident();');
     expect(mapJump).toContain('document.getElementById("dispatch-map")');
     expect(mapJump).toContain('scrollIntoView({');
-    expect(mapJump).toContain('document.getElementById(compactDispatch.value ? "dispatch-recenter-mobile" : "dispatch-recenter")?.focus({ preventScroll: true });');
+    expect(template).toContain('<MapCanvas id="dispatch-canvas-01" tabindex="-1"');
+    expect(mapJump).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');
     expect(css).toContain('#dispatch-map { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(source).toMatch(/function focusResponders\(\): void \{\s*if \(!adminSos\.selectedRequest\) return;/);
     expect(source).toContain('target.focus({ preventScroll: true });');
@@ -130,7 +131,6 @@ describe("admin SOS triage flow", () => {
     expect(css).toContain('.admin-dispatch__responders { scroll-margin-top: calc(5rem + env(safe-area-inset-top, 0px)); }');
     expect(css).toContain('.admin-dispatch__responders:focus-visible');
     expect(css).toContain('.admin-dispatch__next :deep(.v-btn), .admin-dispatch__submit :deep(.v-btn) { width: 100%; }');
-    expect(css).toContain('flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px;');
     expect(css).toContain('.admin-dispatch__photo-image { display: block; width: 100%; height: 100%; object-fit: contain; }');
     expect(css).toContain('.admin-dispatch__photo-open { display: flex; flex-direction: column; width: 100%; min-height: 44px;');
     expect(css).toContain('width: auto; height: auto; object-fit: contain;');
