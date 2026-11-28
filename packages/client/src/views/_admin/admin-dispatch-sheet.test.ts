@@ -37,7 +37,8 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }');
     expect(css).toContain('width: 100%; height: 44px;');
     expect(css).toContain('cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;');
-    expect(css).toContain('#dispatch-sidebar .admin-dispatch__eyebrow { display: none; }');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__intro { display: none; }');
+    expect(markup).toContain('<h1>مرکز پایش و اعزام اضطراری (SOS)</h1>'); // Desktop title remains.
     expect(css).toContain('height: min(45dvh, 24rem);');
     expect(css).toContain('inset: 0 0 min(45dvh, 24rem) 0;');
     expect(shell).toContain('inset-block-end: calc(min(45dvh, 24rem) + 3.75rem');

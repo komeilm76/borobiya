@@ -3372,13 +3372,9 @@ onBeforeUnmount(() => {
   }
   #dispatch-sidebar.admin-dispatch__sidebar--dragging .admin-dispatch__sheet-handle { cursor: grabbing; }
   #dispatch-sidebar .admin-dispatch__header { flex: none; padding: 0 0 .3rem; }
-  #dispatch-sidebar .admin-dispatch__intro { display: block; margin-bottom: .2rem; }
-  #dispatch-sidebar .admin-dispatch__heading { gap: .5rem; }
-  #dispatch-sidebar .admin-dispatch__brand-icon { width: 2.2rem; height: 2.2rem; border-radius: .7rem; }
-  #dispatch-sidebar .admin-dispatch__heading h1 {
-    font-size: .87rem !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  #dispatch-sidebar .admin-dispatch__eyebrow { display: none; }
+  /* The sheet handle and step tabs identify the workspace on mobile. Keep
+     the full page title on desktop without spending a mobile row on it. */
+  #dispatch-sidebar .admin-dispatch__intro { display: none; }
   #dispatch-sidebar .admin-dispatch__toolbar { gap: .35rem; }
   #dispatch-sidebar .admin-dispatch__toolbar-actions { gap: .15rem; }
   #dispatch-sidebar .admin-dispatch__filter-select { width: 100%; }
