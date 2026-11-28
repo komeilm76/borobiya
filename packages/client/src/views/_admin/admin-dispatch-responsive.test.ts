@@ -85,7 +85,7 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
 
   it("keeps the narrow layout usable and its actions identifiable", () => {
     expect(css).toContain('@media (max-width: 900px) {');
-    expect(css).toContain('height: min(38dvh, 21rem);');
+    expect(css).toContain('height: min(45dvh, 24rem);');
     expect(css).toContain('max-height: min(25dvh, 15rem);');
     expect(css).toContain('.admin-dispatch__incident-panel--expanded { max-height: min(45dvh, 24rem); }');
     // Child map controls use offsets within the map card, not the outer sidebar width twice.

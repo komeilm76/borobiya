@@ -21,9 +21,20 @@
           aria-label="بستن نتیجهٔ ارسال پیشنهاد" @click="adminSos.dispatchFeedback = null" />
       </template>
     </v-snackbar>
-    <aside id="dispatch-sidebar" class="admin-dispatch__sidebar"
-      :class="{ 'admin-dispatch__sidebar--expanded': compactDispatch && sheetExpanded }"
+    <aside id="dispatch-sidebar" ref="dispatchSidebar" class="admin-dispatch__sidebar"
+      :class="{ 'admin-dispatch__sidebar--expanded': compactDispatch && sheetExpanded,
+        'admin-dispatch__sidebar--dragging': sheetDragging }"
+      :style="compactDispatch && sheetDragHeight !== null ? { height: `${sheetDragHeight}px` } : undefined"
       aria-label="صف SOS و امدادگران نزدیک">
+    <button id="dispatch-sheet-handle" v-if="compactDispatch" type="button" class="admin-dispatch__sheet-handle"
+      :aria-expanded="sheetExpanded" aria-controls="dispatch-sidebar-content"
+      :aria-label="sheetExpanded ? 'کوچک کردن پنل اعزام؛ برای جابه‌جایی بکشید' : 'باز کردن پنل اعزام؛ برای جابه‌جایی بکشید'"
+      title="پنل اعزام را بکشید یا برای باز و بسته شدن بزنید"
+      @pointerdown="startSheetDrag" @pointermove="moveSheetDrag" @pointerup="endSheetDrag"
+      @pointercancel="cancelSheetDrag" @lostpointercapture="cancelSheetDrag"
+      @click="clickSheetHandle" @keydown.up.prevent="setSheetExpanded(true)" @keydown.down.prevent="setSheetExpanded(false)">
+      <span aria-hidden="true" />
+    </button>
     <header id="dispatch-header-01" class="admin-dispatch__header mb-5">
       <div class="admin-dispatch__intro">
         <div class="admin-dispatch__heading">
@@ -32,12 +43,6 @@
             <span class="admin-dispatch__eyebrow">عملیات اضطراری <span aria-hidden="true">/</span> SOS</span>
             <h1>مرکز پایش و اعزام اضطراری (SOS)</h1>
           </div>
-          <button id="dispatch-sheet-size" v-if="compactDispatch" type="button" class="admin-dispatch__sheet-size"
-            :aria-expanded="sheetExpanded" aria-controls="dispatch-sidebar-content"
-            :aria-label="sheetExpanded ? 'کوچک کردن پنل اعزام و نمایش نقشه' : 'باز کردن پنل اعزام'"
-            @click="sheetExpanded = !sheetExpanded">
-            <v-icon :icon="sheetExpanded ? 'mdi-chevron-down' : 'mdi-arrow-expand-vertical'" size="20" aria-hidden="true" />
-          </button>
         </div>
       </div>
 
@@ -814,6 +819,7 @@ import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 import AdminUserProfileDialog from "./AdminUserProfileDialog.vue";
+import { dispatchDraggedHeight, dispatchSheetBounds, dispatchSheetShouldExpand } from "@/admin/dispatch-sheet-gesture";
 
 const sosSeverityKey = [
   { severity: "high", label: "فوری" },
@@ -1142,7 +1148,78 @@ async function testSound(): Promise<void> {
 const compactDispatch = useMediaQuery("(max-width: 900px)");
 const sheetTab = ref<"queue" | "responders">("queue");
 const sheetExpanded = ref(false);
-watch(compactDispatch, () => { sheetTab.value = "queue"; sheetExpanded.value = false; });
+const dispatchSidebar = ref<HTMLElement | null>(null);
+const sheetDragHeight = ref<number | null>(null);
+const sheetDragging = ref(false);
+type SheetPointer = { id: number; startY: number; startHeight: number;
+  lastY: number; lastTime: number; velocityY: number;
+  bounds: { peek: number; expanded: number }; moved: boolean };
+let sheetPointer: SheetPointer | null = null;
+let suppressSheetClick = false;
+let suppressSheetClickTimer: ReturnType<typeof setTimeout> | null = null;
+
+function setSheetExpanded(expanded: boolean): void {
+  sheetExpanded.value = expanded;
+  sheetDragHeight.value = null;
+}
+function startSheetDrag(event: PointerEvent): void {
+  if (!compactDispatch.value || !event.isPrimary || event.button !== 0 || sheetPointer) return;
+  const sidebar = dispatchSidebar.value;
+  if (!sidebar) return;
+  const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  sheetPointer = { id: event.pointerId, startY: event.clientY, startHeight: sidebar.getBoundingClientRect().height,
+    lastY: event.clientY, lastTime: event.timeStamp, velocityY: 0,
+    bounds: dispatchSheetBounds(window.innerHeight, fontSize), moved: false };
+  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+}
+function moveSheetDrag(event: PointerEvent): void {
+  const pointer = sheetPointer;
+  if (!pointer || pointer.id !== event.pointerId || !compactDispatch.value) return;
+  if (!pointer.moved && Math.abs(event.clientY - pointer.startY) < 6) return;
+  pointer.moved = true;
+  sheetDragging.value = true;
+  sheetDragHeight.value = dispatchDraggedHeight(pointer.startHeight, pointer.startY, event.clientY, pointer.bounds);
+  if (event.timeStamp > pointer.lastTime) {
+    pointer.velocityY = (event.clientY - pointer.lastY) / (event.timeStamp - pointer.lastTime);
+    pointer.lastY = event.clientY;
+    pointer.lastTime = event.timeStamp;
+  }
+  event.preventDefault();
+}
+function endSheetDrag(event: PointerEvent): void {
+  const pointer = sheetPointer;
+  if (!pointer || pointer.id !== event.pointerId) return;
+  const handle = event.currentTarget as HTMLElement;
+  sheetPointer = null;
+  if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+  if (pointer.moved) {
+    const height = dispatchDraggedHeight(pointer.startHeight, pointer.startY, event.clientY, pointer.bounds);
+    const velocity = event.timeStamp - pointer.lastTime > 120 ? 0 : pointer.velocityY;
+    setSheetExpanded(dispatchSheetShouldExpand(height, event.clientY - pointer.startY, velocity, pointer.bounds));
+    // Pointer capture may synthesize a click on the handle after release.
+    suppressSheetClick = true;
+    if (suppressSheetClickTimer) clearTimeout(suppressSheetClickTimer);
+    suppressSheetClickTimer = setTimeout(() => { suppressSheetClick = false; suppressSheetClickTimer = null; }, 0);
+  }
+  sheetDragging.value = false;
+}
+function cancelSheetDrag(event: PointerEvent): void {
+  if (!sheetPointer || sheetPointer.id !== event.pointerId) return;
+  sheetPointer = null;
+  sheetDragHeight.value = null;
+  sheetDragging.value = false;
+}
+function clickSheetHandle(): void {
+  if (suppressSheetClick) return;
+  setSheetExpanded(!sheetExpanded.value);
+}
+watch(compactDispatch, () => {
+  sheetPointer = null;
+  sheetDragHeight.value = null;
+  sheetDragging.value = false;
+  sheetTab.value = "queue";
+  sheetExpanded.value = false;
+});
 function selectSheetTab(tab: "queue" | "responders"): void {
   sheetTab.value = tab;
   if (tab === "responders") sheetExpanded.value = true;
@@ -2070,6 +2147,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  if (suppressSheetClickTimer) clearTimeout(suppressSheetClickTimer);
   stopPulseLoop();
   if (placeSearchTimer) clearTimeout(placeSearchTimer);
   placeSearchController?.abort();
@@ -3094,7 +3172,7 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .admin-dispatch__sidebar {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%;
-    height: min(38dvh, 21rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+    height: min(45dvh, 24rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
     display: block; border-left: 0; border-top: 1px solid var(--bb-color-outline);
   }
   .admin-dispatch__queue, .admin-dispatch__nearby { display: block; min-height: 0; }
@@ -3102,7 +3180,7 @@ onBeforeUnmount(() => {
     display: flex; height: auto;
   }
   .admin-dispatch__map-and-actions > #dispatch-map {
-    inset: 0 0 min(38dvh, 21rem) 0; width: 100%; height: calc(100% - min(38dvh, 21rem));
+    inset: 0 0 min(45dvh, 24rem) 0; width: 100%; height: calc(100% - min(45dvh, 24rem));
   }
   .admin-dispatch__header { padding: 0; margin-bottom: .5rem !important; }
   .admin-dispatch__intro { display: none; }
@@ -3200,9 +3278,9 @@ onBeforeUnmount(() => {
 }
 #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 42px; padding-inline: .75rem; }
 #dispatch-sidebar .admin-dispatch__sheet-nav { display: none; }
-#dispatch-sidebar .admin-dispatch__sheet-size { display: none; }
+#dispatch-sidebar .admin-dispatch__sheet-handle { display: none; }
 #dispatch-sidebar .admin-dispatch__sheet-nav button:focus-visible,
-#dispatch-sidebar .admin-dispatch__sheet-size:focus-visible {
+#dispatch-sidebar .admin-dispatch__sheet-handle:focus-visible {
   outline: 3px solid var(--bb-color-primary); outline-offset: -3px;
 }
 /* Both worklists share the form language: spacious touch rows, quiet
@@ -3276,20 +3354,31 @@ onBeforeUnmount(() => {
     border-radius: 1.15rem 1.15rem 0 0; box-shadow: 0 -12px 35px rgba(12, 34, 42, .18);
     transition: height .24s ease;
   }
+  #dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }
   #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(82dvh, 46rem); }
-  #dispatch-sidebar .admin-dispatch__header { flex: none; padding: 0 0 .45rem; }
-  #dispatch-sidebar .admin-dispatch__intro { display: block; margin-bottom: .45rem; }
+  #dispatch-sidebar .admin-dispatch__sheet-handle {
+    display: grid; place-items: center; flex: none; width: 100%; height: 44px;
+    padding: 0 0 18px; border: 0; border-radius: .75rem; background: transparent;
+    cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #dispatch-sidebar .admin-dispatch__sheet-handle span {
+    display: block; width: 2.5rem; height: 5px; border-radius: 999px;
+    background: color-mix(in srgb, var(--bb-color-muted) 75%, var(--bb-color-surface));
+  }
+  #dispatch-sidebar .admin-dispatch__sheet-handle:hover span,
+  #dispatch-sidebar .admin-dispatch__sheet-handle:focus-visible span,
+  #dispatch-sidebar.admin-dispatch__sidebar--dragging .admin-dispatch__sheet-handle span {
+    background: var(--bb-color-primary);
+  }
+  #dispatch-sidebar.admin-dispatch__sidebar--dragging .admin-dispatch__sheet-handle { cursor: grabbing; }
+  #dispatch-sidebar .admin-dispatch__header { flex: none; padding: 0 0 .3rem; }
+  #dispatch-sidebar .admin-dispatch__intro { display: block; margin-bottom: .2rem; }
   #dispatch-sidebar .admin-dispatch__heading { gap: .5rem; }
   #dispatch-sidebar .admin-dispatch__brand-icon { width: 2.2rem; height: 2.2rem; border-radius: .7rem; }
   #dispatch-sidebar .admin-dispatch__heading h1 {
     font-size: .87rem !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  #dispatch-sidebar .admin-dispatch__eyebrow { font-size: .8rem; }
-  #dispatch-sidebar .admin-dispatch__sheet-size {
-    display: grid; place-items: center; flex: none; width: 44px; height: 44px;
-    margin-inline-start: auto; border: 0; border-radius: .75rem;
-    background: var(--bb-color-inset); color: var(--bb-color-text); cursor: pointer;
-  }
+  #dispatch-sidebar .admin-dispatch__eyebrow { display: none; }
   #dispatch-sidebar .admin-dispatch__toolbar { gap: .35rem; }
   #dispatch-sidebar .admin-dispatch__toolbar-actions { gap: .15rem; }
   #dispatch-sidebar .admin-dispatch__filter-select { width: 100%; }
@@ -3317,6 +3406,10 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__section--hidden { display: none; }
   #dispatch-sidebar .admin-dispatch__queue,
   #dispatch-sidebar .admin-dispatch__nearby { flex: none; border-top: 1px solid var(--bb-color-outline); }
+  /* The step label and count already live in the fixed tab bar. Do not spend
+     another row repeating them above the first emergency request. */
+  #dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }
+  #dispatch-sidebar .admin-dispatch__queue { padding-top: .2rem; }
   #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list,
   #dispatch-sidebar .admin-dispatch__responders .responder-list {
     max-height: none; overflow: visible;
@@ -3341,7 +3434,7 @@ onBeforeUnmount(() => {
 }
 @media (forced-colors: active) {
   #dispatch-sidebar .admin-dispatch__sheet-nav button.is-active { outline: 2px solid Highlight; }
-  #dispatch-sidebar .admin-dispatch__sheet-size,
+  #dispatch-sidebar .admin-dispatch__sheet-handle,
   #dispatch-sidebar .admin-dispatch__brand-icon,
   #dispatch-sidebar .admin-dispatch__section-number { border: 1px solid CanvasText; }
 }

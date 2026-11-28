@@ -118,8 +118,8 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(shellCss).toContain('inset-block-end: calc(4rem + env(safe-area-inset-bottom, 0px));');
     expect(shellCss).toContain('inset-block-end: calc(7.5rem + env(safe-area-inset-bottom, 0px));');
     expect(shellCss).toContain('inset-inline-start: calc(.75rem + env(safe-area-inset-right, 0px));');
-    expect(shellCss).toContain('inset-block-end: calc(min(38dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));');
-    expect(shellCss).toContain('inset-block-end: calc(min(38dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('inset-block-end: calc(min(45dvh, 24rem) + 3.75rem + env(safe-area-inset-bottom, 0px));');
+    expect(shellCss).toContain('inset-block-end: calc(min(45dvh, 24rem) + 7.25rem + env(safe-area-inset-bottom, 0px));');
     expect(css).toContain('position: absolute; z-index: 5; right: 1.125rem;');
     expect(css).toContain('right: .875rem; bottom: calc(.5rem + env(safe-area-inset-bottom, 0px));');
     expect((4 - .75) * 16 - 44).toBe(8); // Desktop legend to SOS.
