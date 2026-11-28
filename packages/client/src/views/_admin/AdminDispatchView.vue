@@ -3420,7 +3420,7 @@ onBeforeUnmount(() => {
     transition: height .24s ease;
   }
   #dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }
-  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(72dvh, 40rem); }
+  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(68dvh, 38rem); }
   #dispatch-sidebar .admin-dispatch__sheet-handle {
     display: grid; place-items: center; flex: none; width: 100%; height: 44px;
     padding: 0 0 18px; border: 0; border-radius: .75rem; background: transparent;
@@ -3469,8 +3469,14 @@ onBeforeUnmount(() => {
   }
   #dispatch-sidebar .admin-dispatch__content { order: 2; flex: 1 1 auto; overflow-y: auto; }
   #dispatch-sidebar .admin-dispatch__section--hidden { display: none; }
-  #dispatch-sidebar .admin-dispatch__queue,
-  #dispatch-sidebar .admin-dispatch__nearby { flex: none; border-top: 1px solid var(--bb-color-outline); }
+  #dispatch-sidebar .admin-dispatch__queue { flex: none; border-top: 1px solid var(--bb-color-outline); }
+  /* Grow the responder worklist into the remaining space. On short/peek
+     sheets the card keeps room for its controls and the outer scrollport
+     exposes them; on expanded sheets only its result rows need to scroll. */
+  #dispatch-sidebar .admin-dispatch__nearby:not(.admin-dispatch__section--hidden) {
+    display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0;
+    border-top: 1px solid var(--bb-color-outline);
+  }
   /* The step label and count already live in the fixed tab bar. Do not spend
      another row repeating them above the first emergency request. */
   #dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }
@@ -3481,14 +3487,20 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__responders .responder-list { padding: .15rem .1rem .2rem; }
   #dispatch-sidebar .dispatch-responder-row { margin-bottom: .25rem; }
   #dispatch-sidebar .admin-dispatch__submit { padding: .35rem .2rem .15rem !important; }
-  #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list,
-  #dispatch-sidebar .admin-dispatch__responders .responder-list {
+  #dispatch-sidebar .admin-dispatch__queue .dispatch-request-list {
     max-height: none; overflow: visible;
   }
-  #dispatch-sidebar .admin-dispatch__queue > #dispatch-queue,
-  #dispatch-sidebar .admin-dispatch__nearby > #dispatch-responders { height: auto; }
-  /* Vuetify cards normally clip descendants; let the action bar stick to
-     the sheet's scrollport while the responder rows move underneath it. */
+  #dispatch-sidebar .admin-dispatch__queue > #dispatch-queue { height: auto; }
+  #dispatch-sidebar .admin-dispatch__nearby > #dispatch-responders {
+    flex: 1 1 auto; height: 17rem; min-height: 17rem;
+  }
+  #dispatch-sidebar .admin-dispatch__responders .responder-list {
+    flex: 1 1 auto; min-height: 4.5rem; max-height: none;
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  /* The action stays below the growing result list, independently of the
+     number of responders. Keep the card overflow visible for the sticky
+     action on short sheets where the entire worklist must scroll. */
   #dispatch-sidebar .admin-dispatch__responders { overflow: visible !important; }
   #dispatch-sidebar .admin-dispatch__submit { position: sticky; bottom: 0; }
   #dispatch-sidebar .admin-dispatch__submit :deep(.v-btn) { min-height: 44px; }

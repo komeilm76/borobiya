@@ -33,7 +33,7 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(rail).toContain('admin-dispatch__section--hidden');
     expect(rail.indexOf('id="dispatch-notice-04"')).toBeLessThan(rail.indexOf('id="dispatch-queue-region"'));
     expect(rail.indexOf('id="dispatch-queue-region"')).toBeLessThan(rail.indexOf('id="dispatch-nearby"'));
-    expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(72dvh, 40rem); }');
+    expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(68dvh, 38rem); }');
     expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }');
     expect(css).toContain('width: 100%; height: 44px;');
     expect(css).toContain('cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;');
@@ -50,9 +50,14 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(rail.indexOf('class="admin-dispatch__sheet-nav"')).toBeLessThan(rail.indexOf('id="dispatch-sidebar-content"')); // Logical keyboard order.
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__section--hidden { display: none; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }');
-    expect(css).toContain('max-height: none; overflow: visible;');
+    expect(css).toContain('max-height: none; overflow: visible;'); // Queue still scrolls with the sheet.
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__nearby:not(.admin-dispatch__section--hidden) {\n    display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0;');
+    expect(css).toContain('flex: 1 1 auto; height: 17rem; min-height: 17rem;');
+    expect(css).toContain('flex: 1 1 auto; min-height: 4.5rem; max-height: none;\n    overflow-y: auto; overscroll-behavior: contain;');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__responders { overflow: visible !important; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__submit { position: sticky; bottom: 0; }');
+    expect(rail.indexOf('class="responder-list"')).toBeLessThan(rail.indexOf('class="admin-dispatch__submit'));
+    expect(rail).toContain('id="dispatch-responders" tabindex="-1"');
   });
 
   it("reveals responder controls from an SOS choice or detail action, without bypassing dispatch validation", () => {

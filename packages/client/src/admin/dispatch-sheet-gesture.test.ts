@@ -4,10 +4,10 @@ import { dispatchDraggedHeight, dispatchSheetBounds, dispatchSheetShouldExpand }
 describe("dispatch bottom-sheet gesture", () => {
   it("matches the CSS peek/expanded dvh and rem stops on short phones and tablets", () => {
     expect(dispatchSheetBounds(568, 16).peek).toBeCloseTo(227.2);
-    expect(dispatchSheetBounds(568, 16).expanded).toBeCloseTo(408.96);
-    expect(dispatchSheetBounds(1024, 16)).toEqual({ peek: 336, expanded: 640 });
+    expect(dispatchSheetBounds(568, 16).expanded).toBeCloseTo(386.24);
+    expect(dispatchSheetBounds(1024, 16)).toEqual({ peek: 336, expanded: 608 });
     expect(dispatchSheetBounds(568, 20).peek).toBeCloseTo(227.2);
-    expect(dispatchSheetBounds(568, 20).expanded).toBeCloseTo(408.96);
+    expect(dispatchSheetBounds(568, 20).expanded).toBeCloseTo(386.24);
   });
 
   it("follows upward/downward motion and stays within the two stops", () => {

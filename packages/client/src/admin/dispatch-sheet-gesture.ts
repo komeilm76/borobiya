@@ -4,7 +4,7 @@
 export function dispatchSheetBounds(viewportHeight: number, rootFontSize: number): { peek: number; expanded: number } {
   return {
     peek: Math.min(viewportHeight * .40, rootFontSize * 21),
-    expanded: Math.min(viewportHeight * .72, rootFontSize * 40)
+    expanded: Math.min(viewportHeight * .68, rootFontSize * 38)
   };
 }
 
