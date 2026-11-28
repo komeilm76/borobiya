@@ -557,7 +557,7 @@
                     role="img" :aria-label="`اولویت: ${severityMeta(adminSos.selectedRequest.severity).label}`" />
                   <strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
                 </span>
-                <v-chip v-if="!incidentExpanded" id="dispatch-chip-14" class="admin-dispatch__incident-status"
+                <v-chip id="dispatch-chip-14" class="admin-dispatch__incident-status"
                   :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
                   :prepend-icon="statusMeta(adminSos.selectedRequest.status).icon" size="small" variant="tonal"
                   :aria-label="statusMeta(adminSos.selectedRequest.status).label">
@@ -2744,7 +2744,7 @@ onBeforeUnmount(() => {
 }
 .admin-dispatch__incident-panel .admin-dispatch__replacement-note {
   display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .4rem;
-  margin: .35rem .65rem 0; padding: .35rem .5rem; border-radius: .65rem;
+  margin: .35rem var(--dispatch-incident-inset) 0; padding: .35rem .5rem; border-radius: .65rem;
   background: var(--bb-color-inset); color: var(--bb-color-text); font-size: .8rem;
 }
 .admin-dispatch__replacement-note > .v-icon,
@@ -2752,7 +2752,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__replacement-note small { font-size: .8rem; }
 .admin-dispatch__replacement-note .dispatch-replacement__location { flex-basis: 100%; }
 .admin-dispatch__incident-panel .admin-dispatch__replacement-action {
-  margin: .35rem .65rem .25rem; min-height: 38px; height: 38px; font-size: .8rem;
+  margin: .35rem var(--dispatch-incident-inset) .25rem; min-height: 38px; height: 38px; font-size: .8rem;
 }
 @media (max-width: 900px) {
   #dispatch-sidebar .dispatch-replacement__actions :deep(.v-btn),
@@ -3090,8 +3090,19 @@ onBeforeUnmount(() => {
 /* Only the content scrolls: the scrollbar stays inset within the outer card,
    while the collapse control remains visible even for long mission histories. */
 #dispatch-incident-content {
+  --dispatch-incident-inset: .3rem;
   min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: thin; padding-inline: .15rem; border-radius: .65rem;
+}
+/* The image establishes the content edge; keep the card contents and mission
+   history on that same line, inside the inset scrollport at every width. */
+#dispatch-incident-content > .admin-dispatch__mission-header,
+#dispatch-incident-content > .dispatch-mission-timeline,
+#dispatch-incident-content > .admin-dispatch__followup,
+#dispatch-incident-content > #dispatch-notice-09,
+#dispatch-incident-content > #dispatch-loading-01,
+#dispatch-incident-content > p[role="status"] {
+  margin-inline: var(--dispatch-incident-inset);
 }
 /* The floating panel supplies the surface. Keep facts flat; only the sender
    identity gets a subtle inset treatment, while alerts remain. */
@@ -3108,17 +3119,17 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .admin-dispatch__location-details,
 .admin-dispatch__incident-panel .admin-dispatch__next { border: 0; }
 /* Keep the information and actions on the RTL start edge. */
-.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem .6rem .2rem; }
+.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem var(--dispatch-incident-inset) .2rem; }
 .admin-dispatch__incident-panel .admin-dispatch__sender {
   gap: .5rem; padding: .4rem .55rem;
   border: 1px solid color-mix(in srgb, var(--bb-color-outline) 50%, transparent);
   border-radius: .75rem; background: var(--bb-color-inset);
 }
 .admin-dispatch__incident-panel .admin-dispatch__sender-copy strong { color: var(--bb-color-muted); font-size: .8rem; font-weight: 600; }
-.admin-dispatch__incident-panel .admin-dispatch__photo { margin: .05rem .3rem .15rem; }
+.admin-dispatch__incident-panel .admin-dispatch__photo { margin: .05rem var(--dispatch-incident-inset) .15rem; }
 .admin-dispatch__incident-panel .admin-dispatch__photo-preview { height: clamp(8rem, 22vh, 12rem); }
 .admin-dispatch__incident-panel #dispatch-incident :deep(.admin-dispatch__detail-body) {
-  gap: .5rem; padding: .45rem .65rem .65rem; line-height: 1.5;
+  gap: .5rem; padding: .45rem var(--dispatch-incident-inset) .65rem; line-height: 1.5;
 }
 .admin-dispatch__incident-panel .admin-dispatch__description {
   padding: 0 0 .55rem; border-bottom: 1px solid var(--bb-color-outline);
@@ -3167,7 +3178,7 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-status :deep(.v-chip__content) { white-space: nowrap; }
 .admin-dispatch__incident-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
 .admin-dispatch__incident-panel #dispatch-incident { margin-bottom: .3rem; }
-.admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .2rem .6rem .35rem; }
+.admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .2rem var(--dispatch-incident-inset) .35rem; }
 .admin-dispatch__search {
   position: absolute; z-index: 11; top: calc(.75rem + env(safe-area-inset-top, 0px));
   left: calc(.75rem + env(safe-area-inset-left, 0px));

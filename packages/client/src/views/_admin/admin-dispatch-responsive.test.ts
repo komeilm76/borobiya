@@ -36,7 +36,7 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(css).toContain('.admin-dispatch__incident-panel {');
     expect(css).toContain('display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;');
-    expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
+    expect(css).toContain('#dispatch-incident-content {\n  --dispatch-incident-inset: .3rem;\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
     expect(template).toContain('class="admin-dispatch__incident-header"');
     expect(template).toContain('aria-controls="dispatch-map"');
@@ -110,7 +110,7 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('.admin-dispatch__priority-dot {\n  display: inline-block; flex: none; width: 9px; height: 9px;');
     expect(css).toContain('.admin-dispatch__sender { display: grid; grid-template-columns: 44px minmax(0, 1fr);');
     expect(css).not.toContain('.admin-dispatch__incident-panel .admin-dispatch__sender { grid-template-columns: 2rem');
-    expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
+    expect(css).toContain('#dispatch-incident-content {\n  --dispatch-incident-inset: .3rem;\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
     expect(source).toContain("'--dispatch-current-sheet-height': `${sheetDragHeight}px`");
     expect(compactLayout).toContain('--dispatch-current-sheet-height: var(--dispatch-expanded-sheet-height);');
     // Child map controls use offsets within the map card, not the outer sidebar width twice.

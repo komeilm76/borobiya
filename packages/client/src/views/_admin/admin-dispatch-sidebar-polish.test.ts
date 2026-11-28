@@ -79,7 +79,7 @@ describe("dispatch pinned rail and uncluttered map", () => {
       css.indexOf('.admin-dispatch__search {', css.indexOf('.admin-dispatch__incident-panel {')));
     expect(panel).toContain('max-height: min(86dvh, calc(100dvh - 6rem));');
     expect(panel).toContain('flex-direction: column; overflow: hidden;');
-    expect(panel).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto;');
+    expect(panel).toContain('#dispatch-incident-content {\n  --dispatch-incident-inset: .3rem;\n  min-height: 0; overflow-y: auto;');
     expect(panel).toContain('scrollbar-width: thin; padding-inline: .15rem; border-radius: .65rem;');
     expect(panel).toContain('.admin-dispatch__incident-panel #dispatch-incident {\n  border: 0 !important; border-radius: 0 !important; box-shadow: none !important;');
     expect(panel).toContain('.admin-dispatch__incident-panel .admin-dispatch__facts > div,');
@@ -155,10 +155,10 @@ describe("dispatch pinned rail and uncluttered map", () => {
     const markup = template!.content;
     const panel = css.slice(css.indexOf('/* Keep the information and actions on the RTL start edge.'));
     expect(panel).not.toContain('.admin-dispatch__detail-heading { justify-content: flex-start;');
-    expect(panel).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem .6rem .2rem; }');
+    expect(panel).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem var(--dispatch-incident-inset) .2rem; }');
     expect(css).toContain('grid-template-columns: 44px minmax(0, 1fr);');
     expect(panel).not.toContain('.admin-dispatch__sender-action');
-    expect(panel).toContain('gap: .5rem; padding: .45rem .65rem .65rem;');
+    expect(panel).toContain('gap: .5rem; padding: .45rem var(--dispatch-incident-inset) .65rem;');
     expect(panel).toContain('border-radius: .75rem; background: var(--bb-color-inset);');
     expect(panel).toContain('min-height: 44px; height: 44px; padding-inline: .5rem;');
     expect(markup).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده"');
@@ -168,6 +168,25 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(markup).toContain('aria-label="انتخاب امدادگر و اعزام"');
     expect(markup).toContain('aria-label="بازخوانی مأموریت‌ها"');
     expect(markup).toContain('aria-controls="dispatch-responders" @click="focusResponders"');
+  });
+
+  it("aligns photo, sender, details and mission follow-up to one inset on phone and desktop", () => {
+    const markup = template!.content;
+    const content = markup.slice(markup.indexOf('v-show="incidentExpanded" id="dispatch-incident-content"'),
+      markup.indexOf('id="dispatch-dialog-02"'));
+    expect(content).toContain('class="admin-dispatch__photo"');
+    expect(content).toContain('class="admin-dispatch__sender-group"');
+    expect(content).toContain('class="admin-dispatch__mission-header"');
+    expect(content).toContain('class="mb-3 pa-3 dispatch-mission-timeline"');
+    expect(content).toContain('class="admin-dispatch__followup mb-3"');
+    expect(css).toContain('--dispatch-incident-inset: .3rem;');
+    expect(css).toContain('.admin-dispatch__incident-panel .admin-dispatch__photo { margin: .05rem var(--dispatch-incident-inset) .15rem; }');
+    expect(css).toContain('.admin-dispatch__incident-panel .admin-dispatch__sender-group { margin: .4rem var(--dispatch-incident-inset) .2rem; }');
+    expect(css).toContain('gap: .5rem; padding: .45rem var(--dispatch-incident-inset) .65rem; line-height: 1.5;');
+    expect(css).toContain('#dispatch-incident-content > .admin-dispatch__mission-header,\n#dispatch-incident-content > .dispatch-mission-timeline,\n#dispatch-incident-content > .admin-dispatch__followup,');
+    expect(css).toContain('margin-inline: var(--dispatch-incident-inset);');
+    expect(css).toContain('.admin-dispatch__incident-panel .admin-dispatch__map-note { margin: .2rem var(--dispatch-incident-inset) .35rem; }');
+    expect(css).toContain('margin: .35rem var(--dispatch-incident-inset) 0; padding: .35rem .5rem;');
   });
 
   it("uses one rail surface without nested card elevation, borders or oversized desktop actions", () => {

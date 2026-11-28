@@ -52,7 +52,8 @@ describe("admin SOS triage flow", () => {
     expect(header).not.toContain('>روی نقشه</v-btn>');
     expect(header).toContain('class="admin-dispatch__priority-dot" :style="sosPriorityStyle(adminSos.selectedRequest.severity)"');
     expect(header).toContain('role="img" :aria-label="`اولویت: ${severityMeta(adminSos.selectedRequest.severity).label}`"');
-    expect(header).toContain('v-if="!incidentExpanded" id="dispatch-chip-14" class="admin-dispatch__incident-status"');
+    expect(header).toContain('<v-chip id="dispatch-chip-14" class="admin-dispatch__incident-status"');
+    expect(header).not.toContain('v-if="!incidentExpanded"');
     expect(header).toContain(':aria-label="statusMeta(adminSos.selectedRequest.status).label"');
     expect(header).toContain('{{ statusMeta(adminSos.selectedRequest.status).queueLabel }}');
     expect(header).not.toContain('severityMeta(adminSos.selectedRequest.severity).label }}</small>');
