@@ -33,17 +33,21 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
     expect(rail).toContain('admin-dispatch__section--hidden');
     expect(rail.indexOf('id="dispatch-notice-04"')).toBeLessThan(rail.indexOf('id="dispatch-queue-region"'));
     expect(rail.indexOf('id="dispatch-queue-region"')).toBeLessThan(rail.indexOf('id="dispatch-nearby"'));
-    expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(82dvh, 46rem); }');
+    expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(72dvh, 40rem); }');
     expect(css).toContain('#dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }');
     expect(css).toContain('width: 100%; height: 44px;');
     expect(css).toContain('cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__intro { display: none; }');
     expect(markup).toContain('<h1>مرکز پایش و اعزام اضطراری (SOS)</h1>'); // Desktop title remains.
-    expect(css).toContain('height: min(45dvh, 24rem);');
-    expect(css).toContain('inset: 0 0 min(45dvh, 24rem) 0;');
-    expect(shell).toContain('inset-block-end: calc(min(45dvh, 24rem) + 3.75rem');
+    expect(css).toContain('height: min(40dvh, 21rem);');
+    expect(css).toContain('inset: 0 0 min(40dvh, 21rem) 0;');
+    expect(shell).toContain('inset-block-end: calc(min(40dvh, 21rem) + 3.75rem');
     expect(shell).toContain('.app-shell--map:has(.admin-dispatch__sidebar--dragging) .sos-fab.sos-fab {');
     expect(shell).toContain('visibility: hidden; pointer-events: none;');
+    expect(css).toContain('order: 3; flex: none; padding: .25rem 0 .1rem; gap: .3rem;');
+    expect(css).toContain('border-top: 1px solid var(--bb-color-outline);\n    background: rgb(var(--v-theme-surface));');
+    expect(css).toContain('#dispatch-sidebar .admin-dispatch__content { order: 2; flex: 1 1 auto; overflow-y: auto; }');
+    expect(rail.indexOf('class="admin-dispatch__sheet-nav"')).toBeLessThan(rail.indexOf('id="dispatch-sidebar-content"')); // Logical keyboard order.
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__section--hidden { display: none; }');
     expect(css).toContain('#dispatch-sidebar .admin-dispatch__queue :deep(.v-card-title) { display: none; }');
     expect(css).toContain('max-height: none; overflow: visible;');
@@ -52,8 +56,9 @@ describe("dispatch sidebar across desktop, tablet and phone", () => {
   });
 
   it("reveals responder controls from an SOS choice or detail action, without bypassing dispatch validation", () => {
-    expect(source).toContain('if (compactDispatch.value) selectSheetTab("responders");');
-    expect(source).toContain('if (tab === "responders") sheetExpanded.value = true;');
+    expect(markup).toContain(`@click="selectSheetTab('responders')"`);
+    expect(source).toContain('if (compactDispatch.value) selectSheetTab("responders", true);');
+    expect(source).toContain('if (expand) sheetExpanded.value = true;');
     expect(source).toContain('if (!compactDispatch.value || !event.isPrimary || event.button !== 0 || sheetPointer) return;');
     expect(source).toContain('if (pointer.moved) {');
     expect(source).toContain('if (suppressSheetClick) return;');

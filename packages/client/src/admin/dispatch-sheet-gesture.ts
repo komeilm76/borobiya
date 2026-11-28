@@ -3,8 +3,8 @@
 // cause the handle to jump mid-drag.
 export function dispatchSheetBounds(viewportHeight: number, rootFontSize: number): { peek: number; expanded: number } {
   return {
-    peek: Math.min(viewportHeight * .45, rootFontSize * 24),
-    expanded: Math.min(viewportHeight * .82, rootFontSize * 46)
+    peek: Math.min(viewportHeight * .40, rootFontSize * 21),
+    expanded: Math.min(viewportHeight * .72, rootFontSize * 40)
   };
 }
 

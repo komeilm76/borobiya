@@ -620,10 +620,10 @@ a {
     inset-block-start: auto;
   }
   .app-shell--map:has(.admin-dispatch) .sos-fab.sos-fab {
-    inset-block-end: calc(min(45dvh, 24rem) + 3.75rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(min(40dvh, 21rem) + 3.75rem + env(safe-area-inset-bottom, 0px));
   }
   .app-shell--map:has(.admin-dispatch) .app-general-share {
-    inset-block-end: calc(min(45dvh, 24rem) + 7.25rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(min(40dvh, 21rem) + 7.25rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

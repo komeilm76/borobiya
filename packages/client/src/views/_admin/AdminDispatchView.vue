@@ -1227,9 +1227,11 @@ watch(compactDispatch, () => {
   sheetTab.value = "queue";
   sheetExpanded.value = false;
 });
-function selectSheetTab(tab: "queue" | "responders"): void {
+function selectSheetTab(tab: "queue" | "responders", expand = false): void {
   sheetTab.value = tab;
-  if (tab === "responders") sheetExpanded.value = true;
+  // Tab switching alone respects the operator's chosen sheet height. Opening
+  // a request or jumping to dispatch expands it so the controls stay usable.
+  if (expand) sheetExpanded.value = true;
   // Each worklist starts at its heading, not the previous tab's scroll offset.
   void nextTick(() => {
     const content = document.getElementById("dispatch-sidebar-content");
@@ -1826,7 +1828,7 @@ function quickRedispatch(requestId: string): void {
 }
 
 function focusReplacement(requestId: string): void {
-  if (compactDispatch.value) { selectSheetTab("queue"); sheetExpanded.value = true; }
+  if (compactDispatch.value) selectSheetTab("queue", true);
   adminSos.setFilterStatus("pending");
   const item = adminSos.requests.find((request) => request.id === requestId);
   if (item) focusRequest(item);
@@ -1843,7 +1845,7 @@ function toggleQueueRequest(item: SosRequestRecord): void {
     return;
   }
   focusRequest(item);
-  if (compactDispatch.value) selectSheetTab("responders");
+  if (compactDispatch.value) selectSheetTab("responders", true);
 }
 
 function focusRequest(item: SosRequestRecord): void {
@@ -1916,7 +1918,7 @@ function focusNearbyResponder(userId: string): void {
 function focusResponders(): void {
   if (!adminSos.selectedRequest) return;
   if (compactDispatch.value && (sheetTab.value !== "responders" || !sheetExpanded.value)) {
-    selectSheetTab("responders");
+    selectSheetTab("responders", true);
     void nextTick(focusResponders);
     return;
   }
@@ -3189,7 +3191,7 @@ onBeforeUnmount(() => {
 @media (max-width: 900px) {
   .admin-dispatch__sidebar {
     top: auto; left: 0; right: 0; bottom: 0; width: 100%;
-    height: min(45dvh, 24rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
+    height: min(40dvh, 21rem); padding: .7rem .8rem calc(.7rem + env(safe-area-inset-bottom, 0px));
     display: block; border-left: 0; border-top: 1px solid var(--bb-color-outline);
   }
   .admin-dispatch__queue, .admin-dispatch__nearby { display: block; min-height: 0; }
@@ -3197,7 +3199,7 @@ onBeforeUnmount(() => {
     display: flex; height: auto;
   }
   .admin-dispatch__map-and-actions > #dispatch-map {
-    inset: 0 0 min(45dvh, 24rem) 0; width: 100%; height: calc(100% - min(45dvh, 24rem));
+    inset: 0 0 min(40dvh, 21rem) 0; width: 100%; height: calc(100% - min(40dvh, 21rem));
   }
   .admin-dispatch__header { padding: 0; margin-bottom: .5rem !important; }
   .admin-dispatch__intro { display: none; }
@@ -3382,7 +3384,7 @@ onBeforeUnmount(() => {
     transition: height .24s ease;
   }
   #dispatch-sidebar.admin-dispatch__sidebar--dragging { transition: none; }
-  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(82dvh, 46rem); }
+  #dispatch-sidebar.admin-dispatch__sidebar--expanded { height: min(72dvh, 40rem); }
   #dispatch-sidebar .admin-dispatch__sheet-handle {
     display: grid; place-items: center; flex: none; width: 100%; height: 44px;
     padding: 0 0 18px; border: 0; border-radius: .75rem; background: transparent;
@@ -3407,7 +3409,11 @@ onBeforeUnmount(() => {
   #dispatch-sidebar .admin-dispatch__filter-select { width: 100%; }
   #dispatch-sidebar .admin-dispatch__sheet-nav {
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    flex: none; padding: .15rem 0 .4rem; gap: .3rem;
+    /* Keep DOM navigation before long lists for keyboard users, but dock it
+       visually below the independent scrollport in both sheet positions. */
+    order: 3; flex: none; padding: .25rem 0 .1rem; gap: .3rem;
+    border-top: 1px solid var(--bb-color-outline);
+    background: rgb(var(--v-theme-surface));
   }
   #dispatch-sidebar .admin-dispatch__sheet-nav button {
     display: flex; align-items: center; justify-content: center; gap: .35rem;
@@ -3425,7 +3431,7 @@ onBeforeUnmount(() => {
     padding-inline: .2rem; border-radius: 999px;
     background: rgba(var(--v-theme-primary), .12); font-size: .8rem;
   }
-  #dispatch-sidebar .admin-dispatch__content { flex: 1 1 auto; overflow-y: auto; }
+  #dispatch-sidebar .admin-dispatch__content { order: 2; flex: 1 1 auto; overflow-y: auto; }
   #dispatch-sidebar .admin-dispatch__section--hidden { display: none; }
   #dispatch-sidebar .admin-dispatch__queue,
   #dispatch-sidebar .admin-dispatch__nearby { flex: none; border-top: 1px solid var(--bb-color-outline); }
