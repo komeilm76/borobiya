@@ -547,14 +547,21 @@
         <div v-if="adminSos.selectedRequest" id="dispatch-incident-panel" class="admin-dispatch__incident-panel"
           :class="{ 'admin-dispatch__incident-panel--expanded': incidentExpanded }"
           @click.self="collapseSheetForIncident">
-          <button id="dispatch-incident-toggle" type="button" class="admin-dispatch__incident-toggle"
-            :aria-expanded="incidentExpanded" aria-controls="dispatch-incident-content"
-            @click="toggleIncidentPanel">
-            <v-icon icon="mdi-alert-circle-outline" color="error" size="22" aria-hidden="true" />
-            <span><strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
-              <small>{{ statusMeta(adminSos.selectedRequest.status).label }} · {{ severityMeta(adminSos.selectedRequest.severity).label }}</small></span>
-            <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
-          </button>
+          <div class="admin-dispatch__incident-header">
+            <button id="dispatch-incident-toggle" type="button" class="admin-dispatch__incident-toggle"
+              :aria-expanded="incidentExpanded" aria-controls="dispatch-incident-content"
+              @click="toggleIncidentPanel">
+              <v-icon icon="mdi-alert-circle-outline" color="error" size="22" aria-hidden="true" />
+              <span><strong>{{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}</strong>
+                <small>{{ statusMeta(adminSos.selectedRequest.status).label }} · {{ severityMeta(adminSos.selectedRequest.severity).label }}</small></span>
+              <v-icon :icon="incidentExpanded ? 'mdi-chevron-up' : 'mdi-chevron-down'" aria-hidden="true" />
+            </button>
+            <v-btn id="dispatch-action-21" class="admin-dispatch__incident-map" icon="mdi-map-marker-radius-outline"
+              color="primary" variant="tonal" aria-controls="dispatch-map"
+              :aria-label="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
+              :title="nearbyFeatures.features.length ? 'نمایش حادثه و امدادگران نزدیک روی نقشه' : 'نمایش محل حادثه روی نقشه'"
+              @click.stop="focusSelectedIncidentMap" />
+          </div>
           <div v-show="incidentExpanded" id="dispatch-incident-content">
         <v-card v-if="adminSos.selectedRequest" id="dispatch-incident" class="admin-dispatch__surface bb-map-navigation-card bb-surface-card" elevation="0" rounded="xl">
           <section v-if="adminSos.selectedRequest.photoUrl" class="admin-dispatch__photo" aria-label="تصویر پیوست حادثه">
@@ -663,9 +670,7 @@
             <p v-if="adminSos.selectedRequestProposals.length > 0" class="admin-dispatch__proposal-note">
               {{ adminSos.selectedRequestProposals.length.toLocaleString('fa-IR') }} پیشنهاد در این نشست ارسال شد؛ وضعیت پذیرش آن‌ها در این بخش تأیید نمی‌شود.
             </p>
-            <div class="admin-dispatch__next">
-              <v-btn id="dispatch-action-21" color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-map-marker-outline"
-                aria-label="نمایش حادثه روی نقشه" aria-controls="dispatch-map" @click="focusSelectedIncidentMap">روی نقشه</v-btn>
+            <div v-if="compactDispatch" class="admin-dispatch__next">
               <v-btn id="dispatch-action-22" color="primary" variant="flat" rounded="lg" prepend-icon="mdi-account-search-outline"
                 aria-label="انتخاب امدادگر و اعزام" aria-controls="dispatch-responders" @click="focusResponders">انتخاب و اعزام</v-btn>
             </div>
@@ -1926,14 +1931,21 @@ function frameSelectedIncident(): void {
 
 function focusSelectedIncidentMap(): void {
   if (!adminSos.selectedRequest) return;
+  // The compact information panel covers the map when open. Reveal the map
+  // before framing the incident and nearby responders, even from a tall sheet.
+  if (compactDispatch.value) {
+    collapseSheetForIncident();
+    incidentExpanded.value = false;
+    photoDialogOpen.value = false;
+    showLivePanel.value = false;
+  }
   frameSelectedIncident();
   const target = document.getElementById("dispatch-map");
   target?.scrollIntoView({
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
     block: "start"
   });
-  // Keep keyboard focus on the labelled map region after removing the
-  // redundant recenter buttons; do not strand it on the incident card.
+  // Place keyboard focus on the labelled map region, not on the header icon.
   document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });
 }
 
@@ -3142,12 +3154,14 @@ onBeforeUnmount(() => {
 .admin-dispatch__incident-panel .dispatch-mission-timeline :deep(.timeline) {
   border: 0; box-shadow: none; background: transparent;
 }
+.admin-dispatch__incident-header { display: flex; align-items: center; gap: .25rem; min-width: 0; padding-inline: .25rem; }
 .admin-dispatch__incident-toggle {
-  display: flex; align-items: center; gap: .5rem; width: 100%; min-height: 48px;
-  padding: .45rem .65rem; border: 0; border-radius: 1rem; cursor: pointer;
+  display: flex; flex: 1 1 auto; align-items: center; gap: .5rem; min-width: 0; min-height: 48px;
+  padding: .45rem .4rem; border: 0; border-radius: 1rem; cursor: pointer;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   text-align: start; font: inherit;
 }
+.admin-dispatch__incident-map { flex: none; width: 44px; min-width: 44px; height: 44px; border-radius: .85rem; }
 .admin-dispatch__incident-toggle > span { display: grid; flex: 1; min-width: 0; }
 .admin-dispatch__incident-toggle strong, .admin-dispatch__incident-toggle small { overflow-wrap: anywhere; }
 .admin-dispatch__incident-toggle small { font-size: .8rem; color: var(--bb-color-muted); }

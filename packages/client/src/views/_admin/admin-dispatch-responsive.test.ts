@@ -38,7 +38,10 @@ describe("fullscreen dispatch workspace (source-pinned; no Vue mount)", () => {
     expect(css).toContain('display: flex; flex-direction: column; overflow: hidden; pointer-events: auto;');
     expect(css).toContain('#dispatch-incident-content {\n  min-height: 0; overflow-y: auto; overscroll-behavior: contain;');
     expect(template).toContain('@click="toggleQueueRequest(item)"');
-    expect(template).toContain('aria-controls="dispatch-map" @click="focusSelectedIncidentMap"');
+    expect(template).toContain('class="admin-dispatch__incident-header"');
+    expect(template).toContain('aria-controls="dispatch-map"');
+    expect(template).toContain('@click.stop="focusSelectedIncidentMap"');
+    expect(template).toContain('<div v-if="compactDispatch" class="admin-dispatch__next">');
     expect(source).toContain('frameSelectedIncident();');
     expect(template).toContain('id="dispatch-map-legend"');
     expect(template).toContain('id="dispatch-map-choices"');

@@ -160,7 +160,9 @@ describe("dispatch pinned rail and uncluttered map", () => {
     expect(panel).toContain('border-radius: .75rem; background: var(--bb-color-inset);');
     expect(panel).toContain('min-height: 44px; height: 44px; padding-inline: .5rem;');
     expect(markup).toContain('aria-label="مشاهدهٔ پروفایل ارسال‌کننده"');
-    expect(markup).toContain('aria-label="نمایش حادثه روی نقشه"');
+    expect(markup).toContain('id="dispatch-action-21" class="admin-dispatch__incident-map"');
+    expect(markup).toContain('aria-controls="dispatch-map"');
+    expect(panel).toContain('.admin-dispatch__incident-map { flex: none; width: 44px; min-width: 44px; height: 44px;');
     expect(markup).toContain('aria-label="انتخاب امدادگر و اعزام"');
     expect(markup).toContain('aria-label="بازخوانی مأموریت‌ها"');
     expect(markup).toContain('aria-controls="dispatch-responders" @click="focusResponders"');

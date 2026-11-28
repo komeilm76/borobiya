@@ -24,7 +24,9 @@ describe("dispatch map controls across screen sizes", () => {
   });
 
   it("keeps SOS and the incident-details map action usable without an extra floating button", () => {
-    expect(markup).toContain('aria-controls="dispatch-map" @click="focusSelectedIncidentMap"');
+    expect(markup).toContain('class="admin-dispatch__incident-header"');
+    expect(markup).toContain('icon="mdi-map-marker-radius-outline"');
+    expect(markup).toContain('@click.stop="focusSelectedIncidentMap"');
     expect(markup).toContain('<MapCanvas id="dispatch-canvas-01" tabindex="-1"');
     expect(source).toContain('document.getElementById("dispatch-canvas-01")?.focus({ preventScroll: true });');
     expect(source).toContain('map.flyTo({ center: [incident.location.lon, incident.location.lat], offset: dispatchFocusOffset()');

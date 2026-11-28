@@ -36,12 +36,22 @@ describe("admin SOS triage flow", () => {
     expect(detail).toContain('adminSos.selectedRequest.location.isManual');
     expect(detail).toContain('adminSos.selectedRequest.location.accuracy !== undefined');
     expect(detail).toContain('adminSos.selectedRequest.photoUrl');
+    expect(detail).toContain('<div v-if="compactDispatch" class="admin-dispatch__next">');
     expect(detail).toContain('aria-controls="dispatch-responders" @click="focusResponders"');
-    expect(detail).toContain('aria-controls="dispatch-map" @click="focusSelectedIncidentMap"');
+    expect(detail).not.toContain('id="dispatch-action-21"');
     expect(detail).not.toContain('@click="requestDispatch"');
+    const header = template.slice(template.indexOf('class="admin-dispatch__incident-header"'), template.indexOf('id="dispatch-incident-content"'));
+    expect(header).toContain('id="dispatch-incident-toggle"');
+    expect(header).toContain('id="dispatch-action-21" class="admin-dispatch__incident-map" icon="mdi-map-marker-radius-outline"');
+    expect(header).toContain("'نمایش حادثه و امدادگران نزدیک روی نقشه'");
+    expect(header).toContain('aria-controls="dispatch-map"');
+    expect(header).toContain('@click.stop="focusSelectedIncidentMap"');
+    expect(header).not.toContain('>روی نقشه</v-btn>');
     // The map jump keeps the incident framed and hands off keyboard focus.
     const mapJump = source.slice(source.indexOf('function focusSelectedIncidentMap(): void {'),
       source.indexOf('function focusNearbyResponder(userId: string): void {'));
+    expect(mapJump).toContain('collapseSheetForIncident();');
+    expect(mapJump).toContain('incidentExpanded.value = false;');
     expect(mapJump).toContain('frameSelectedIncident();');
     expect(mapJump).toContain('document.getElementById("dispatch-map")');
     expect(mapJump).toContain('scrollIntoView({');
