@@ -289,13 +289,6 @@
               />
             </div>
           </v-card-title>
-          <div v-if="adminSos.selectedRequest.photoUrl && photoSrc" class="admin-dispatch__responder-evidence">
-            <span><v-icon icon="mdi-image-outline" size="18" aria-hidden="true" /> تصویر پیوست این حادثه در دسترس است</span>
-            <v-btn id="dispatch-action-29" size="small" variant="tonal" color="primary"
-              :loading="photoOpenLoading" :disabled="photoOpenLoading"
-              aria-label="بررسی تصویر پیوست حادثه در اندازهٔ بزرگ" @click="openPhoto">بررسی تصویر</v-btn>
-          </div>
-          <p v-if="photoOpenError && compactDispatch && sheetTab === 'responders'" role="alert" class="admin-dispatch__photo-error admin-dispatch__photo-error--responder">{{ photoOpenError }}</p>
           <form id="dispatch-form-01" class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
             <v-text-field id="dispatch-field-01" v-model="responderSearchInput" label="نام کاربری امدادگر"
               placeholder="حداقل ۲ حرف از نام کاربری"
@@ -590,7 +583,7 @@
               <v-btn id="dispatch-action-20" v-if="!photoLoading && auth.accessToken" size="small" variant="tonal"
                 color="primary" @click="photoRetryNonce++">تلاش دوباره</v-btn>
             </div>
-            <p v-if="photoOpenError && (!compactDispatch || sheetTab !== 'responders')" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
+            <p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">{{ photoOpenError }}</p>
           </section>
           <v-card-title class="admin-dispatch__detail-heading">
             <div class="admin-dispatch__detail-title">
@@ -3398,18 +3391,6 @@ onBeforeUnmount(() => {
   min-height: 24px; padding-inline: .4rem; }
 #dispatch-sidebar .dispatch-responder-row__meta { gap: .2rem .55rem; line-height: 1.4; }
 #dispatch-sidebar .dispatch-responder-row__map { min-width: 44px; min-height: 44px; }
-#dispatch-sidebar .admin-dispatch__responder-evidence {
-  display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between;
-  gap: .35rem; margin: .1rem .35rem .3rem; padding: .4rem .5rem;
-  border-radius: .7rem; background: rgba(var(--v-theme-primary), .08);
-  color: var(--bb-color-primary); font-size: .8rem; font-weight: 700;
-}
-#dispatch-sidebar .admin-dispatch__responder-evidence > span { display: inline-flex; align-items: center; gap: .3rem; }
-#dispatch-sidebar .admin-dispatch__responder-evidence :deep(.v-btn) { min-height: 38px; }
-#dispatch-sidebar .admin-dispatch__photo-error--responder { margin: .2rem .5rem; }
-@media (max-width: 900px) {
-  #dispatch-sidebar .admin-dispatch__responder-evidence :deep(.v-btn) { min-height: 44px; }
-}
 @media (forced-colors: active) {
   #dispatch-sidebar .dispatch-request-row.v-list-item--active,
   #dispatch-sidebar .dispatch-responder-row--selected { outline: 2px solid Highlight; outline-offset: -2px; }

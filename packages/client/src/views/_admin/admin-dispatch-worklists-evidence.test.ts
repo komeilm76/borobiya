@@ -38,19 +38,21 @@ describe("dispatch worklists and incident evidence", () => {
     expect(css).toContain('#dispatch-sidebar .dispatch-request-row.v-list-item--active {\n  border-color: var(--bb-color-primary);');
   });
 
-  it("makes multi-selection visible and lets phone operators review the image from the responder step", () => {
+  it("keeps multi-selection visible without duplicating incident photo controls in the responder list", () => {
     const responders = markup.slice(markup.indexOf('id="dispatch-responders" tabindex="-1"'),
       markup.indexOf('</section>', markup.indexOf('id="dispatch-responders" tabindex="-1"')));
-    expect(responders).toContain('class="admin-dispatch__responder-evidence"');
-    expect(responders).toContain('id="dispatch-action-29"');
-    expect(responders).toContain('photoOpenError && compactDispatch && sheetTab === \'responders\'');
+    expect(responders).not.toContain('admin-dispatch__responder-evidence');
+    expect(responders).not.toContain('تصویر پیوست این حادثه در دسترس است');
+    expect(responders).not.toContain('photoOpenError');
+    expect(markup).toContain('<p v-if="photoOpenError" class="admin-dispatch__photo-error" role="alert">');
+    expect(css).not.toContain('.admin-dispatch__responder-evidence');
     expect(responders).toContain('class="dispatch-responder-row__selection" aria-hidden="true"');
     expect(responders).toContain('adminSos.selectedResponderIds.includes(responder.userId) ? \'mdi-check\' : \'mdi-plus\'');
     expect(responders).toContain('@click="adminSos.toggleResponderSelection(responder.userId)"');
     expect(responders).toContain('class="dispatch-responder-row__map"');
     expect(css).toContain('#dispatch-sidebar .dispatch-responder-row__select { min-height: 68px;');
     expect(css).toContain('#dispatch-sidebar .dispatch-responder-row--selected .dispatch-responder-row__selection {');
-    expect(css).toContain('#dispatch-sidebar .admin-dispatch__responder-evidence :deep(.v-btn) { min-height: 44px; }');
+    expect(markup).toContain('id="dispatch-button-03" v-if="photoSrc" type="button" class="admin-dispatch__photo-open"');
     expect(compileTemplate({ filename: "AdminDispatchView.vue", id: "evidence", source: markup }).errors).toEqual([]);
     expect(compileStyle({ filename: "AdminDispatchView.vue", id: "evidence", scoped: true, source: css }).errors).toEqual([]);
   });
